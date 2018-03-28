@@ -22,8 +22,20 @@ transfer_layer:
         avoid_download : True
 #        avoid_download : False
 
-       
+  - name     : Serial
+    type     : Serial
+    init     :
+        port     : COM13
+        read_termination : "\r"
+        baudrate : 19200
+
 hw_drivers:
+  - name      : SMU
+    type      : scpi
+    interface : Serial
+    init      :
+        device : Keithley 2410
+
   - name      : GPAC
     type      : GPAC
     interface : USB

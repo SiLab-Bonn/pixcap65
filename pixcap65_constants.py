@@ -1,0 +1,16 @@
+COL_NMAX = 39 
+PIX_NMAX = 40
+
+EN_CLK_0 = 1
+EN_CLK_1 = 2
+EN_CLK_2 = 4
+EN_CLK_3 = 8
+
+EN_BIAS_0 = 0
+EN_BIAS_1 = 1
+EN_BIAS_2 = 2
+EN_BIAS_3 = 3
+
+EN_EOC_1 = 1
+EN_EOC_2 = 2
+EN_EOC_3 = 4
