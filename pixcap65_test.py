@@ -6,7 +6,7 @@ Script for small tests
 #import itertools
 #import operator
 #import time
-import thread
+import _thread
 import yaml
 
 from pixcap65 import pixcap65
@@ -17,7 +17,7 @@ import matplotlib.pyplot as plt
 import numpy as np
 import pylab as pl
 
-import SiLibUSB    
+
 import time
 from bitarray import bitarray
 import logging
@@ -32,10 +32,12 @@ seq_size  = 4 # granularity of the clock sequencer
 
 dut['SMU'].off()
 dut['SMU'].source_volt()
-dut['SMU']._intf.write('SOUR:VOLT:RANGE 2.2')
-dut['SMU']._intf.write('SENS:CURR:NPLC 10')
-dut['SMU'].set_voltage(1.2)
-dut['SMU'].set_current_limit(0.0001)
+dut['SMU'].set_voltage_range(1.5)
+dut['SMU'].set_current_nlpc(10)
+dut['SMU'].set_voltage(1.0)
+dut['SMU'].set_current_limit(0.001)
+dut['SMU'].set_current_sense_range(0.000001)
+
 
 dut['SEQ'].reset()
 dut['SEQ'].set_clk_divide(1)
@@ -52,55 +54,60 @@ dut['SEQ'].start()
 
 dut['SMU'].on()
 time.sleep(1)
-dut['SMU'].get_current()
-
-# time.sleep(2)
-# full_string = dut['SMU'].get_current()
-# print 'Voltage:' +  full_string.split(',')[0]
-# print 'Current: ' + full_string.split(',')[1]
+dut['SMU'].get_reading()
 
 
-freq_sweep_array = np.arange(1, 10, 1)#.astype(np.float) # [MHz]
+row_start =  0
+row_stop  =  0
+col_start =  5
+col_stop  =  9
 
-#freq_sweep_array = [1.0, 2.0, 5.0, 10.0, 20.0]
+row_range = range(row_stop, row_start-1,-1)
+col_range = range(col_start, col_stop+1)
 
 
-for i_col in range(17, 18):
-    current_array = []
+freq_sweep_array = np.arange(1, 4.1, 1)#.astype(np.float) # [MHz]
+table_first_row = ["row\col"]
+table_first_row.extend(col_range)
+table_row = []
+
+
+data_file = open("D:/Users/Hans/work/RD53/PixCap65/Measurements/pixcap_full_data_image1.txt", "w")
+#data_file.write(','.join(map(str,table_first_row))+'\n')
+
+for i_row in row_range:
+    table_row=[]
+    for i_col in col_range:
+        current_array = []
+        dut.disable_all_pixels()
+        dut.disable_all_columns()
+        dut.enable_column(i_col, c.EN_EOC_3)
+        dut.enable_pixel_clk(i_col, i_row, c.EN_CLK_0 | c.EN_CLK_3)
+        
+        for freq in freq_sweep_array:
+            temp = freq * seq_size
+            dut['MIO_PLL'].setFrequency(temp)
+            #time.sleep(1)
+            result = dut['SMU'].get_reading()
+            current_array.append(float(result.split(',')[1]))
+        
+        pl.plot(freq_sweep_array, current_array, label = "COL["+ str(i_col) + ']ROW[' + str(i_row) + ']')
+        a,b = np.polyfit(freq_sweep_array, current_array, 1) 
+        print(i_col, i_row, a)
+        table_row.append(a)
+        fit_fn = a*freq_sweep_array + b
+        pl.plot(freq_sweep_array, current_array, 'o', label = 'COL({i_col})PIX(0)'.format(i_col=i_col))
+        pl.plot(freq_sweep_array, fit_fn, label = 'a={a:.3E}, b={b:.3E}'.format(a=a, b=b))
     
-    COL_DUT = i_col
-    PIX_DUT = 0
-    dut.disbale_all_pixels()
-    dut.disable_all_columns()
-    dut.enable_column(COL_DUT, c.EN_EOC_3)
-    dut.enable_pixel_clk(COL_DUT, PIX_DUT, c.EN_CLK_0 | c.EN_CLK_3)
+    print(','.join(map(str, table_row)))
+    data_file.write( ','.join(map(str, table_row)) + '\n')    
     
-    for freq in freq_sweep_array:
-        temp = freq * seq_size
-        dut['MIO_PLL'].setFrequency(temp)
-        #time.sleep(1)
-        result = dut['SMU'].get_current()
-        current_array.append(float(result.split(',')[1]))
-    
-#    pl.plot(freq_sweep_array, current_array, c = colors[color_index] , label = "COL["+ str(COL_DUT) + ']PIX[' + str(PIX_DUT) + ']') 
-#    pl.plot(freq_sweep_array, current_array, label = "COL["+ str(COL_DUT) + ']PIX[' + str(PIX_DUT) + ']')
-    a,b = np.polyfit(freq_sweep_array, current_array, 1) 
-    print  a 
-    fit_fn = a*freq_sweep_array + b
-    pl.plot(freq_sweep_array, current_array, 'o', label = 'COL({i_col})PIX(0)'.format(i_col=i_col))
-    pl.plot(freq_sweep_array, fit_fn, label = 'a={a:.3E}, b={b:.3E}'.format(a=a, b=b))
-    
-
-
+data_file.close()
+dut['SMU'].off()
 pl.legend(loc='best')
-#ylim(0,2)
 pl.xlabel('Freq [MHz]')
 pl.ylabel('I [A]')
 pl.show()
- 
-
-
-dut['SMU'].off()
 dut.close()
 
 

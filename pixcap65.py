@@ -9,13 +9,8 @@
 #  $Date:: 2015-01-04 10:56:36 #$:
 #
 
-import time
-
 from basil.dut import Dut
-
-
 from pylab import *
-
 import matplotlib.pyplot as plt
 import numpy as np
 
@@ -47,9 +42,9 @@ class pixcap65(Dut):
 			self['VDD'].set_enable(pwr_en)
 
 			time.sleep(0.1)
-			print ''
-			print 'VDD:\t', format(self['VDD'].get_voltage(unit='V'), '.3f'), 'V\t', format(self['VDD'].get_current(), '.3f'), 'mA'
-			print ''
+			print('')
+			print('VDD:\t', format(self['VDD'].get_voltage(unit='V'), '.3f'), 'V\t', format(self['VDD'].get_current(), '.3f'), 'mA')
+			print('')
 		else:
 			self['VDD'].set_enable(pwr_en)
 		return
@@ -75,9 +70,9 @@ class pixcap65(Dut):
 		self.update_spi()
 		return
 	
-	def disbale_all_pixels(self):
-		for i_col in range(0, c.COL_NMAX):
-			for i_pix in range(0, c.PIX_NMAX):
+	def disable_all_pixels(self):
+		for i_col in range(0, c.COL_NMAX+1):
+			for i_pix in range(0, c.PIX_NMAX+1):
 				self['SPI']['COL'][c.COL_NMAX - i_col]['PIX'][c.PIX_NMAX - i_pix]['CLK_EN'] = 0
 				self['SPI']['COL'][c.COL_NMAX - i_col]['PIX'][c.PIX_NMAX - i_pix]['SEL'] = 0
 		self.update_spi()		
@@ -89,7 +84,7 @@ class pixcap65(Dut):
 		return
 	
 	def disable_all_columns(self):
-		for i_col in range(0, c.COL_NMAX):
+		for i_col in range(0, c.COL_NMAX+1):
 			self['SPI']['COL'][c.COL_NMAX - i_col]['EOC'] = 0
 		self.update_spi()		
 		return

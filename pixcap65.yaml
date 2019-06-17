@@ -18,14 +18,14 @@ transfer_layer:
     type  : SiUsb
     board_id : 201
     init  :
-        bit_file : "../device/ise/pixcap65.bit"
+        bit_file : "device/ise/pixcap65.bit"
         avoid_download : True
 #        avoid_download : False
 
   - name     : Serial
     type     : Serial
     init     :
-        port     : COM13
+        port     : COM3
         read_termination : "\r"
         baudrate : 19200
 
