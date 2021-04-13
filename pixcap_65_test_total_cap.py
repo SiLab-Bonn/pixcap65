@@ -1,5 +1,12 @@
 """
-Script for small tests
+The latest version of the Pixcap65 test script for measuring the total pixel capacitance.
+
+Changes compared to original script:
+- Remote control of depletion voltage source
+- Reading some current values before actual measurement to avoid incorrect currents due to initial oscillation effects of SMU
+- Vary the order of column/row routing and switching frequency using the reversed arrays (uncomment corresponding lines in code)
+- Fit also returns covariance matrix in order to extract the errors of the fit parameters if needed
+- Output in txt file also includes offset (y-intercept) next to the slope
 """
 
 #import array
