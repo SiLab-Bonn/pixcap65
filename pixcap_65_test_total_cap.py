@@ -94,13 +94,13 @@ class PixCap65TotalCap(object):
         # self.dut['SMU1'].set_current_limit(0.001)
         # self.dut['SMU1'].set_current_sense_range(0.00001)
 
-        self.dut['SMU3'].off()
-        self.dut['SMU3'].source_volt()
-        self.dut['SMU3'].set_voltage_range(1.5)
-        self.dut['SMU3'].set_current_nlpc(10)
-        self.dut['SMU3'].set_voltage(self.scan_config['Vin'])
-        self.dut['SMU3'].set_current_limit(0.001)
-        self.dut['SMU3'].set_current_sense_range(0.00001)
+        self.dut['SMU'].off()
+        self.dut['SMU'].source_volt()
+        self.dut['SMU'].set_voltage_range(1.5)
+        self.dut['SMU'].set_current_nlpc(10)
+        self.dut['SMU'].set_voltage(self.scan_config['Vin'])
+        self.dut['SMU'].set_current_limit(0.001)
+        self.dut['SMU'].set_current_sense_range(0.00001)
 
         self.dut['SEQ'].reset()
         self.dut['SEQ'].set_clk_divide(1)
@@ -114,17 +114,17 @@ class PixCap65TotalCap(object):
         self.dut['SEQ'].write()
         self.dut['SEQ'].start()
 
-        self.dut['SMU3'].on()
+        self.dut['SMU'].on()
 
         # measure some current values; avoid measuring incorrect currents due to initial oscillation effects of SMU
         logging.debug('Waiting for settling of SMU...')
         for i in range(0, 30):
-            c3 = self.dut['SMU3'].get_current()
+            c3 = self.dut['SMU'].get_current()
             current = float(c3.split(',')[1])
             logging.debug('Current: %.3e' % current)
             time.sleep(1)
 
-        self.dut['SMU3'].get_current()
+        self.dut['SMU'].get_current()
 
     def scan(self):
         row_range = range(self.scan_config['start_row'], self.scan_config['stop_row'])
@@ -144,7 +144,7 @@ class PixCap65TotalCap(object):
                     freq_conv = freq * self.seq_size
                     self.dut['MIO_PLL'].setFrequency(freq_conv)
                     time.sleep(1)
-                    result = self.dut['SMU3'].get_current()
+                    result = self.dut['SMU'].get_current()
                     current = float(result.split(',')[1])
                     self.hist_current[i_col, i_row, k] = current
                     store_scan_par_values(scan_parameters=self.scan_parameters, scan_param_id=k, frequency=freq)
@@ -163,7 +163,7 @@ class PixCap65TotalCap(object):
 
     def close(self):
         self.out_file_h5.close()
-        self.dut['SMU3'].off()
+        self.dut['SMU'].off()
         self.dut.close()
 
 
