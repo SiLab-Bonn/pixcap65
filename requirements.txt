@@ -1,0 +1,14 @@
+numpy>=2.3
+matplotlib
+tables
+pyyaml
+# basil_daq@git+https://github.com/SiLab-Bonn/basil.git
+# this approach is working but it requires it to be present
+-e ../basil
+bitarray
+coloredlogs
+
+# my own additives out of habit mostly
+iminuit
+kafe2
+scipy
