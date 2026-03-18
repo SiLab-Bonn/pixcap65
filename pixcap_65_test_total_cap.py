@@ -81,6 +81,8 @@ class PixCap65TotalCap(object):
         self.scan_parameters = OrderedDict()
 
         self.hist_current = np.full(shape=(40, 40, len(scan_config['frequency_range'])), fill_value=np.nan)  # current value for each measured frequency per pixel
+        self.hist_individual_currents = np.full(shape=(40, 40, len(scan_config['frequency_range'])), fill_value=np.nan)
+        self.hist_current_errors = np.full(shape=(40, 40, len(scan_config['frequency_range'])), fill_value=np.nan)
 
     def configure(self):
         self.seq_size = 4  # granularity of the clock sequencer
@@ -131,23 +133,55 @@ class PixCap65TotalCap(object):
         col_range = range(self.scan_config['start_column'], self.scan_config['stop_column'])
         frequency_range = self.scan_config['frequency_range']
 
-        for i_row in row_range:
-            for i_col in col_range:
-                logging.info('Measuring pixel (%i, %i)...' % (i_col, i_row))
-                self.dut.disable_all_pixels()
-                self.dut.disable_all_columns()
+        # Addition by Dominik to perform also a down sweep in frequency
+        if "double_sweep" in self.scan_config and self.scan_config["double_sweep"]:
+            frequency_range = np.concatenate((frequency_range, np.flip(frequency_range)))
+        enumerate_freq_range = enumerate(frequency_range)
 
-                self.dut.enable_column(i_col, c.EN_EOC_3)
-                self.dut.enable_pixel_clk(i_col, i_row, c.EN_CLK_0 | c.EN_CLK_3)
+        if "average_measurements" in self.scan_config and self.scan_config["average_measurements"] > 1:
+            n_measurements = self.scan_config["average_measurements"]
+            hist_individual_currents = np.full(shape=(40, 40, len(frequency_range), n_measurements), fill_value=np.nan)
+            for i_row in row_range:
+                for i_col in col_range:
+                    logging.info('Measuring pixel (%i, %i)...' % (i_col, i_row))
+                    self.dut.disable_all_pixels()
+                    self.dut.disable_all_columns()
 
-                for k, freq in enumerate(frequency_range):
-                    freq_conv = freq * self.seq_size
-                    self.dut['MIO_PLL'].setFrequency(freq_conv)
-                    time.sleep(1)
-                    result = self.dut['SMU'].get_current()
-                    current = float(result.split(',')[1])
-                    self.hist_current[i_col, i_row, k] = current
-                    store_scan_par_values(scan_parameters=self.scan_parameters, scan_param_id=k, frequency=freq)
+                    self.dut.enable_column(i_col, c.EN_EOC_3)
+                    self.dut.enable_pixel_clk(i_col, i_row, c.EN_CLK_0 | c.EN_CLK_3)
+
+                    for k, freq in enumerate_freq_range:
+                        freq_conv = freq * self.seq_size
+                        self.dut['MIO_PLL'].setFrequency(freq_conv)
+                        time.sleep(1)
+                        for m in range(n_measurements):
+                            result = self.dut['SMU'].get_current()
+                            current = float(result.split(',')[1])
+                            hist_individual_currents[i_col, i_row, k, m] = current
+                            time.sleep(1e-6)
+
+                        store_scan_par_values(scan_parameters=self.scan_parameters, scan_param_id=k, frequency=freq)
+            average_currents = np.nanmean(hist_individual_currents, axis=3, keepdims=True)
+            self.hist_current = average_currents[:, :, :, 0]
+            self.hist_current_errors = np.nanstd(hist_individual_currents, axis=3, mean=average_currents)
+        else:
+            for i_row in row_range:
+                for i_col in col_range:
+                    logging.info('Measuring pixel (%i, %i)...' % (i_col, i_row))
+                    self.dut.disable_all_pixels()
+                    self.dut.disable_all_columns()
+
+                    self.dut.enable_column(i_col, c.EN_EOC_3)
+                    self.dut.enable_pixel_clk(i_col, i_row, c.EN_CLK_0 | c.EN_CLK_3)
+
+                    for k, freq in enumerate_freq_range:
+                        freq_conv = freq * self.seq_size
+                        self.dut['MIO_PLL'].setFrequency(freq_conv)
+                        time.sleep(1)
+                        result = self.dut['SMU'].get_current()
+                        current = float(result.split(',')[1])
+                        self.hist_current[i_col, i_row, k] = current
+                        store_scan_par_values(scan_parameters=self.scan_parameters, scan_param_id=k, frequency=freq)
 
         # Save raw data
         _store_scan_par_values(h5_file=self.out_file_h5, scan_parameters=self.scan_parameters)
@@ -158,6 +192,19 @@ class PixCap65TotalCap(object):
                                        filters=tb.Filters(complib='blosc',
                                                           complevel=5,
                                                           fletcher32=False))
+        self.out_file_h5.create_carray(self.out_file_h5.root,
+                                       name='HistCurrErr',
+                                       title='Current Error Histogram',
+                                       obj=self.hist_current_errors,
+                                       )
+
+        # need the additional entries for the advanced averaging implementation
+        if "average_measurements" in self.scan_config and self.scan_config["average_measurements"] > 1:
+            self.out_file_h5.create_carray(self.out_file_h5.root,
+                                          name='HistCurrValues',
+                                          title='Multiple Current Histogram',
+                                          obj=hist_individual_currents,
+                                          )
 
         logging.info('Done')
 
@@ -165,6 +212,15 @@ class PixCap65TotalCap(object):
         self.out_file_h5.close()
         self.dut['SMU'].off()
         self.dut.close()
+
+    def __enter__(self):
+        self.configure()
+        return self
+
+    def __exit__(self, exc_type, exc_value, traceback):
+        self.close()
+        return False
+
 
 
 if __name__ == '__main__':
