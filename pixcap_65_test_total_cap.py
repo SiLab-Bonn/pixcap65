@@ -9,21 +9,19 @@ Changes compared to original script:
 - Output in txt file also includes offset (y-intercept) next to the slope
 """
 
-import tables as tb
+import logging
+import time
 from collections import OrderedDict
 
-from pixcap65 import pixcap65
+import numpy as np
+import tables as tb
+from bitarray import bitarray
+
 import pixcap65_constants as c
 from analysis import analyze_data
-from plotting import plot_data
-from basil.dut import Dut
 from configs.config_handler import extract_smu_current_error
-
-import numpy as np
-
-import time
-from bitarray import bitarray
-import logging
+from pixcap65 import pixcap65
+from plotting import plot_data
 
 logging.getLogger().setLevel(logging.INFO)
 
@@ -96,6 +94,9 @@ class PixCap65TotalCap(object):
             import yaml
             self.smu_range_config = yaml.safe_load(f)
         self.hist_current_errors = np.full(shape=(40, 40, self.n_frequencies), fill_value=np.nan)
+        self.scan_indices = np.ndindex((40, 40))
+        # depending on the scan configuration it should be possible to swap the indices.
+        # TODO: implement this
 
     def configure(self):
         self.seq_size = 4  # granularity of the clock sequencer
@@ -109,13 +110,7 @@ class PixCap65TotalCap(object):
         # self.dut['SMU1'].set_current_limit(0.001)
         # self.dut['SMU1'].set_current_sense_range(0.00001)
 
-        self.dut['SMU'].off()
-        self.dut['SMU'].source_volt()
-        self.dut['SMU'].set_voltage_range(1.5)
-        self.dut['SMU'].set_current_nlpc(10)
-        self.dut['SMU'].set_voltage(self.scan_config['Vin'])
-        self.dut['SMU'].set_current_limit(0.001)
-        self.dut['SMU'].set_current_sense_range(self.current_sense_range)
+        self.init_smu()
 
         self.dut['SEQ'].reset()
         self.dut['SEQ'].set_clk_divide(1)
@@ -129,17 +124,18 @@ class PixCap65TotalCap(object):
         self.dut['SEQ'].write()
         self.dut['SEQ'].start()
 
-        self.dut['SMU'].on()
+        self.dut['SMU'].on(**self.smu_kwargs)
 
         # measure some current values; avoid measuring incorrect currents due to initial oscillation effects of SMU
         logging.debug('Waiting for settling of SMU...')
         for i in range(0, 30):
-            c3 = self.dut['SMU'].get_current()
-            current = float(c3.split(',')[1])
+            current = self.get_source_current()
             logging.debug('Current: %.3e' % current)
             time.sleep(1)
 
-        self.dut['SMU'].get_current()
+        # changed to simplify changes in the used SMU
+        # self.dut['SMU'].get_current()
+        self.get_source_current()
 
     def scan(self):
         # select the group to write the analysis results to
@@ -157,7 +153,9 @@ class PixCap65TotalCap(object):
 
         if "average_measurements" in self.scan_config and self.scan_config["average_measurements"] > 1:
             n_measurements = self.scan_config["average_measurements"]
-            hist_individual_currents = np.full(shape=(40, 40, self.n_frequencies, n_measurements), fill_value=np.nan)
+            individual_currents_shape = (40, 40, self.n_frequencies, n_measurements)
+            if self.hist_individual_currents.shape != individual_currents_shape:
+                self.hist_individual_currents = np.full(shape=(40, 40, self.n_frequencies, n_measurements), fill_value=np.nan)
             for i_row in row_range:
                 for i_col in col_range:
                     logging.info('Measuring pixel (%i, %i)...' % (i_col, i_row))
@@ -171,16 +169,12 @@ class PixCap65TotalCap(object):
                         freq_conv = freq * self.seq_size
                         self.dut['MIO_PLL'].setFrequency(freq_conv)
                         time.sleep(1)
-                        for m in range(n_measurements):
-                            result = self.dut['SMU'].get_current()
-                            current = float(result.split(',')[1])
-                            hist_individual_currents[i_col, i_row, k, m] = current
-                            time.sleep(1e-6)
-
+                        self.hist_individual_currents[i_col, i_row, k] = self.get_source_current_multiple(n_measurements)[:]
                         store_scan_par_values(scan_parameters=self.scan_parameters, scan_param_id=k, frequency=freq)
-            average_currents = np.nanmean(hist_individual_currents, axis=3, keepdims=True)
+
+            average_currents = np.nanmean(self.hist_individual_currents, axis=3, keepdims=True)
             self.hist_current = average_currents[:, :, :, 0]
-            self.hist_current_errors = np.nanstd(hist_individual_currents, axis=3, mean=average_currents)
+            self.hist_current_errors = np.nanstd(self.hist_individual_currents, axis=3, mean=average_currents)
         else:
             for i_row in row_range:
                 for i_col in col_range:
@@ -195,9 +189,7 @@ class PixCap65TotalCap(object):
                         freq_conv = freq * self.seq_size
                         self.dut['MIO_PLL'].setFrequency(freq_conv)
                         time.sleep(1)
-                        result = self.dut['SMU'].get_current()
-                        current = float(result.split(',')[1])
-                        self.hist_current[i_col, i_row, k] = current
+                        self.hist_current[i_col, i_row, k] = self.get_source_current()
                         store_scan_par_values(scan_parameters=self.scan_parameters, scan_param_id=k, frequency=freq)
 
         # Save raw data
@@ -215,10 +207,10 @@ class PixCap65TotalCap(object):
             self.out_file_h5.create_carray(data_group,
                                            name='HistCurrValues',
                                            title='Multiple Current Histogram',
-                                           obj=hist_individual_currents,
+                                           obj=self.hist_individual_currents,
                                            )
         else:
-            self.hist_current_errors = extract_smu_current_error(self.smu_range_config, self.hist_current)
+            self.hist_current_errors = extract_smu_current_error(self.smu_range_config, self.hist_current, self.current_sense_range)
 
         self.out_file_h5.create_carray(data_group,
                                        name='HistCurrErr',
@@ -243,6 +235,38 @@ class PixCap65TotalCap(object):
     def __exit__(self, exc_type, exc_value, traceback):
         self.close()
         return False
+
+
+    # Handle the SMU!
+    def get_source_current(self) -> float:
+        result = self.dut['SMU'].get_current(**self.smu_kwargs)
+        current = float(result.split(',')[1])
+        return current
+
+    def set_bias_voltage(self, voltage: float):
+        self.dut['SMU'].set_voltage(voltage, channel=2)
+        time.sleep(1)
+
+    def init_smu(self, voltage_range=1.5, current_limit=0.001, plc=10):
+        self.dut['SMU'].off(**self.smu_kwargs)
+        self.dut['SMU'].source_volt(**self.smu_kwargs)
+        self.dut['SMU'].set_voltage_range(voltage_range, **self.smu_kwargs)
+        self.dut['SMU'].set_current_nlpc(plc, **self.smu_kwargs)
+        self.dut['SMU'].set_voltage(self.scan_config['Vin'], **self.smu_kwargs)
+        self.dut['SMU'].set_current_limit(current_limit, **self.smu_kwargs)
+        self.dut['SMU'].set_current_sense_range(self.current_sense_range, **self.smu_kwargs)
+
+    def get_source_current_multiple(self, n: int):
+        def measurement_step():
+            current = self.get_source_current()
+            time.sleep(1e-6)
+            return current
+
+        return np.array([measurement_step() for _ in range(n)])
+
+    @property
+    def smu_kwargs(self):
+        return {"channel": 1}
 
 
 if __name__ == '__main__':
