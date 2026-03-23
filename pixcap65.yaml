@@ -25,16 +25,23 @@ transfer_layer:
   - name     : Serial
     type     : Serial
     init     :
-        port     : COM3
-        read_termination : "\r"
+        port     : "/dev/ttyUSB0"
+        # for 2410 we need
+        # read_termination : "\r"
+        read_termination : "\n"
         baudrate : 19200
+        # only necessary when 2602a is used as SMU
+        parity   : "E"
+        bytesize : 8
+
+
 
 hw_drivers:
   - name      : SMU
     type      : scpi
     interface : Serial
     init      :
-        device : Keithley 2410
+        device : Keithley 2602a
 
   - name      : GPAC
     type      : GPAC
