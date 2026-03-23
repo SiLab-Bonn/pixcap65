@@ -89,6 +89,9 @@ def advanced_analysis(raw_data):
             resistor_hist[ii, jj] = resistor
             resistor_error_hist[ii, jj] = resistor_error
 
+        import serial
+        serial.EIGHTBITS
+
         # Store capacitance values
         in_file_h5.create_carray(group,
                                  name='HistCap',
