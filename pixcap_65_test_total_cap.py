@@ -17,6 +17,7 @@ import pixcap65_constants as c
 from analysis import analyze_data
 from plotting import plot_data
 from basil.dut import Dut
+from configs.config_handler import extract_smu_current_error
 
 import numpy as np
 
@@ -89,6 +90,11 @@ class PixCap65TotalCap(object):
         self.hist_current = np.full(shape=(40, 40, self.n_frequencies),
                                     fill_value=np.nan)  # current value for each measured frequency per pixel
         self.hist_individual_currents = np.full(shape=(40, 40, self.n_frequencies), fill_value=np.nan)
+
+        self.current_sense_range = 0.00001
+        with open("configs/2410_Range.yaml", "r") as f:
+            import yaml
+            self.smu_range_config = yaml.safe_load(f)
         self.hist_current_errors = np.full(shape=(40, 40, self.n_frequencies), fill_value=np.nan)
 
     def configure(self):
@@ -109,7 +115,7 @@ class PixCap65TotalCap(object):
         self.dut['SMU'].set_current_nlpc(10)
         self.dut['SMU'].set_voltage(self.scan_config['Vin'])
         self.dut['SMU'].set_current_limit(0.001)
-        self.dut['SMU'].set_current_sense_range(0.00001)
+        self.dut['SMU'].set_current_sense_range(self.current_sense_range)
 
         self.dut['SEQ'].reset()
         self.dut['SEQ'].set_clk_divide(1)
@@ -203,11 +209,6 @@ class PixCap65TotalCap(object):
                                        filters=tb.Filters(complib='blosc',
                                                           complevel=5,
                                                           fletcher32=False))
-        self.out_file_h5.create_carray(data_group,
-                                       name='HistCurrErr',
-                                       title='Current Error Histogram',
-                                       obj=self.hist_current_errors,
-                                       )
 
         # need the additional entries for the advanced averaging implementation
         if "average_measurements" in self.scan_config and self.scan_config["average_measurements"] > 1:
@@ -216,6 +217,15 @@ class PixCap65TotalCap(object):
                                            title='Multiple Current Histogram',
                                            obj=hist_individual_currents,
                                            )
+        else:
+            self.hist_current_errors = extract_smu_current_error(self.smu_range_config, self.hist_current)
+
+        self.out_file_h5.create_carray(data_group,
+                                       name='HistCurrErr',
+                                       title='Current Error Histogram',
+                                       obj=self.hist_current_errors,
+                                       )
+
 
         # TODO: make it possible to directly export it also in a root tree.
 
