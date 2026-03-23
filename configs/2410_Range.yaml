@@ -1,0 +1,121 @@
+comment: here display corresponds to the default measurement accuracy.
+voltage:
+- range: 200.0
+  unit: mV
+  prefix: 0.001
+  resolution:
+    display: 1e-3
+    accuracy: 0.012
+    amps: 0.3
+    resistance: NaN
+    temperature: 23
+  normalised: 0.2
+- range: 2.0
+  unit: V
+  prefix: 1.0
+  resolution:
+    display: 1e-5
+    accuracy: 0.012
+    amps: 3e-4
+    resistance: NaN
+    temperature: 23
+  normalised: 2.0
+- range: 20.0
+  unit: V
+  prefix: 1.0
+  resolution:
+    display: NaN
+    accuracy: 0.015
+    amps: 1e-4
+    resistance: NaN
+    temperature: 23
+  normalised: 20.0
+- range: 200.0
+  unit: V
+  prefix: 1.0
+  resolution:
+    display: 1e-2
+    accuracy: 0.015
+    amps: 5e-2
+    resistance: NaN
+    temperature: 23
+  normalised: 200.0
+current:
+- range: 1.0
+  unit: µA
+  prefix: 1.0e-06
+  resolution:
+    display: 1e-5
+    accuracy: 0.029
+    amps: 3e-4
+    temperature: 23
+  normalised: 1.0e-06
+- range: 10.0
+  unit: µA
+  prefix: 1.0e-06
+  resolution:
+    display: 1e-4
+    accuracy: 0.027
+    amps: 7e-4
+    temperature: 23
+  normalised: 9.999999999999999e-06
+- range: 100.0
+  unit: µA
+  prefix: 1.0e-06
+  resolution:
+    display: 1e-3
+    accuracy: 0.025
+    amps: 6e-3
+    temperature: 23
+  normalised: 9.999999999999999e-05
+- range: 1.0
+  unit: mA
+  prefix: 0.001
+  resolution:
+    display: 1e-5
+    accuracy: 0.027
+    amps: 6e-5
+    temperature: 23
+  normalised: 0.001
+- range: 20.0
+  unit: mA
+  prefix: 0.001
+  resolution:
+    display: 1e-4
+    accuracy: 0.035
+    amps: 0.0012
+    temperature: 23
+  normalised: 0.02
+- range: 100.0
+  unit: mA
+  prefix: 0.001
+  resolution:
+    display: 1e-3
+    accuracy: 0.055
+    amps: 6e-3
+    temperature: 23
+  normalised: 0.1
+- range: 1.0
+  unit: A
+  prefix: 1.0
+  resolution:
+    display: 1e-5
+    accuracy: 0.22
+    amps: 0.00057
+    temperature: 23
+  normalised: 1.0
+temperature:
+  voltage:
+  - upper: 1000
+    lower: 20
+    scaling: 0.15
+    coefficient: 1.0
+  - upper: 2
+    lower: 0.2
+    scaling: 0.3
+    coefficient: 1.0
+  current:
+  - upper: 1000000
+    lower: 0
+    scaling: 0.15
+    coefficient: 1.0

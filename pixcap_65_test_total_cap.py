@@ -23,6 +23,7 @@ import numpy as np
 import time
 from bitarray import bitarray
 import logging
+
 logging.getLogger().setLevel(logging.INFO)
 
 
@@ -48,7 +49,9 @@ def _store_scan_par_values(h5_file, scan_parameters):
     # FIXME only float32 supported so far
     fields.extend([(name, np.float32) for name in keys])
 
-    scan_par_table = h5_file.create_table(h5_file.root, name='scan_params', title='Scan parameter values per scan parameter id', description=np.dtype(fields))
+    scan_par_table = h5_file.create_table(h5_file.root, name='scan_params',
+                                          title='Scan parameter values per scan parameter id',
+                                          description=np.dtype(fields))
     for par_id, par_values in scan_parameters.items():
         a = np.full(shape=(1,), fill_value=np.NaN).astype(np.dtype(fields))
         for key, val in par_values.items():
@@ -80,9 +83,13 @@ class PixCap65TotalCap(object):
 
         self.scan_parameters = OrderedDict()
 
-        self.hist_current = np.full(shape=(40, 40, len(scan_config['frequency_range'])), fill_value=np.nan)  # current value for each measured frequency per pixel
-        self.hist_individual_currents = np.full(shape=(40, 40, len(scan_config['frequency_range'])), fill_value=np.nan)
-        self.hist_current_errors = np.full(shape=(40, 40, len(scan_config['frequency_range'])), fill_value=np.nan)
+        self.n_frequencies = len(scan_config['frequency_range'])
+        if "double_sweep" in scan_config and scan_config["double_sweep"]:
+            self.n_frequencies *= 2
+        self.hist_current = np.full(shape=(40, 40, self.n_frequencies),
+                                    fill_value=np.nan)  # current value for each measured frequency per pixel
+        self.hist_individual_currents = np.full(shape=(40, 40, self.n_frequencies), fill_value=np.nan)
+        self.hist_current_errors = np.full(shape=(40, 40, self.n_frequencies), fill_value=np.nan)
 
     def configure(self):
         self.seq_size = 4  # granularity of the clock sequencer
@@ -129,6 +136,10 @@ class PixCap65TotalCap(object):
         self.dut['SMU'].get_current()
 
     def scan(self):
+        # select the group to write the analysis results to
+        data_group = self.out_file_h5.root
+        data_group._f_setattr('frequencies', self.n_frequencies)
+
         row_range = range(self.scan_config['start_row'], self.scan_config['stop_row'])
         col_range = range(self.scan_config['start_column'], self.scan_config['stop_column'])
         frequency_range = self.scan_config['frequency_range']
@@ -140,7 +151,7 @@ class PixCap65TotalCap(object):
 
         if "average_measurements" in self.scan_config and self.scan_config["average_measurements"] > 1:
             n_measurements = self.scan_config["average_measurements"]
-            hist_individual_currents = np.full(shape=(40, 40, len(frequency_range), n_measurements), fill_value=np.nan)
+            hist_individual_currents = np.full(shape=(40, 40, self.n_frequencies, n_measurements), fill_value=np.nan)
             for i_row in row_range:
                 for i_col in col_range:
                     logging.info('Measuring pixel (%i, %i)...' % (i_col, i_row))
@@ -185,14 +196,14 @@ class PixCap65TotalCap(object):
 
         # Save raw data
         _store_scan_par_values(h5_file=self.out_file_h5, scan_parameters=self.scan_parameters)
-        self.out_file_h5.create_carray(self.out_file_h5.root,
+        self.out_file_h5.create_carray(data_group,
                                        name='HistCurr',
                                        title='Current Histogram',
                                        obj=self.hist_current,
                                        filters=tb.Filters(complib='blosc',
                                                           complevel=5,
                                                           fletcher32=False))
-        self.out_file_h5.create_carray(self.out_file_h5.root,
+        self.out_file_h5.create_carray(data_group,
                                        name='HistCurrErr',
                                        title='Current Error Histogram',
                                        obj=self.hist_current_errors,
@@ -200,11 +211,13 @@ class PixCap65TotalCap(object):
 
         # need the additional entries for the advanced averaging implementation
         if "average_measurements" in self.scan_config and self.scan_config["average_measurements"] > 1:
-            self.out_file_h5.create_carray(self.out_file_h5.root,
-                                          name='HistCurrValues',
-                                          title='Multiple Current Histogram',
-                                          obj=hist_individual_currents,
-                                          )
+            self.out_file_h5.create_carray(data_group,
+                                           name='HistCurrValues',
+                                           title='Multiple Current Histogram',
+                                           obj=hist_individual_currents,
+                                           )
+
+        # TODO: make it possible to directly export it also in a root tree.
 
         logging.info('Done')
 
@@ -220,7 +233,6 @@ class PixCap65TotalCap(object):
     def __exit__(self, exc_type, exc_value, traceback):
         self.close()
         return False
-
 
 
 if __name__ == '__main__':
