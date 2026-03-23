@@ -1,0 +1,134 @@
+voltage:
+- range: 100.0
+  unit: mV
+  prefix: 0.001
+  resolution:
+    display: 1e-3
+    accuracy: 0.015
+    amps: 0.15
+    resistance: 1e10
+    temperature: 23
+  normalised: 0.1
+- range: 1.0
+  unit: V
+  prefix: 1.0
+  resolution:
+    display: 1e-5
+    accuracy: 0.015
+    amps: 2e-4
+    resistance: 1e10
+    temperature: 23
+  normalised: 1.0
+- range: 6.0
+  unit: V
+  prefix: 1.0
+  resolution:
+    display: 1e-5
+    accuracy: 0.015
+    amps: 1e-3
+    resistance: 1e10
+    temperature: 23
+  normalised: 6.0
+- range: 40.0
+  unit: V
+  prefix: 1.0
+  resolution:
+    display: 1e-4
+    accuracy: 0.015
+    amps: 8e-3
+    resistance: 1e10
+    temperature: 23
+  normalised: 40.0
+current:
+- range: 100.0
+  unit: nA
+  prefix: 1.0e-09
+  resolution:
+    display: 1e-3
+    accuracy: 0.05
+    amps: 0.1
+    temperature: 23
+  normalised: 1.0000000000000001e-07
+- range: 1.0
+  unit: µA
+  prefix: 1.0e-06
+  resolution:
+    display: 1e-5
+    accuracy: 0.025
+    amps: 5e-4
+    temperature: 23
+  normalised: 1.0e-06
+- range: 10.0
+  unit: µA
+  prefix: 1.0e-06
+  resolution:
+    display: 1e-4
+    accuracy: 0.025
+    amps: 0.0015
+    temperature: 23
+  normalised: 9.999999999999999e-06
+- range: 100.0
+  unit: µA
+  prefix: 1.0e-06
+  resolution:
+    display: 1e-3
+    accuracy: 0.02
+    amps: 25e-3
+    temperature: 23
+  normalised: 9.999999999999999e-05
+- range: 1.0
+  unit: mA
+  prefix: 0.001
+  resolution:
+    display: 1e-5
+    accuracy: 0.02
+    amps: 2e-4
+    temperature: 23
+  normalised: 0.001
+- range: 10.0
+  unit: mA
+  prefix: 0.001
+  resolution:
+    display: 1e-4
+    accuracy: 0.02
+    amps: 0.0025
+    temperature: 23
+  normalised: 0.01
+- range: 100.0
+  unit: mA
+  prefix: 0.001
+  resolution:
+    display: 1e-3
+    accuracy: 0.02
+    amps: 2e-2
+    temperature: 23
+  normalised: 0.1
+- range: 1.0
+  unit: A
+  prefix: 1.0
+  resolution:
+    display: 1e-5
+    accuracy: 0.03
+    amps: 0.0015
+    temperature: 23
+  normalised: 1.0
+- range: 3.0
+  unit: A
+  prefix: 1.0
+  resolution:
+    display: 1e-5
+    accuracy: 0.05
+    amps: 0.0035
+    temperature: 23
+  normalised: 3.0
+temperature:
+  voltage:
+  - upper: 1000000
+    lower: 0
+    scaling: 0.15
+    coefficient: 1.0
+  current:
+  - upper: 1000000
+    lower: 0
+    scaling: 0.15
+    coefficient: 1.0
