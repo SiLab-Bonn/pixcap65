@@ -9,11 +9,14 @@
 #  $Date:: 2015-01-04 10:56:36 #$:
 #
 
-from basil.dut import Dut
-import numpy as np
 import time
+
+from basil.dut import Dut
+
 import pixcap65_constants as c
 
+
+# perhaps add the channel information to the pixcap config file and extract it from here!
 
 class pixcap65(Dut):
     def init(self, init_conf=None, **kwargs):
