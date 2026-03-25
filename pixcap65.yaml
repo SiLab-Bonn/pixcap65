@@ -39,11 +39,21 @@ transfer_layer:
 
 
 hw_drivers:
-  - name      : SMU
-    type      : scpi
-    interface : Serial
-    init      :
-        device : Keithley 2602a
+  - name        : SMU
+    type        : scpi
+    interface   : Serial
+    init        :
+        device  : Keithley 2602a
+    pixcap_init :
+      channel   : 1
+
+  - name        : SMU1
+    type        : scpi
+    interface   : Serial
+    init        :
+      device    : Keithley 2602a
+    pixcap_init :
+      channel   : 2
 
   - name      : GPAC
     type      : GPAC

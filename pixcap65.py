@@ -9,18 +9,111 @@
 #  $Date:: 2015-01-04 10:56:36 #$:
 #
 
+import logging
 import time
 
+import numpy as np
 from basil.dut import Dut
 
 import pixcap65_constants as c
 
-
 # perhaps add the channel information to the pixcap config file and extract it from here!
+float_initialiser = np.float32
 
 class pixcap65(Dut):
+    __smu_kwargs = {}
+    __bias_kwargs = {"channel" : 2}
+    __bias_smu_key = 'SMU'
+
     def init(self, init_conf=None, **kwargs):
         Dut.init(self, init_conf=init_conf, **kwargs)
+
+
+        # extract additional SMU configuration from the config file
+        # its a bit dirty but it should work for now.
+        if 'hw_drivers' in self._conf:
+            for driver in self._conf['hw_drivers']:
+                if 'name' in driver and driver['name'] == "SMU":
+                    smu_config = driver
+                    break
+            else:
+                logging.error("No SMU device found in the hardware configuration file.")
+                smu_config = {}
+
+            if 'pixcap_init' in smu_config:
+                if 'single_channel' in smu_config['pixcap_init']:
+                    if smu_config['pixcap_init']['single_channel']:
+                        common_smu_possible = False
+                    else:
+                        self.__smu_kwargs['channel'] = smu_config['pixcap_init']['channel']
+                elif 'channel' in smu_config['pixcap_init']:
+                    self.__smu_kwargs['channel'] = smu_config['pixcap_init']['channel']
+                else:
+                    common_smu_possible = False
+
+            # extract the additional configuration for the biasing supply
+            # if no further configuration could be found, use the default values
+            if 'transfer_layer' not in self._conf:
+                tl_config = {}
+                primary_interface = smu_config['interface']
+                for entry in self._conf['transfer_layer']:
+                    if 'type' in entry and entry['type'] == 'Serial':
+                        serial_interface = entry['name']
+                        interface_drivers = []
+                        for driver in self._conf['hw_drivers']:
+                            if 'interface' not in driver:
+                                continue
+                            if driver['interface'] != serial_interface:
+                                continue
+                            if 'type' not in driver:
+                                continue
+                            if driver['type'] != 'scpi':
+                                continue
+                            interface_drivers.append(driver)
+                        tl_config[serial_interface] = interface_drivers.copy()
+
+                # check the additional devices on the primary interface
+                suitable_devices = []
+                for device in tl_config[primary_interface]:
+                    if device['name'] == "SMU":
+                        continue
+                    suitable_devices.append(device)
+                for serial in tl_config.keys():
+                    if serial == primary_interface:
+                        continue
+                    suitable_devices.extend(tl_config[serial])
+
+                if len(suitable_devices) == 0:
+                    assert common_smu_possible, "No suitable SMU device found on any serial interface."
+                    self.__bias_smu_key = 'SMU'
+                    bias_config = smu_config
+                elif len(suitable_devices) == 1:
+                    self.__bias_smu_key = suitable_devices[0]['name']
+                    bias_config = suitable_devices[0]
+                else:
+                    logging.warning("More than one SMU device found on the serial interfaces. Will choose the first beginning with SMU.")
+                    for device in suitable_devices:
+                        if device['name'].startswith('SMU'):
+                            self.__bias_smu_key = device['name']
+                            bias_config = device
+                            break
+                    else:
+                        raise Exception("More than one SMU device found on the serial interfaces.")
+
+                # extract the additional configuration for the biasing supply
+                if 'pixcap_init' in bias_config:
+                    if 'single_channel' in bias_config['pixcap_init'] and not bias_config['pixcap_init'][
+                        'single_channel']:
+                        self.__bias_kwargs['channel'] = bias_config['pixcap_init']['channel']
+                    elif 'channel' in smu_config['pixcap_init']:
+                        self.__bias_kwargs['channel'] = bias_config['pixcap_init']['channel']
+            else:
+                logging.error("The hardware configuration file does not contain the transfer layer configuration.")
+
+        else:
+            logging.error("The hardware configuration file does not contain the hardware drivers.")
+
+        # setup the chip
         self.switch_on_power_supply_voltages(1)
         self['SPI'].set_size(9960)
         self.reset_chip()
@@ -92,3 +185,113 @@ class pixcap65(Dut):
     def init_config(self):
         self['SPI'].set_size(9960)
         self.reset_chip()
+
+    # Handle the SMU!
+
+    def init_smu(self, src_u, current_range, voltage_range=1.5, current_limit=0.001, plc=10):
+        self['SMU'].off(**self.smu_kwargs)
+        # self['SMU'].clear_buffer1(**self.smu_kwargs)
+        # self['SMU'].clear_buffer2(**self.smu_kwargs)
+        # self['SMU'].set_buffer1_mode(0, **self.smu_kwargs)
+        # self['SMU'].set_buffer2_mode(0, **self.smu_kwargs)
+        self['SMU'].source_volt(**self.smu_kwargs)
+        self['SMU'].set_voltage_range(voltage_range, **self.smu_kwargs)
+        self['SMU'].set_current_nlpc(plc, **self.smu_kwargs)
+        self['SMU'].set_voltage(src_u, **self.smu_kwargs)
+        self['SMU'].set_current_limit(current_limit, **self.smu_kwargs)
+        self['SMU'].set_current_sense_range(current_range, **self.smu_kwargs)
+
+    def smu_on(self):
+        self['SMU'].on(**self.smu_kwargs)
+
+    @property
+    def get_source_current(self) -> float:
+        result = self['SMU'].get_current(**self.smu_kwargs)
+        if not (isinstance(result, float)
+                or isinstance(result, int)
+                or isinstance(result, np.float32)
+                or isinstance(result, np.float64)
+                or isinstance(result, str)):
+            print(type(result), result)
+            raise Exception(f"The current returned {result} which was not recognised as a format.")
+        if isinstance(result, str) and ',' in result:
+            current = float_initialiser(result.split(',')[1])
+        else:
+            current = float_initialiser(result)
+        if np.isnan(current):
+            logging.warning("It was a NaN value measured by the SMU.")
+            raise Exception(f"The current returned {current} was not recognised as a number.")
+        return current
+
+    def averaged_current(self, n: int = 10):
+        self['SMU'].set_number_measurements(n, **self.smu_kwargs)
+        self['SMU'].multi_current_measurement(**self.smu_kwargs)
+        result = self['SMU'].get_averaged_current(**self.smu_kwargs)
+        print(result)
+        print("Will now exit for convenience!")
+        import sys
+        sys.exit(0)
+
+    def get_source_current_multiple(self, n: int):
+        def measurement_step():
+            current = self.get_source_current
+            time.sleep(1e-6)
+            return current
+
+        return np.array([measurement_step() for _ in range(n)])
+
+        # alternative but potentially faster implementation
+        # self['SMU'].set_number_measurements(n, **self.smu_kwargs)
+        # self['SMU'].multi_current_measurement(**self.smu_kwargs)
+        # result = self['SMU'].get_multi_current(**self.smu_kwargs)
+        # return np.array(result.split(','), dtype=float_initialiser)
+
+    def smu_off(self):
+        self.dut['SMU'].off(**self.smu_kwargs)
+
+    # Handle the biasing supply
+    def init_bias_voltage(self, voltage: float = -80.0, voltage_range=1.5, current_limit=0.001, current_range=0.00001):
+        # Refactor this according to the actual setup
+        # settings for sensor depletion source
+        self[self.bias_smu_key].off(**self.smu_bias_kwargs)
+        self[self.bias_smu_key].source_volt(**self.smu_bias_kwargs)
+        self[self.bias_smu_key].set_voltage_range(voltage_range, **self.smu_bias_kwargs)
+        self[self.bias_smu_key].set_current_nlpc(self.smu_plc, **self.smu_bias_kwargs)
+        self[self.bias_smu_key].set_voltage(voltage, **self.smu_bias_kwargs)
+        self[self.bias_smu_key].set_current_limit(current_limit, **self.smu_bias_kwargs)
+        self[self.bias_smu_key].set_current_sense_range(current_range, **self.smu_bias_kwargs)
+
+    def set_bias_on(self):
+        self[self.bias_smu_key].on(**self.smu_bias_kwargs)
+
+    def set_bias_off(self):
+        self[self.bias_smu_key].off(**self.smu_bias_kwargs)
+
+    def set_bias_voltage(self, voltage: float):
+        self[self.bias_smu_key].set_voltage(voltage, **self.smu_bias_kwargs)
+        time.sleep(1)
+
+    @property
+    def bias_voltage(self):
+        return self[self.bias_smu_key].get_voltage(**self.smu_bias_kwargs)
+
+    @bias_voltage.setter
+    def bias_voltage(self, voltage):
+        self.set_bias_voltage(voltage)
+
+    @property
+    def smu_plc(self):
+        return 10
+
+    # Handle the implementation of the SMU config
+    @property
+    def smu_kwargs(self):
+        return self.__smu_kwargs
+
+    @property
+    def smu_bias_kwargs(self):
+        return self.__bias_kwargs
+
+    @property
+    def bias_smu_key(self):
+        return self.__bias_smu_key

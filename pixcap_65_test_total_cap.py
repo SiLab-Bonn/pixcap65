@@ -155,6 +155,8 @@ class PixCap65TotalCap(object):
             frequency_range = np.concatenate((frequency_range, np.flip(frequency_range)))
         if "average_measurements" in self.scan_config and self.scan_config["average_measurements"] > 1:
             n_measurements = self.scan_config["average_measurements"]
+            # Added for convenience of the averaged measurements.
+            # self.pixcap['SMU'].set_number_measurements(n_measurements, **self.smu_kwargs)
             individual_currents_shape = (40, 40, self.n_frequencies, n_measurements)
             if self.hist_individual_currents.shape != individual_currents_shape:
                 self.hist_individual_currents = np.full(shape=(40, 40, self.n_frequencies, n_measurements), fill_value=np.nan)
@@ -173,7 +175,7 @@ class PixCap65TotalCap(object):
                         freq_conv = freq * self.seq_size
                         self.dut['MIO_PLL'].setFrequency(freq_conv)
                         time.sleep(1)
-                        self.hist_individual_currents[i_col, i_row, k] = self.get_source_current_multiple(
+                        self.hist_individual_currents[i_col, i_row, k, :] = self.get_source_current_multiple(
                             n_measurements)[:]
                         store_scan_par_values(scan_parameters=self.scan_parameters, scan_param_id=k, frequency=freq)
 
@@ -265,73 +267,38 @@ class PixCap65TotalCap(object):
         return self.dut
 
     # Handle the SMU!
-    # TODO: transfer these functions to the pixcap class for convenience
+    # these will now just forward the commands to the pixcap object
     def init_smu(self, voltage_range=1.5, current_limit=0.001, plc=10):
-        self.dut['SMU'].off(**self.smu_kwargs)
-        self.dut['SMU'].source_volt(**self.smu_kwargs)
-        self.dut['SMU'].set_voltage_range(voltage_range, **self.smu_kwargs)
-        self.dut['SMU'].set_current_nlpc(plc, **self.smu_kwargs)
-        self.dut['SMU'].set_voltage(self.scan_config['Vin'], **self.smu_kwargs)
-        self.dut['SMU'].set_current_limit(current_limit, **self.smu_kwargs)
-        self.dut['SMU'].set_current_sense_range(self.current_sense_range, **self.smu_kwargs)
+        self.pixcap.init_smu(self.scan_config['Vin'], self.current_sense_range, voltage_range, current_limit, plc)
 
     def smu_on(self):
-        self.dut['SMU'].on(**self.smu_kwargs)
+        self.pixcap.smu_on()
 
     def get_source_current(self) -> float:
-        result = self.dut['SMU'].get_current(**self.smu_kwargs)
-        if not (isinstance(result, float)
-            or isinstance(result, int)
-            or isinstance(result, np.float32)
-            or isinstance(result, np.float64)
-            or isinstance(result, str)):
-            print(type(result), result)
-            raise Exception(f"The current returned {result} which was not recognised as a format.")
-        if isinstance(result, str) and ',' in result:
-            current = float(result.split(',')[1])
-        else:
-            current = np.float32(result)
-        if np.isnan(current):
-            raise Exception(f"The current returned {current} was not recognised as a number.")
-        return current
+        return self.pixcap.get_source_current
 
     def get_source_current_multiple(self, n: int):
-        def measurement_step():
-            current = self.get_source_current()
-            time.sleep(1e-6)
-            return current
-
-        return np.array([measurement_step() for _ in range(n)])
+        return self.pixcap.get_source_current_multiple(n)
 
     def smu_off(self):
-        self.dut['SMU'].off(**self.smu_kwargs)
+        self.pixcap.smu_off()
 
     # Handle the biasing supply
     def init_bias_voltage(self, voltage: float = -80.0):
-        pass
-        # TODO: Refactor this to match the actual setup
-        # settings for sensor depletion source
-        # self.dut['SMU1'].off()
-        # self.dut['SMU1'].source_volt()
-        # self.dut['SMU1'].set_voltage_range(1.5)
-        # self.dut['SMU1'].set_current_nlpc(10)
-        # self.dut['SMU1'].set_voltage(-80.0)
-        # self.dut['SMU1'].set_current_limit(0.001)
-        # self.dut['SMU1'].set_current_sense_range(0.00001)
+        self.pixcap.init_bias_voltage(voltage)
 
     def set_bias_on(self):
-        self.dut['SMU'].on(channel=2)
+        self.pixcap.set_bias_on()
 
     def set_bias_off(self):
-        self.dut['SMU'].off(channel=2)
+       self.pixcap.set_bias_off()
 
     def set_bias_voltage(self, voltage: float):
-        self.dut['SMU'].set_voltage(voltage, channel=2)
-        time.sleep(1)
+        self.pixcap.bias_voltage = voltage
 
     @property
     def smu_kwargs(self):
-        return {"channel": 1}
+        return self.pixcap.smu_kwargs
 
 
 if __name__ == '__main__':
