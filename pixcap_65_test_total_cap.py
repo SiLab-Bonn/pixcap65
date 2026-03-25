@@ -24,6 +24,12 @@ from pixcap65 import pixcap65
 from plotting import plot_data
 
 logging.getLogger().setLevel(logging.INFO)
+logger = logging.getLogger(__name__)
+logger.setLevel(logging.DEBUG)
+log_handler = logging.FileHandler('pixcap_65_test.log')
+log_formater = logging.Formatter('%(asctime)s - %(name)s - [%(levelname)-8s] (%(threadName)-10s) %(message)s')
+log_handler.setFormatter(log_formater)
+logger.addHandler(log_handler)
 
 
 def store_scan_par_values(scan_parameters, scan_param_id, **kwargs):
@@ -89,7 +95,10 @@ class PixCap65TotalCap(object):
             self.n_frequencies *= 2
         self.hist_current = np.full(shape=(40, 40, self.n_frequencies),
                                     fill_value=np.nan)  # current value for each measured frequency per pixel
-        self.hist_individual_currents = np.full(shape=(40, 40, self.n_frequencies), fill_value=np.nan)
+        self.n_measurements = scan_config.get("average_measurements", 8)
+        self.hist_individual_currents = np.full(shape=(40, 40, self.n_frequencies, self.n_measurements), fill_value=np.nan)
+        if "average_measurements" not in scan_config or scan_config["average_measurements"] < 1:
+            self.n_measurements = -1
 
         self.current_sense_range = 0.00001
         with open("configs/2410_Range.yaml", "r") as f:
@@ -136,7 +145,6 @@ class PixCap65TotalCap(object):
             time.sleep(1)
 
         # changed to simplify changes in the used SMU
-        # self.dut['SMU'].get_current()
         self.get_source_current()
 
     def scan(self):
@@ -185,6 +193,7 @@ class PixCap65TotalCap(object):
             for i_row in row_range:
                 for i_col in col_range:
                     logging.info('Measuring pixel (%i, %i)...' % (i_col, i_row))
+                    logger.info('Measuring pixel (%i, %i)...' % (i_col, i_row))
                     self.dut.disable_all_pixels()
                     self.dut.disable_all_columns()
 
@@ -260,6 +269,7 @@ class PixCap65TotalCap(object):
 
 
     # Handle the SMU!
+    # TODO: transfer these functions to the pixcap class for convenience
     def get_source_current(self) -> float:
         result = self.dut['SMU'].get_current(**self.smu_kwargs)
         if not (isinstance(result, float)
@@ -277,6 +287,15 @@ class PixCap65TotalCap(object):
             raise Exception(f"The current returned {current} was not recognised as a number.")
         return current
 
+    def init_bias_voltage(self, voltage: float):
+        pass
+
+    def set_bias_off(self):
+        pass
+
+    def set_bias_on(self):
+        pass
+
     def set_bias_voltage(self, voltage: float):
         self.dut['SMU'].set_voltage(voltage, channel=2)
         time.sleep(1)
@@ -289,6 +308,12 @@ class PixCap65TotalCap(object):
         self.dut['SMU'].set_voltage(self.scan_config['Vin'], **self.smu_kwargs)
         self.dut['SMU'].set_current_limit(current_limit, **self.smu_kwargs)
         self.dut['SMU'].set_current_sense_range(self.current_sense_range, **self.smu_kwargs)
+
+    def smu_on(self):
+        self.dut['SMU'].on(**self.smu_kwargs)
+
+    def smu_off(self):
+        self.dut['SMU'].off(**self.smu_kwargs)
 
     def get_source_current_multiple(self, n: int):
         def measurement_step():
