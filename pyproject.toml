@@ -1,20 +1,23 @@
 [project]
 name = "pixcap65_USER_NAME"
-version = "0.0.3"
+version = "0.1.0"
 authors = [
-
+    { name = "Hans Krüger", email="krueger@physik.uni-bonn.de"},
 ]
+maintainers = [
+    { name = "Yannick Dieter", email = "dieter@physik.uni-bonn.de" },
+]
+
 readme = "README.md"
 requires-python = ">=3.9"
 dependencies = [
     "numpy>=2.3",
     "matplotlib",
-    "tables",
+    "tables>=3.0",
     "pyyaml",
     "bitarray",
     "coloredlogs",
-    "basil_daq",
-    "scipy"
+    "basil_daq<=3.1.0",
 ]
 
 [project.urls]
@@ -23,8 +26,14 @@ Issues = ""
 
 [project.optional-dependencies]
 advanced = [
-    "iminuit",
-    "kafe2"
+    "iminuit>2.30.0",
+    "kafe2>2.10.0",
+    "scipy>=1.15.0",
+    "numpy>=2.3"
+]
+visualization = [
+    "pyqt5",
+    "vitables"
 ]
 
 [build-system]
