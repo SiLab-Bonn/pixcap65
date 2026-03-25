@@ -29,9 +29,6 @@ There should be one 'event' per measured pixel
 | currents\[n_frequencies\]\[measurements\]/D | Daten | Durch die SMU gemessene Ströme           |
 | avg_current\[n_frequencies\]/D              | Daten | Mittelwerte der gemessenen Ströme        |
 | std_current\[n_frequencies\]/D              | Daten | Standardabweichung der gemessenen Ströme |
-|                                             |       |                                          |
-|                                             |       |                                          |
-|                                             |       |                                          |
 
 And the same after processing the data
 
@@ -52,3 +49,5 @@ And the same after processing the data
 | leak_err/D                                  | Auswertung | Estimation for the error of the pixels leakage current |
 | res/D                                       | Auswertung | Estimation for the on-resistance                       |
 | res_err/D                                   | Auswertung | Estimation for the error of the on-resistance          |
+| chi2/D                                      | Auswertung | Chi^2 Estimator at it's minimum for the fit statistics |
+| p/D                                         | Auswertung | p-Value of the fit to characterize its g.o.f.          |

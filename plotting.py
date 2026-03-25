@@ -2,15 +2,13 @@
 Plotting of Pixcap65 data.
 """
 
+import numpy as np
 import tables as tb
-from matplotlib.backends.backend_pdf import PdfPages
-
-from matplotlib import pyplot as plt
-from matplotlib.figure import Figure
 from matplotlib import cm
 from matplotlib.backends.backend_agg import FigureCanvasAgg as FigureCanvas
+from matplotlib.backends.backend_pdf import PdfPages
+from matplotlib.figure import Figure
 from mpl_toolkits.axes_grid1 import make_axes_locatable
-import numpy as np
 
 cmap = cm.get_cmap('viridis')
 
@@ -51,6 +49,7 @@ def plot_data(interpreted_data):
             output_pdf.savefig(fig, bbox_inches='tight')
 
             # Current vs. frequency
+            print(f"The histograms shape is {current_hist.shape}")
             for col in range(0, current_hist.shape[0]):
                 for row in range(0, current_hist.shape[1]):
                     if np.isfinite(current_hist[col, row, 0]):

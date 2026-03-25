@@ -2,9 +2,8 @@
 Analysis of Pixcap65 data. Fits freq vs current to extract the capacitance. A 2D histogram containing the capcitance for each pixel is stored.
 """
 
-import tables as tb
-import matplotlib.pyplot as plt
 import numpy as np
+import tables as tb
 
 
 def full_capacitance_model(freq, c=1e-6, r=1e6, i=0, u0=1):
@@ -21,8 +20,6 @@ def advanced_analysis(raw_data):
     resistor_error_hist = np.full(shape=(40, 40), fill_value=np.nan)
     fit_cov = np.full(shape=(40, 40, 4, 4), fill_value=np.nan)
 
-    from iminuit import Minuit
-    from iminuit.cost import LeastSquares
     from kafe2 import XYContainer
     from kafe2 import XYFit
     with tb.open_file(raw_data, mode='a') as in_file_h5:
@@ -170,6 +167,7 @@ def analyze_data(raw_data):
                     leak = res[0][1]
                     cov = res[1]
                 else:
+                    # print(f"unexpected infinite value {current_hist[col, row, 0]} for {col} and {row};")
                     cap = np.nan
                     leak = np.nan
                     cov = np.full(shape=(2, 2), fill_value=np.nan)
