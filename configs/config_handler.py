@@ -1,25 +1,27 @@
 import enum
-import sys
+import logging.config
+import logging.handlers
 import os
+import sys
 from collections.abc import Iterable
 from typing import Callable
 
-import yaml
 import numpy as np
+import yaml
 
 # TODO: add the functions doc strings
 
 CONFIG_KIND_CURRENT = 'current'
 CONFIG_KIND_VOLTAGE = 'voltage'
 
-class CONFIG_ELEMENTS(enum.Enum):
+class CONFIG_ELEMENTS(enum.StrEnum):
     NORMALISED_RANGE = 'normalised'
     RANGE_UNIT = 'unit'
     RESOLUTION = 'resolution'
     UNIT_PREFIX_VALUE = 'prefix'
     RANGE = 'range'
 
-class RESOLUTION_ELEMENTS(enum.Enum):
+class RESOLUTION_ELEMENTS(enum.StrEnum):
     ACCURACY = 'accuracy'
     AMPS = 'amps'
 

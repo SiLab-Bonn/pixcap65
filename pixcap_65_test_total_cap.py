@@ -46,13 +46,15 @@ def _store_scan_par_values(h5_file, scan_parameters):
         keys.update(par_values.keys())
     fields = [('scan_param_id', np.uint32)]
     # FIXME only float32 supported so far
+    # float64 should be available now
+    # fields.extend([(name, np.float64) for name in keys])
     fields.extend([(name, np.float32) for name in keys])
 
     scan_par_table = h5_file.create_table(h5_file.root, name='scan_params',
                                           title='Scan parameter values per scan parameter id',
                                           description=np.dtype(fields))
     for par_id, par_values in scan_parameters.items():
-        a = np.full(shape=(1,), fill_value=np.NaN).astype(np.dtype(fields))
+        a = np.full(shape=(1,), fill_value=np.nan).astype(np.dtype(fields))
         for key, val in par_values.items():
             a['scan_param_id'] = par_id
             a[key] = np.float32(val)
@@ -60,10 +62,10 @@ def _store_scan_par_values(h5_file, scan_parameters):
 
 
 scan_configuration = {
-    'start_column': 10,
-    'stop_column': 30,
-    'start_row': 10,
-    'stop_row': 30,
+    'start_column': 0,
+    'stop_column': 40,
+    'start_row': 0,
+    'stop_row': 40,
 
     'Vin': 1.0,  # input voltage in V
     'frequency_range': np.arange(1, 4.1, 1)  # frequency sweep in MHz
@@ -130,7 +132,7 @@ class PixCap65TotalCap(object):
         logging.debug('Waiting for settling of SMU...')
         for i in range(0, 30):
             current = self.get_source_current()
-            logging.debug('Current: %.3e' % current)
+            logging.debug('Current: {}'.format(current))
             time.sleep(1)
 
         # changed to simplify changes in the used SMU
@@ -156,6 +158,8 @@ class PixCap65TotalCap(object):
             individual_currents_shape = (40, 40, self.n_frequencies, n_measurements)
             if self.hist_individual_currents.shape != individual_currents_shape:
                 self.hist_individual_currents = np.full(shape=(40, 40, self.n_frequencies, n_measurements), fill_value=np.nan)
+
+            logging.info("Average over multiple measurements!")
             for i_row in row_range:
                 for i_col in col_range:
                     logging.info('Measuring pixel (%i, %i)...' % (i_col, i_row))
@@ -176,6 +180,8 @@ class PixCap65TotalCap(object):
             self.hist_current = average_currents[:, :, :, 0]
             self.hist_current_errors = np.nanstd(self.hist_individual_currents, axis=3, mean=average_currents)
         else:
+            logging.info('Scan pixel by single measurements.')
+            logger.info('Scan pixel by single measurements.')
             for i_row in row_range:
                 for i_col in col_range:
                     logging.info('Measuring pixel (%i, %i)...' % (i_col, i_row))
@@ -189,11 +195,23 @@ class PixCap65TotalCap(object):
                         freq_conv = freq * self.seq_size
                         self.dut['MIO_PLL'].setFrequency(freq_conv)
                         time.sleep(1)
-                        self.hist_current[i_col, i_row, k] = self.get_source_current()
+                        current = self.get_source_current()
+                        self.hist_current[i_col, i_row, k] = current
+                        if np.isnan(current):
+                            logging.warning(f'nan result for {i_col}, {i_row}, {k}')
+                            logger.warning(f'nan result for {i_col}, {i_row}, {k}')
+                        if (not np.isnan(current) and np.isnan(self.hist_current[i_col, i_row, k])):
+                            logging.warning('There was a difference after saving the data.')
+                            logger.warning('There was a difference after saving the data.')
+                        if (k == 0):
+                            logging.debug('%f' % (current))
+                            logger.debug('%f' % (current))
                         store_scan_par_values(scan_parameters=self.scan_parameters, scan_param_id=k, frequency=freq)
 
         # Save raw data
         _store_scan_par_values(h5_file=self.out_file_h5, scan_parameters=self.scan_parameters)
+        if np.all(np.isnan(self.hist_current)):
+            raise Exception("UNEXPECTED: All measurement entries are still NaN.")
         self.out_file_h5.create_carray(data_group,
                                        name='HistCurr',
                                        title='Current Histogram',
@@ -210,13 +228,17 @@ class PixCap65TotalCap(object):
                                            obj=self.hist_individual_currents,
                                            )
         else:
-            self.hist_current_errors = extract_smu_current_error(self.smu_range_config, self.hist_current, self.current_sense_range)
+            try:
+                self.hist_current_errors = extract_smu_current_error(self.smu_range_config, self.hist_current, self.current_sense_range)
+            except Exception as e:
+                logging.error(e.args)
 
-        self.out_file_h5.create_carray(data_group,
-                                       name='HistCurrErr',
-                                       title='Current Error Histogram',
-                                       obj=self.hist_current_errors,
-                                       )
+        if hasattr(self, "hist_current_errors") and not np.all(np.isnan(self.hist_current_errors)):
+            self.out_file_h5.create_carray(data_group,
+                                           name='HistCurrErr',
+                                           title='Current Error Histogram',
+                                           obj=self.hist_current_errors,
+                                           )
 
 
         # TODO: make it possible to directly export it also in a root tree.
@@ -225,7 +247,7 @@ class PixCap65TotalCap(object):
 
     def close(self):
         self.out_file_h5.close()
-        self.dut['SMU'].off()
+        self.dut['SMU'].off(**self.smu_kwargs)
         self.dut.close()
 
     def __enter__(self):
@@ -240,7 +262,19 @@ class PixCap65TotalCap(object):
     # Handle the SMU!
     def get_source_current(self) -> float:
         result = self.dut['SMU'].get_current(**self.smu_kwargs)
-        current = float(result.split(',')[1])
+        if not (isinstance(result, float)
+            or isinstance(result, int)
+            or isinstance(result, np.float32)
+            or isinstance(result, np.float64)
+            or isinstance(result, str)):
+            print(type(result), result)
+            raise Exception(f"The current returned {result} which was not recognised as a format.")
+        if isinstance(result, str) and ',' in result:
+            current = float(result.split(',')[1])
+        else:
+            current = np.float32(result)
+        if np.isnan(current):
+            raise Exception(f"The current returned {current} was not recognised as a number.")
         return current
 
     def set_bias_voltage(self, voltage: float):
@@ -251,7 +285,7 @@ class PixCap65TotalCap(object):
         self.dut['SMU'].off(**self.smu_kwargs)
         self.dut['SMU'].source_volt(**self.smu_kwargs)
         self.dut['SMU'].set_voltage_range(voltage_range, **self.smu_kwargs)
-        self.dut['SMU'].set_current_nlpc(plc, **self.smu_kwargs)
+        # self.dut['SMU'].set_current_nlpc(plc, **self.smu_kwargs)  # not implemented
         self.dut['SMU'].set_voltage(self.scan_config['Vin'], **self.smu_kwargs)
         self.dut['SMU'].set_current_limit(current_limit, **self.smu_kwargs)
         self.dut['SMU'].set_current_sense_range(self.current_sense_range, **self.smu_kwargs)
@@ -271,11 +305,21 @@ class PixCap65TotalCap(object):
 
 if __name__ == '__main__':
     output_file = "./TEST.h5"
-    pix = PixCap65TotalCap(scan_configuration, output_file)
-    pix.configure()
-    pix.scan()
-    pix.close()
+    # try:
+    #     pix = PixCap65TotalCap(scan_configuration, output_file)
+    #     pix.configure()
+    #     pix.scan()
+    # finally:
+    #     pix.close()
+
+    output_file_2 = "./TEST_2.h5"
+    with PixCap65TotalCap(scan_configuration, output_file_2) as pix:
+        pix.scan()
+
 
     # Analyse and plot data
-    analyze_data(output_file)
-    plot_data(output_file)
+    # analyze_data(output_file)
+    # plot_data(output_file)
+
+    analyze_data(output_file_2)
+    plot_data(output_file_2)
