@@ -1,0 +1,36 @@
+version: 1
+
+disable_existing_loggers: False
+
+formatters:
+  brief:
+    format: '%(message)s'
+  default:
+    format: '%(asctime)s %(levelname)-8s %(name)-15s %(message)s'
+    datefmt: '%Y-%m-%d %H:%M:%S'
+
+  silab:
+    format: '%(asctime)s - %(name)s - [%(levelname)-8s] (%(threadName)-10s) %(message)s'
+    datefmt: '%Y-%m-%d %H:%M:%S'
+
+handlers:
+  file:
+    class: logging.FileHandler
+    formatter: silab
+    filename: pixcap.log
+    mode: 'a'
+
+loggers:
+  pixcap.test_total_cap:
+    level: DEBUG
+    handlers: [file]
+    propagate: no
+
+  silab:
+    level: DEBUG
+    handlers: [file]
+
+
+
+
+
