@@ -20,8 +20,10 @@ from bitarray import bitarray
 import pixcap65_constants as c
 from analysis import analyze_data
 from configs.config_handler import extract_smu_current_error
-from pixcap65 import pixcap65
+from pixcap65 import Pixcap65
 from plotting import plot_data
+
+MEASURING_PIXEL_TEXT = 'Measuring pixel (%i, %i)...'
 
 logging.getLogger().setLevel(logging.INFO)
 logger = logging.getLogger(__name__)
@@ -33,19 +35,19 @@ logger.addHandler(log_handler)
 
 
 def store_scan_par_values(scan_parameters, scan_param_id, **kwargs):
-    '''
+    """
         Manually store the scan parameter values for the scan parameter id
         This allows to reconstruct the scan parameter values for a given parameter state vector
-    '''
+    """
     if scan_parameters.get(scan_param_id) and scan_parameters.get(scan_param_id) != kwargs:
         raise ValueError('You cannot change the scan parameter value of a scan parameter id')
     scan_parameters[scan_param_id] = kwargs
 
 
 def _store_scan_par_values(h5_file, scan_parameters):
-    '''
+    """
         Create scan_params table after a scan
-    '''
+    """
     # Create parameter description
     keys = set()  # find all keys to make the table column names
     for par_values in scan_parameters.values():
@@ -80,7 +82,7 @@ scan_configuration = {
 
 class PixCap65TotalCap(object):
     def __init__(self, scan_config, output_file):
-        self.dut = pixcap65("pixcap65.yaml")
+        self.dut = Pixcap65("pixcap65.yaml")
         self.dut.init()
 
         self.scan_config = scan_config
@@ -96,7 +98,8 @@ class PixCap65TotalCap(object):
         self.hist_current = np.full(shape=(40, 40, self.n_frequencies),
                                     fill_value=np.nan)  # current value for each measured frequency per pixel
         self.n_measurements = scan_config.get("average_measurements", 8)
-        self.hist_individual_currents = np.full(shape=(40, 40, self.n_frequencies, self.n_measurements), fill_value=np.nan)
+        self.hist_individual_currents = np.full(shape=(40, 40, self.n_frequencies, self.n_measurements),
+                                                fill_value=np.nan)
         if "average_measurements" not in scan_config or scan_config["average_measurements"] < 1:
             self.n_measurements = -1
 
@@ -105,13 +108,12 @@ class PixCap65TotalCap(object):
             import yaml
             self.smu_range_config = yaml.safe_load(f)
         self.hist_current_errors = np.full(shape=(40, 40, self.n_frequencies), fill_value=np.nan)
-        self.scan_indices = np.ndindex((40, 40))
-        # depending on the scan configuration it should be possible to swap the indices.
-        # TODO: implement this
+        self.seq_size = 4  # granularity of the clock sequencer
+        self.mode_logging_text = 'Scan pixel by single measurements.'
+        self.handle_measurement = self._handle_single_measurement
+        self.filters = tb.Filters(complib='blosc', complevel=5, fletcher32=False)
 
     def configure(self):
-        self.seq_size = 4  # granularity of the clock sequencer
-
         # settings for sensor depletion source
         # self.init_bias_voltage(voltage=-80.0)
 
@@ -133,7 +135,7 @@ class PixCap65TotalCap(object):
 
         # measure some current values; avoid measuring incorrect currents due to initial oscillation effects of SMU
         logging.debug('Waiting for settling of SMU...')
-        for i in range(0, 30):
+        for _ in range(0, 30):
             current = self.get_source_current()
             logging.debug('Current: {}'.format(current))
             time.sleep(1)
@@ -153,76 +155,88 @@ class PixCap65TotalCap(object):
         # Addition by Dominik to perform also a down sweep in frequency
         if "double_sweep" in self.scan_config and self.scan_config["double_sweep"]:
             frequency_range = np.concatenate((frequency_range, np.flip(frequency_range)))
-        if "average_measurements" in self.scan_config and self.scan_config["average_measurements"] > 1:
-            n_measurements = self.scan_config["average_measurements"]
-            # Added for convenience of the averaged measurements.
-            # self.pixcap['SMU'].set_number_measurements(n_measurements, **self.smu_kwargs)
-            individual_currents_shape = (40, 40, self.n_frequencies, n_measurements)
-            if self.hist_individual_currents.shape != individual_currents_shape:
-                self.hist_individual_currents = np.full(shape=(40, 40, self.n_frequencies, n_measurements), fill_value=np.nan)
 
-            logging.info("Average over multiple measurements!")
-            for i_row in row_range:
-                for i_col in col_range:
-                    logging.info('Measuring pixel (%i, %i)...' % (i_col, i_row))
-                    self.dut.disable_all_pixels()
-                    self.dut.disable_all_columns()
+        self.pre_scan_handler()
+        logging.info(self.mode_logging_text)
+        logger.info(self.mode_logging_text)
+        for i_row in row_range:
+            for i_col in col_range:
+                logging.info(MEASURING_PIXEL_TEXT % (i_col, i_row))
+                logger.info(MEASURING_PIXEL_TEXT % (i_col, i_row))
+                self.dut.disable_all_pixels()
+                self.dut.disable_all_columns()
 
-                    self.dut.enable_column(i_col, c.EN_EOC_3)
-                    self.dut.enable_pixel_clk(i_col, i_row, c.EN_CLK_0 | c.EN_CLK_3)
+                self.dut.enable_column(i_col, c.EN_EOC_3)
+                self.dut.enable_pixel_clk(i_col, i_row, c.EN_CLK_0 | c.EN_CLK_3)
 
-                    for k, freq in enumerate(frequency_range):
-                        freq_conv = freq * self.seq_size
-                        self.dut['MIO_PLL'].setFrequency(freq_conv)
-                        time.sleep(1)
-                        self.hist_individual_currents[i_col, i_row, k, :] = self.get_source_current_multiple(
-                            n_measurements)[:]
-                        store_scan_par_values(scan_parameters=self.scan_parameters, scan_param_id=k, frequency=freq)
+                for k, freq in enumerate(frequency_range):
+                    freq_conv = freq * self.seq_size
+                    self.dut['MIO_PLL'].setFrequency(freq_conv)
+                    time.sleep(1)
 
-            average_currents = np.nanmean(self.hist_individual_currents, axis=3, keepdims=True)
-            self.hist_current = average_currents[:, :, :, 0]
-            self.hist_current_errors = np.nanstd(self.hist_individual_currents, axis=3, mean=average_currents)
-        else:
-            logging.info('Scan pixel by single measurements.')
-            logger.info('Scan pixel by single measurements.')
-            for i_row in row_range:
-                for i_col in col_range:
-                    logging.info('Measuring pixel (%i, %i)...' % (i_col, i_row))
-                    logger.info('Measuring pixel (%i, %i)...' % (i_col, i_row))
-                    self.dut.disable_all_pixels()
-                    self.dut.disable_all_columns()
+                    self.handle_measurement(i_col, i_row, k)
+                    store_scan_par_values(scan_parameters=self.scan_parameters, scan_param_id=k, frequency=freq)
 
-                    self.dut.enable_column(i_col, c.EN_EOC_3)
-                    self.dut.enable_pixel_clk(i_col, i_row, c.EN_CLK_0 | c.EN_CLK_3)
+        self.post_scan_handler()
 
-                    for k, freq in enumerate(frequency_range):
-                        freq_conv = freq * self.seq_size
-                        self.dut['MIO_PLL'].setFrequency(freq_conv)
-                        time.sleep(1)
-                        current = self.get_source_current()
-                        self.hist_current[i_col, i_row, k] = current
-                        if np.isnan(current):
-                            logging.warning(f'nan result for {i_col}, {i_row}, {k}')
-                            logger.warning(f'nan result for {i_col}, {i_row}, {k}')
-                        if (not np.isnan(current) and np.isnan(self.hist_current[i_col, i_row, k])):
-                            logging.warning('There was a difference after saving the data.')
-                            logger.warning('There was a difference after saving the data.')
-                        if (k == 0):
-                            logging.debug('%f' % (current))
-                            logger.debug('%f' % (current))
-                        store_scan_par_values(scan_parameters=self.scan_parameters, scan_param_id=k, frequency=freq)
+        # if "average_measurements" in self.scan_config and self.scan_config["average_measurements"] > 1:
+        #     logging.info(self.mode_logging_text)
+        #     logger.info(self.mode_logging_text)
+        #     for i_row in row_range:
+        #         for i_col in col_range:
+        #             logging.info(MEASURING_PIXEL_TEXT % (i_col, i_row))
+        #             logger.info(MEASURING_PIXEL_TEXT % (i_col, i_row))
+        #             self.dut.disable_all_pixels()
+        #             self.dut.disable_all_columns()
+        #
+        #             self.dut.enable_column(i_col, c.EN_EOC_3)
+        #             self.dut.enable_pixel_clk(i_col, i_row, c.EN_CLK_0 | c.EN_CLK_3)
+        #
+        #             for k, freq in enumerate(frequency_range):
+        #                 freq_conv = freq * self.seq_size
+        #                 self.dut['MIO_PLL'].setFrequency(freq_conv)
+        #                 time.sleep(1)
+        #                 self.hist_individual_currents[i_col, i_row, k, :] = self.get_source_current_multiple(
+        #                     self.n_measurements)[:]
+        #                 store_scan_par_values(scan_parameters=self.scan_parameters, scan_param_id=k, frequency=freq)
+        #
+        #     average_currents = np.nanmean(self.hist_individual_currents, axis=3, keepdims=True)
+        #     self.hist_current = average_currents[:, :, :, 0]
+        #     self.hist_current_errors = np.nanstd(self.hist_individual_currents, axis=3, mean=average_currents)
+        # else:
+        #     logging.info(self.mode_logging_text)
+        #     logger.info(self.mode_logging_text)
+        #     for i_row in row_range:
+        #         for i_col in col_range:
+        #             logging.info(MEASURING_PIXEL_TEXT % (i_col, i_row))
+        #             logger.info(MEASURING_PIXEL_TEXT % (i_col, i_row))
+        #             self.dut.disable_all_pixels()
+        #             self.dut.disable_all_columns()
+        #
+        #             self.dut.enable_column(i_col, c.EN_EOC_3)
+        #             self.dut.enable_pixel_clk(i_col, i_row, c.EN_CLK_0 | c.EN_CLK_3)
+        #
+        #             for k, freq in enumerate(frequency_range):
+        #                 freq_conv = freq * self.seq_size
+        #                 self.dut['MIO_PLL'].setFrequency(freq_conv)
+        #                 time.sleep(1)
+        #
+        #                 current = self.get_source_current()
+        #                 self.hist_current[i_col, i_row, k] = current
+        #                 if k == 0:
+        #                     logging.debug('%f' % current)
+        #                     logger.debug('%f' % current)
+        #                 store_scan_par_values(scan_parameters=self.scan_parameters, scan_param_id=k, frequency=freq)
 
         # Save raw data
         _store_scan_par_values(h5_file=self.out_file_h5, scan_parameters=self.scan_parameters)
         if np.all(np.isnan(self.hist_current)):
-            raise Exception("UNEXPECTED: All measurement entries are still NaN.")
+            raise ValueError("UNEXPECTED: All measurement entries are still NaN.")
         self.out_file_h5.create_carray(data_group,
                                        name='HistCurr',
                                        title='Current Histogram',
                                        obj=self.hist_current,
-                                       filters=tb.Filters(complib='blosc',
-                                                          complevel=5,
-                                                          fletcher32=False))
+                                       filters=self.filters)
 
         # need the additional entries for the advanced averaging implementation
         if "average_measurements" in self.scan_config and self.scan_config["average_measurements"] > 1:
@@ -230,24 +244,61 @@ class PixCap65TotalCap(object):
                                            name='HistCurrValues',
                                            title='Multiple Current Histogram',
                                            obj=self.hist_individual_currents,
+                                           filters=self.filters,
                                            )
         else:
             try:
-                self.hist_current_errors = extract_smu_current_error(self.smu_range_config, self.hist_current, self.current_sense_range)
+                self.hist_current_errors = extract_smu_current_error(self.smu_range_config, self.hist_current,
+                                                                     self.current_sense_range)
             except Exception as e:
                 logging.error(e.args)
+                logging.exception("Something went wrong during the estimation of the measurement errors.")
 
         if hasattr(self, "hist_current_errors") and not np.all(np.isnan(self.hist_current_errors)):
             self.out_file_h5.create_carray(data_group,
                                            name='HistCurrErr',
                                            title='Current Error Histogram',
                                            obj=self.hist_current_errors,
+                                           filters=self.filters,
                                            )
-
 
         # TODO: make it possible to directly export it also in a root tree.
 
         logging.info('Done')
+
+    def post_scan_handler(self):
+        if "average_measurements" in self.scan_config and self.scan_config["average_measurements"] > 1:
+            average_currents = np.nanmean(self.hist_individual_currents, axis=3, keepdims=True)
+            self.hist_current = average_currents[:, :, :, 0]
+            self.hist_current_errors = np.nanstd(self.hist_individual_currents, axis=3, mean=average_currents)
+
+    def pre_scan_handler(self):
+        if "average_measurements" in self.scan_config and self.scan_config["average_measurements"] > 1:
+            self.n_measurements = self.scan_config["average_measurements"]
+            # Added for convenience of the averaged measurements.
+            # self.pixcap['SMU'].set_number_measurements(n_measurements, **self.smu_kwargs)
+            individual_currents_shape = (40, 40, self.n_frequencies, self.n_measurements)
+            if self.hist_individual_currents.shape != individual_currents_shape:
+                self.hist_individual_currents = np.full(shape=(40, 40, self.n_frequencies, self.n_measurements),
+                                                        fill_value=np.nan)
+
+            self.mode_logging_text = "Average over multiple measurements!"
+            self.handle_measurement = self._handle_averaged_measurement
+
+        else:
+            self.mode_logging_text = 'Scan pixel by single measurements.'
+            self.handle_measurement = self._handle_single_measurement
+
+    def _handle_single_measurement(self, col, row, k):
+        current = self.get_source_current()
+        self.hist_current[col, row, k] = current
+        if k == 0:
+            logging.debug('%f' % current)
+            logger.debug('%f' % current)
+
+    def _handle_averaged_measurement(self, col, row, k):
+        self.hist_individual_currents[col, row, k, :] = self.get_source_current_multiple(
+            self.n_measurements)[:]
 
     def close(self):
         self.out_file_h5.close()
@@ -291,7 +342,7 @@ class PixCap65TotalCap(object):
         self.pixcap.set_bias_on()
 
     def set_bias_off(self):
-       self.pixcap.set_bias_off()
+        self.pixcap.set_bias_off()
 
     def set_bias_voltage(self, voltage: float):
         self.pixcap.bias_voltage = voltage
@@ -313,7 +364,6 @@ if __name__ == '__main__':
     output_file_2 = "./TEST_2.h5"
     with PixCap65TotalCap(scan_configuration, output_file_2) as pix:
         pix.scan()
-
 
     # Analyse and plot data
     # analyze_data(output_file)
