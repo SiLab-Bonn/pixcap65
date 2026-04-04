@@ -171,3 +171,12 @@ registers:
         size    : 1
         offset  : 0              
 
+  - name: SMU
+    type: FunctionalRegister
+    hw_driver: SMU
+    arg_add: { 'channel': 1 }
+
+  - name: BIAS_SUPPLY
+    type: FunctionalRegister
+    hw_driver: SMU
+    arg_add: { 'channel': 2 }
