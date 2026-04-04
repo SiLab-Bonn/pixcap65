@@ -41,7 +41,7 @@ transfer_layer:
     init:
       # not sure whether this would work at all.
       resource_name: ASRL/dev/ttyUSB0
-      resource_name: ASRLCOM3
+      # resource_name: ASRLCOM3
       read_termination: "\n"
       baud_rate: 19200
       parity: 2
@@ -55,7 +55,7 @@ transfer_layer:
     type: Visa
     init:
       # VXI-11 communication
-      resource_name: TCPIP::131.220.x.x::INSTR
+      # resource_name: TCPIP::131.220.x.x::INSTR
       # Raw socket communication
       resource_name: TCPIP::131.220.x.x::5025::SOCKET
       read_termination: "\n"
