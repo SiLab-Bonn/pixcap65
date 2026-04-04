@@ -1,0 +1,6 @@
+/r13-measurement/
+/r13-measurement/**
+/*-measurement/**
+**.h5
+/.venv
+gpgkey
