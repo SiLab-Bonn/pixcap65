@@ -9,7 +9,7 @@ voltage:
     amps: 0.3
     resistance: NaN
     temperature: 23
-  normalised: 0.2
+  normalised: '2.e-01'
 - range: 2.0
   unit: V
   prefix: 1.0
@@ -19,7 +19,7 @@ voltage:
     amps: 3e-4
     resistance: NaN
     temperature: 23
-  normalised: 2.0
+  normalised: '2.e+00'
 - range: 20.0
   unit: V
   prefix: 1.0
@@ -29,7 +29,7 @@ voltage:
     amps: 1e-4
     resistance: NaN
     temperature: 23
-  normalised: 20.0
+  normalised: '2.e+01'
 - range: 200.0
   unit: V
   prefix: 1.0
@@ -39,7 +39,7 @@ voltage:
     amps: 5e-2
     resistance: NaN
     temperature: 23
-  normalised: 200.0
+  normalised: '2.e+02'
 current:
 - range: 1.0
   unit: µA
@@ -49,7 +49,7 @@ current:
     accuracy: 0.029
     amps: 3e-4
     temperature: 23
-  normalised: 1.0e-06
+  normalised: '1.e-06'
 - range: 10.0
   unit: µA
   prefix: 1.0e-06
@@ -58,7 +58,7 @@ current:
     accuracy: 0.027
     amps: 7e-4
     temperature: 23
-  normalised: 9.999999999999999e-06
+  normalised: '1.e-05'
 - range: 100.0
   unit: µA
   prefix: 1.0e-06
@@ -67,7 +67,7 @@ current:
     accuracy: 0.025
     amps: 6e-3
     temperature: 23
-  normalised: 9.999999999999999e-05
+  normalised: '1.e-04'
 - range: 1.0
   unit: mA
   prefix: 0.001
@@ -76,7 +76,7 @@ current:
     accuracy: 0.027
     amps: 6e-5
     temperature: 23
-  normalised: 0.001
+  normalised: '1.e-03'
 - range: 20.0
   unit: mA
   prefix: 0.001
@@ -85,7 +85,7 @@ current:
     accuracy: 0.035
     amps: 0.0012
     temperature: 23
-  normalised: 0.02
+  normalised: '2.e-02'
 - range: 100.0
   unit: mA
   prefix: 0.001
@@ -94,7 +94,7 @@ current:
     accuracy: 0.055
     amps: 6e-3
     temperature: 23
-  normalised: 0.1
+  normalised: '1.e-01'
 - range: 1.0
   unit: A
   prefix: 1.0
@@ -103,7 +103,7 @@ current:
     accuracy: 0.22
     amps: 0.00057
     temperature: 23
-  normalised: 1.0
+  normalised: '1.e+00'
 temperature:
   voltage:
   - upper: 1000

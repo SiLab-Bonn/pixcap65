@@ -1,0 +1,86 @@
+# Device description for the Keithley 2602A Sourcemeter.
+# set_ function expect a parameter, get_ function return a parameter.
+# Just the very basic commands are implemented here.
+top_level:
+  identifier: Keithley Instruments Inc., Model 2602A
+channel:
+  reset: smuX.reset()
+  on: smuX.source.output = 1
+  off: smuX.source.output = 0
+  source_current: smuX.source.func = smuX.OUTPUT_DCAMPS
+  source_volt: smuX.source.func = smuX.OUTPUT_DCVOLTS
+  set_current_nlpc: smuX.measure.nplc =
+  set_current_limit: smuX.source.limiti =
+  set_voltage_limit: smuX.source.limitv =
+  set_current_range: smuX.source.rangei =
+  set_voltage_range: smuX.source.rangev =
+  get_current_autorange: print(smuX.source.autorangei)
+  get_voltage_autorange: print(smuX.source.autorangev)
+  set_current_autorange: smuX.source.autorangei =
+  set_voltage_autorange: smuX.source.autorangev =
+  get_source_current: print(smuX.source.leveli)
+  get_source_voltage: print(smuX.source.levelv)
+  set_current: smuX.source.leveli =
+  set_voltage: smuX.source.levelv =
+  set_current_sense_range: smuX.measure.rangei =
+  set_voltage_sense_range: smuX.measure.rangev =
+  get_current_sense_range: print(smuX.measure.rangei)
+  get_voltage_sense_range: print(smuX.measure.rangev)
+  get_current: print(smuX.measure.i())
+  get_voltage: print(smuX.measure.v())
+  multi_current_measurement: smuX.measure.i(smuX.nvbuffer1)
+  multi_voltage_measurement: smuX.measure.v(smuX.nvbuffer2)
+  get_multi_current: printbuffer(1, smuX.measure.count, smuX.nvbuffer1)
+  get_multi_voltage: printbuffer(1, smuX.measure.count, smuX.nvbuffer2)
+  create_average_current: statistics1 = smuX.buffer.getstats(smuX.nvbuffer1)
+  create_average_voltage: statistics2 = smuX.buffer.getstats(smuX.nvbuffer2)
+  get_averaged_current: print(statistics1.mean,statistics1.stddev)
+  get_averaged_voltage: printbuffer(1,4,statistics2)
+  set_number_measurements: smuX.measure.count =
+  get_number_measurements: print(smuX.measure.count)
+  get_current_sense_autorange: print(smuX.measure.autorangei)
+  get_voltage_sense_autorange: print(smuX.measure.autorangev)
+  set_current_sense_autorange: smuX.measure.autorangei =
+  set_voltage_sense_autorange: smuX.measure.autorangev =
+  get_sense_interval: print(smuX.measure.interval)
+  set_sense_interval: smuX.measure.interval =
+  set_mode_measure_current_A: display.smuX.measure.func = display.MEASURE_DCAMPS
+  four_wire_on: smuX.sense = smuX.SENSE_REMOTE
+  four_wire_off: smuX.sense = smuX.SENSE_LOCAL
+  get_buffer1_mode: print(smuX.nvbuffer1.appendmode)
+  set_buffer1_mode: smuX.nvbuffer1.appendmode =
+  get_buffer2_mode: print(smuX.nvbuffer2.appendmode)
+  set_buffer2_mode: smuX.nvbuffer2.appendmode =
+  clear_buffer1: smuX.nvbuffer1.clear()
+  clear_buffer2: smuX.nvbuffer2.clear()
+
+top_back:
+  binary_format: format.data = format.DREAL
+  text_format: format.data = format.ASCII
+  set_ascii_precision: format.asciiprecision =
+  set_byte_order: format.byteorder =
+  clear_errors: errorqueue.clear()
+  get_n_errors: print(errorqueue.count)
+  load_error: errorCode, message, serverity, errorNode = errorqueue.next()
+  get_error_code: print(errorCode)
+  get_error_message: print(message)
+  get_error_severity: print(serverity)
+  get_error_node: print(errorNode)
+  __scpi_binary_commands:
+    get_multi_current:
+      datatype: 'f'
+    get_multi_voltage:
+      datatype: 'f'
+    get_averaged_voltage:
+      datatype: 'f'
+
+template_config:
+  channels: 2
+  replace_pattern: smu
+
+#on : smuX.source.output = 1
+#off : smuX.source.output = 0
+#get_current : print(smuX.measure.i())
+#set_voltage : smuX.source.levelv =
+#get_voltage : print(smuX.measure.v())
+#set_mode_measure_current : display.smuX.measure.func = display.MEASURE_DCAMPS
