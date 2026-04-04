@@ -6,25 +6,21 @@ Script for measuring Inter Pixel Capacitance
 #import itertools
 #import operator
 #import time
-import _thread
-import yaml
 
-from pixcap65 import pixcap65
-import pixcap65_constants as c
-from basil.dut import Dut
+import logging
+import time
 
-import matplotlib.pyplot as plt
 import numpy as np
 import pylab as pl
-
-import time
 from bitarray import bitarray
-import logging
-import coloredlogs
+
+import pixcap65_constants as c
+from pixcap65 import Pixcap65
+
 logging.getLogger().setLevel(logging.INFO)
 
 
-dut = pixcap65("pixcap65.yaml")
+dut = Pixcap65("pixcap65.yaml")
 dut.init()
 
 seq_size  = 4 #granularity of the clock sequencer
