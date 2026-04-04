@@ -8,7 +8,7 @@ voltage:
     amps: 0.15
     resistance: 1e10
     temperature: 23
-  normalised: 0.1
+  normalised: '1.e-01'
 - range: 1.0
   unit: V
   prefix: 1.0
@@ -18,7 +18,7 @@ voltage:
     amps: 2e-4
     resistance: 1e10
     temperature: 23
-  normalised: 1.0
+  normalised: '1.e+00'
 - range: 6.0
   unit: V
   prefix: 1.0
@@ -28,7 +28,7 @@ voltage:
     amps: 1e-3
     resistance: 1e10
     temperature: 23
-  normalised: 6.0
+  normalised: '6.e+00'
 - range: 40.0
   unit: V
   prefix: 1.0
@@ -38,7 +38,7 @@ voltage:
     amps: 8e-3
     resistance: 1e10
     temperature: 23
-  normalised: 40.0
+  normalised: '4.e+01'
 current:
 - range: 100.0
   unit: nA
@@ -48,7 +48,7 @@ current:
     accuracy: 0.05
     amps: 0.1
     temperature: 23
-  normalised: 1.0000000000000001e-07
+  normalised: '1.00e-07'
 - range: 1.0
   unit: µA
   prefix: 1.0e-06
@@ -57,7 +57,7 @@ current:
     accuracy: 0.025
     amps: 5e-4
     temperature: 23
-  normalised: 1.0e-06
+  normalised: '1.e-06'
 - range: 10.0
   unit: µA
   prefix: 1.0e-06
@@ -66,7 +66,7 @@ current:
     accuracy: 0.025
     amps: 0.0015
     temperature: 23
-  normalised: 9.999999999999999e-06
+  normalised: '1.e-05'
 - range: 100.0
   unit: µA
   prefix: 1.0e-06
@@ -75,7 +75,7 @@ current:
     accuracy: 0.02
     amps: 25e-3
     temperature: 23
-  normalised: 9.999999999999999e-05
+  normalised: '1.e-04'
 - range: 1.0
   unit: mA
   prefix: 0.001
@@ -84,7 +84,7 @@ current:
     accuracy: 0.02
     amps: 2e-4
     temperature: 23
-  normalised: 0.001
+  normalised: '1.e-03'
 - range: 10.0
   unit: mA
   prefix: 0.001
@@ -93,7 +93,7 @@ current:
     accuracy: 0.02
     amps: 0.0025
     temperature: 23
-  normalised: 0.01
+  normalised: '1.e-02'
 - range: 100.0
   unit: mA
   prefix: 0.001
@@ -102,7 +102,7 @@ current:
     accuracy: 0.02
     amps: 2e-2
     temperature: 23
-  normalised: 0.1
+  normalised: '1.e-01'
 - range: 1.0
   unit: A
   prefix: 1.0
@@ -111,7 +111,7 @@ current:
     accuracy: 0.03
     amps: 0.0015
     temperature: 23
-  normalised: 1.0
+  normalised: '1.e+00'
 - range: 3.0
   unit: A
   prefix: 1.0
@@ -120,7 +120,7 @@ current:
     accuracy: 0.05
     amps: 0.0035
     temperature: 23
-  normalised: 3.0
+  normalised: '3.e+00'
 temperature:
   voltage:
   - upper: 1000000
