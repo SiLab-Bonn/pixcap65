@@ -1,4 +1,7 @@
+# file: noinspection SpellCheckingInspection
+# noinspection SpellCheckingInspection
 COL_NMAX = 39
+# noinspection SpellCheckingInspection
 PIX_NMAX = 40
 
 EN_CLK_0 = 1

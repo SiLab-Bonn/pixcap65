@@ -61,10 +61,10 @@ top_back:
   set_byte_order: format.byteorder =
   clear_errors: errorqueue.clear()
   get_n_errors: print(errorqueue.count)
-  load_error: errorCode, message, serverity, errorNode = errorqueue.next()
+  load_error: errorCode, message, severity, errorNode = errorqueue.next()
   get_error_code: print(errorCode)
   get_error_message: print(message)
-  get_error_severity: print(serverity)
+  get_error_severity: print(severity)
   get_error_node: print(errorNode)
   __scpi_binary_commands:
     get_multi_current:

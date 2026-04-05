@@ -1,10 +1,9 @@
-# pixcap65
+# Pixcap 65
 
 Host software for the PixCap65 chip control system based on MIO2 + GPAC hardware.
 
-
-
 ## Setup
+
 * GPAC 5V
 * FPGA-Board 5V
 

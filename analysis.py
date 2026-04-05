@@ -1,20 +1,25 @@
 """
-Analysis of Pixcap65 data. Fits freq vs current to extract the capacitance. A 2D histogram containing the capcitance for each pixel is stored.
+Analysis of Pixcap65 data. Fits freq vs current to extract the capacitance. A 2D histogram containing the capacitance
+for each pixel is stored.
 """
 
 import numpy as np
 import tables as tb
+from iminuit import Minuit
+from iminuit.cost import LeastSquares
 
 
 def full_capacitance_model(freq, c=1e-6, r=1e6, i=0, u0=1):
     # ignores the reference voltage for now
     return (u0 * c * freq + i) / (1 + r * c * freq)
 
+
 def advanced_analysis(raw_data):
     with tb.open_file(raw_data, mode='a') as in_file_h5:
         advanced_analysis_delegate(in_file_h5, in_file_h5.root, in_file_h5.root)
 
-def advanced_analysis_delegate(file: tb.File, data_group: tb.Group, result_group: tb.Group):
+
+def advanced_analysis_delegate(file: tb.File, data_group: tb.Group, result_group: tb.Group, use_kafe2=True):
     cap_hist = np.full(shape=(40, 40), fill_value=np.nan)
     cap_error_hist = np.full(shape=(40, 40), fill_value=np.nan)
     leak_hist = np.full(shape=(40, 40), fill_value=np.nan)
@@ -41,37 +46,39 @@ def advanced_analysis_delegate(file: tb.File, data_group: tb.Group, result_group
     print(current_hist.shape)
     for ii, jj in np.indices(current_hist.shape):
         if np.isfinite(current_hist[ii, jj, 0]):
-            xy_data = XYContainer(scan_parameters['frequency'], current_hist[ii, jj])
-            # errors?
-            xy_fit = XYFit(xy_data, model_function=full_capacitance_model)
-            xy_fit.fix_parameter('u0', 1)
-            fit_results = xy_fit.do_fit()
-
-            # unused minuit
-            # cost = LeastSquares(scan_parameters['frequency'], current_hist[ii, jj],
-            #                     np.zeros_like(scan_parameters['frequency']), model=full_capcitance_model)
-            # m = Minuit(cost, c=1e-6, r=1e6, i=0)
-            # m.fixto('u0', 1)
-            # m.migrad()
-            # m.hesse()
+            if use_kafe2:
+                xy_data = XYContainer(scan_parameters['frequency'], current_hist[ii, jj])
+                # errors?
+                xy_fit = XYFit(xy_data, model_function=full_capacitance_model)
+                xy_fit.fix_parameter('u0', 1)
+                fit_results = xy_fit.do_fit()
+            else:
+                # unused minuit
+                cost = LeastSquares(scan_parameters['frequency'], current_hist[ii, jj],
+                                    np.zeros_like(scan_parameters['frequency']), model=full_capacitance_model)
+                m = Minuit(cost, c=1e-6, r=1e6, i=0)
+                m.fixto('u0', 1)
+                m.migrad()
+                m.hesse()
 
             # extract the fit parameters
-            cap = fit_results['parameter_values']['c'] * 1e-6  # convert to F
-            cap_error = fit_results['parameter_errors']['c'] * 1e-6
-            leakage = fit_results['parameter_values']['i']
-            leakage_error = fit_results['parameter_errors']['i']
-            resistor = fit_results['parameter_values']['r']
-            resistor_error = fit_results['parameter_errors']['r']
-            fit_cov[ii, jj] = fit_results['covariance_matrix']
-
-            # iMinuit is currently not in use
-            # cap = m.values['c'] * 1e-6  # convert to F
-            # cap_error = m.errors['c'] * 1e-6
-            # leakage = m.values['i']
-            # leakage_error = m.errors['i']
-            # resistor = m.values['r']
-            # resistor_error = m.errors['r']
-            # fit_cov[ii, jj] = m.covariance
+            if use_kafe2:
+                cap = fit_results['parameter_values']['c'] * 1e-6  # convert to F
+                cap_error = fit_results['parameter_errors']['c'] * 1e-6
+                leakage = fit_results['parameter_values']['i']
+                leakage_error = fit_results['parameter_errors']['i']
+                resistor = fit_results['parameter_values']['r']
+                resistor_error = fit_results['parameter_errors']['r']
+                fit_cov[ii, jj] = fit_results['covariance_matrix']
+            else:
+                # iMinuit is currently not in use
+                cap = m.values['c'] * 1e-6  # convert to F
+                cap_error = m.errors['c'] * 1e-6
+                leakage = m.values['i']
+                leakage_error = m.errors['i']
+                resistor = m.values['r']
+                resistor_error = m.errors['r']
+                fit_cov[ii, jj] = m.covariance
         else:
             cap = np.nan
             cap_error = np.nan
@@ -90,60 +97,61 @@ def advanced_analysis_delegate(file: tb.File, data_group: tb.Group, result_group
 
     # Store capacitance values
     file.create_carray(group,
-                             name='HistCap',
-                             title='Capacitance Histogram',
-                             obj=cap_hist,
-                             filters=tb.Filters(complib='blosc',
-                                                complevel=5,
-                                                fletcher32=False))
+                       name='HistCap',
+                       title='Capacitance Histogram',
+                       obj=cap_hist,
+                       filters=tb.Filters(complib='blosc',
+                                          complevel=5,
+                                          fletcher32=False))
     file.create_carray(group,
-                             name='HistCapErr',
-                             title='Capacitance Error Histogram',
-                             obj=cap_error_hist,
-                             filters=tb.Filters(complib='blosc',
-                                                complevel=5,
-                                                fletcher32=False))
+                       name='HistCapErr',
+                       title='Capacitance Error Histogram',
+                       obj=cap_error_hist,
+                       filters=tb.Filters(complib='blosc',
+                                          complevel=5,
+                                          fletcher32=False))
 
     file.create_carray(group,
-                             name='HistLeak',
-                             title='Leakage Current Histogram',
-                             obj=leak_hist,
-                             filters=tb.Filters(complib='blosc',
-                                                complevel=5,
-                                                fletcher32=False))
+                       name='HistLeak',
+                       title='Leakage Current Histogram',
+                       obj=leak_hist,
+                       filters=tb.Filters(complib='blosc',
+                                          complevel=5,
+                                          fletcher32=False))
     file.create_carray(group,
-                             name='HistLeakErr',
-                             title='Leakage Current Error Histogram',
-                             obj=leak_error_hist,
-                             filters=tb.Filters(complib='blosc',
-                                                complevel=5,
-                                                fletcher32=False))
+                       name='HistLeakErr',
+                       title='Leakage Current Error Histogram',
+                       obj=leak_error_hist,
+                       filters=tb.Filters(complib='blosc',
+                                          complevel=5,
+                                          fletcher32=False))
 
     file.create_carray(group,
-                             name='HistRes',
-                             title='On-Resistance Histogram',
-                             obj=resistor_hist,
-                             filters=tb.Filters(complib='blosc',
-                                                complevel=5,
-                                                fletcher32=False))
+                       name='HistRes',
+                       title='On-Resistance Histogram',
+                       obj=resistor_hist,
+                       filters=tb.Filters(complib='blosc',
+                                          complevel=5,
+                                          fletcher32=False))
     file.create_carray(group,
-                             name='HistResErr',
-                             title='On-Resistance Error Histogram',
-                             obj=resistor_error_hist,
-                             filters=tb.Filters(complib='blosc',
-                                                complevel=5,
-                                                fletcher32=False))
+                       name='HistResErr',
+                       title='On-Resistance Error Histogram',
+                       obj=resistor_error_hist,
+                       filters=tb.Filters(complib='blosc',
+                                          complevel=5,
+                                          fletcher32=False))
 
     file.create_carray(group,
-                             name='HistFitCov',
-                             title='Fit Covariance Matrix',
-                             obj=fit_cov,
-                             )
+                       name='HistFitCov',
+                       title='Fit Covariance Matrix',
+                       obj=fit_cov,
+                       )
 
 
 def analyze_data(raw_data):
     with tb.open_file(raw_data, mode='a') as in_file_h5:
         analyze_data_delegate(in_file_h5, in_file_h5.root, in_file_h5.root)
+
 
 def analyze_data_delegate(file: tb.File, data_group: tb.Group, result_group: tb.Group):
     cap_hist = np.full(shape=(40, 40), fill_value=np.nan)  # capacitance for each pixel
@@ -193,26 +201,26 @@ def analyze_data_delegate(file: tb.File, data_group: tb.Group, result_group: tb.
 
     # Store capacitance values
     file.create_carray(group,
-                             name='HistCap',
-                             title='Capacitance Histogram',
-                             obj=cap_hist,
-                             filters=tb.Filters(complib='blosc',
-                                                complevel=5,
-                                                fletcher32=False))
+                       name='HistCap',
+                       title='Capacitance Histogram',
+                       obj=cap_hist,
+                       filters=tb.Filters(complib='blosc',
+                                          complevel=5,
+                                          fletcher32=False))
 
     file.create_carray(group,
-                             name='HistLeak',
-                             title='Leakage Current Histogram',
-                             obj=leak_hist,
-                             filters=tb.Filters(complib='blosc',
-                                                complevel=5,
-                                                fletcher32=False))
+                       name='HistLeak',
+                       title='Leakage Current Histogram',
+                       obj=leak_hist,
+                       filters=tb.Filters(complib='blosc',
+                                          complevel=5,
+                                          fletcher32=False))
 
     file.create_carray(group,
-                             name='HistFitCov',
-                             title='Fit Covariance Matrix',
-                             obj=fit_cov,
-                             )
+                       name='HistFitCov',
+                       title='Fit Covariance Matrix',
+                       obj=fit_cov,
+                       )
 
 
 if __name__ == '__main__':

@@ -2,7 +2,7 @@
 name = "pixcap65_USER_NAME"
 version = "0.1.0"
 authors = [
-    { name = "Hans Krüger", email="krueger@physik.uni-bonn.de"},
+    { name = "Hans Krüger", email = "krueger@physik.uni-bonn.de" },
 ]
 maintainers = [
     { name = "Yannick Dieter", email = "dieter@physik.uni-bonn.de" },

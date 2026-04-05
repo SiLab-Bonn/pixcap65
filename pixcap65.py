@@ -321,8 +321,6 @@ class Pixcap65(Dut):
     @seq_size.setter
     def seq_size(self, size):
         self.__seq_size = size
-        return self.__seq_size
-
 
     @property
     def cvm_frequency(self):
@@ -333,7 +331,5 @@ class Pixcap65(Dut):
         self.__current_cvm_frequency = freq
         res = self[self.__mio_pll_key].setFrequency(freq)
         if not res:
-            logger.warning("Could not set the MIO PLL frequency to %d Hz.",  freq)
+            logger.warning("Could not set the MIO PLL frequency to %d Hz.", freq)
         time.sleep(self.frequency_settling)
-
-

@@ -26,6 +26,7 @@ scan_configuration = {
     'frequency_range': np.arange(1, 4.1, 1)  # .astype(np.float) # [MHz]
 }
 
+
 class InterCap(tb.IsDescription):
     col = tb.Int32Col(pos=0)
     row = tb.Int32Col(pos=1)
@@ -47,7 +48,7 @@ class Pixcap65InterCap(PixCap65Measurement):
         self.inter_hist_current_2 = np.full(shape=(40, 40, self.n_frequencies),
                                             fill_value=np.nan)  # current value for each measured frequency per pixel
         self.total_hist_current_2 = np.full(shape=(40, 40, self.n_frequencies),
-                                      fill_value=np.nan)  # current value for each measured frequency per pixel
+                                            fill_value=np.nan)  # current value for each measured frequency per pixel
 
     def configure(self):
         self.pixcap['SMU3'].off()
@@ -153,7 +154,7 @@ class Pixcap65InterCap(PixCap65Measurement):
                     result2 = self.pixcap['SMU2'].get_reading()
                     self.inter_hist_current_2[i_col, i_row, k] = self.pixcap['SMU2'].get_reading().split(',')[1]
                     current_array2.append(float(result2.split(',')[1]))
-                    store_scan_par_values(scan_parameters=self.scan_parameters,scan_param_id=k, frequency=freq)
+                    store_scan_par_values(scan_parameters=self.scan_parameters, scan_param_id=k, frequency=freq)
 
             self.out_file_h5.create_carray(self.measurement_group,
                                            name='TotalHistCurr',
@@ -190,9 +191,9 @@ class Pixcap65InterCap(PixCap65Measurement):
     def freq_sweep_array_plot(self):
         return np.arange(0, 5.1, 1)
 
-
     def analyze(self):
-        result_table = self.out_file_h5.create_table(self.analysis_group, name='result_table', description=InterCap, title='result_table')
+        result_table = self.out_file_h5.create_table(self.analysis_group, name='result_table', description=InterCap,
+                                                     title='result_table')
         inter_capacitance_a = self.out_file_h5.create_carray(self.analysis_group, name='InterHistCapA',
                                                              atom=tb.Float64Atom(), shape=(40, 40),
                                                              title='Inter Capacitance A', filters=self.filters)
@@ -201,19 +202,22 @@ class Pixcap65InterCap(PixCap65Measurement):
                                                              title='Inter Capacitance B', filters=self.filters)
         total_capacitance = self.out_file_h5.create_carray(self.analysis_group, name='TotalHistCap',
                                                            atom=tb.Float64Atom(), shape=(40, 40),
-                                                           title='Total Pixel Capacitance Histogram', filters=self.filters)
+                                                           title='Total Pixel Capacitance Histogram',
+                                                           filters=self.filters)
         inter_leakage_a = self.out_file_h5.create_carray(self.analysis_group, name='InterHistLeakA',
                                                          atom=tb.Float64Atom(), shape=(40, 40),
-                                                         title='Inter Leakage Current Histogram A', filters=self.filters)
+                                                         title='Inter Leakage Current Histogram A',
+                                                         filters=self.filters)
         inter_leakage_b = self.out_file_h5.create_carray(self.analysis_group, name='InterLeakCapB',
                                                          atom=tb.Float64Atom(), shape=(40, 40),
-                                                         title='Inter Leakage Current Histogram B', filters=self.filters)
+                                                         title='Inter Leakage Current Histogram B',
+                                                         filters=self.filters)
         total_leakage = self.out_file_h5.create_carray(self.analysis_group, name='TotalHistLeak', atom=tb.Float64Atom(),
                                                        shape=(40, 40), title='Total Leakage Current Histogram',
                                                        filters=self.filters)
         for i_row in self.row_range:
             for i_col in self.col_range:
-                # I'm not quite sure whether this association of the smus to the different capacitance's ist correct.
+                # I'm not quite sure whether this association of the SMUs to the different capacitance's ist correct.
                 # apply linear fit to measured current values; also returns covariance matrix
                 matrix1 = np.polyfit(self.freq_sweep_array, self.current_array1[i_col, i_row, :], 1, cov=True)
                 matrix2 = np.polyfit(self.freq_sweep_array, self.current_array2[i_col, i_row, :], 1, cov=True)
@@ -298,6 +302,7 @@ class Pixcap65InterCap(PixCap65Measurement):
     @property
     def col_range(self):
         return range(self.col_start, self.col_stop + 1)
+
     @property
     def row_range(self):
         return range(self.row_stop, self.row_start - 1, -1)

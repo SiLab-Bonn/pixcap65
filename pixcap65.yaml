@@ -1,3 +1,4 @@
+#file: noinspection SpellCheckingInspection,IncorrectFormatting
 #
 # ------------------------------------------------------------
 # Copyright (c) SILAB , Physics Institute of Bonn University
@@ -180,3 +181,24 @@ registers:
     type: FunctionalRegister
     hw_driver: SMU
     arg_add: { 'channel': 2 }
+
+  - name: VM1
+    type: FunctionalRegister
+    hw_driver: SMU
+    arg_add: { 'channel': -1 }
+
+  - name: VM2
+    type: FunctionalRegister
+    hw_driver: SMU
+    arg_add: { 'channel': -1 }
+
+  - name: VM3
+    type: FunctionalRegister
+    hw_driver: SMU
+    arg_add: { 'channel': -1 }
+
+  - name: SMU_SETUP
+    type: FunctionalRegister
+    hw_driver: SMU
+    arg_add: {}
+
