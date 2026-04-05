@@ -20,11 +20,23 @@ import pixcap65_constants as c
 # perhaps add the channel information to the pixcap config file and extract it from here!
 float_initialiser = np.float32
 
+logger = logging.getLogger(__name__)
+
 
 class Pixcap65(Dut):
     __smu_kwargs = {}
     __bias_kwargs = {}
     __bias_smu_key = 'BIAS_SUPPLY'
+    __primary_smu_key = 'SMU'
+    __vm1_smu_key = 'VM1_SMU'
+    __vm2_smu_key = 'VM2_SMU'
+    __vm3_smu_key = 'VM3_SMU'
+    __mio_pll_key = 'MIO_PLL'
+
+    __seq_size = 1
+    __current_cvm_frequency = 0
+
+    frequency_settling = 1
 
     def init(self, init_conf=None, **kwargs):
         Dut.init(self, init_conf=init_conf, **kwargs)
@@ -191,44 +203,44 @@ class Pixcap65(Dut):
 
     # Handle the SMU!
     def init_smu(self, src_u, current_range, voltage_range=1.5, current_limit=0.001, plc=10):
-        self['SMU'].off(**self.smu_kwargs)
-        self['SMU'].clear_buffer1(**self.smu_kwargs)
-        self['SMU'].clear_buffer2(**self.smu_kwargs)
-        self['SMU'].set_buffer1_mode(0, **self.smu_kwargs)
-        self['SMU'].set_buffer2_mode(0, **self.smu_kwargs)
-        self['SMU'].source_volt(**self.smu_kwargs)
-        self['SMU'].set_voltage_range(voltage_range, **self.smu_kwargs)
-        self['SMU'].set_current_nlpc(plc, **self.smu_kwargs)
-        self['SMU'].set_voltage(src_u, **self.smu_kwargs)
-        self['SMU'].set_current_limit(current_limit, **self.smu_kwargs)
-        self['SMU'].set_current_sense_range(current_range, **self.smu_kwargs)
+        self[self.__primary_smu_key].off(**self.smu_kwargs)
+        self[self.__primary_smu_key].clear_buffer1(**self.smu_kwargs)
+        self[self.__primary_smu_key].clear_buffer2(**self.smu_kwargs)
+        self[self.__primary_smu_key].set_buffer1_mode(0, **self.smu_kwargs)
+        self[self.__primary_smu_key].set_buffer2_mode(0, **self.smu_kwargs)
+        self[self.__primary_smu_key].source_volt(**self.smu_kwargs)
+        self[self.__primary_smu_key].set_voltage_range(voltage_range, **self.smu_kwargs)
+        self[self.__primary_smu_key].set_current_nlpc(plc, **self.smu_kwargs)
+        self[self.__primary_smu_key].set_voltage(src_u, **self.smu_kwargs)
+        self[self.__primary_smu_key].set_current_limit(current_limit, **self.smu_kwargs)
+        self[self.__primary_smu_key].set_current_sense_range(current_range, **self.smu_kwargs)
 
     def smu_on(self):
-        self['SMU'].on(**self.smu_kwargs)
+        self[self.__primary_smu_key].on(**self.smu_kwargs)
 
     @property
     def get_source_current(self) -> float:
-        result = self['SMU'].get_current(**self.smu_kwargs)
+        result = self[self.__primary_smu_key].get_current(**self.smu_kwargs)
         if not (isinstance(result, float)
                 or isinstance(result, int)
                 or isinstance(result, np.float32)
                 or isinstance(result, np.float64)
                 or isinstance(result, str)):
             print(type(result), result)
-            raise Exception(f"The current returned {result} which was not recognised as a format.")
+            raise TypeError("The current returned {result} which was not recognised as a format.".format(result=result))
         if isinstance(result, str) and ',' in result:
             current = float_initialiser(result.split(',')[1])
         else:
             current = float_initialiser(result)
         if np.isnan(current):
             logging.warning("It was a NaN value measured by the SMU.")
-            raise Exception(f"The current returned {current} was not recognised as a number.")
+            raise ValueError("The current returned {current} was not recognised as a number.".format(current=current))
         return current
 
     def averaged_current(self, n: int = 10):
-        self['SMU'].set_number_measurements(n, **self.smu_kwargs)
-        self['SMU'].multi_current_measurement(**self.smu_kwargs)
-        result = self['SMU'].get_averaged_current(**self.smu_kwargs)
+        self[self.__primary_smu_key].set_number_measurements(n, **self.smu_kwargs)
+        self[self.__primary_smu_key].multi_current_measurement(**self.smu_kwargs)
+        result = self[self.__primary_smu_key].get_averaged_current(**self.smu_kwargs)
         print(result)
         print("Will now exit for convenience!")
         import sys
@@ -249,7 +261,7 @@ class Pixcap65(Dut):
         # return np.array(result.split(','), dtype=float_initialiser)
 
     def smu_off(self):
-        self['SMU'].off(**self.smu_kwargs)
+        self[self.__primary_smu_key].off(**self.smu_kwargs)
 
     # Handle the biasing supply
     def init_bias_voltage(self, voltage: float = -80.0, voltage_range=1.5, current_limit=0.001, current_range=0.00001):
@@ -273,6 +285,10 @@ class Pixcap65(Dut):
         self[self.bias_smu_key].set_voltage(voltage, **self.smu_bias_kwargs)
         time.sleep(1)
 
+    def set_frequency(self, freq: float):
+        self.cvm_frequency = freq
+
+    # properties of the pixcap system
     @property
     def bias_voltage(self):
         return self[self.bias_smu_key].get_voltage(**self.smu_bias_kwargs)
@@ -297,3 +313,27 @@ class Pixcap65(Dut):
     @property
     def bias_smu_key(self):
         return self.__bias_smu_key
+
+    @property
+    def seq_size(self):
+        return self.__seq_size
+
+    @seq_size.setter
+    def seq_size(self, size):
+        self.__seq_size = size
+        return self.__seq_size
+
+
+    @property
+    def cvm_frequency(self):
+        return self.__current_cvm_frequency
+
+    @cvm_frequency.setter
+    def cvm_frequency(self, freq):
+        self.__current_cvm_frequency = freq
+        res = self[self.__mio_pll_key].setFrequency(freq)
+        if not res:
+            logger.warning("Could not set the MIO PLL frequency to %d Hz.",  freq)
+        time.sleep(self.frequency_settling)
+
+

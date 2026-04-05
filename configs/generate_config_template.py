@@ -1,14 +1,42 @@
+import argparse
+import os
+from argparse import ArgumentParser
 from typing import Iterable
 
+import numpy as np
 import ruamel.yaml
 from ruamel.yaml.comments import CommentedMap
 
 yml = ruamel.yaml.YAML()
 
-smu_modifier = ['a', 'b', 'c', 'd', 'e', 'f', 'g', 'h', 'i', 'j', 'k', 'l', 'm', 'n', 'o', 'p', 'q', 'r', 's', 't', 'u', 'v', 'w', 'x', 'y', 'z']
+smu_character = ['a', 'b', 'c', 'd', 'e', 'f', 'g', 'h', 'i', 'j', 'k', 'l', 'm', 'n', 'o', 'p', 'q', 'r', 's', 't', 'u', 'v', 'w', 'x', 'y', 'z']
+smu_numbering = np.arange(101)
+
+def path_type(string):
+    if os.path.exists(string):
+        return string
+    else:
+        raise argparse.ArgumentTypeError("The file %s does not exist!" % string)
 
 if __name__ == "__main__":
-    with open("keithley_2602a_template.yaml", 'r') as f:
+    parser = ArgumentParser()
+    parser.add_argument('--template', '-t', type=path_type, default='keithley_2602a_template.yaml', help='Path to the template file')
+    parser.add_argument('--output', '-o', type=str, default=None, help='Path to write the output to.')
+    parser.add_argument('--smu_numbering', '-n', action='store_true', default=101, help='Whether, to use numbering scheme for the SMU channels.')
+    args = parser.parse_args()
+
+    if args.smu_numbering:
+        smu_modifier = smu_numbering
+    else:
+        smu_modifier = smu_character
+
+    if args.output is None:
+        if args.template.endswith('_template.yaml'):
+            args.output = args.template.replace('_template.yaml', '.yaml')
+        else:
+            args.output = args.template.replace('.yaml', '_modified.yaml')
+
+    with open(args.template, 'r') as f:
         config = yml.load(f)
 
     # extract the final comments
@@ -65,7 +93,7 @@ if __name__ == "__main__":
 
     config.yaml_end_comment_extend(final_comments, clear=False)
 
-    with open("keithley_2602a_config.yaml", 'w') as f:
+    with open(args.output, 'w') as f:
         yml.dump(config, f)
 
 
