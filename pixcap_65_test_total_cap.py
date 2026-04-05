@@ -7,6 +7,11 @@ Changes compared to original script:
 - Vary the order of column/row routing and switching frequency using the reversed arrays (uncomment corresponding lines in code)
 - Fit also returns covariance matrix in order to extract the errors of the fit parameters if needed
 - Output in txt file also includes offset (y-intercept) next to the slope
+
+Changes compared to first/second modification:
+- packaged the measurement of the total pixel capacitance into a class hierarchy (introduced a super class common to the different measurement procedures
+- enabled the option to measure multiple currents and average over these to obtain an estimator for the currents standard error
+- automatic error estimation by using information from the SMU's manual
 """
 
 import logging
@@ -15,13 +20,14 @@ from collections import OrderedDict
 
 import numpy as np
 import tables as tb
+import yaml
 from bitarray import bitarray
 
 import pixcap65_constants as c
-from analysis import analyze_data
+from analysis import analyze_data, advanced_analysis_delegate
 from configs.config_handler import extract_smu_current_error
 from pixcap65 import Pixcap65
-from plotting import plot_data
+from plotting import plot_data, plot_data_delegate
 
 MEASURING_PIXEL_TEXT = 'Measuring pixel (%i, %i)...'
 
@@ -79,8 +85,7 @@ scan_configuration = {
     'frequency_range': np.arange(1, 4.1, 1)  # frequency sweep in MHz
 }
 
-
-class PixCap65TotalCap(object):
+class PixCap65Measurement(object):
     def __init__(self, scan_config, output_file):
         self.dut = Pixcap65("pixcap65.yaml")
         self.dut.init()
@@ -93,6 +98,101 @@ class PixCap65TotalCap(object):
         self.scan_parameters = OrderedDict()
 
         self.n_frequencies = len(scan_config['frequency_range'])
+
+    def update_config(self, scan_config):
+        self.scan_config = scan_config
+        self.n_frequencies = len(scan_config['frequency_range'])
+
+    def configure(self):
+        raise NotImplementedError
+
+    def scan(self):
+        raise NotImplementedError
+
+    def analyze(self):
+        raise NotImplementedError
+
+    def plot(self):
+        raise NotImplementedError
+
+    def close(self):
+        self.out_file_h5.close()
+        # self.dut['SMU'].off(**self.smu_kwargs)
+        self.smu_off()
+        self.dut.close()
+
+    @property
+    def pixcap(self):
+        return self.dut
+
+    @property
+    def seq_size(self):
+        # granularity of the clock sequencer
+        return 4
+
+    @property
+    def filters(self):
+        return tb.Filters(complib='blosc', complevel=5, fletcher32=False)
+
+    def __enter__(self):
+        self.configure()
+        return self
+
+    def __exit__(self, exc_type, exc_value, traceback):
+        self.close()
+        return False
+
+    # Handle the SMU!
+    # these will now just forward the commands to the pixcap object
+    def init_smu(self, voltage_range=1.5, current_limit=0.001, plc=10):
+        self.pixcap.init_smu(self.scan_config['Vin'], self.current_sense_range, voltage_range, current_limit, plc)
+
+    def smu_on(self):
+        self.pixcap.smu_on()
+
+    def get_source_current(self) -> float:
+        return self.pixcap.get_source_current
+
+    def get_source_current_multiple(self, n: int):
+        return self.pixcap.get_source_current_multiple(n)
+
+    def smu_off(self):
+        self.pixcap.smu_off()
+
+    # Handle the biasing supply
+    def init_bias_voltage(self, voltage: float = -80.0):
+        self.pixcap.init_bias_voltage(voltage)
+
+    def set_bias_on(self):
+        self.pixcap.set_bias_on()
+
+    def set_bias_off(self):
+        self.pixcap.set_bias_off()
+
+    def set_bias_voltage(self, voltage: float):
+        self.pixcap.bias_voltage = voltage
+
+    @property
+    def pixcap(self):
+        return self.dut
+
+    @property
+    def smu_kwargs(self):
+        return self.pixcap.smu_kwargs
+
+    @property
+    def analysis_group(self):
+        return self.out_file_h5.root
+
+    @property
+    def measurement_group(self):
+        return self.out_file_h5.root
+
+
+class PixCap65TotalCap(PixCap65Measurement):
+    def __init__(self, scan_config, output_file):
+        super(PixCap65TotalCap).__init__(scan_config, output_file)
+
         if "double_sweep" in scan_config and scan_config["double_sweep"]:
             self.n_frequencies *= 2
         self.hist_current = np.full(shape=(40, 40, self.n_frequencies),
@@ -103,15 +203,14 @@ class PixCap65TotalCap(object):
         if "average_measurements" not in scan_config or scan_config["average_measurements"] < 1:
             self.n_measurements = -1
 
-        self.current_sense_range = 0.00001
+        # FIXME: use the right smu configuration file!
+        smu_range_config = "configs/{}_Range.yaml".format([drv['init']['device'] for drv in self.dut._conf['hw_drivers'] if drv['name'] == 'SMU'][0].replace(' ', '_'))
+        print("Using the SMU range config file: ", smu_range_config)
         with open("configs/2410_Range.yaml", "r") as f:
-            import yaml
             self.smu_range_config = yaml.safe_load(f)
         self.hist_current_errors = np.full(shape=(40, 40, self.n_frequencies), fill_value=np.nan)
-        self.seq_size = 4  # granularity of the clock sequencer
         self.mode_logging_text = 'Scan pixel by single measurements.'
         self.handle_measurement = self._handle_single_measurement
-        self.filters = tb.Filters(complib='blosc', complevel=5, fletcher32=False)
 
     def configure(self):
         # settings for sensor depletion source
@@ -142,6 +241,7 @@ class PixCap65TotalCap(object):
 
         # changed to simplify changes in the used SMU
         self.get_source_current()
+
 
     def scan(self):
         # select the group to write the analysis results to
@@ -266,6 +366,14 @@ class PixCap65TotalCap(object):
 
         logging.info('Done')
 
+    def plot(self):
+        from matplotlib.backends.backend_pdf import PdfPages
+        with PdfPages(self.output_file[:-3] + '.pdf') as output_pdf:
+            plot_data_delegate(self.out_file_h5.root, self.out_file_h5.root, output_pdf)
+
+    def analyze(self):
+        advanced_analysis_delegate(self.out_file_h5, self.out_file_h5.root, self.out_file_h5.root)
+
     def post_scan_handler(self):
         if "average_measurements" in self.scan_config and self.scan_config["average_measurements"] > 1:
             average_currents = np.nanmean(self.hist_individual_currents, axis=3, keepdims=True)
@@ -300,57 +408,9 @@ class PixCap65TotalCap(object):
         self.hist_individual_currents[col, row, k, :] = self.get_source_current_multiple(
             self.n_measurements)[:]
 
-    def close(self):
-        self.out_file_h5.close()
-        self.dut['SMU'].off(**self.smu_kwargs)
-        self.dut.close()
-
-    def __enter__(self):
-        self.configure()
-        return self
-
-    def __exit__(self, exc_type, exc_value, traceback):
-        self.close()
-        return False
-
     @property
-    def pixcap(self):
-        return self.dut
-
-    # Handle the SMU!
-    # these will now just forward the commands to the pixcap object
-    def init_smu(self, voltage_range=1.5, current_limit=0.001, plc=10):
-        self.pixcap.init_smu(self.scan_config['Vin'], self.current_sense_range, voltage_range, current_limit, plc)
-
-    def smu_on(self):
-        self.pixcap.smu_on()
-
-    def get_source_current(self) -> float:
-        return self.pixcap.get_source_current
-
-    def get_source_current_multiple(self, n: int):
-        return self.pixcap.get_source_current_multiple(n)
-
-    def smu_off(self):
-        self.pixcap.smu_off()
-
-    # Handle the biasing supply
-    def init_bias_voltage(self, voltage: float = -80.0):
-        self.pixcap.init_bias_voltage(voltage)
-
-    def set_bias_on(self):
-        self.pixcap.set_bias_on()
-
-    def set_bias_off(self):
-        self.pixcap.set_bias_off()
-
-    def set_bias_voltage(self, voltage: float):
-        self.pixcap.bias_voltage = voltage
-
-    @property
-    def smu_kwargs(self):
-        return self.pixcap.smu_kwargs
-
+    def current_sense_range(self):
+        return 0.00001
 
 if __name__ == '__main__':
     output_file = "./TEST.h5"

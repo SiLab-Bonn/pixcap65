@@ -5,7 +5,6 @@ Script for measuring Inter Pixel Capacitance
 import gc
 import logging
 import time
-from collections import OrderedDict
 
 import numpy as np
 import pylab as pl
@@ -13,7 +12,7 @@ import tables as tb
 from bitarray import bitarray
 
 import pixcap65_constants as c
-from pixcap65 import Pixcap65
+from pixcap_65_test_total_cap import PixCap65Measurement
 from pixcap_65_test_total_cap import store_scan_par_values
 
 logging.getLogger().setLevel(logging.INFO)
@@ -38,22 +37,11 @@ class InterCap(tb.IsDescription):
     leakage_total = tb.Float64Col(pos=7)
 
 
-class Pixcap65InterCap(object):
+class Pixcap65InterCap(PixCap65Measurement):
     def __init__(self, scan_config, output_file):
-        self.dut = Pixcap65("pixcap65.yaml")
-        self.dut.init()
+        super(Pixcap65InterCap).__init__(scan_config, output_file)
 
-        self.scan_config = scan_config
-
-        self.output_file = output_file
-        self.out_file_h5 = tb.open_file(self.output_file, mode='w')
-
-        self.scan_parameters = OrderedDict()
-
-        self.seq_size = 4  # granularity of the clock sequencer
-
-        # prepare the data fields of the measurement
-        self.n_frequencies = len(self.freq_sweep_array)
+        # prepare the data fields for the measurement
         self.inter_hist_current_1 = np.full(shape=(40, 40, self.n_frequencies),
                                             fill_value=np.nan)  # current value for each measured frequency per pixel
         self.inter_hist_current_2 = np.full(shape=(40, 40, self.n_frequencies),
@@ -187,18 +175,6 @@ class Pixcap65InterCap(object):
             gc.collect()
 
     @property
-    def measurement_group(self):
-        return self.out_file_h5.root
-
-    @property
-    def analysis_group(self):
-        return self.out_file_h5.root
-
-    @property
-    def filters(self):
-        return tb.filters.Filters(complevel=5, complib='blosc', fletcher32=False)
-
-    @property
     def current_array1(self):
         return self.measurement_group.InterHistCurrA
 
@@ -286,9 +262,10 @@ class Pixcap65InterCap(object):
                 pl.plot(self.freq_sweep_array_plot, fit_fn, label='c={a:.3E}, d={b:.3E}'.format(a=e, b=d))
 
     def close(self):
-        # time.sleep(300)
+        time.sleep(300)
 
-        # self.pixcap['SMU1'].off()
+        super(Pixcap65InterCap, self).close()
+
         self.pixcap['SMU2'].off()
         self.pixcap['SMU3'].off()
 
@@ -296,16 +273,6 @@ class Pixcap65InterCap(object):
         pl.xlabel('Freq [MHz]')
         pl.ylabel('I [A]')
         pl.show()
-        self.pixcap.close()
-        data_file.close()
-
-    def __enter__(self):
-        self.configure()
-        return self
-
-    def __exit__(self, exc_type, exc_val, exc_tb):
-        self.close()
-        return False
 
     @property
     def pixcap(self):
