@@ -23,12 +23,12 @@ handlers:
 loggers:
   pixcap.test_total_cap:
     level: DEBUG
-    handlers: [file]
+    handlers: [ file ]
     propagate: no
 
   silab:
     level: DEBUG
-    handlers: [file]
+    handlers: [ file ]
 
 
 

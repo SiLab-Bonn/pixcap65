@@ -9,8 +9,10 @@ from ruamel.yaml.comments import CommentedMap
 
 yml = ruamel.yaml.YAML()
 
-smu_character = ['a', 'b', 'c', 'd', 'e', 'f', 'g', 'h', 'i', 'j', 'k', 'l', 'm', 'n', 'o', 'p', 'q', 'r', 's', 't', 'u', 'v', 'w', 'x', 'y', 'z']
+smu_character = ['a', 'b', 'c', 'd', 'e', 'f', 'g', 'h', 'i', 'j', 'k', 'l', 'm', 'n', 'o', 'p', 'q', 'r', 's', 't',
+                 'u', 'v', 'w', 'x', 'y', 'z']
 smu_numbering = np.arange(101)
+
 
 def path_type(string):
     if os.path.exists(string):
@@ -18,11 +20,14 @@ def path_type(string):
     else:
         raise argparse.ArgumentTypeError("The file %s does not exist!" % string)
 
+
 if __name__ == "__main__":
     parser = ArgumentParser()
-    parser.add_argument('--template', '-t', type=path_type, default='keithley_2602a_template.yaml', help='Path to the template file')
+    parser.add_argument('--template', '-t', type=path_type, default='Keithley_2602a_template.yaml',
+                        help='Path to the template file')
     parser.add_argument('--output', '-o', type=str, default=None, help='Path to write the output to.')
-    parser.add_argument('--smu_numbering', '-n', action='store_true', default=101, help='Whether, to use numbering scheme for the SMU channels.')
+    parser.add_argument('--smu_numbering', '-n', action='store_true', default=101,
+                        help='Whether, to use numbering scheme for the SMU channels.')
     args = parser.parse_args()
 
     if args.smu_numbering:
@@ -76,7 +81,7 @@ if __name__ == "__main__":
             for key, value in channel_declarations.items():
                 current_channel_configuration[key] = value.replace(searchPattern, f"{replacePattern}{smu_modifier[i]}")
 
-            channel_configurations[f"channel {i+1}"] = current_channel_configuration
+            channel_configurations[f"channel {i + 1}"] = current_channel_configuration
 
     print(channel_configurations)
 
@@ -95,5 +100,3 @@ if __name__ == "__main__":
 
     with open(args.output, 'w') as f:
         yml.dump(config, f)
-
-

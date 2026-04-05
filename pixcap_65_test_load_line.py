@@ -16,6 +16,7 @@ from pixcap_65_test_total_cap import PixCap65Measurement
 logger = logging.getLogger()
 logger.setLevel(logging.DEBUG)
 
+# noinspection SpellCheckingInspection
 scan_configuration = {
     'start_column': 12,
     'stop_column': 12,
@@ -37,7 +38,7 @@ class Pixcap65LoadLine(PixCap65Measurement):
 
     def configure(self):
         # TODO: Refactor the smu access methods for better readability!
-        # TODO: Refactor this into a init method for the smus!
+        # TODO: Refactor this into a init method for the SMUs!
         self.dut['SMU3'].off()
         self.dut['SMU3'].source_volt()
         self.dut['SMU3'].set_voltage_range(1.5)
@@ -61,7 +62,8 @@ class Pixcap65LoadLine(PixCap65Measurement):
         bit_array_clk_0.setall(0)
         bit_array_clk_0[m + 1:-1] = 1
 
-        # vary charging time by looping over the number of bits in bit_array_clk_3 that are set to 1; number is reduced by one in every step
+        # vary charging time by looping over the number of bits in bit_array_clk_3 that are set to 1;
+        # number is reduced by one in every step
         for i in range(m, 0, -1):
             self.pixcap['SEQ'].reset()
             self.pixcap['SEQ'].set_clk_divide(1)

@@ -3,15 +3,19 @@ The latest version of the Pixcap65 test script for measuring the total pixel cap
 
 Changes compared to original script:
 - Remote control of depletion voltage source
-- Reading some current values before actual measurement to avoid incorrect currents due to initial oscillation effects of SMU
-- Vary the order of column/row routing and switching frequency using the reversed arrays (uncomment corresponding lines in code)
+- Reading some current values before actual measurement to avoid incorrect currents due to initial oscillation
+    effects of SMU
+- Vary the order of column/row routing and switching frequency using the reversed arrays (uncomment corresponding
+    lines in code)
 - Fit also returns covariance matrix in order to extract the errors of the fit parameters if needed
 - Output in txt file also includes offset (y-intercept) next to the slope
 
 Changes compared to first/second modification:
-- packaged the measurement of the total pixel capacitance into a class hierarchy (introduced a super class common to the different measurement procedures
-- enabled the option to measure multiple currents and average over these to obtain an estimator for the currents standard error
-- automatic error estimation by using information from the SMU's manual
+- packaged the measurement of the total pixel capacitance into a class hierarchy (introduced a super class common
+    to the different measurement procedures
+- enabled the option to measure multiple currents and average over these to obtain an estimator for the currents
+    standard error
+- automatic error estimation by using information from the SMUs manual
 """
 
 import logging
@@ -85,6 +89,7 @@ scan_configuration = {
     'frequency_range': np.arange(1, 4.1, 1)  # frequency sweep in MHz
 }
 
+
 class PixCap65Measurement(object):
     def __init__(self, scan_config, output_file):
         self.dut = Pixcap65("pixcap65.yaml")
@@ -144,6 +149,10 @@ class PixCap65Measurement(object):
 
     # Handle the SMU!
     # these will now just forward the commands to the pixcap object
+    @property
+    def current_sense_range(self):
+        return 0.000001
+
     def init_smu(self, voltage_range=1.5, current_limit=0.001, plc=10):
         self.pixcap.init_smu(self.scan_config['Vin'], self.current_sense_range, voltage_range, current_limit, plc)
 
@@ -173,10 +182,6 @@ class PixCap65Measurement(object):
         self.pixcap.bias_voltage = voltage
 
     @property
-    def pixcap(self):
-        return self.dut
-
-    @property
     def smu_kwargs(self):
         return self.pixcap.smu_kwargs
 
@@ -204,7 +209,9 @@ class PixCap65TotalCap(PixCap65Measurement):
             self.n_measurements = -1
 
         # FIXME: use the right smu configuration file!
-        smu_range_config = "configs/{}_Range.yaml".format([drv['init']['device'] for drv in self.dut._conf['hw_drivers'] if drv['name'] == 'SMU'][0].replace(' ', '_'))
+        smu_range_config = "configs/{}_Range.yaml".format(
+            [drv['init']['device'] for drv in self.dut._conf['hw_drivers'] if drv['name'] == 'SMU'][0].replace(' ',
+                                                                                                               '_'))
         print("Using the SMU range config file: ", smu_range_config)
         with open("configs/2410_Range.yaml", "r") as f:
             self.smu_range_config = yaml.safe_load(f)
@@ -241,7 +248,6 @@ class PixCap65TotalCap(PixCap65Measurement):
 
         # changed to simplify changes in the used SMU
         self.get_source_current()
-
 
     def scan(self):
         # select the group to write the analysis results to
@@ -411,6 +417,7 @@ class PixCap65TotalCap(PixCap65Measurement):
     @property
     def current_sense_range(self):
         return 0.00001
+
 
 if __name__ == '__main__':
     output_file = "./TEST.h5"

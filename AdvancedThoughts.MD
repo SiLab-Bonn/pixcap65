@@ -1,21 +1,27 @@
-# Advanced Thoughts onto modifiying the measurement procedure
+# Advanced Thoughts onto modifying the measurement procedure
+
 ## Implementation notes
+
 To be implemented:
+
 * sweep up, followed by sweeping down
 * internally handling multiple sweeps of the power supply
 * gather high statistics for each frequency before switching to the next bias
 * measure the average current multiple times for averaging afterwards and error estimation
 
-
 ## Datastructures
+
 ### HDF5 files
-Here the columns are ordered by the coordinates of the pixel on the grid, so there is no need for further adjustments into this direction
+
+Here the columns are ordered by the coordinates of the pixel on the grid, so there is no need for further adjustments
+into this direction
 There is also no need for a ´Event` block.
 But we should separate the advancements from investigation and data taking from each other.
-Also, it should be possible to either switch the file fast or create a own group/table within one file for each bias voltage investigated or other differences.
-
+Also, it should be possible to either switch the file fast or create a own group/table within one file for each bias
+voltage investigated or other differences.
 
 ### Root Tree
+
 There should be one 'event' per measured pixel
 
 | Branch                                      | Block | Bedeutung                                |

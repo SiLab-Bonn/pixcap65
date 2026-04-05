@@ -1,6 +1,7 @@
 """
 Plotting of Pixcap65 data.
 """
+import os.path
 
 import numpy as np
 import tables as tb
@@ -62,8 +63,10 @@ def plot_data_delegate(data_group: tb.Group, analysis_group: tb.Group, output_pd
                 ax = fig.add_subplot(111)
                 res = np.polyfit(scan_parameters['frequency'], current_hist[col, row] * 1e9, deg=1, cov=True)
                 f = np.arange(0, scan_parameters['frequency'].max() * 1.1, 0.1)
-                ax.plot(f, res[0][0] * f + res[0][1], color=cmap(0.6), ls='--', marker='', label='Fit to data:\n$C_d = %.1f\,$fF' % res[0][0])
-                ax.plot(scan_parameters['frequency'], current_hist[col, row] * 1e9, marker='o', ls='', label='Pixel({i_col},{i_row})'.format(i_col=col, i_row=row), color=cmap(0.2))
+                ax.plot(f, res[0][0] * f + res[0][1], color=cmap(0.6), ls='--', marker='',
+                        label='Fit to data:\n$C_d = %.1f\,$fF' % res[0][0])
+                ax.plot(scan_parameters['frequency'], current_hist[col, row] * 1e9, marker='o', ls='',
+                        label='Pixel({i_col},{i_row})'.format(i_col=col, i_row=row), color=cmap(0.2))
                 ax.set_ylabel('Current / nA')
                 ax.set_xlabel('Frequency / MHz')
                 ax.legend()
@@ -72,7 +75,6 @@ def plot_data_delegate(data_group: tb.Group, analysis_group: tb.Group, output_pd
                 # ax.plot(freq_sweep_array, fit_fn, label = 'a={a:.3E}, b={b:.3E}'.format(a=a, b=b))
             else:
                 continue
-
 
         # #apply linear fit to measured current values; also returns covariance matrix
         # matrix = np.polyfit(freq_sweep_array, current_array, 1, cov=True)
@@ -89,4 +91,4 @@ def plot_data_delegate(data_group: tb.Group, analysis_group: tb.Group, output_pd
 
 
 if __name__ == '__main__':
-    plot_data(interpreted_data='/home/silab/git/pixcap65/pixcap_LF_50x50_DC_R3_80V_HV.h5')
+    plot_data(interpreted_data=os.path.expanduser('~/git/pixcap65/pixcap_LF_50x50_DC_R3_80V_HV.h5'))
