@@ -4,3 +4,5 @@
 **.h5
 /.venv
 gpgkey
+/bare-measurement/
+/advanced-bare-measurement/
