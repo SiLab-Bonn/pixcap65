@@ -23,33 +23,33 @@ transfer_layer:
       avoid_download: True
   #        avoid_download : False
 
-  - name: Serial
-    type: Serial
-    init:
-      port: "/dev/ttyUSB0"
-      # for 2410 we need
-      # read_termination : "\r"
-      read_termination: "\n"
-      baudrate: 19200
-      # only necessary when 2602a is used as SMU
-      parity: "E"
-      bytesize: 8
-      rtscts: True
-      exclusive: False
+#  - name: Serial
+#    type: Serial
+#    init:
+#      port: "/dev/ttyUSB0"
+#      # for 2410 we need
+#      # read_termination : "\r"
+#      read_termination: "\n"
+#      baudrate: 19200
+#      # only necessary when 2602a is used as SMU
+#      parity: "E"
+#      bytesize: 8
+#      rtscts: True
+#      exclusive: False
   # use this only as a serial driver
-  - name: Visa
-    type: Visa
-    init:
-      # not sure whether this would work at all.
-      resource_name: ASRL/dev/ttyUSB0
-      # resource_name: ASRLCOM3
-      read_termination: "\n"
-      baud_rate: 19200
-      parity: 2
-      data_bits: 8
-      flow_control: 2
-      access_mode: 0
-      backend: "@py"
+#  - name: Visa
+#    type: Visa
+#    init:
+#      # not sure whether this would work at all.
+#      resource_name: ASRL/dev/ttyUSB0
+#      # resource_name: ASRLCOM3
+#      read_termination: "\n"
+#      baud_rate: 19200
+#      parity: 2
+#      data_bits: 8
+#      flow_control: 2
+#      access_mode: 0
+#      backend: "@py"
 
   # use this as an ip driver
   - name: Visa
@@ -58,7 +58,7 @@ transfer_layer:
       # VXI-11 communication
       # resource_name: TCPIP::131.220.x.x::INSTR
       # Raw socket communication
-      resource_name: TCPIP::131.220.x.x::5025::SOCKET
+      resource_name: TCPIP::131.220.165.155::5025::SOCKET
       read_termination: "\n"
       write_termination: "\n"
       chunk_size: 2097152
@@ -77,13 +77,13 @@ hw_drivers:
     pixcap_init:
       channel: 1
 
-  - name: SMU1
-    type: scpi
-    interface: Visa
-    init:
-      device: Keithley 2602a
-    pixcap_init:
-      channel: 2
+#  - name: SMU1
+#    type: scpi
+#    interface: Visa
+#    init:
+#      device: Keithley 2602a
+#    pixcap_init:
+#      channel: 2
 
   - name: GPAC
     type: GPAC

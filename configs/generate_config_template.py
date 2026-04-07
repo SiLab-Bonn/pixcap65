@@ -23,10 +23,10 @@ def path_type(string):
 
 if __name__ == "__main__":
     parser = ArgumentParser()
-    parser.add_argument('--template', '-t', type=path_type, default='Keithley_2602a_template.yaml',
+    parser.add_argument('--template', '-t', type=path_type, default='keithley_2602a_template.yaml',
                         help='Path to the template file')
     parser.add_argument('--output', '-o', type=str, default=None, help='Path to write the output to.')
-    parser.add_argument('--smu_numbering', '-n', action='store_true', default=101,
+    parser.add_argument('--smu_numbering', '-n', action='store_true',
                         help='Whether, to use numbering scheme for the SMU channels.')
     args = parser.parse_args()
 

@@ -7,9 +7,14 @@ channel:
   reset: smuX.reset()
   on: smuX.source.output = 1
   off: smuX.source.output = 0
+  get_buffer1_mode: print(smuX.nvbuffer1.appendmode)
+  set_buffer1_mode: smuX.nvbuffer1.appendmode =
+  get_buffer2_mode: print(smuX.nvbuffer2.appendmode)
+  set_buffer2_mode: smuX.nvbuffer2.appendmode =
+  clear_buffer1: smuX.nvbuffer1.clear()
+  clear_buffer2: smuX.nvbuffer2.clear()
   source_current: smuX.source.func = smuX.OUTPUT_DCAMPS
   source_volt: smuX.source.func = smuX.OUTPUT_DCVOLTS
-  set_current_nlpc: smuX.measure.nplc =
   set_current_limit: smuX.source.limiti =
   set_voltage_limit: smuX.source.limitv =
   set_current_range: smuX.source.rangei =
@@ -22,12 +27,24 @@ channel:
   get_source_voltage: print(smuX.source.levelv)
   set_current: smuX.source.leveli =
   set_voltage: smuX.source.levelv =
+  four_wire_on: smuX.sense = smuX.SENSE_REMOTE
+  four_wire_off: smuX.sense = smuX.SENSE_LOCAL
+  get_remote_sense: smuX.sense
+  set_current_nlpc: smuX.measure.nplc =
+  set_voltage_nlpc: smuX.measure.nplc =
+  get_current_nlpc: print(smuX.measure.nplc)
+  get_voltage_nlpc: print(smuX.measure.nplc)
+  get_current_sense_autorange: print(smuX.measure.autorangei)
+  get_voltage_sense_autorange: print(smuX.measure.autorangev)
+  set_current_sense_autorange: smuX.measure.autorangei =
+  set_voltage_sense_autorange: smuX.measure.autorangev =
   set_current_sense_range: smuX.measure.rangei =
   set_voltage_sense_range: smuX.measure.rangev =
   get_current_sense_range: print(smuX.measure.rangei)
   get_voltage_sense_range: print(smuX.measure.rangev)
   get_current: print(smuX.measure.i())
   get_voltage: print(smuX.measure.v())
+  get_reading: print(smuX.measure.iv())
   multi_current_measurement: smuX.measure.i(smuX.nvbuffer1)
   multi_voltage_measurement: smuX.measure.v(smuX.nvbuffer2)
   get_multi_current: printbuffer(1, smuX.measure.count, smuX.nvbuffer1)
@@ -38,21 +55,13 @@ channel:
   get_averaged_voltage: printbuffer(1,4,statistics2)
   set_number_measurements: smuX.measure.count =
   get_number_measurements: print(smuX.measure.count)
-  get_current_sense_autorange: print(smuX.measure.autorangei)
-  get_voltage_sense_autorange: print(smuX.measure.autorangev)
-  set_current_sense_autorange: smuX.measure.autorangei =
-  set_voltage_sense_autorange: smuX.measure.autorangev =
   get_sense_interval: print(smuX.measure.interval)
   set_sense_interval: smuX.measure.interval =
   set_mode_measure_current_A: display.smuX.measure.func = display.MEASURE_DCAMPS
-  four_wire_on: smuX.sense = smuX.SENSE_REMOTE
-  four_wire_off: smuX.sense = smuX.SENSE_LOCAL
-  get_buffer1_mode: print(smuX.nvbuffer1.appendmode)
-  set_buffer1_mode: smuX.nvbuffer1.appendmode =
-  get_buffer2_mode: print(smuX.nvbuffer2.appendmode)
-  set_buffer2_mode: smuX.nvbuffer2.appendmode =
-  clear_buffer1: smuX.nvbuffer1.clear()
-  clear_buffer2: smuX.nvbuffer2.clear()
+  set_mode_measure_voltage_V: display.smuX.measure.func = display.MEASURE_DCVOLTS
+  set_mode_measure_ohms_O: display.smuX.measure.func = display.MEASURE_OHMS
+  set_mode_measure_watts_W: display.smuX.measure.func = display.MEASURE_WATTS
+  get_mode_measure: print(display.smuX.measure.func)
 
 top_back:
   binary_format: format.data = format.DREAL
