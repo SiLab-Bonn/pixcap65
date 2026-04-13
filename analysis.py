@@ -8,18 +8,39 @@ import tables as tb
 from iminuit import Minuit
 from iminuit.cost import LeastSquares
 
+from utils_2 import walk_to_node
+
 
 def full_capacitance_model(freq, c=1e-6, r=1e6, i=0, u0=1):
     # ignores the reference voltage for now
     return (u0 * c * freq + i) / (1 + r * c * freq)
 
-
-def advanced_analysis(raw_data):
+# TODO: REFACTOR the actual measurement paths in the file structure.
+def advanced_analysis(raw_data, use_kafe2=False, is_cv=False, base_path=None):
     with tb.open_file(raw_data, mode='a') as in_file_h5:
-        advanced_analysis_delegate(in_file_h5, in_file_h5.root, in_file_h5.root)
+        if base_path is None:
+            base_group = in_file_h5.root
+        else:
+            base_group = walk_to_node(in_file_h5.root, base_path)
+        if is_cv:
+            # need to perform the analysis for every bias voltage
+            cv_data = np.full(shape=(40, 40, base_group.biasing.measurements.BiasVoltageHist.shape[0]),
+                              fill_value=np.nan)
+            for k, bias_voltage in enumerate(base_group.biasing.measurements.BiasVoltageHist):
+                bias_name = f"bias_{bias_voltage}_V".replace('-', "M_").replace(".", "__")
+                data_group = base_group.biasing.measurements[bias_name]
+                ana_group = walk_to_node(base_group.biasing, str_join("/", "analysis", bias_name), create=True)
+                advanced_analysis_delegate(in_file_h5, data_group, ana_group, use_kafe2=use_kafe2)
+                cap_data = ana_group.HistCap[:]
+                cv_data[:, :, k] = cap_data[:, :]
 
+            in_file_h5.create_carray(base_group.biasing.analysis, name="UCHist", title="Histogram of the U-C-curve",
+                                     filters=tb.Filters(complib='blosc', complevel=5, fletcher32=False), obj=cv_data)
+        else:
+            ana_group = walk_to_node(base_group.total_cap, "analysis", create=True)
+            advanced_analysis_delegate(in_file_h5, base_group.total_cap.measurements, ana_group, use_kafe2=use_kafe2)
 
-def advanced_analysis_delegate(file: tb.File, data_group: tb.Group, result_group: tb.Group, use_kafe2=True):
+def advanced_analysis_delegate(file: tb.File, data_group: tb.Group, result_group: tb.Group, use_kafe2=True, is_cv=False):
     cap_hist = np.full(shape=(40, 40), fill_value=np.nan)
     cap_error_hist = np.full(shape=(40, 40), fill_value=np.nan)
     leak_hist = np.full(shape=(40, 40), fill_value=np.nan)
@@ -144,14 +165,35 @@ def advanced_analysis_delegate(file: tb.File, data_group: tb.Group, result_group
     file.create_carray(group,
                        name='HistFitCov',
                        title='Fit Covariance Matrix',
-                       obj=fit_cov,
+                       obj=fit_cov, filters=tb.Filters(complib='blosc',
+                                                      complevel=5,
+                                                      fletcher32=False)
                        )
 
+def str_join(delimiter, *args):
+    return delimiter.join(args)
 
-def analyze_data(raw_data):
+def analyze_data(raw_data, is_cv=False, base_path=None):
     with tb.open_file(raw_data, mode='a') as in_file_h5:
-        analyze_data_delegate(in_file_h5, in_file_h5.root, in_file_h5.root)
+        if base_path is None:
+            base_group = in_file_h5.root
+        else:
+            base_group = walk_to_node(in_file_h5.root, base_path)
+        if is_cv:
+            # need to perform the analysis for every bias voltage
+            cv_data = np.full(shape=(40, 40, base_group.biasing.measurements.BiasVoltageHist.shape[0]), fill_value=np.nan)
+            for k, bias_voltage in enumerate(base_group.biasing.measurements.BiasVoltageHist):
+                bias_name = f"bias_{bias_voltage}_V".replace('-', "M_").replace(".", "__")
+                data_group = base_group.biasing.measurements[bias_name]
+                ana_group = walk_to_node(base_group.biasing, str_join("/", "analysis", bias_name), create=True)
+                analyze_data_delegate(in_file_h5, data_group, ana_group)
+                cap_data = ana_group.HistCap[:]
+                cv_data[:, :, k] = cap_data[:, :]
 
+            in_file_h5.create_carray(base_group.biasing.analysis, name="UCHist", title="Histogram of the U-C-curve", filters=tb.Filters(complib='blosc',complevel=5,fletcher32=False), obj=cv_data)
+        else:
+            ana_group = walk_to_node(base_group.total_cap, "analysis", create=True)
+            analyze_data_delegate(in_file_h5, base_group.total_cap.measurements, ana_group)
 
 def analyze_data_delegate(file: tb.File, data_group: tb.Group, result_group: tb.Group):
     cap_hist = np.full(shape=(40, 40), fill_value=np.nan)  # capacitance for each pixel
@@ -219,7 +261,7 @@ def analyze_data_delegate(file: tb.File, data_group: tb.Group, result_group: tb.
     file.create_carray(group,
                        name='HistFitCov',
                        title='Fit Covariance Matrix',
-                       obj=fit_cov,
+                       obj=fit_cov,filters=tb.Filters(complib='blosc',complevel=5,fletcher32=False)
                        )
 
 

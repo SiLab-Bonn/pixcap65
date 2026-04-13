@@ -1,11 +1,12 @@
 [project]
-name = "pixcap65_USER_NAME"
+name = "pixcap65"
 version = "0.1.0"
 authors = [
     { name = "Hans Krüger", email = "krueger@physik.uni-bonn.de" },
 ]
 maintainers = [
-    { name = "Yannick Dieter", email = "dieter@physik.uni-bonn.de" },
+    { name = "Yannick Dieter", email = "dieter@physik.uni-bonn.de",
+      name = "Dominik Fischer", email = "s6dkfisc@uni-bonn.de" },
 ]
 
 readme = "README.md"
@@ -15,9 +16,9 @@ dependencies = [
     "matplotlib",
     "tables>=3.0",
     "pyyaml",
-    "bitarray",
+    "bitarray>=3.4.0",
     "coloredlogs",
-    "basil_daq<=3.1.0",
+    "basil_daq @ git+https://...@revion to use",
 ]
 
 [project.urls]

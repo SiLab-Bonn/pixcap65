@@ -11,9 +11,12 @@
 
 import logging
 import time
+from enum import StrEnum
+from typing import Any
 
 import numpy as np
 from basil.dut import Dut
+from numpy import ndarray
 
 import pixcap65_constants as c
 
@@ -22,114 +25,96 @@ float_initialiser = np.float32
 
 logger = logging.getLogger(__name__)
 
+class BasilConfigKeys(StrEnum):
+    TRANSFER_LAYER = 'transfer_layer'
+    HARDWARE_LAYER = 'hw_drivers'
+    REGISTER_LAYER = 'registers'
+
 
 class Pixcap65(Dut):
     __smu_kwargs = {}
     __bias_kwargs = {}
     __bias_smu_key = 'BIAS_SUPPLY'
     __primary_smu_key = 'SMU'
-    __vm1_smu_key = 'VM1_SMU'
-    __vm2_smu_key = 'VM2_SMU'
-    __vm3_smu_key = 'VM3_SMU'
+    __vm1_smu_key = 'VM1'
+    __vm2_smu_key = 'VM2'
+    __vm3_smu_key = 'VM3'
     __mio_pll_key = 'MIO_PLL'
 
     __seq_size = 1
     __current_cvm_frequency = 0
+    # __source_settling_time = 1
+    # __frequency_settling = 1
+    __source_settling_time = 0.2
+    __frequency_settling = 0.2
 
-    frequency_settling = 1
+    @property
+    def frequency_settling(self):
+        return self.__frequency_settling
+
+    @frequency_settling.setter
+    def frequency_settling(self, value):
+        self.__frequency_settling = value
+
+    @property
+    def primary_smu_key(self):
+        return self.__primary_smu_key
+
+    @property
+    def vm1_smu_key(self):
+        return self.__vm1_smu_key
+
+    @property
+    def vm2_smu_key(self):
+        return self.__vm2_smu_key
+
+    @property
+    def vm3_smu_key(self):
+        return self.__vm3_smu_key
 
     def init(self, init_conf=None, **kwargs):
-        Dut.init(self, init_conf=init_conf, **kwargs)
+        from usb.core import USBTimeoutError
+        try:
+            Dut.init(self, init_conf=init_conf, **kwargs)
+        except USBTimeoutError:
+            # perform a power cycle if possible
+            logger.error("An USB error occured try to solve the issue by a power cycle.")
+            if "power" in list(self._hardware_layer.keys()):
+                power_driver = self._hardware_layer["power"]
+                from basil.dut import Base
+                assert isinstance(power_driver, Base)
+                if not power_driver._intf.is_initialized:
+                    power_driver._intf.init()
+                if power_driver.is_initialized:
+                    power_driver.init()
 
-        # extract additional SMU configuration from the config file
-        # its a bit dirty but it should work for now.
-        # if 'hw_drivers' in self._conf:
-        #     for driver in self._conf['hw_drivers']:
-        #         if 'name' in driver and driver['name'] == "SMU":
-        #             smu_config = driver
-        #             break
-        #     else:
-        #         logging.error("No SMU device found in the hardware configuration file.")
-        #         smu_config = {}
-        #
-        #     if 'pixcap_init' in smu_config:
-        #         if 'single_channel' in smu_config['pixcap_init']:
-        #             if smu_config['pixcap_init']['single_channel']:
-        #                 common_smu_possible = False
-        #             else:
-        #                 self.__smu_kwargs['channel'] = smu_config['pixcap_init']['channel']
-        #         elif 'channel' in smu_config['pixcap_init']:
-        #             self.__smu_kwargs['channel'] = smu_config['pixcap_init']['channel']
-        #         else:
-        #             common_smu_possible = False
-        #
-        #     # extract the additional configuration for the biasing supply
-        #     # if no further configuration could be found, use the default values
-        #     if 'transfer_layer' not in self._conf:
-        #         tl_config = {}
-        #         primary_interface = smu_config['interface']
-        #         for entry in self._conf['transfer_layer']:
-        #             if 'type' in entry and entry['type'] == 'Serial':
-        #                 serial_interface = entry['name']
-        #                 interface_drivers = []
-        #                 for driver in self._conf['hw_drivers']:
-        #                     if 'interface' not in driver:
-        #                         continue
-        #                     if driver['interface'] != serial_interface:
-        #                         continue
-        #                     if 'type' not in driver:
-        #                         continue
-        #                     if driver['type'] != 'scpi':
-        #                         continue
-        #                     interface_drivers.append(driver)
-        #                 tl_config[serial_interface] = interface_drivers.copy()
-        #
-        #         # check the additional devices on the primary interface
-        #         suitable_devices = []
-        #         for device in tl_config[primary_interface]:
-        #             if device['name'] == "SMU":
-        #                 continue
-        #             suitable_devices.append(device)
-        #         for serial in tl_config.keys():
-        #             if serial == primary_interface:
-        #                 continue
-        #             suitable_devices.extend(tl_config[serial])
-        #
-        #         if len(suitable_devices) == 0:
-        #             assert common_smu_possible, "No suitable SMU device found on any serial interface."
-        #             self.__bias_smu_key = 'SMU'
-        #             bias_config = smu_config
-        #         elif len(suitable_devices) == 1:
-        #             self.__bias_smu_key = suitable_devices[0]['name']
-        #             bias_config = suitable_devices[0]
-        #         else:
-        #             logging.warning("More than one SMU device found on the serial interfaces. Will choose the first beginning with SMU.")
-        #             for device in suitable_devices:
-        #                 if device['name'].startswith('SMU'):
-        #                     self.__bias_smu_key = device['name']
-        #                     bias_config = device
-        #                     break
-        #             else:
-        #                 raise Exception("More than one SMU device found on the serial interfaces.")
-        #
-        #         # extract the additional configuration for the biasing supply
-        #         if 'pixcap_init' in bias_config:
-        #             if 'single_channel' in bias_config['pixcap_init'] and not bias_config['pixcap_init'][
-        #                 'single_channel']:
-        #                 self.__bias_kwargs['channel'] = bias_config['pixcap_init']['channel']
-        #             elif 'channel' in smu_config['pixcap_init']:
-        #                 self.__bias_kwargs['channel'] = bias_config['pixcap_init']['channel']
-        #     else:
-        #         logging.error("The hardware configuration file does not contain the transfer layer configuration.")
-        #
-        # else:
-        #     logging.error("The hardware configuration file does not contain the hardware drivers.")
+                power_driver.set_enable(0, channel=1)
+                power_driver.set_enable(0, channel=2)
+                time.sleep(5)
+                power_driver.set_enable(1, channel=1)
+                power_driver.set_enable(1, channel=2)
+
+                try:
+                    power_driver.close()
+                except:
+                    power_driver.is_initialized = True
+
+                if power_driver._intf.is_initialized:
+                    try:
+                        power_driver._intf.close()
+                    except:
+                        power_driver._intf.is_initialized = True
+
+                # now try the configuration of the board again.
+                time.sleep(30)
+                logger.info("Power cycle for FPGA completed")
+                Dut.init(self, init_conf=init_conf, **kwargs)
+            else:
+                raise
 
         # setup the chip
         self.switch_on_power_supply_voltages(1)
         self.init_config()
-        # self['SPI'].set_size(9960)
-        # self.reset_chip()
 
     def close(self):
         self.switch_on_power_supply_voltages(0)
@@ -140,7 +125,7 @@ class Pixcap65(Dut):
         """
         Switches on default supply voltages
         """
-        if (pwr_en):
+        if pwr_en:
             self['VDD'].set_current_limit(100, unit='mA')
             # Power
             self['VDD'].set_voltage(1.2, unit='V')
@@ -201,26 +186,111 @@ class Pixcap65(Dut):
         self['SPI'].set_size(9960)
         self.reset_chip()
 
-    # Handle the SMU!
-    def init_smu(self, src_u, current_range, voltage_range=1.5, current_limit=0.001, plc=10):
-        self[self.__primary_smu_key].off(**self.smu_kwargs)
-        self[self.__primary_smu_key].clear_buffer1(**self.smu_kwargs)
-        self[self.__primary_smu_key].clear_buffer2(**self.smu_kwargs)
-        self[self.__primary_smu_key].set_buffer1_mode(0, **self.smu_kwargs)
-        self[self.__primary_smu_key].set_buffer2_mode(0, **self.smu_kwargs)
-        self[self.__primary_smu_key].source_volt(**self.smu_kwargs)
-        self[self.__primary_smu_key].set_voltage_range(voltage_range, **self.smu_kwargs)
-        self[self.__primary_smu_key].set_current_nlpc(plc, **self.smu_kwargs)
-        self[self.__primary_smu_key].set_voltage(src_u, **self.smu_kwargs)
-        self[self.__primary_smu_key].set_current_limit(current_limit, **self.smu_kwargs)
-        self[self.__primary_smu_key].set_current_sense_range(current_range, **self.smu_kwargs)
-
-    def smu_on(self):
-        self[self.__primary_smu_key].on(**self.smu_kwargs)
+    def set_frequency(self, freq: float):
+        self.cvm_frequency = freq
 
     @property
-    def get_source_current(self) -> float:
-        result = self[self.__primary_smu_key].get_current(**self.smu_kwargs)
+    def cvm_frequency(self):
+        return self.__current_cvm_frequency
+
+    @cvm_frequency.setter
+    def cvm_frequency(self, freq):
+        prev_freq = self.__current_cvm_frequency
+        self.__current_cvm_frequency = freq
+        try:
+            logger.debug("Set the frequency to %f MHz with seq size %i.", freq, self.seq_size)
+            eff_freq = freq * self.seq_size
+            res = self[self.__mio_pll_key].setFrequency(eff_freq)
+            if not res:
+                logger.warning("Could not set the MIO PLL frequency to %d Hz.", freq)
+        except:
+            # error occured => revert the whole thing!
+            self.__current_cvm_frequency = prev_freq
+            raise
+        else:
+            time.sleep(self.frequency_settling)
+
+    @property
+    def source_settling_time(self):
+        return self.__source_settling_time
+
+    @source_settling_time.setter
+    def source_settling_time(self, time):
+        self.__source_settling_time = time
+
+    # Handle the SMU!
+    # region Accesor methods for a general SMU
+    def smu_init(self, smu: str, current_limit: float, current_range, plc: int, src_u, voltage_range: float, kwargs=None):
+        if kwargs is None:
+            kwargs = {}
+        self[smu].off(**kwargs)
+        try:
+            if self[smu].get_buffer2_mode(**kwargs).startswith("NEXT"):
+                print("Buffer 1 is still in data taking mode. Need to clear it.")
+                self[smu].disable_buffer(**kwargs)
+                time.sleep(10)
+            if self[smu].get_buffer2_mode(**kwargs).startswith("NEXT"):
+                print("Buffer 2 is still in data taking mode. Need to clear it.")
+                self[smu].disable_buffer(**kwargs)
+                time.sleep(10)
+            self[smu].set_number_trigger_points(1)
+        except ValueError:
+            pass
+
+        self[smu].clear_buffer1(**kwargs)
+        self[smu].clear_buffer2(**kwargs)
+        try:
+            self[smu].set_buffer1_mode(0, **kwargs)
+            self[smu].set_buffer2_mode(0, **kwargs)
+        except ValueError:
+            logger.warning("No buffer modes for the selected SMU. Will skip buffer mode configuration.")
+        try:
+            self[smu].disable_filter()
+        except ValueError:
+            logger.exception("No filter settings for the selected SMU. Will skip filter configuration.")
+        self[smu].source_volt(**kwargs)
+        self[smu].set_voltage_range(voltage_range, **kwargs)
+        self[smu].set_current_nlpc(plc, **kwargs)
+        self[smu].set_voltage(src_u, **kwargs)
+        self[smu].set_current_limit(current_limit, **kwargs)
+        self[smu].set_current_sense_range(current_range, **kwargs)
+
+    def smu_source_volt(self, smu:str, **kwargs):
+        if kwargs is None:
+            kwargs = {}
+        self[smu].source_volt(**kwargs)
+
+    def smu_source_current(self, smu: str, **kwargs):
+        if kwargs is None:
+            kwargs = {}
+        self[smu].source_current(**kwargs)
+
+    def set_smu_source_voltage(self, smu: str, voltage: float, kwargs=None):
+        if kwargs is None:
+            kwargs = {}
+        self[smu].set_voltage(voltage, **kwargs)
+        time.sleep(self.source_settling_time)
+
+    def set_smu_source_current(self, smu: str, current: float, kwargs=None):
+        if kwargs is None:
+            kwargs = {}
+        self[smu].set_current(current, **kwargs)
+        time.sleep(self.source_settling_time)
+
+    def get_smu_source_voltage(self, smu: str, **kwargs):
+        if kwargs is None:
+            kwargs = {}
+        return self[smu].get_source_voltage(**kwargs)
+
+    def get_smu_source_current(self, smu: str, **kwargs):
+        if kwargs is None:
+            kwargs = {}
+        return self[smu].get_source_current(**kwargs)
+
+    def smu_measure_current(self, smu: str, kwargs=None) -> Any:
+        if kwargs is None:
+            kwargs = {}
+        result = self[smu].get_current(**kwargs)
         if not (isinstance(result, float)
                 or isinstance(result, int)
                 or isinstance(result, np.float32)
@@ -237,66 +307,412 @@ class Pixcap65(Dut):
             raise ValueError("The current returned {current} was not recognised as a number.".format(current=current))
         return current
 
-    def averaged_current(self, n: int = 10):
-        self[self.__primary_smu_key].set_number_measurements(n, **self.smu_kwargs)
-        self[self.__primary_smu_key].multi_current_measurement(**self.smu_kwargs)
-        result = self[self.__primary_smu_key].get_averaged_current(**self.smu_kwargs)
-        print(result)
-        print("Will now exit for convenience!")
-        import sys
-        sys.exit(0)
+    def smu_measure_voltage(self, smu: str, kwargs=None) -> Any:
+        if kwargs is None:
+            kwargs = {}
+        result = self[smu].get_voltage(**kwargs)
+        if not (isinstance(result, float)
+                or isinstance(result, int)
+                or isinstance(result, np.float32)
+                or isinstance(result, np.float64)
+                or isinstance(result, str)):
+            print(type(result), result)
+            raise TypeError("The current returned {result} which was not recognised as a format.".format(result=result))
+        if isinstance(result, str) and ',' in result:
+            voltage = float_initialiser(result.split(',')[1])
+        else:
+            voltage = float_initialiser(result)
+        if np.isnan(voltage):
+            logging.warning("It was a NaN value measured by the SMU.")
+            raise ValueError("The current returned {current} was not recognised as a number.".format(current=voltage))
+        return voltage
 
-    def get_source_current_multiple(self, n: int):
+    def smu_averaged_current(self, n: int, smu: str, kwargs=None) -> tuple[float, float]:
+        if kwargs is None:
+            kwargs = {}
+        try:
+            self[smu].disable_filter()
+        except ValueError:
+            pass
+        self[smu].set_number_measurements(n, **kwargs)
+        self[smu].multi_current_measurement(**kwargs)
+        result = self[smu].get_averaged_current(**kwargs)
+        return tuple([float(elem) for elem in result.split(',')[:2]])
+
+    def smu_averaged_voltage(self, n: int, smu: str, kwargs=None) -> tuple[float, float]:
+        if kwargs is None:
+            kwargs = {}
+        try:
+            self[smu].disable_filter()
+        except ValueError:
+            pass
+        self[smu].set_number_measurements(n, **kwargs)
+        self[smu].multi_voltage_measurement(**kwargs)
+        result = self[smu].get_averaged_voltage(**kwargs)
+        return tuple([float(elem) for elem in result.split(',')[:2]])
+
+    def smu_advanced_current_multiple(self, n: int, smu: str, kwargs=None) -> ndarray:
+        if kwargs is None:
+            kwargs = {}
+        try:
+            self[smu].disable_filter()
+        except ValueError:
+            pass
+        self[smu].set_number_measurements(n, **kwargs)
+        try:
+            self[smu].set_number_triggers(n, **kwargs)
+        except ValueError:
+            pass
+        self[smu].multi_current_measurement(**kwargs)
+        result = self[smu].get_multi_current(**kwargs)
+        return np.array(result.split(','), dtype=float_initialiser)
+
+    def smu_advanced_voltage_multiple(self, n: int, smu: str, kwargs=None) -> ndarray:
+        if kwargs is None:
+            kwargs = {}
+        try:
+            self[smu].disable_filter()
+        except ValueError:
+            pass
+        self[smu].set_number_measurements(n, **kwargs)
+        self[smu].multi_voltage_measurement(**kwargs)
+        result = self[smu].get_multi_voltage(**kwargs)
+        return np.array(result.split(','), dtype=float_initialiser)
+
+    def general_smu_current_multiple(self, smu: str, n: int, kwargs=None) -> ndarray:
+        if kwargs is None:
+            kwargs = {}
+        try:
+            self[smu].disable_filter()
+        except ValueError:
+            pass
         def measurement_step():
-            current = self.get_source_current
+            current = self.smu_measure_current(smu, kwargs=kwargs)
             time.sleep(1e-6)
             return current
 
         return np.array([measurement_step() for _ in range(n)])
 
-        # alternative but potentially faster implementation
-        # self['SMU'].set_number_measurements(n, **self.smu_kwargs)
-        # self['SMU'].multi_current_measurement(**self.smu_kwargs)
-        # result = self['SMU'].get_multi_current(**self.smu_kwargs)
-        # return np.array(result.split(','), dtype=float_initialiser)
+    def general_smu_voltage_multiple(self, smu: str, n: int, kwargs=None) -> ndarray:
+        if kwargs is None:
+            kwargs = {}
+
+        try:
+            self[smu].disable_filter()
+        except ValueError:
+            pass
+        def measurement_step():
+            current = self.smu_measure_voltage(smu, kwargs=kwargs)
+            time.sleep(1e-6)
+            return current
+
+        return np.array([measurement_step() for _ in range(n)])
+
+    def smu_output_on(self, smu: str, kwargs=None):
+        if kwargs is None:
+            kwargs = {}
+        self[smu].on(**kwargs)
+
+    def smu_output_off(self, smu: str, kwargs=None):
+        if kwargs is None:
+            kwargs = {}
+        self[smu].off(**kwargs)
+    # endregion
+
+    # implementations for the different SMU's in use with pixcap
+    # region Primary SMU used for VM 3
+    # primary smu used for VM 3
+    def init_smu(self, src_u, current_range, voltage_range=1.5, current_limit=0.001, plc=10):
+        self.smu_init(self.__primary_smu_key, current_limit, current_range, plc, src_u, voltage_range, kwargs=self.smu_kwargs)
+
+    def smu_on(self):
+        self.smu_output_on(self.__primary_smu_key, kwargs=self.smu_kwargs)
 
     def smu_off(self):
-        self[self.__primary_smu_key].off(**self.smu_kwargs)
+        self.smu_output_off(self.__primary_smu_key, kwargs=self.smu_kwargs)
 
+    def smu_set_current_source(self):
+        self.smu_source_current(self.__primary_smu_key, kwargs=self.smu_kwargs)
+
+    def smu_set_voltage_source(self):
+        self.smu_source_volt(self.__primary_smu_key, kwargs=self.smu_kwargs)
+
+    @property
+    def source_voltage_smu(self):
+        return self.get_smu_source_voltage(self.__primary_smu_key, kwargs=self.smu_kwargs)
+
+    @source_voltage_smu.setter
+    def source_voltage_smu(self, value):
+        self.set_smu_source_voltage(self.__primary_smu_key, value, kwargs=self.smu_kwargs)
+
+    @property
+    def source_current_smu(self):
+        return self.get_smu_source_current(self.__primary_smu_key, kwargs=self.smu_kwargs)
+
+    @source_current_smu.setter
+    def source_current_smu(self, value):
+        self.set_smu_source_current(self.__primary_smu_key, value, kwargs=self.smu_kwargs)
+
+    @property
+    def get_source_current(self) -> float:
+        return self.smu_measure_current(self.__primary_smu_key, kwargs=self.smu_kwargs)
+
+    def smu_measure_volts(self):
+        return self.smu_measure_voltage(self.__primary_smu_key, kwargs=self.smu_kwargs)
+
+    def averaged_current(self, n: int = 10):
+        return self.smu_averaged_current(n, self.__primary_smu_key, kwargs=self.smu_kwargs)
+
+    def averaged_voltage(self, n: int = 10):
+        return self.smu_averaged_voltage(n, self.__primary_smu_key, kwargs=self.smu_kwargs)
+
+    def get_source_current_multiple(self, n: int):
+        return self.general_smu_current_multiple(self.__primary_smu_key, n, kwargs=self.smu_kwargs)
+
+    def get_source_voltage_multiple(self, n: int):
+        return self.general_smu_voltage_multiple(self.__primary_smu_key, n, kwargs=self.smu_kwargs)
+
+    def get_advanced_current_multiple(self, n: int):
+        return self.smu_advanced_current_multiple(n, self.__primary_smu_key, kwargs=self.smu_kwargs)
+
+    def get_advanced_voltage_multiple(self, n: int):
+        return self.smu_advanced_voltage_multiple(n, self.__primary_smu_key, kwargs=self.smu_kwargs)
+    # endregion
+
+    # region Handle the biasing supply.
     # Handle the biasing supply
-    def init_bias_voltage(self, voltage: float = -80.0, voltage_range=1.5, current_limit=0.001, current_range=0.00001):
-        # Refactor this according to the actual setup
-        # settings for sensor depletion source
-        self[self.bias_smu_key].off(**self.smu_bias_kwargs)
-        self[self.bias_smu_key].source_volt(**self.smu_bias_kwargs)
-        self[self.bias_smu_key].set_voltage_range(voltage_range, **self.smu_bias_kwargs)
-        self[self.bias_smu_key].set_current_nlpc(self.smu_plc, **self.smu_bias_kwargs)
-        self[self.bias_smu_key].set_voltage(voltage, **self.smu_bias_kwargs)
-        self[self.bias_smu_key].set_current_limit(current_limit, **self.smu_bias_kwargs)
-        self[self.bias_smu_key].set_current_sense_range(current_range, **self.smu_bias_kwargs)
+    def init_bias(self, voltage, current_range, voltage_range=1.5, current_limit=0.001, plc=10):
+        self.smu_init(self.__bias_smu_key, current_limit, current_range, plc, voltage, voltage_range,
+                      kwargs=self.smu_bias_kwargs)
 
-    def set_bias_on(self):
-        self[self.bias_smu_key].on(**self.smu_bias_kwargs)
+    def bias_on(self):
+        self.smu_output_on(self.__bias_smu_key, kwargs=self.smu_bias_kwargs)
 
-    def set_bias_off(self):
-        self[self.bias_smu_key].off(**self.smu_bias_kwargs)
+    def bias_off(self):
+        self.smu_output_off(self.__bias_smu_key, kwargs=self.smu_bias_kwargs)
 
-    def set_bias_voltage(self, voltage: float):
-        self[self.bias_smu_key].set_voltage(voltage, **self.smu_bias_kwargs)
-        time.sleep(1)
+    def bias_current_source(self):
+        self.smu_source_current(self.__bias_smu_key, kwargs=self.smu_bias_kwargs)
 
-    def set_frequency(self, freq: float):
-        self.cvm_frequency = freq
+    def bias_voltage_source(self):
+        self.smu_source_volt(self.__bias_smu_key, kwargs=self.smu_bias_kwargs)
 
-    # properties of the pixcap system
     @property
     def bias_voltage(self):
-        return self[self.bias_smu_key].get_voltage(**self.smu_bias_kwargs)
+        return self.get_smu_source_voltage(self.__bias_smu_key, kwargs=self.smu_bias_kwargs)
 
     @bias_voltage.setter
-    def bias_voltage(self, voltage):
-        self.set_bias_voltage(voltage)
+    def bias_voltage(self, value):
+        self.set_smu_source_voltage(self.__bias_smu_key, value, kwargs=self.smu_bias_kwargs)
 
+    @property
+    def bias_current(self):
+        return self.get_smu_source_current(self.__bias_smu_key, kwargs=self.smu_bias_kwargs)
+
+    @bias_current.setter
+    def bias_current(self, value):
+        self.set_smu_source_current(self.__bias_smu_key, value, kwargs=self.smu_bias_kwargs)
+
+    def bias_measure_current(self) -> float:
+        return self.smu_measure_current(self.__bias_smu_key, kwargs=self.smu_bias_kwargs)
+
+    def bias_measure_volts(self):
+        return self.smu_measure_voltage(self.__bias_smu_key, kwargs=self.smu_bias_kwargs)
+
+    def bias_averaged_current(self, n: int = 10):
+        return self.smu_averaged_current(n, self.__bias_smu_key, kwargs=self.smu_bias_kwargs)
+
+    def bias_averaged_voltage(self, n: int = 10):
+        return self.smu_averaged_voltage(n, self.__bias_smu_key, kwargs=self.smu_bias_kwargs)
+
+    def bias_current_multiple(self, n: int):
+        return self.general_smu_current_multiple(self.__bias_smu_key, n, kwargs=self.smu_bias_kwargs)
+
+    def bias_voltage_multiple(self, n: int):
+        return self.general_smu_voltage_multiple(self.__bias_smu_key, n, kwargs=self.smu_bias_kwargs)
+
+    def bias_advanced_current_multiple(self, n: int):
+        return self.smu_advanced_current_multiple(n, self.__bias_smu_key, kwargs=self.smu_bias_kwargs)
+
+    def bias_advanced_voltage_multiple(self, n: int):
+        return self.smu_advanced_voltage_multiple(n, self.__bias_smu_key, kwargs=self.smu_bias_kwargs)
+    # endregion
+
+    # region Handle the VM1 Connector SMU
+    def init_vm1(self, src_u, current_range, voltage_range=1.5, current_limit=0.001, plc=10):
+        self.smu_init(self.__vm1_smu_key, current_limit, current_range, plc, src_u, voltage_range,
+                      kwargs=self.smu_vm1_kwargs)
+
+    def vm1_on(self):
+        self.smu_output_on(self.__vm1_smu_key, kwargs=self.smu_vm1_kwargs)
+
+    def vm1_off(self):
+        self.smu_output_off(self.__vm1_smu_key, kwargs=self.smu_vm1_kwargs)
+
+    def vm1_current_source(self):
+        self.smu_source_current(self.__vm1_smu_key, kwargs=self.smu_vm1_kwargs)
+
+    def vm1_voltage_source(self):
+        self.smu_source_volt(self.__vm1_smu_key, kwargs=self.smu_vm1_kwargs)
+
+    @property
+    def vm1_voltage(self):
+        return self.get_smu_source_voltage(self.__vm1_smu_key, kwargs=self.smu_vm1_kwargs)
+
+    @vm1_voltage.setter
+    def vm1_voltage(self, value):
+        self.set_smu_source_voltage(self.__vm1_smu_key, value, kwargs=self.smu_vm1_kwargs)
+
+    @property
+    def vm1_current(self):
+        return self.get_smu_source_current(self.__vm1_smu_key, kwargs=self.smu_vm1_kwargs)
+
+    @vm1_current.setter
+    def vm1_current(self, value):
+        self.set_smu_source_current(self.__vm1_smu_key, value, kwargs=self.smu_vm1_kwargs)
+
+    def vm1_measure_current(self) -> float:
+        return self.smu_measure_current(self.__vm1_smu_key, kwargs=self.smu_vm1_kwargs)
+
+    def vm1_measure_volts(self):
+        return self.smu_measure_voltage(self.__vm1_smu_key, kwargs=self.smu_vm1_kwargs)
+
+    def vm1_averaged_current(self, n: int = 10):
+        return self.smu_averaged_current(n, self.__vm1_smu_key, kwargs=self.smu_vm1_kwargs)
+
+    def vm1_averaged_voltage(self, n: int = 10):
+        return self.smu_averaged_voltage(n, self.__vm1_smu_key, kwargs=self.smu_vm1_kwargs)
+
+    def vm1_current_multiple(self, n: int):
+        return self.general_smu_current_multiple(self.__vm1_smu_key, n, kwargs=self.smu_vm1_kwargs)
+
+    def vm1_voltage_multiple(self, n: int):
+        return self.general_smu_voltage_multiple(self.__vm1_smu_key, n, kwargs=self.smu_vm1_kwargs)
+
+    def vm1_advanced_current_multiple(self, n: int):
+        return self.smu_advanced_current_multiple(n, self.__vm1_smu_key, kwargs=self.smu_vm1_kwargs)
+
+    def vm1_advanced_voltage_multiple(self, n: int):
+        return self.smu_advanced_voltage_multiple(n, self.__vm1_smu_key, kwargs=self.smu_vm1_kwargs)
+    # endregion
+
+    # region Handle the VM2 Connector SMU
+    def init_vm2(self, src_u, current_range, voltage_range=1.5, current_limit=0.001, plc=10):
+        self.smu_init(self.__vm2_smu_key, current_limit, current_range, plc, src_u, voltage_range,
+                      kwargs=self.smu_vm2_kwargs)
+
+    def vm2_on(self):
+        self.smu_output_on(self.__vm2_smu_key, kwargs=self.smu_vm2_kwargs)
+
+    def vm2_off(self):
+        self.smu_output_off(self.__vm2_smu_key, kwargs=self.smu_vm2_kwargs)
+
+    def vm2_current_source(self):
+        self.smu_source_current(self.__vm2_smu_key, kwargs=self.smu_vm2_kwargs)
+
+    def vm2_voltage_source(self):
+        self.smu_source_volt(self.__vm2_smu_key, kwargs=self.smu_vm2_kwargs)
+
+    @property
+    def vm2_voltage(self):
+        return self.get_smu_source_voltage(self.__vm2_smu_key, kwargs=self.smu_vm2_kwargs)
+
+    @vm2_voltage.setter
+    def vm2_voltage(self, value):
+        self.set_smu_source_voltage(self.__vm2_smu_key, value, kwargs=self.smu_vm2_kwargs)
+
+    @property
+    def vm2_current(self):
+        return self.get_smu_source_current(self.__vm2_smu_key, kwargs=self.smu_vm2_kwargs)
+
+    @vm2_current.setter
+    def vm2_current(self, value):
+        self.set_smu_source_current(self.__vm2_smu_key, value, kwargs=self.smu_vm2_kwargs)
+
+    def vm2_measure_current(self) -> float:
+        return self.smu_measure_current(self.__vm2_smu_key, kwargs=self.smu_vm2_kwargs)
+
+    def vm2_measure_volts(self):
+        return self.smu_measure_voltage(self.__vm2_smu_key, kwargs=self.smu_vm2_kwargs)
+
+    def vm2_averaged_current(self, n: int = 10):
+        return self.smu_averaged_current(n, self.__vm2_smu_key, kwargs=self.smu_vm2_kwargs)
+
+    def vm2_averaged_voltage(self, n: int = 10):
+        return self.smu_averaged_voltage(n, self.__vm2_smu_key, kwargs=self.smu_vm2_kwargs)
+
+    def vm2_current_multiple(self, n: int):
+        return self.general_smu_current_multiple(self.__vm2_smu_key, n, kwargs=self.smu_vm2_kwargs)
+
+    def vm2_voltage_multiple(self, n: int):
+        return self.general_smu_voltage_multiple(self.__vm2_smu_key, n, kwargs=self.smu_vm2_kwargs)
+
+    def vm2_advanced_current_multiple(self, n: int):
+        return self.smu_advanced_current_multiple(n, self.__vm2_smu_key, kwargs=self.smu_vm2_kwargs)
+
+    def vm2_advanced_voltage_multiple(self, n: int):
+        return self.smu_advanced_voltage_multiple(n, self.__vm2_smu_key, kwargs=self.smu_vm2_kwargs)
+    # endregion
+
+    # region Handle the VM3 Connector SMU
+    def init_vm3(self, src_u, current_range, voltage_range=1.5, current_limit=0.001, plc=10):
+        self.smu_init(self.__vm3_smu_key, current_limit, current_range, plc, src_u, voltage_range,
+                      kwargs=self.smu_vm3_kwargs)
+
+    def vm3_on(self):
+        self.smu_output_on(self.__vm3_smu_key, kwargs=self.smu_vm3_kwargs)
+
+    def vm3_off(self):
+        self.smu_output_off(self.__vm3_smu_key, kwargs=self.smu_vm3_kwargs)
+
+    def vm3_current_source(self):
+        self.smu_source_current(self.__vm3_smu_key, kwargs=self.smu_vm3_kwargs)
+
+    def vm3_voltage_source(self):
+        self.smu_source_volt(self.__vm3_smu_key, kwargs=self.smu_vm3_kwargs)
+
+    @property
+    def vm3_voltage(self):
+        return self.get_smu_source_voltage(self.__vm3_smu_key, kwargs=self.smu_vm3_kwargs)
+
+    @vm3_voltage.setter
+    def vm3_voltage(self, value):
+        self.set_smu_source_voltage(self.__vm3_smu_key, value, kwargs=self.smu_vm3_kwargs)
+
+    @property
+    def vm3_current(self):
+        return self.get_smu_source_current(self.__vm3_smu_key, kwargs=self.smu_vm3_kwargs)
+
+    @vm3_current.setter
+    def vm3_current(self, value):
+        self.set_smu_source_current(self.__vm3_smu_key, value, kwargs=self.smu_vm3_kwargs)
+
+    def vm3_measure_current(self) -> float:
+        return self.smu_measure_current(self.__vm3_smu_key, kwargs=self.smu_vm3_kwargs)
+
+    def vm3_measure_volts(self):
+        return self.smu_measure_voltage(self.__vm3_smu_key, kwargs=self.smu_vm3_kwargs)
+
+    def vm3_averaged_current(self, n: int = 10):
+        return self.smu_averaged_current(n, self.__vm3_smu_key, kwargs=self.smu_vm3_kwargs)
+
+    def vm3_averaged_voltage(self, n: int = 10):
+        return self.smu_averaged_voltage(n, self.__vm3_smu_key, kwargs=self.smu_vm3_kwargs)
+
+    def vm3_current_multiple(self, n: int):
+        return self.general_smu_current_multiple(self.__vm3_smu_key, n, kwargs=self.smu_vm3_kwargs)
+
+    def vm3_voltage_multiple(self, n: int):
+        return self.general_smu_voltage_multiple(self.__vm3_smu_key, n, kwargs=self.smu_vm3_kwargs)
+
+    def vm3_advanced_current_multiple(self, n: int):
+        return self.smu_advanced_current_multiple(n, self.__vm3_smu_key, kwargs=self.smu_vm3_kwargs)
+
+    def vm3_advanced_voltage_multiple(self, n: int):
+        return self.smu_advanced_voltage_multiple(n, self.__vm3_smu_key, kwargs=self.smu_vm3_kwargs)
+    # endregion
+
+    # general properties!
     @property
     def smu_plc(self):
         return 10
@@ -311,6 +727,18 @@ class Pixcap65(Dut):
         return self.__bias_kwargs
 
     @property
+    def smu_vm1_kwargs(self):
+        return {}
+
+    @property
+    def smu_vm2_kwargs(self):
+        return {}
+
+    @property
+    def smu_vm3_kwargs(self):
+        return {}
+
+    @property
     def bias_smu_key(self):
         return self.__bias_smu_key
 
@@ -320,16 +748,5 @@ class Pixcap65(Dut):
 
     @seq_size.setter
     def seq_size(self, size):
+        logger.debug("Setting seq size to %i.", size)
         self.__seq_size = size
-
-    @property
-    def cvm_frequency(self):
-        return self.__current_cvm_frequency
-
-    @cvm_frequency.setter
-    def cvm_frequency(self, freq):
-        self.__current_cvm_frequency = freq
-        res = self[self.__mio_pll_key].setFrequency(freq)
-        if not res:
-            logger.warning("Could not set the MIO PLL frequency to %d Hz.", freq)
-        time.sleep(self.frequency_settling)
