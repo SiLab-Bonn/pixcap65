@@ -37,6 +37,39 @@ transfer_layer:
         rtscts   : True
         exclusive : False
 
+  - name: Serial2 
+    type: Serial
+    init:
+      port: "/dev/ttyUSB1"
+      # for power supply
+      # read_termination: "\r\n"
+      # write_termination: "\n"
+      # baudrate: 19200
+      # timeout: 2.0
+      # xonxoff: True
+      # parity: N
+      # stopbits: 1
+      # bytesize: 8
+      # for biasing smu
+      read_termination: "\r"
+      baudrate: 19200
+      parity: N
+      bytesize: 8
+      timeout: 120
+
+  - name: Serial3 
+    type: Serial
+    init:
+      port: "/dev/ttyUSB2"
+      # for power supply
+      read_termination: "\r\n"
+      write_termination: "\n"
+      baudrate: 19200
+      timeout: 2.0
+      xonxoff: True
+      parity: N
+      stopbits: 1
+      bytesize: 8
 
 
 hw_drivers:
@@ -55,6 +88,13 @@ hw_drivers:
       device    : Keithley 2602a
     pixcap_init :
       channel   : 2
+
+  - name        : BIAS_SMU
+    type        : scpi
+    interface   : Serial2
+    init        :
+      device    : Keithley 2410
+      enable_formatting: False
 
   - name      : GPAC
     type      : GPAC
@@ -84,9 +124,9 @@ hw_drivers:
     interface : USB
     base_addr : 0x14000
     
-#  - name      : power
-#    type      : tti_ql355tp
-#    interface : SerialCOM12
+  - name      : power
+    type      : tti_ql355tp
+    interface : Serial3
 
 registers:
   - name        : VDD
@@ -179,8 +219,8 @@ registers:
 
   - name: BIAS_SUPPLY
     type: FunctionalRegister
-    hw_driver: SMU
-    arg_add: { 'channel': 2 }
+    hw_driver: BIAS_SMU
+    arg_add: {  }
 
   - name: VM1
     type: FunctionalRegister

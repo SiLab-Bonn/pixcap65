@@ -163,7 +163,7 @@ def extract_smu_range_error(smu_config: dict, data, range_spec: float, kind: str
     """
     assert kind in smu_config
     for entry in smu_config[kind]:
-        if effective_floating_type(entry[ConfigElements.NORMALISED_RANGE]) == range_spec:
+        if np.isclose(effective_floating_type(entry[ConfigElements.NORMALISED_RANGE]), range_spec):
             reading_error = result_floating_type(entry[ConfigElements.RESOLUTION][ResolutionElements.ACCURACY])
             absolute_error = result_floating_type(entry[ConfigElements.RESOLUTION][ResolutionElements.ACCURACY.AMPS])
             break
