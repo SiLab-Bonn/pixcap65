@@ -41,12 +41,24 @@ class Pixcap65(Dut):
     __vm3_smu_key = 'VM3'
     __mio_pll_key = 'MIO_PLL'
 
+    __smu_keys = [__primary_smu_key, __vm1_smu_key, __vm2_smu_key, __vm3_smu_key, __bias_smu_key]
+    smu_setup_devices = {} # hold the keys for the access to parts of a smu which are not channel depend for each of the smu registers.
+
     __seq_size = 1
     __current_cvm_frequency = 0
     # __source_settling_time = 1
     # __frequency_settling = 1
     __source_settling_time = 0.2
     __frequency_settling = 0.2
+    __n_measurements = {
+                        __primary_smu_key: 1,
+                        __vm1_smu_key: 1,
+                        __vm2_smu_key: 1,
+                        __vm3_smu_key: 1,
+                        __bias_smu_key: 1,
+                        }
+
+    binary_active = False
 
     @property
     def frequency_settling(self):
@@ -106,7 +118,7 @@ class Pixcap65(Dut):
                         power_driver._intf.is_initialized = True
 
                 # now try the configuration of the board again.
-                time.sleep(30)
+                time.sleep(10)
                 logger.info("Power cycle for FPGA completed")
                 Dut.init(self, init_conf=init_conf, **kwargs)
             else:
@@ -116,8 +128,27 @@ class Pixcap65(Dut):
         self.switch_on_power_supply_voltages(1)
         self.init_config()
 
+        # make sure that we have a setup mapping for the different SMUs
+        from basil.RL.FunctionalRegister import FunctionalRegister
+        for smu_key in self.__smu_keys:
+            if isinstance(self[smu_key], FunctionalRegister):
+                # adjust the register
+                try:
+                    self.smu_setup_devices[smu_key] = self[smu_key]._drv.name
+                except:
+                    self.smu_setup_devices[smu_key] = smu_key
+            else:
+                self.smu_setup_devices[smu_key] = smu_key
+
+        print(self.smu_setup_devices)
+
+
     def close(self):
         self.switch_on_power_supply_voltages(0)
+        try:
+            self[self.smu_setup_devices[self.primary_smu_key]].text_format()
+        except ValueError:
+            pass
         self['SEQ'].clear()
         Dut.close(self)
 
@@ -220,6 +251,7 @@ class Pixcap65(Dut):
 
     # Handle the SMU!
     # region Accesor methods for a general SMU
+    # MARK: perhaps this functions should be shifted direct to a SMU type in the basil framework?
     def smu_init(self, smu: str, current_limit: float, current_range, plc: int, src_u, voltage_range: float, kwargs=None):
         if kwargs is None:
             kwargs = {}
@@ -351,32 +383,44 @@ class Pixcap65(Dut):
         result = self[smu].get_averaged_voltage(**kwargs)
         return tuple([float(elem) for elem in result.split(',')[:2]])
 
-    def smu_advanced_current_multiple(self, n: int, smu: str, kwargs=None) -> ndarray:
+    def smu_advanced_current_multiple(self, n: int | None, smu: str, kwargs=None) -> ndarray:
         if kwargs is None:
             kwargs = {}
         try:
+            # this function might not be implemented.
             self[smu].disable_filter()
         except ValueError:
             pass
-        self[smu].set_number_measurements(n, **kwargs)
-        try:
-            self[smu].set_number_triggers(n, **kwargs)
-        except ValueError:
-            pass
-        self[smu].multi_current_measurement(**kwargs)
-        result = self[smu].get_multi_current(**kwargs)
+        if n is not None and self.__n_measurements[smu] != n:
+            self.set_smu_measurements(smu, n, kwargs)
+        result = self[smu].get_advanced_current(**kwargs)
+        if "binary_enabled" in kwargs and kwargs["binary_enabled"]:
+            n = self.__n_measurements[smu]
+            if result.shape[0] > n:
+                offset = int(result.shape[0] % n)
+                shift = int(result.shape[0] // n)
+                return result[offset::shift]
+            return result
         return np.array(result.split(','), dtype=float_initialiser)
 
     def smu_advanced_voltage_multiple(self, n: int, smu: str, kwargs=None) -> ndarray:
         if kwargs is None:
             kwargs = {}
         try:
+            # this function might not be implemented.
             self[smu].disable_filter()
         except ValueError:
             pass
-        self[smu].set_number_measurements(n, **kwargs)
-        self[smu].multi_voltage_measurement(**kwargs)
-        result = self[smu].get_multi_voltage(**kwargs)
+        if n is not None and self.__n_measurements[smu] != n:
+            self.set_smu_measurements(smu, n, kwargs)
+        result = self[smu].get_advanced_voltage(**kwargs)
+        if "binary_enabled" in kwargs and kwargs["binary_enabled"]:
+            n = self.__n_measurements[smu]
+            if result.shape[0] > n:
+                offset = int(result.shape[0] % n)
+                shift = int(result.shape[0] // n)
+                return result[offset::shift]
+            return result
         return np.array(result.split(','), dtype=float_initialiser)
 
     def general_smu_current_multiple(self, smu: str, n: int, kwargs=None) -> ndarray:
@@ -417,6 +461,23 @@ class Pixcap65(Dut):
         if kwargs is None:
             kwargs = {}
         self[smu].off(**kwargs)
+
+    def set_smu_measurements(self, smu: str, value: int, kwargs=None):
+        if kwargs is None:
+            kwargs = {}
+        if value == -1:
+            self[smu].set_number_measurements(1, **kwargs)
+            try:
+                self[smu].set_number_triggers(1, **kwargs)
+            except ValueError:
+                pass
+        else:
+            self[smu].set_number_measurements(value, **kwargs)
+            try:
+                self[smu].set_number_triggers(value, **kwargs)
+            except ValueError:
+                pass
+        self.__n_measurements[smu] = value
     # endregion
 
     # implementations for the different SMU's in use with pixcap
@@ -473,10 +534,16 @@ class Pixcap65(Dut):
         return self.general_smu_voltage_multiple(self.__primary_smu_key, n, kwargs=self.smu_kwargs)
 
     def get_advanced_current_multiple(self, n: int):
-        return self.smu_advanced_current_multiple(n, self.__primary_smu_key, kwargs=self.smu_kwargs)
+        kargs = self.smu_kwargs.copy()
+        kargs['binary_enabled'] = self.binary_active
+        kargs['data_points'] = self.n_measurements
+        return self.smu_advanced_current_multiple(n, self.__primary_smu_key, kwargs=kargs)
 
     def get_advanced_voltage_multiple(self, n: int):
-        return self.smu_advanced_voltage_multiple(n, self.__primary_smu_key, kwargs=self.smu_kwargs)
+        kargs = self.smu_kwargs.copy()
+        kargs['binary_enabled'] = self.binary_active
+        kargs['data_points'] = self.n_measurements
+        return self.smu_advanced_voltage_multiple(n, self.__primary_smu_key, kwargs=kargs)
     # endregion
 
     # region Handle the biasing supply.
@@ -750,3 +817,15 @@ class Pixcap65(Dut):
     def seq_size(self, size):
         logger.debug("Setting seq size to %i.", size)
         self.__seq_size = size
+
+    @property
+    def n_measurements(self):
+        return self.__n_measurements[self.primary_smu_key]
+
+    @n_measurements.setter
+    def n_measurements(self, value):
+        if value == -1:
+            self[self.primary_smu_key].set_number_measurements(1, **self.smu_kwargs)
+        else:
+            self[self.primary_smu_key].set_number_measurements(value, **self.smu_kwargs)
+        self.__n_measurements[self.primary_smu_key] = value

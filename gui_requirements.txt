@@ -1,0 +1,3 @@
+# appendix for viewing hdf files
+pyqt5>=5.8
+vitables

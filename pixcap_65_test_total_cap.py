@@ -28,6 +28,8 @@ import numpy as np
 import tables as tb
 import yaml
 from bitarray import bitarray
+from tqdm import tqdm
+from tqdm.contrib.logging import logging_redirect_tqdm
 
 import pixcap65_constants as c
 from analysis import advanced_analysis_delegate
@@ -40,6 +42,7 @@ from utils_2 import walk_to_node
 TOTAL_CAP_SEQ_SIZE = 4
 TOTAL_CAP_SEQ_SIZE_KEY = "sequence_size"
 NUMBER_AVERAGE_MEASUREMENTS_KEY = "average_measurements"
+BIASING_NUMBER_AVERAGE_MEASUREMENTS_KEY = "bias_average_measurements"
 MEASURING_PIXEL_TEXT = 'Measuring pixel (%i, %i)...'
 
 logging.getLogger().setLevel(logging.INFO)
@@ -77,15 +80,27 @@ def _store_scan_par_values(h5_file, scan_parameters, group: tb.Group = None, **k
     fields.extend([(name, np.float64) for name in keys])
     # fields.extend([(name, np.float32) for name in keys])
 
-    scan_par_table = h5_file.create_table(group, name='scan_params',
-                                          title='Scan parameter values per scan parameter id',
-                                          description=np.dtype(fields))
-    for par_id, par_values in scan_parameters.items():
-        a = np.full(shape=(1,), fill_value=np.nan).astype(np.dtype(fields))
-        for key, val in par_values.items():
-            a['scan_param_id'] = par_id
-            a[key] = np.float32(val)
-        scan_par_table.append(a)
+    if "scan_params" in group:
+        logging.info("Storing scan parameter values but found an already existing table; will rename it")
+        new_name = "scan_params"
+        while new_name in group:
+            new_name = "{old}_backing".format(old=new_name)
+        group.scan_params.rename(new_name)
+        # group.scan_params.rename("scan_params_old")
+        time.sleep(5)
+
+    try:
+        scan_par_table = h5_file.create_table(group, name='scan_params',
+                                              title='Scan parameter values per scan parameter id',
+                                              description=np.dtype(fields))
+        for par_id, par_values in scan_parameters.items():
+            a = np.full(shape=(1,), fill_value=np.nan).astype(np.dtype(fields))
+            for key, val in par_values.items():
+                a['scan_param_id'] = par_id
+                a[key] = np.float32(val)
+            scan_par_table.append(a)
+    except:
+        logging.error("Failed to create and fill the scan parameters table. But will continue anyway.")
 
 
 class ScanConfigurationKeys(StrEnum):
@@ -98,17 +113,21 @@ class ScanConfigurationKeys(StrEnum):
     FREQUENCY_RANGE = "frequency_range"
     BIAS_VOLTAGE_RANGE = "bias_range"
 
-
 scan_configuration = {
-    'start_column': 20,
-    'stop_column': 30,
-    'start_row': 20,
-    'stop_row': 30,
-    # "average_measurements": 10,
+    'start_column': 0,
+    'stop_column': 40,
+    'start_row': 0,
+    'stop_row': 40,
+    "average_measurements": 6,
+    # "bias_average_measurements": 3,
 
     'Vin': 1.0,  # input voltage in V
     'frequency_range': np.arange(1, 12.1, 0.5),  # frequency sweep in MHz
-    'bias_range': -1 * np.arange(1, 101.1, 0.5)
+    # 'bias_range': -1 * np.arange(1, 100.1, 0.5),
+    # 'bias': -80.0,   # bias voltage to apply in V
+
+    'data_path': "ATLAS_Itk/X2",
+    "out_file_mode": "append",
 }
 
 class BiasTable(tb.IsDescription):
@@ -118,7 +137,6 @@ class BiasTable(tb.IsDescription):
 
 
 class PixCap65Measurement(object):
-    __n_measurements = 1
     smu_range_config = {}
     __group: tb.Group = None
 
@@ -129,6 +147,10 @@ class PixCap65Measurement(object):
         # handle smu error configuration
         adjusted_config = self.dut._conf.copy()
         self._environ_config = OrderedDict()
+        from tqdm_logging_utils import DummyTqdmFile
+        from tqdm import tqdm
+        import sys
+        self.dummy_file = DummyTqdmFile(sys.stdout, tqdm)
 
         rl_mapping = {}
         tl_mapping = {}
@@ -176,19 +198,50 @@ class PixCap65Measurement(object):
         self.scan_config = scan_config
 
         self.output_file = output_file
-        self.out_file_h5 = tb.open_file(self.output_file, mode='w')
+        if os.path.exists(self.output_file) and "out_file_mode" in self.scan_config and self.scan_config["out_file_mode"] == "append":
+            self.out_file_h5 = tb.open_file(self.output_file, mode='a')
+        else:
+            self.out_file_h5 = tb.open_file(self.output_file, mode='w')
         self.__group = self.out_file_h5.root
 
         self.scan_parameters = OrderedDict()
 
         self.n_frequencies = len(scan_config[ScanConfigurationKeys.FREQUENCY_RANGE])
 
-    def update_config(self, scan_config):
-        self.scan_config = scan_config
-        self.n_frequencies = len(scan_config[ScanConfigurationKeys.FREQUENCY_RANGE])
+    def update_config(self, new_config=None):
+        if new_config is not None:
+            self.scan_config.update(new_config)
+        self.n_frequencies = len(self.scan_config[ScanConfigurationKeys.FREQUENCY_RANGE])
+
+        # update the scan config parameters
+        if "data_path" in self.scan_config:
+            self.base_group = self.scan_config["data_path"]
 
     def configure(self):
-        raise NotImplementedError
+        if "output_file" in self.scan_config and os.path.exists(self.scan_config["output_file"]):
+            self.out_file_h5.close()
+            self.out_file_h5 = tb.open_file(self.scan_config["output_file"], mode='a')
+
+        # settings for sensor depletion source
+        self.pixcap.init_bias(voltage=-0.1, voltage_range=1000, current_range=self.bias_sense_range, current_limit=0.000000050)
+        self.pixcap[self.pixcap.bias_smu_key].drain_error_queue()
+        self.pixcap.bias_voltage = -0.1
+        self.pixcap[self.pixcap.bias_smu_key].select_data_format()
+        self.pixcap[self.pixcap.bias_smu_key].set_number_triggers(1)
+        if self.n_measurements == -1:
+            self.pixcap[self.pixcap.bias_smu_key].set_number_measurements(1)
+        else:
+            self.pixcap[self.pixcap.bias_smu_key].set_number_measurements(self.n_measurements)
+        self.pixcap[self.pixcap.bias_smu_key].drain_error_queue()
+        self.init_smu()
+        self.pixcap[self.pixcap.smu_setup_devices[self.pixcap.primary_smu_key]].drain_error_queue()
+        print("fetch some configurations from the smu!")
+        print(self.pixcap[self.pixcap.primary_smu_key].get_sense_interval())
+        print(self.pixcap[self.pixcap.smu_setup_devices[self.pixcap.primary_smu_key]].get_lan_config_method())
+        print(self.pixcap[self.pixcap.smu_setup_devices[self.pixcap.primary_smu_key]].get_lan_ip_adress())
+
+        # update the scan config parameters
+        self.update_config()
 
     def scan(self):
         raise NotImplementedError
@@ -235,6 +288,10 @@ class PixCap65Measurement(object):
     def current_sense_range(self):
         return 0.000001
 
+    @property
+    def bias_sense_range(self):
+        return 0.000001
+
     # Handle the SMU!
     # these will now just forward the commands to the pixcap object
     def init_smu(self, voltage_range=1.5, current_limit=0.001, plc=10):
@@ -272,7 +329,7 @@ class PixCap65Measurement(object):
 
     @base_group.setter
     def base_group(self, value):
-        return walk_to_node(self.out_file_h5.root, value, create=True)
+        self.__group = walk_to_node(self.out_file_h5.root, value, create=True)
 
     @property
     def smu_kwargs(self):
@@ -288,21 +345,25 @@ class PixCap65Measurement(object):
 
     @property
     def n_measurements(self):
-        return self.__n_measurements
+        return self.pixcap.n_measurements
 
     @n_measurements.setter
     def n_measurements(self, value):
-        if value == -1:
-            self.pixcap["SMU"].set_number_measurements(1, **self.pixcap.smu_kwargs)
-        else:
-            self.pixcap["SMU"].set_number_measurements(value, **self.pixcap.smu_kwargs)
-        self.__n_measurements = value
-        print("Set a new measure counter")
-        print(value, self.__n_measurements)
+        self.pixcap.n_measurements = value
 
 
 class PixCap65TotalCap(PixCap65Measurement):
     current_smu_config = {}
+
+    def update_config(self, new_config=None):
+        super(PixCap65TotalCap, self).update_config(new_config)
+        self.n_measurements = self.scan_config.get(NUMBER_AVERAGE_MEASUREMENTS_KEY, 1)
+        if "double_sweep" in self.scan_config and self.scan_config["double_sweep"]:
+            self.n_frequencies *= 2
+
+        self.bias_measurements = self.scan_config.get(BIASING_NUMBER_AVERAGE_MEASUREMENTS_KEY, 1)
+
+
 
     def __init__(self, scan_config, output_file, **kwargs):
         super(PixCap65TotalCap, self).__init__(scan_config, output_file, **kwargs)
@@ -316,6 +377,8 @@ class PixCap65TotalCap(PixCap65Measurement):
                                                 fill_value=np.nan)
         if NUMBER_AVERAGE_MEASUREMENTS_KEY not in scan_config or scan_config[NUMBER_AVERAGE_MEASUREMENTS_KEY] < 1:
             self.n_measurements = -1
+
+        self.bias_measurements = scan_config.get(BIASING_NUMBER_AVERAGE_MEASUREMENTS_KEY, 1)
         self.pixcap.seq_size = self.scan_config.get(TOTAL_CAP_SEQ_SIZE_KEY, TOTAL_CAP_SEQ_SIZE)
         self.hist_current_errors = np.full(shape=(40, 40, self.n_frequencies), fill_value=np.nan)
         self.mode_logging_text = 'Scan pixel by single measurements.'
@@ -324,36 +387,7 @@ class PixCap65TotalCap(PixCap65Measurement):
         self.bias_scan_parameters = OrderedDict()
 
     def configure(self):
-        # settings for sensor depletion source
-        self.pixcap.init_bias(voltage=-20, voltage_range=1000, current_range=0.000001, current_limit=0.000001)
-        self.pixcap[self.pixcap.bias_smu_key].drain_error_queue()
-        self.pixcap.bias_voltage = -1
-        self.pixcap[self.pixcap.bias_smu_key].select_data_format()
-        # self.pixcap.bias_on()
-        # time.sleep(10)
-        # self.pixcap[self.pixcap.bias_smu_key].set_number_triggers(1)
-        # self.pixcap[self.pixcap.bias_smu_key].set_number_measurements(50)
-        # self.pixcap[self.pixcap.bias_smu_key].set_number_triggers(50)
-        # start = time.time()
-        # self.pixcap[self.pixcap.bias_smu_key].multi_current_measurement()
-        # first_2410 = self.pixcap[self.pixcap.bias_smu_key].get_multi_current()
-        # print(f"It take {time.time() - start} seconds.")
-        # print(self.pixcap[self.pixcap.bias_smu_key].get_trigger_delay())
-        # print(len(first_2410.split(',')))
-        # print(first_2410[1::2])
-        # self.pixcap.bias_off()
-        self.pixcap[self.pixcap.bias_smu_key].set_number_triggers(1)
-        if self.n_measurements == -1:
-            self.pixcap[self.pixcap.bias_smu_key].set_number_measurements(1)
-        else:
-            self.pixcap[self.pixcap.bias_smu_key].set_number_measurements(self.n_measurements)
-        self.pixcap[self.pixcap.bias_smu_key].drain_error_queue()
-        self.init_smu()
-        self.pixcap["SMU_SETUP"].drain_error_queue()
-        print("fetch some configurations from the smu!")
-        print(self.pixcap[self.pixcap.primary_smu_key].get_sense_interval())
-        print(self.pixcap["SMU_SETUP"].get_lan_config_method())
-        print(self.pixcap["SMU_SETUP"].get_lan_ip_adress())
+        super(PixCap65TotalCap, self).configure()
 
         self.dut['SEQ'].reset()
         self.dut['SEQ'].set_clk_divide(1)
@@ -370,11 +404,8 @@ class PixCap65TotalCap(PixCap65Measurement):
         self.smu_on()
 
         # measure some current values; avoid measuring incorrect currents due to initial oscillation effects of SMU
+        self.pixcap[self.pixcap.smu_setup_devices[self.pixcap.primary_smu_key]].text_format()
         logging.debug('Waiting for settling of SMU...')
-        if self.n_measurements == -1:
-            temp_measurements = 1
-        else:
-            temp_measurements = self.n_measurements
         self.pixcap[self.pixcap.bias_smu_key].set_number_measurements(1)
         self.pixcap.bias_on()
         for _ in range(0, 30):
@@ -382,27 +413,30 @@ class PixCap65TotalCap(PixCap65Measurement):
             self.pixcap.bias_measure_current()
             logging.debug('Current: {}'.format(current))
             time.sleep(1)
-        self.pixcap[self.pixcap.bias_smu_key].set_number_measurements(temp_measurements)
+        self.pixcap[self.pixcap.bias_smu_key].set_number_measurements(self.bias_measurements)
         self.pixcap.bias_off()
 
         # changed to simplify changes in the used SMU
         self.get_source_current()
 
-        # update the scan config parameters
-        if "data_path" in self.scan_config:
-            self.base_group = self.scan_config["data_path"]
-
-    def scan(self, data_group_spec=None):
+    def scan(self, data_group_spec=None, sequence_call=False):
         # select the group to write the analysis results to
         if data_group_spec is not None and isinstance(data_group_spec, str):
             data_group = walk_to_node(self.base_group, data_group_spec, create=True)
         else:
-            data_group = self.out_file_h5.root
+            data_group = self.base_group
 
         if isinstance(data_group_spec, tb.Node):
             data_group = data_group_spec
         else:
-            data_group = walk_to_node(data_group, "total_cap/measurements", create=True)
+            data_group, verify_creation = walk_to_node(data_group, "total_cap/measurements", create=True, verify_create=True)
+            if not verify_creation:
+                for key, value in data_group._v_children.items():
+                    new_name = key
+                    while new_name in data_group:
+                        new_name = "{old}_backing".format(old=new_name)
+                    value.rename(new_name)
+
         data_group._f_setattr('frequencies', self.n_frequencies)
 
         row_range = range(self.scan_config[ScanConfigurationKeys.START_ROW],
@@ -420,25 +454,30 @@ class PixCap65TotalCap(PixCap65Measurement):
         logger.info(self.mode_logging_text)
         continue_error = None
         try:
-            for i_row in row_range:
-                for i_col in col_range:
-                    logging.info(MEASURING_PIXEL_TEXT % (i_col, i_row))
-                    logger.info(MEASURING_PIXEL_TEXT % (i_col, i_row))
-                    self.dut.disable_all_pixels()
-                    self.dut.disable_all_columns()
+            if 'bias' in self.scan_config and not sequence_call:
+                self.pixcap.bias_voltage = float(self.scan_config["bias"])
+                self.pixcap.bias_on()
+                time.sleep(10)
+                # while not np.isclose(self.pixcap.bias_measure_volts(), self.pixcap.bias_voltage):
+                #     logger.info("Wait for settling of the bias supply.")
+                #     time.sleep(1)
+            with logging_redirect_tqdm():
+                for i_row in tqdm(row_range, desc="Grid row Loop"):
+                    for i_col in tqdm(col_range, desc="Grid column Loop"):
+                        logging.info(MEASURING_PIXEL_TEXT % (i_col, i_row))
+                        logger.info(MEASURING_PIXEL_TEXT % (i_col, i_row))
+                        self.dut.disable_all_pixels()
+                        self.dut.disable_all_columns()
 
-                    self.dut.enable_column(i_col, c.EN_EOC_3)
-                    self.dut.enable_pixel_clk(i_col, i_row, c.EN_CLK_0 | c.EN_CLK_3)
+                        self.dut.enable_column(i_col, c.EN_EOC_3)
+                        self.dut.enable_pixel_clk(i_col, i_row, c.EN_CLK_0 | c.EN_CLK_3)
 
-                    for k, freq in enumerate(frequency_range):
-                        self.pixcap.cvm_frequency = freq
-                        # freq_conv = freq * self.seq_size
-                        # self.dut['MIO_PLL'].setFrequency(freq_conv)
-                        # time.sleep(1)
-
-                        self.handle_measurement(i_col, i_row, k)
-                        store_scan_par_values(scan_parameters=self.scan_parameters, scan_param_id=k, frequency=freq)
+                        for k, freq in enumerate(frequency_range):
+                            self.pixcap.cvm_frequency = freq
+                            self.handle_measurement(i_col, i_row, k)
+                            store_scan_par_values(scan_parameters=self.scan_parameters, scan_param_id=k, frequency=freq)
         except KeyboardInterrupt as e:
+            logger.info("Caught KeyboardInterrupt. Will terminate the program softly.")
             continue_error = e
             continue_saving_operation = True
         except:
@@ -449,40 +488,7 @@ class PixCap65TotalCap(PixCap65Measurement):
         if continue_saving_operation:
             self.post_scan_handler(group=data_group)
 
-            # if "average_measurements" in self.scan_config and self.scan_config["average_measurements"] > 1:
-            #     logging.info(self.mode_logging_text)
-            #     logger.info(self.mode_logging_text)
-            #     for i_row in row_range:
-            #         for i_col in col_range:
-            #             logging.info(MEASURING_PIXEL_TEXT % (i_col, i_row))
-            #             logger.info(MEASURING_PIXEL_TEXT % (i_col, i_row))
-            #             self.dut.disable_all_pixels()
-            #             self.dut.disable_all_columns()
-            #
-            #             self.dut.enable_column(i_col, c.EN_EOC_3)
-            #             self.dut.enable_pixel_clk(i_col, i_row, c.EN_CLK_0 | c.EN_CLK_3)
-            #
-            #             for k, freq in enumerate(frequency_range):
-            #                 freq_conv = freq * self.seq_size
-            #                 self.dut['MIO_PLL'].setFrequency(freq_conv)
-            #                 time.sleep(1)
-            #                 self.hist_individual_currents[i_col, i_row, k, :] = self.get_source_current_multiple(
-            #                     self.n_measurements)[:]
-            #                 store_scan_par_values(scan_parameters=self.scan_parameters, scan_param_id=k, frequency=freq)
-            #
-            #     average_currents = np.nanmean(self.hist_individual_currents, axis=3, keepdims=True)
-            #     self.hist_current = average_currents[:, :, :, 0]
-            #     self.hist_current_errors = np.nanstd(self.hist_individual_currents, axis=3, mean=average_currents)
-            # else:
-            #     logging.info(self.mode_logging_text)
-            #     logger.info(self.mode_logging_text)
-            #     for i_row in row_range:
-            #         for i_col in col_range:
-            #             logging.info(MEASURING_PIXEL_TEXT % (i_col, i_row))
-            #             logger.info(MEASURING_PIXEL_TEXT % (i_col, i_row))
-            #             self.dut.disable_all_pixels()
-            #             self.dut.disable_all_columns()
-            ## select the group to write the analysis results to
+            # select the group to write the analysis results to
             _store_scan_par_values(h5_file=self.out_file_h5, scan_parameters=self.scan_parameters, group=data_group)
             if np.all(np.isnan(self.hist_current)):
                 raise ValueError("UNEXPECTED: All measurement entries are still NaN.")
@@ -509,6 +515,9 @@ class PixCap65TotalCap(PixCap65Measurement):
                                                filters=self.filters,
                                                )
 
+        data_group._f_setattr("freq_unit", "MHz")
+        data_group._f_setattr("current_unit", "A")
+
         if continue_error is not None:
             self.out_file_h5.flush()
             raise continue_error
@@ -533,13 +542,18 @@ class PixCap65TotalCap(PixCap65Measurement):
             bias_group_name = "bias_{bias_voltage}_V".format(bias_voltage=bias_voltage).replace('-', "M_").replace(".",
                                                                                                                    "__")
             if bias_group_name in data_group:
-                # remove the biasing group
+                # remove the biasing group or all of it's contents
                 scan_group = data_group[bias_group_name]
+                for key, value in scan_group._v_children.items():
+                    new_name = key
+                    while new_name in data_group:
+                        new_name = "{old}_backing".format(old=new_name)
+                    value.rename(new_name)
             else:
                 scan_group = data_group._v_file.create_group(where=data_group, name=bias_group_name)
             logger.info("Perform sweep for bias voltage %f.", bias_voltage)
             self.scan_parameters = OrderedDict()
-            self.scan(data_group_spec=scan_group)
+            self.scan(data_group_spec=scan_group, sequence_call=True)
 
         logger.info("Collect all the current information and package it together.")
         # save the bias voltages
@@ -556,7 +570,13 @@ class PixCap65TotalCap(PixCap65Measurement):
         else:
             data_group = self.out_file_h5.root
 
-        data_group = walk_to_node(data_group, "biasing/measurements", create=True)
+        data_group, verify_creation = walk_to_node(data_group, "biasing/measurements", create=True, verify_create=True)
+        if not verify_creation:
+            for key, value in data_group._v_children.items():
+                new_name = key
+                while new_name in data_group:
+                    new_name = "{old}_backing".format(old=new_name)
+                value.rename(new_name)
 
         # prepare the scan
         bias_voltages = np.asarray(self.scan_config[ScanConfigurationKeys.BIAS_VOLTAGE_RANGE])
@@ -564,7 +584,7 @@ class PixCap65TotalCap(PixCap65Measurement):
         data_group._f_setattr('voltages', self.n_voltages)
         self.hist_bias_current = np.full(shape=(self.n_voltages),
                                          fill_value=np.nan)  # current value for each measured frequency per pixel
-        self.hist_bias_individual_currents = np.full(shape=(self.n_voltages, np.abs(self.n_measurements)),
+        self.hist_bias_individual_currents = np.full(shape=(self.n_voltages, self.bias_measurements),
                                                      fill_value=np.nan)
         self.hist_bias_current_errors = np.full(shape=(self.n_voltages), fill_value=np.nan)
 
@@ -623,7 +643,13 @@ class PixCap65TotalCap(PixCap65Measurement):
         else:
             data_group = self.out_file_h5.root
 
-        data_group = walk_to_node(data_group, "biasing/measurements", create=True)
+        data_group, verify_creation = walk_to_node(data_group, "biasing/measurements", create=True, verify_create=True)
+        if not verify_creation:
+            for key, value in data_group._v_children.items():
+                new_name = key
+                while new_name in data_group:
+                    new_name = "{old}_backing".format(old=new_name)
+                value.rename(new_name)
 
         # prepare the scan
         bias_voltages = np.asarray(self.scan_config[ScanConfigurationKeys.BIAS_VOLTAGE_RANGE])
@@ -635,7 +661,7 @@ class PixCap65TotalCap(PixCap65Measurement):
         data_group._f_setattr('voltages', self.n_voltages)
         self.hist_bias_current = np.full(shape=(self.n_voltages),
                                          fill_value=np.nan)  # current value for each measured frequency per pixel
-        self.hist_bias_individual_currents = np.full(shape=(self.n_voltages, np.abs(self.n_measurements)),
+        self.hist_bias_individual_currents = np.full(shape=(self.n_voltages, self.bias_measurements),
                                                      fill_value=np.nan)
         self.hist_bias_current_errors = np.full(shape=(self.n_voltages), fill_value=np.nan)
 
@@ -657,10 +683,15 @@ class PixCap65TotalCap(PixCap65Measurement):
             if bias_group_name in data_group:
                 # remove the biasing group
                 scan_group = data_group[bias_group_name]
+                for key, value in scan_group._v_children.items():
+                    new_name = key
+                    while new_name in data_group:
+                        new_name = "{old}_backing".format(old=new_name)
+                    value.rename(new_name)
             else:
                 scan_group = data_group._v_file.create_group(where=data_group, name=bias_group_name)
             logger.info("Perform sweep for bias voltage %f.", bias_voltage)
-            self.scan(data_group_spec=scan_group)
+            self.scan(data_group_spec=scan_group, sequence_call=True)
 
         self.post_scan_handler(unit="bias", group=data_group)
         _store_scan_par_values(h5_file=self.out_file_h5, scan_parameters=self.bias_scan_parameters, group=data_group)
@@ -701,15 +732,15 @@ class PixCap65TotalCap(PixCap65Measurement):
         advanced_analysis_delegate(self.out_file_h5, self.out_file_h5.root, self.out_file_h5.root)
 
     def post_scan_handler(self, unit=None, **kwargs):
-        if "average_measurements" in self.scan_config and self.scan_config["average_measurements"] > 1:
+        if NUMBER_AVERAGE_MEASUREMENTS_KEY in self.scan_config and self.scan_config[NUMBER_AVERAGE_MEASUREMENTS_KEY] > 1:
             average_currents = np.nanmean(self.hist_individual_currents, axis=3, keepdims=True)
             self.hist_current = average_currents[:, :, :, 0]
             self.hist_current_errors = np.nanstd(self.hist_individual_currents, axis=3, mean=average_currents)
-            if unit == "bias":
-                average_currents = np.nanmean(self.hist_bias_individual_currents, axis=1, keepdims=True)
-                self.hist_bias_current = average_currents[:, 0]
-                self.hist_bias_current_errors = np.nanstd(self.hist_bias_individual_currents, axis=1,
-                                                          mean=average_currents)
+        if unit == "bias" and BIASING_NUMBER_AVERAGE_MEASUREMENTS_KEY in self.scan_config and self.scan_config[BIASING_NUMBER_AVERAGE_MEASUREMENTS_KEY] > 1:
+            average_currents = np.nanmean(self.hist_bias_individual_currents, axis=1, keepdims=True)
+            self.hist_bias_current = average_currents[:, 0]
+            self.hist_bias_current_errors = np.nanstd(self.hist_bias_individual_currents, axis=1,
+                                                      mean=average_currents)
         else:
             if not np.all(np.isnan(self.hist_current)):
                 try:
@@ -718,11 +749,11 @@ class PixCap65TotalCap(PixCap65Measurement):
                 except Exception as e:
                     logging.error(e.args)
                     logging.exception("Something went wrong during the estimation of the measurement errors.")
-            if unit == "bias":
+            if unit == "bias" and not np.all(np.isnan(self.hist_bias_current)):
                 try:
                     self.hist_bias_current_errors = extract_smu_current_error(
                         self.smu_range_config[self.pixcap.bias_smu_key], self.hist_bias_current,
-                        self.current_sense_range)
+                        self.bias_sense_range)
                 except Exception as e:
                     logging.error(e.args)
                     logging.exception("Something went wrong during the estimation of the measurement errors.")
@@ -754,28 +785,30 @@ class PixCap65TotalCap(PixCap65Measurement):
         if NUMBER_AVERAGE_MEASUREMENTS_KEY in self.scan_config and self.scan_config[
             NUMBER_AVERAGE_MEASUREMENTS_KEY] > 1:
             self.n_measurements = self.scan_config[NUMBER_AVERAGE_MEASUREMENTS_KEY]
-            # Added for convenience of the averaged measurements.
-            # self.pixcap['SMU'].set_number_measurements(n_measurements, **self.smu_kwargs)
             individual_currents_shape = (40, 40, self.n_frequencies, self.n_measurements)
             if self.hist_individual_currents.shape != individual_currents_shape:
                 self.hist_individual_currents = np.full(shape=(40, 40, self.n_frequencies, self.n_measurements),
                                                         fill_value=np.nan)
-            if unit == "bias":
-                individual_currents_shape = (self.n_voltages, self.n_measurements)
-                if self.hist_bias_individual_currents.shape != individual_currents_shape:
-                    self.hist_bias_individual_currents = np.full(shape=(self.n_voltages, self.n_measurements),
-                                                                 fill_value=np.nan)
 
             self.mode_logging_text = "Average over multiple measurements!"
             self.handle_measurement = self._handle_averaged_measurement
-            self.handle_bias_measurement = self._handle_averaged_measurement_bias
             self.current_smu_config = self.smu_range_config[self.pixcap.primary_smu_key]
-
         else:
             self.mode_logging_text = 'Scan pixel by single measurements.'
             self.handle_measurement = self._handle_single_measurement
-            self.handle_bias_measurement = self._handle_single_measurement_bias
             self.current_smu_config = self.smu_range_config[self.pixcap.primary_smu_key]
+
+
+        if BIASING_NUMBER_AVERAGE_MEASUREMENTS_KEY in self.scan_config and self.scan_config[BIASING_NUMBER_AVERAGE_MEASUREMENTS_KEY] > 1:
+            self.handle_bias_measurement = self._handle_averaged_measurement_bias
+            if unit == "bias":
+                individual_currents_shape = (self.n_voltages, self.bias_measurements)
+                if self.hist_bias_individual_currents.shape != individual_currents_shape:
+                    self.hist_bias_individual_currents = np.full(shape=individual_currents_shape,
+                                                                 fill_value=np.nan)
+
+        else:
+            self.handle_bias_measurement = self._handle_single_measurement_bias
 
     def _handle_single_measurement(self, col, row, k):
         current = self.get_source_current()
@@ -798,13 +831,13 @@ class PixCap65TotalCap(PixCap65Measurement):
 
     def _handle_averaged_measurement_bias(self, k):
         measurement = self.pixcap.bias_advanced_current_multiple(
-            self.n_measurements)[:]
+            self.bias_measurements)[:]
         assert not np.all(np.isnan(measurement)), "The bias measurement was not performed."
         try:
             self.hist_bias_individual_currents[k, :] = measurement[1::2]
         except:
-            print(k, self.n_measurements)
-            print(measurement.shape)
+            print(k, self.bias_measurements, file=self.dummy_file)
+            print(measurement.shape, file=self.dummy_file)
             raise
 
     @property
@@ -813,30 +846,44 @@ class PixCap65TotalCap(PixCap65Measurement):
 
 
 if __name__ == '__main__':
-    output_file = "./TEST.h5"
-    # try:
-    #     pix = PixCap65TotalCap(scan_configuration, output_file)
-    #     pix.configure()
-    #     pix.scan()
-    # finally:
-    #     pix.close()
-
-    output_file_2 = "./R13_BIAS_CV_COMBI_6.h5"
-    from plotting import plot_combined_data
+    output_file_2 = "./New_2_Scan.h5"
     with PixCap65TotalCap(scan_configuration, output_file_2) as pix:
-        pix.scan()
-        pix.bias_scan()
-        pix.bias_cv_scan()
-        print(pix.out_file_h5)
-        pix.combined_bias_cv_scan()
+        try:
+            pix.pixcap.binary_active = True
+            pix.pixcap[pix.pixcap.smu_setup_devices[pix.pixcap.primary_smu_key]].binary_format()
+            pix.scan(data_group_spec="unbiased_1")
+            # pix.scan(data_group_spec="run_2")
+            del scan_configuration["average_measurements"]
+            scan_configuration["bias_average_measurements"] = 3
+            scan_configuration['bias_range'] = -1 * np.arange(1, 400.1, 0.5),
+            scan_configuration['start_row'] = 22
+            scan_configuration['stop_row'] = 26
+            scan_configuration['start_column'] = 22
+            scan_configuration['stop_column'] = 26
+            pix.pixcap.binary_active = False
+            pix.pixcap[pix.pixcap.smu_setup_devices[pix.pixcap.primary_smu_key]].text_format()
+            pix.update_config(new_config=scan_configuration)
+            pix.bias_scan(data_group_spec="I_V_Characteristic")
+            # pix.bias_cv_scan()
+            # print(pix.out_file_h5)
+            del scan_configuration["bias_average_measurements"]
+            scan_configuration['bias_range'] = -1 * np.arange(1, 100.1, 0.5),
+            scan_configuration['start_row'] = 22
+            scan_configuration['stop_row'] = 26
+            scan_configuration['start_column'] = 22
+            scan_configuration['stop_column'] = 26
+            pix.update_config(new_config=scan_configuration)
+            pix.combined_bias_cv_scan(data_group_spec="C_V_Characteristic")
+        finally:
+            pix.pixcap[pix.pixcap.smu_setup_devices[pix.pixcap.primary_smu_key]].text_format()
 
     # Analyse and plot data
-    # analyze_data(output_file)
-    # plot_data(output_file)
+    # advanced_analysis(output_file_2, base_path="ATLAS ITk/unbiased_1")
+    # plot_data(output_file_2, base_path="ATLAS ITk/unbiased_1")
 
-    # analyze_data(output_file_2)
-    # plot_data(output_file_2)
-    # plot_bias_data(output_file_2)
+    # analyze_data(output_file_2, base_path="ATLAS ITk/run_1")
+    # plot_data(output_file_2, base_path="ATLAS ITk/run_1")
+    # plot_bias_data(output_file_2, base_path="ATLAS ITk/I_V_Characteristic")
     # analyze_data(output_file_2, is_cv=True)
     # plot_cv_data(output_file_2)
-    plot_combined_data(output_file_2, first_lower=-100, first_upper=-50, second_lower=-8, second_upper=0)
+    # plot_combined_data(output_file_2, first_lower=-100, first_upper=-50, second_lower=-8, second_upper=0, base_path="ATLAS ITk/C_V_Characteristic")

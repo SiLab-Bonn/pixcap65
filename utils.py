@@ -26,6 +26,7 @@ logger = logging.getLogger(__name__)
 
 class PixcapMeasurements(StrEnum):
     TOTAL_CAPACITANCE = "total capacitance"
+    INTER_CAPACITANCE = "inter-pixel capacitance"
 
 class PixCapSetup(Dut):
     pixcap: Optional[PixCap65Measurement]
@@ -33,6 +34,7 @@ class PixCapSetup(Dut):
     def __init__(self, scan_config, output_file, config="", name="PixcapSetup", measurement=None, hl_keys=None, tl_keys=None, rl_keys=None):
         if measurement is None:
             measurement = PixcapMeasurements.TOTAL_CAPACITANCE
+        assert isinstance(measurement, PixcapMeasurements) or issubclass(measurement, PixCap65Measurement)
         temp_dut = Base(config)
         adjusted_config = temp_dut._conf.copy()
         self._environ_config = OrderedDict()
@@ -81,8 +83,6 @@ class PixCapSetup(Dut):
                     rl_mapping[layer["name"]] = idx
                 else:
                     logger.info("Register at %i has no name. Will skip it.", idx)
-
-
 
         # process the provided config
         if "power" in hl_mapping:
@@ -169,10 +169,20 @@ class PixCapSetup(Dut):
 
         # get the correct pixcap measurement class
         assert False, "Just a enforced exit from this class to check the dictionary modification behaviour."
+        pix_args = {
+            "scan_config"   :   scan_config,
+            "output_file"   :   output_file,
+            "pix_config"    :   adjusted_config,
+        }
+        if issubclass(measurement, PixcapMeasurement):
+            self.pixcap = measurement(**pix_args)
         match (measurement):
             case PixcapMeasurements.TOTAL_CAPACITANCE: 
                 from pixcap_65_test_total_cap import PixCap65TotalCap
-                self.pixcap = PixCap65TotalCap(scan_config, output_file, pix_config=adjusted_config)
+                self.pixcap = PixCap65TotalCap(**pix_args)
+            case PixcapMeasurements.INTER_CAPACITANCE:
+                from pixcap_65_test_inter_cap import Pixcap65TestInterCap
+                self.pixcap = Pixcap65TestInterCap(**pix_args)
             case _:
                 raise ValueError(f"provided measurement class does not exist.")
 

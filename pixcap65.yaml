@@ -36,6 +36,7 @@ transfer_layer:
         bytesize : 8
         rtscts   : True
         exclusive : False
+        timeout: 120
 
   - name: Serial2 
     type: Serial
@@ -73,21 +74,12 @@ transfer_layer:
 
 
 hw_drivers:
-  - name        : SMU
+  - name        : SMU_Device
     type        : scpi
     interface   : Serial
     init        :
         device  : Keithley 2602a
-    pixcap_init :
-      channel   : 1
-
-  - name        : SMU1
-    type        : scpi
-    interface   : Serial
-    init        :
-      device    : Keithley 2602a
-    pixcap_init :
-      channel   : 2
+        enable_binary_commands: True
 
   - name        : BIAS_SMU
     type        : scpi
@@ -214,31 +206,31 @@ registers:
 
   - name: SMU
     type: FunctionalRegister
-    hw_driver: SMU
+    hw_driver: SMU_Device
     arg_add: { 'channel': 1 }
 
   - name: BIAS_SUPPLY
     type: FunctionalRegister
     hw_driver: BIAS_SMU
-    arg_add: {  }
+    arg_add: { }
 
   - name: VM1
     type: FunctionalRegister
-    hw_driver: SMU
+    hw_driver: SMU_Device
     arg_add: { 'channel': -1 }
 
   - name: VM2
     type: FunctionalRegister
-    hw_driver: SMU
+    hw_driver: SMU_Device
     arg_add: { 'channel': -1 }
 
   - name: VM3
     type: FunctionalRegister
-    hw_driver: SMU
-    arg_add: { 'channel': -1 }
+    hw_driver: SMU_Device
+    arg_add: { 'channel': 1 }
 
   - name: SMU_SETUP
     type: FunctionalRegister
-    hw_driver: SMU
+    hw_driver: SMU_Device
     arg_add: {}
 
