@@ -1,0 +1,7 @@
+# my own additives out of habit mostly
+iminuit
+kafe2
+scipy
+
+# equipment tests
+tqdm

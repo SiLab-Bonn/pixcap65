@@ -93,18 +93,83 @@ def test_source_settling(setlling_range: Iterable, file_name: str):
         fig.savefig("source_settling_test.png")
 
 def test_reading_speed(smu, file_name: str, config: dict, reading_range: Iterable, n_tests=10):
-    from tqdm import trange
     reading_range = np.asarray(reading_range)
     with PixCap65TotalCap(config, file_name) as pix:
+        try:
+            pix.pixcap[pix.pixcap.smu_setup_devices[smu]].text_format()
+        except ValueError:
+            pass
+        pix.pixcap.bias_voltage = -0.1
+        pix.pixcap.bias_on()
+        pix.pixcap.set_smu_measurements(smu, 1)
+        start = time.time()
+        pix.pixcap[smu].get_current()
+        diff = time.time() - start
+        print(f"Single measurement takes {diff} seconds.")
         for n_readings in reading_range:
             print(f"Test for {n_readings} readings.")
-            for _ in trange(n_tests):
+            start = time.time()
+            for _ in range(n_tests):
                 pix.pixcap.smu_advanced_current_multiple(n_readings, smu)
+            diff = time.time() - start
+            print(f"{n_readings} take {diff/n_tests} seconds each.")
+
+        pix.pixcap[pix.pixcap.smu_setup_devices[smu]].drain_error_queue()
+        pix.pixcap.bias_off()
+
+def test_reading_speed_adv(smu, file_name: str, config: dict, reading_range: Iterable, n_tests=10):
+    reading_range = np.asarray(reading_range)
+    from basil.dut import Base
+    basis = Base("pixcap65.yaml")
+    dut_config = basis._conf.copy()
+    for hw in dut_config["hw_drivers"]:
+        if hw["name"] != "SMU":
+            continue
+        hw["init"]["enable_binary_commands"] = True
+    with PixCap65TotalCap(config, file_name, pix_config=dut_config) as pix:
+        internal_smu = pix.pixcap[smu]
+        try:
+            internal_smu.disable_filter()
+        except ValueError:
+            pass
+        try:
+            pix.pixcap[pix.pixcap.smu_setup_devices[smu]].binary_format()
+            internal_smu.set_current_nlpc(1)
+            for n_readings in reading_range:
+                print(f"Test for {n_readings} readings.")
+                internal_smu.set_number_measurements(n_readings)
+                try:
+                    internal_smu.set_number_triggers(n_readings)
+                except ValueError:
+                    pass
+                start = time.time()
+                for _ in range(n_tests):
+                    internal_smu.get_advanced_current(binary_enabled=True, data_points=n_readings)
+                diff = time.time() - start
+                print(f"{n_readings} take {diff / n_tests} seconds each.")
+
+        finally:
+            pix.pixcap[pix.pixcap.smu_setup_devices[smu]].text_format()
+            pix.pixcap[pix.pixcap.smu_setup_devices[smu]].drain_error_queue()
+            internal_smu.set_current_nlpc(10)
 
 if __name__ == "__main__":
-    test_frequency_settling(np.linspace(0, 1, 20), "freq_settling_test.h5")
-    print(np.linspace(0, 2, 30))
-    test_source_settling(np.linspace(0, 2, 30), "source_settling_test.h5")
+    # test_frequency_settling(np.linspace(0, 1, 20), "freq_settling_test.h5")
+    # print(np.linspace(0, 2, 30))
+    # test_source_settling(np.linspace(0, 2, 30), "source_settling_test.h5")
 
-    test_reading_speed("VM3", "reading_speed_test.h5", scan_configuration, np.arange(3,20.1,1))
+    # print("start reading test.")
+    # test_reading_speed("VM3", "reading_speed_test.h5", scan_configuration, np.arange(3,20.1,1), n_tests=20)
+    # print("start advanced test")
+    test_reading_speed_adv("VM3", "reading_speed_test_advanced.h5", scan_configuration, np.arange(3, 20.1, 1), n_tests=20)
+    # print("Test the bias smu!")
+    # test_reading_speed("BIAS_SUPPLY", "reading_speed_test_bias.h5", scan_configuration, np.arange(3, 20.1, 1), n_tests=20)
+
+    # with tb.open_file("./R13_Initial_3_Scan.h5", "r") as f:
+    #     group = walk_to_node(f.root, "ATLAS ITk/unbiased_1/total_cap/measurements")
+    #     print(group._v_children)
+    #     for key, value in group._v_children.items():
+    #         print(key, value, sep=";;; ")
+
+
 

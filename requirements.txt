@@ -11,11 +11,5 @@ pyusb
 pySiLibUSB
 pyserial
 
-# appendix for viewing hdf files
-pyqt5>=5.8
-vitables
-
-# my own additives out of habit mostly
-iminuit
-kafe2
-scipy
+-r gui_requirements.txt
+-r advanced_requirements.txt

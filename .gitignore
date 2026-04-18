@@ -1,8 +1,8 @@
-/r13-measurement/
-/r13-measurement/**
+/data/r13-measurement/
+/data/r13-measurement/**
 /*-measurement/**
 **.h5
 /.venv
 gpgkey
-/bare-measurement/
-/advanced-bare-measurement/
+/data/bare-measurement/
+/data/advanced-bare-measurement/
