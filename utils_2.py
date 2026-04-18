@@ -8,7 +8,7 @@ import numpy as np
 import tables as tb
 from tqdm.contrib import DummyTqdmFile
 
-GroupType = Union[tb.Group, tb.Node, tb.Leaf, tb.RootGroup]
+GroupType = Union[tb.Group, tb.Node, tb.Leaf]
 
 
 def walk_to_node(parent: tb.Node, path: str, create=False, verify_create=False):
