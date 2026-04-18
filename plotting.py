@@ -188,12 +188,6 @@ def plot_cv_data_delegate(data_group, analysis_group, output_pdf, first_upper=No
         check_leaf_unit(analysis_group.UCHist, "F")
         check_leaf_unit(analysis_group.UCErrHist, "F")
 
-        # some temporary checks; TODO: remove this again
-        temp_1 = analysis_group.UCHist[:]
-        temp_2 = analysis_group.UCHist[:, :, :]
-        print("Test the analysis results pointsers.!")
-        print(temp_1.shape, temp_2.shape, temp_1.shape == temp_2.shape)
-
         cap_data = analysis_group.UCHist[:, :, :]
         cap_errors = analysis_group.UCErrHist[:, :, :]
         if np.any(np.isnan(cap_data[ii, jj, :])):
@@ -340,16 +334,22 @@ def plot_data_delegate(data_group: tb.Group, analysis_group: tb.Group, output_pd
 
     # Current vs. frequency
     print("The histograms shape is {}".format(current_hist.shape))
-    for col, row in np.indices(current_hist.shape[:2]):
+    for col, row in np.ndindex(current_hist.shape[:2]):
         if np.isfinite(current_hist[col, row, 0]):
             fig = Figure()
             _ = FigureCanvas(fig)
             ax = fig.add_subplot(111)
             # res = np.polyfit(scan_parameters['frequency'], current_hist[col, row] * 1e9, deg=1, cov=True)
             f = np.arange(0, scan_parameters['frequency'].max() * 1.1, 0.1)
-            actual_cap = cap_hist[col, row] * 1e9
-            ax.plot(f, cap_hist[col, row] * 1e15 * f + leak_hist[col,row], color=cmap(0.6), ls='--', marker='',
-                    label='Fit to data:\n$C_d = %.1f\,$fF' % actual_cap)
+            actual_cap = cap_hist[col, row] * 1e15
+            if "HistRes" in analysis_group and np.isfinite(analysis_group.HistRes[col, row]):
+                from analysis import full_capacitance_model
+                ax.plot(f, full_capacitance_model(f, c=cap_hist[col, row] * 1e6, r=analysis_group.HistRes[col, row],
+                                                  i=leak_hist[col, row] * 1.e-9, u0=1) * 1e9, color=cmap(0.6), ls='--', marker='',
+                        label='Fit to data:\n$C_d = %.1f\,$fF' % actual_cap)
+            else:
+                ax.plot(f, cap_hist[col, row] * 1e15 * f + leak_hist[col,row], color=cmap(0.6), ls='--', marker='',
+                        label='Fit to data:\n$C_d = %.1f\,$fF' % actual_cap)
             if np.all(np.isfinite(current_err_hist[col, row, :])):
                 ax.errorbar(scan_parameters['frequency'], current_hist[col, row] * 1e9, yerr=current_err_hist[col, row] * 1e9, fmt='o',
                             ls='',
@@ -403,4 +403,8 @@ def plot_compare_delegate(first_group: GroupType, second_group: GroupType, outpu
 
 
 if __name__ == '__main__':
-    plot_data(interpreted_data=os.path.expanduser('~/git/pixcap65/pixcap_LF_50x50_DC_R3_80V_HV.h5'))
+    # plot_data(interpreted_data=os.path.expanduser('~/git/pixcap65/pixcap_LF_50x50_DC_R3_80V_HV.h5'))
+    # plot_data(interpreted_data='Data/New_1_Initial_6_Scan.h5', base_path="ATLAS ITk/unbiased_3", suffix="general_data_test_test", use_group=True)
+    plot_bias_data(interpreted_data='Data/New_1_Initial_6_Scan.h5', base_path="ATLAS ITk/I_V_Characteristic", use_group=True)
+    plot_combined_data(interpreted_data='Data/New_1_Initial_6_Scan.h5', base_path="ATLAS ITk/C_V_Characteristic",
+                       use_group=True, first_lower=-60, first_upper=-40, second_lower=-5, second_upper=0)

@@ -22,6 +22,7 @@ import logging
 import os
 import time
 from collections import OrderedDict
+from collections.abc import Mapping, Iterable
 from enum import StrEnum
 
 import numpy as np
@@ -29,13 +30,14 @@ import tables as tb
 import yaml
 from bitarray import bitarray
 from tqdm import tqdm
-from tqdm.contrib.logging import logging_redirect_tqdm
+from tqdm.contrib import DummyTqdmFile
 
 import pixcap65_constants as c
 from analysis import advanced_analysis_delegate
 from configs.config_handler import extract_smu_current_error
 from pixcap65 import Pixcap65, BasilConfigKeys
 from plotting import plot_data_delegate
+from tqdm_logging_utils import logging_redirect_tqdm
 from utils_2 import walk_to_node
 
 # constants for structuring of config readouts.
@@ -75,10 +77,7 @@ def _store_scan_par_values(h5_file, scan_parameters, group: tb.Group = None, **k
     for par_values in scan_parameters.values():
         keys.update(par_values.keys())
     fields = [('scan_param_id', np.uint32)]
-    # FIXME only float32 supported so far
-    # float64 should be available now
     fields.extend([(name, np.float64) for name in keys])
-    # fields.extend([(name, np.float32) for name in keys])
 
     if "scan_params" in group:
         logging.info("Storing scan parameter values but found an already existing table; will rename it")
@@ -102,16 +101,17 @@ def _store_scan_par_values(h5_file, scan_parameters, group: tb.Group = None, **k
     except:
         logging.error("Failed to create and fill the scan parameters table. But will continue anyway.")
 
-
 class ScanConfigurationKeys(StrEnum):
     START_COLUMN = "start_column"
     STOP_COLUMN = "stop_column"
     START_ROW = "start_row"
     STOP_ROW = "stop_row"
     AVERAGE_MEASUREMENTS = NUMBER_AVERAGE_MEASUREMENTS_KEY
+    BIAS_AVERAGE_MEASUREMENTS = "bias_average_measurements"
     VIN = "Vin"
     FREQUENCY_RANGE = "frequency_range"
     BIAS_VOLTAGE_RANGE = "bias_range"
+    BIAS_VOLTAGE_SINGLE = "bias"
 
 scan_configuration = {
     'start_column': 0,
@@ -124,7 +124,7 @@ scan_configuration = {
     'Vin': 1.0,  # input voltage in V
     'frequency_range': np.arange(1, 12.1, 0.5),  # frequency sweep in MHz
     # 'bias_range': -1 * np.arange(1, 100.1, 0.5),
-    # 'bias': -80.0,   # bias voltage to apply in V
+    'bias': -80.0,   # bias voltage to apply in V
 
     'data_path': "ATLAS_Itk/X2",
     "out_file_mode": "append",
@@ -147,10 +147,9 @@ class PixCap65Measurement(object):
         # handle smu error configuration
         adjusted_config = self.dut._conf.copy()
         self._environ_config = OrderedDict()
-        from tqdm_logging_utils import DummyTqdmFile
-        from tqdm import tqdm
         import sys
-        self.dummy_file = DummyTqdmFile(sys.stdout, tqdm)
+        self.dummy_file = DummyTqdmFile(sys.stdout)
+        self.dummy_error_file = DummyTqdmFile(sys.stderr)
 
         rl_mapping = {}
         tl_mapping = {}
@@ -294,7 +293,9 @@ class PixCap65Measurement(object):
 
     # Handle the SMU!
     # these will now just forward the commands to the pixcap object
-    def init_smu(self, voltage_range=1.5, current_limit=0.001, plc=10):
+    def init_smu(self, voltage_range=1.5, current_limit=0.001, plc=None):
+        if plc is None:
+            plc = self.scan_config.get('plc_cycles', 10)
         self.pixcap.init_smu(self.scan_config[ScanConfigurationKeys.VIN], self.current_sense_range, voltage_range,
                              current_limit, plc)
 
@@ -362,8 +363,6 @@ class PixCap65TotalCap(PixCap65Measurement):
             self.n_frequencies *= 2
 
         self.bias_measurements = self.scan_config.get(BIASING_NUMBER_AVERAGE_MEASUREMENTS_KEY, 1)
-
-
 
     def __init__(self, scan_config, output_file, **kwargs):
         super(PixCap65TotalCap, self).__init__(scan_config, output_file, **kwargs)
@@ -458,6 +457,10 @@ class PixCap65TotalCap(PixCap65Measurement):
                 self.pixcap.bias_voltage = float(self.scan_config["bias"])
                 self.pixcap.bias_on()
                 time.sleep(10)
+                try:
+                    data_group._f_setattr("bias_voltage", self.pixcap.bias_voltage)
+                except:
+                    logger.error("Failed to save bias voltage as an attribute", exc_info=True)
                 # while not np.isclose(self.pixcap.bias_measure_volts(), self.pixcap.bias_voltage):
                 #     logger.info("Wait for settling of the bias supply.")
                 #     time.sleep(1)
@@ -492,31 +495,55 @@ class PixCap65TotalCap(PixCap65Measurement):
             _store_scan_par_values(h5_file=self.out_file_h5, scan_parameters=self.scan_parameters, group=data_group)
             if np.all(np.isnan(self.hist_current)):
                 raise ValueError("UNEXPECTED: All measurement entries are still NaN.")
-            self.out_file_h5.create_carray(data_group,
+            temp_array = self.out_file_h5.create_carray(data_group,
                                            name='HistCurr',
                                            title='Current Histogram',
                                            obj=self.hist_current,
                                            filters=self.filters)
+            temp_array.attrs["Units"] = "A"
+            temp_array.flush()
 
             # need the additional entries for the advanced averaging implementation
             if "average_measurements" in self.scan_config and self.scan_config["average_measurements"] > 1:
-                self.out_file_h5.create_carray(data_group,
+                temp_array = self.out_file_h5.create_carray(data_group,
                                                name='HistCurrValues',
                                                title='Multiple Current Histogram',
                                                obj=self.hist_individual_currents,
                                                filters=self.filters,
                                                )
+                temp_array.attrs["Units"] = "A"
+                temp_array.flush()
 
             if hasattr(self, "hist_current_errors") and not np.all(np.isnan(self.hist_current_errors)):
-                self.out_file_h5.create_carray(data_group,
+                temp_array = self.out_file_h5.create_carray(data_group,
                                                name='HistCurrErr',
                                                title='Current Error Histogram',
                                                obj=self.hist_current_errors,
                                                filters=self.filters,
                                                )
+                temp_array.attrs["Units"] = "A"
+                temp_array.flush()
 
         data_group._f_setattr("freq_unit", "MHz")
         data_group._f_setattr("current_unit", "A")
+        if not sequence_call:
+            for config_key, config_setting in self.scan_config.items():
+                if isinstance(config_setting, Iterable) or isinstance(config_setting, Mapping):
+                    continue
+                attr_config_key = "configuration_{}".format(config_key)
+                if attr_config_key in data_group._v_attrs:
+                    logger.error("Unexpectedly the configuration key is already present.")
+                    temp_key = attr_config_key
+                    while temp_key in data_group._v_attrs:
+                        temp_key = "{}_backing".format(temp_key)
+                    data_group._f_setattr(temp_key, data_group._f_getattr(attr_config_key))
+                try:
+                    data_group._f_setattr(attr_config_key, config_setting)
+                except:
+                    logger.error("Failed to write scan configuration option %s as attribute.", config_key, exc_info=True)
+        else:
+            logger.debug("Sequence call encountered when writing the configuration options as attribute. Skip this.")
+
 
         if continue_error is not None:
             self.out_file_h5.flush()
@@ -533,34 +560,54 @@ class PixCap65TotalCap(PixCap65Measurement):
             data_group = self.out_file_h5.root
 
         data_group = walk_to_node(data_group, "biasing/measurements", create=True)
+        data_group._f_setattr("bias_unit", "V")
         bias_voltages = np.asarray(self.scan_config[ScanConfigurationKeys.BIAS_VOLTAGE_RANGE])
         self.pixcap.bias_voltage = 0
         self.pixcap.bias_on()
 
-        for bias_voltage in bias_voltages:
-            self.pixcap.bias_voltage = bias_voltage
-            bias_group_name = "bias_{bias_voltage}_V".format(bias_voltage=bias_voltage).replace('-', "M_").replace(".",
-                                                                                                                   "__")
-            if bias_group_name in data_group:
-                # remove the biasing group or all of it's contents
-                scan_group = data_group[bias_group_name]
-                for key, value in scan_group._v_children.items():
-                    new_name = key
-                    while new_name in data_group:
-                        new_name = "{old}_backing".format(old=new_name)
-                    value.rename(new_name)
-            else:
-                scan_group = data_group._v_file.create_group(where=data_group, name=bias_group_name)
-            logger.info("Perform sweep for bias voltage %f.", bias_voltage)
-            self.scan_parameters = OrderedDict()
-            self.scan(data_group_spec=scan_group, sequence_call=True)
+        with logging_redirect_tqdm():
+            for bias_voltage in tqdm(bias_voltages, desc="Bias voltage scan"):
+                self.pixcap.bias_voltage = bias_voltage
+                bias_group_name = "bias_{bias_voltage}_V".format(bias_voltage=bias_voltage).replace('-', "M_").replace(".",
+                                                                                                                       "__")
+                if bias_group_name in data_group:
+                    # remove the biasing group or all of it's contents
+                    scan_group = data_group[bias_group_name]
+                    for key, value in scan_group._v_children.items():
+                        new_name = key
+                        while new_name in data_group:
+                            new_name = "{old}_backing".format(old=new_name)
+                        value.rename(new_name)
+                else:
+                    scan_group = data_group._v_file.create_group(where=data_group, name=bias_group_name)
+                logger.info("Perform sweep for bias voltage %f.", bias_voltage)
+                self.scan_parameters = OrderedDict()
+                self.scan(data_group_spec=scan_group, sequence_call=True)
 
         logger.info("Collect all the current information and package it together.")
         # save the bias voltages
-        self.out_file_h5.create_carray(data_group, name="BiasVoltageHist", title="Histogram of chosen bias voltages",
+        temp_array = self.out_file_h5.create_carray(data_group, name="BiasVoltageHist", title="Histogram of chosen bias voltages",
                                        obj=bias_voltages, filters=self.filters)
+        temp_array.attrs["Units"] = "V"
+        temp_array.flush()
+        data_group._f_setattr("bias_voltage_unit", "V")
         # TODO: implement this repackaging.
         # compacting will happen when analyzing the data!
+
+        for config_key, config_setting in self.scan_config.items():
+            if isinstance(config_setting, Iterable) or isinstance(config_setting, Mapping):
+                continue
+            attr_config_key = "configuration_{}".format(config_key)
+            if attr_config_key in data_group._v_attrs:
+                logger.error("Unexpectedly the configuration key is already present.")
+                temp_key = attr_config_key
+                while temp_key in data_group._v_attrs:
+                    temp_key = "{}_backing".format(temp_key)
+                data_group._f_setattr(temp_key, data_group._f_getattr(attr_config_key))
+            try:
+                data_group._f_setattr(attr_config_key, config_setting)
+            except:
+                logger.error("Failed to write scan configuration option %s as attribute.", config_key, exc_info=True)
         logger.info("Done bias measurements.")
 
     def bias_scan(self, data_group_spec=None):
@@ -591,7 +638,9 @@ class PixCap65TotalCap(PixCap65Measurement):
         if "BiasVoltageHist" in data_group:
             data_group.remove("BiasVoltageHist")
             time.sleep(1)
-        self.out_file_h5.create_carray(data_group, "BiasVoltageHist", obj=bias_voltages, filters=self.filters)
+        temp_array = self.out_file_h5.create_carray(data_group, "BiasVoltageHist", obj=bias_voltages, filters=self.filters)
+        temp_array.attrs["Units"] = "V"
+        temp_array.flush()
 
         self.pre_scan_handler(unit="bias")
         logging.info(self.mode_logging_text)
@@ -610,30 +659,51 @@ class PixCap65TotalCap(PixCap65Measurement):
         _store_scan_par_values(h5_file=self.out_file_h5, scan_parameters=self.bias_scan_parameters, group=data_group)
         if np.all(np.isnan(self.hist_bias_current)):
             raise ValueError("UNEXPECTED: All measurement entries are still NaN.")
-        self.out_file_h5.create_carray(data_group,
+        temp_array = self.out_file_h5.create_carray(data_group,
                                        name='HistCurr',
                                        title='Current Histogram',
                                        obj=self.hist_bias_current,
                                        filters=self.filters)
+        temp_array.attrs["Units"] = "A"
+        temp_array.flush()
 
         # need the additional entries for the advanced averaging implementation
         if "average_measurements" in self.scan_config and self.scan_config["average_measurements"] > 1:
-            self.out_file_h5.create_carray(data_group,
+            temp_array = self.out_file_h5.create_carray(data_group,
                                            name='HistCurrValues',
                                            title='Multiple Current Histogram',
                                            obj=self.hist_bias_individual_currents,
                                            filters=self.filters,
                                            )
+            temp_array.attrs["Units"] = "A"
+            temp_array.flush()
 
         if hasattr(self, "hist_current_errors") and not np.all(np.isnan(self.hist_current_errors)):
-            self.out_file_h5.create_carray(data_group,
+            temp_array = self.out_file_h5.create_carray(data_group,
                                            name='HistCurrErr',
                                            title='Current Error Histogram',
                                            obj=self.hist_bias_current_errors,
                                            filters=self.filters,
                                            )
+            temp_array.attrs["Units"] = "A"
+            temp_array.flush()
         self.set_bias_off()
-
+        data_group._f_setattr("bias_current_unit", "A")
+        data_group._f_setattr("bias_voltage_unit", "V")
+        for config_key, config_setting in self.scan_config.items():
+            if isinstance(config_setting, Iterable) or isinstance(config_setting, Mapping):
+                continue
+            attr_config_key = "configuration_{}".format(config_key)
+            if attr_config_key in data_group._v_attrs:
+                logger.error("Unexpectedly the configuration key is already present.")
+                temp_key = attr_config_key
+                while temp_key in data_group._v_attrs:
+                    temp_key = "{}_backing".format(temp_key)
+                data_group._f_setattr(temp_key, data_group._f_getattr(attr_config_key))
+            try:
+                data_group._f_setattr(attr_config_key, config_setting)
+            except:
+                logger.error("Failed to write scan configuration option %s as attribute.", config_key, exc_info=True)
         logging.info('Done')
 
     def combined_bias_cv_scan(self, data_group_spec=None):
@@ -657,8 +727,11 @@ class PixCap65TotalCap(PixCap65Measurement):
         if "BiasVoltageHist" in data_group:
             data_group.remove("BiasVoltageHist")
             time.sleep(1)
-        self.out_file_h5.create_carray(data_group, "BiasVoltageHist", obj=bias_voltages, filters=self.filters)
+        temp_array = self.out_file_h5.create_carray(data_group, "BiasVoltageHist", obj=bias_voltages, filters=self.filters)
+        temp_array.attrs["Units"] = "V"
+        temp_array.flush()
         data_group._f_setattr('voltages', self.n_voltages)
+        data_group._f_setattr('bias_unit', "V")
         self.hist_bias_current = np.full(shape=(self.n_voltages),
                                          fill_value=np.nan)  # current value for each measured frequency per pixel
         self.hist_bias_individual_currents = np.full(shape=(self.n_voltages, self.bias_measurements),
@@ -673,7 +746,8 @@ class PixCap65TotalCap(PixCap65Measurement):
         self.dut.disable_all_pixels()
         self.dut.disable_all_columns()
 
-        for k, bias_voltage in enumerate(bias_voltages):
+        from tqdm.contrib import tenumerate
+        for k, bias_voltage in tenumerate(bias_voltages, desc="Bias Voltage Scan."):
             self.pixcap.bias_voltage = bias_voltage
             self.scan_parameters = OrderedDict()
             self.handle_bias_measurement(k)
@@ -697,30 +771,51 @@ class PixCap65TotalCap(PixCap65Measurement):
         _store_scan_par_values(h5_file=self.out_file_h5, scan_parameters=self.bias_scan_parameters, group=data_group)
         if np.all(np.isnan(self.hist_current)):
             raise ValueError("UNEXPECTED: All measurement entries are still NaN.")
-        self.out_file_h5.create_carray(data_group,
+        temp_array = self.out_file_h5.create_carray(data_group,
                                        name='HistCurr',
                                        title='Current Histogram',
                                        obj=self.hist_bias_current,
                                        filters=self.filters)
+        temp_array.attrs["Units"] = "A"
+        temp_array.flush()
 
         # need the additional entries for the advanced averaging implementation
         if "average_measurements" in self.scan_config and self.scan_config["average_measurements"] > 1:
-            self.out_file_h5.create_carray(data_group,
+            temp_array = self.out_file_h5.create_carray(data_group,
                                            name='HistCurrValues',
                                            title='Multiple Current Histogram',
                                            obj=self.hist_bias_individual_currents,
                                            filters=self.filters,
                                            )
+            temp_array.attrs["Units"] = "A"
+            temp_array.flush()
 
         if hasattr(self, "hist_current_errors") and not np.all(np.isnan(self.hist_current_errors)):
-            self.out_file_h5.create_carray(data_group,
+            temp_array = self.out_file_h5.create_carray(data_group,
                                            name='HistCurrErr',
                                            title='Current Error Histogram',
                                            obj=self.hist_bias_current_errors,
                                            filters=self.filters,
                                            )
+            temp_array.attrs["Units"] = "A"
+            temp_array.flush()
         self.set_bias_off()
 
+        data_group._f_setattr("bias_current_unit", "A")
+        for config_key, config_setting in self.scan_config.items():
+            if isinstance(config_setting, Iterable) or isinstance(config_setting, Mapping):
+                continue
+            attr_config_key = "configuration_{}".format(config_key)
+            if attr_config_key in data_group._v_attrs:
+                logger.error("Unexpectedly the configuration key is already present.")
+                temp_key = attr_config_key
+                while temp_key in data_group._v_attrs:
+                    temp_key = "{}_backing".format(temp_key)
+                data_group._f_setattr(temp_key, data_group._f_getattr(attr_config_key))
+            try:
+                data_group._f_setattr(attr_config_key, config_setting)
+            except:
+                logger.error("Failed to write scan configuration option %s as attribute.", config_key, exc_info=True)
         logging.info('Done')
 
     def plot(self):
@@ -773,6 +868,8 @@ class PixCap65TotalCap(PixCap65Measurement):
                     #                self.hist_bias_current_errors[i])])
                     entry.append()
                 except ValueError as e:
+                    print("scan parameters")
+                    print(self.scan_config[ScanConfigurationKeys.BIAS_VOLTAGE_RANGE][i])
                     print("currents")
                     print(self.hist_bias_current.shape)
                     print(self.hist_bias_current[i])
@@ -851,29 +948,30 @@ if __name__ == '__main__':
         try:
             pix.pixcap.binary_active = True
             pix.pixcap[pix.pixcap.smu_setup_devices[pix.pixcap.primary_smu_key]].binary_format()
-            pix.scan(data_group_spec="unbiased_1")
-            # pix.scan(data_group_spec="run_2")
-            del scan_configuration["average_measurements"]
-            scan_configuration["bias_average_measurements"] = 3
-            scan_configuration['bias_range'] = -1 * np.arange(1, 400.1, 0.5),
-            scan_configuration['start_row'] = 22
-            scan_configuration['stop_row'] = 26
-            scan_configuration['start_column'] = 22
-            scan_configuration['stop_column'] = 26
-            pix.pixcap.binary_active = False
-            pix.pixcap[pix.pixcap.smu_setup_devices[pix.pixcap.primary_smu_key]].text_format()
-            pix.update_config(new_config=scan_configuration)
-            pix.bias_scan(data_group_spec="I_V_Characteristic")
+            pix.scan(data_group_spec="biased_80_V")
+            # # pix.scan(data_group_spec="run_2")
+            # del scan_configuration["average_measurements"]
+            # scan_configuration["bias_average_measurements"] = 3
+            # scan_configuration['bias_range'] = -1 * np.arange(1, 400.1, 0.5)
+            # # scan_configuration['bias_range'] = -1 * np.arange(1, 5.1, 0.5)
+            # scan_configuration['start_row'] = 22
+            # scan_configuration['stop_row'] = 26
+            # scan_configuration['start_column'] = 22
+            # scan_configuration['stop_column'] = 26
+            # pix.pixcap.binary_active = False
+            # pix.pixcap[pix.pixcap.smu_setup_devices[pix.pixcap.primary_smu_key]].text_format()
+            # pix.update_config(new_config=scan_configuration)
+            # pix.bias_scan(data_group_spec="I_V_Characteristic")
             # pix.bias_cv_scan()
             # print(pix.out_file_h5)
-            del scan_configuration["bias_average_measurements"]
-            scan_configuration['bias_range'] = -1 * np.arange(1, 100.1, 0.5),
-            scan_configuration['start_row'] = 22
-            scan_configuration['stop_row'] = 26
-            scan_configuration['start_column'] = 22
-            scan_configuration['stop_column'] = 26
-            pix.update_config(new_config=scan_configuration)
-            pix.combined_bias_cv_scan(data_group_spec="C_V_Characteristic")
+            # del scan_configuration["bias_average_measurements"]
+            # scan_configuration['bias_range'] = -1 * np.arange(1, 100.1, 0.5)
+            # scan_configuration['start_row'] = 22
+            # scan_configuration['stop_row'] = 26
+            # scan_configuration['start_column'] = 22
+            # scan_configuration['stop_column'] = 26
+            # pix.update_config(new_config=scan_configuration)
+            # pix.combined_bias_cv_scan(data_group_spec="C_V_Characteristic")
         finally:
             pix.pixcap[pix.pixcap.smu_setup_devices[pix.pixcap.primary_smu_key]].text_format()
 
