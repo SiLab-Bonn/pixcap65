@@ -404,7 +404,7 @@ def plot_compare_delegate(first_group: GroupType, second_group: GroupType, outpu
 
 if __name__ == '__main__':
     # plot_data(interpreted_data=os.path.expanduser('~/git/pixcap65/pixcap_LF_50x50_DC_R3_80V_HV.h5'))
-    # plot_data(interpreted_data='Data/New_1_Initial_6_Scan.h5', base_path="ATLAS ITk/unbiased_3", suffix="general_data_test_test", use_group=True)
-    plot_bias_data(interpreted_data='Data/New_1_Initial_6_Scan.h5', base_path="ATLAS ITk/I_V_Characteristic", use_group=True)
-    plot_combined_data(interpreted_data='Data/New_1_Initial_6_Scan.h5', base_path="ATLAS ITk/C_V_Characteristic",
-                       use_group=True, first_lower=-60, first_upper=-40, second_lower=-5, second_upper=0)
+    plot_data(interpreted_data='New_2_Scan.h5', base_path="ATLAS_Itk/X2/unbiased_1", suffix="general_data_80V", use_group=True)
+    # plot_bias_data(interpreted_data='New_2_Scan.h5', base_path="ATLAS_Itk/X2/I_V_Characteristic", use_group=True)
+    # plot_combined_data(interpreted_data='New_2_Scan.h5', base_path="ATLAS_Itk/X2/C_V_Characteristic",
+    #                    use_group=True, first_lower=-60, first_upper=-40, second_lower=-5, second_upper=0)
