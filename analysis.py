@@ -397,7 +397,10 @@ def advanced_analysis_delegate(file: tb.File, data_group: tb.Group, result_group
             leakage_error = np.nan
             resistor = np.nan
             resistor_error = np.nan
-            fit_cov[ii, jj] = np.full(shape=(4, 4), fill_value=np.nan)
+            if full_model:
+                fit_cov[ii, jj, :3, :3] = np.full(shape=(3, 3), fill_value=np.nan)
+            else:
+                fit_cov[ii, jj, :2, :2] = np.full(shape=(2, 2), fill_value=np.nan)
 
         # temporarily save the results to memory
         cap_hist[ii, jj] = cap
@@ -1016,5 +1019,7 @@ def effective_doping(capacitances, bias_voltages, diode_area=None):
 
 if __name__ == '__main__':
     # analyze_data(raw_data='/home/silab/git/pixcap65/pixcap_full_data_image1.h5')
-    advanced_analysis(raw_data='New_2_Scan.h5', base_path="ATLAS_Itk/X2/unbiased_1")
-    # advanced_analysis(raw_data='Data/New_1_Initial_6_Scan.h5', base_path="ATLAS ITk/unbiased_3")
+    # advanced_analysis(raw_data='New_2_Scan.h5', base_path="ATLAS_Itk/X2/unbiased_1")
+    advanced_analysis(raw_data='Data/r13-measurement/R13_Initial_3_Scan.h5',base_path="ATLAS ITk/unbiased_1")
+    # analyze_data(raw_data='Data/r13-measurement/R13_BIAS_CV_COMBI_6.h5', is_cv=True, first_boundaries=(-100,-40), second_boundaries=(-10, 0),)
+

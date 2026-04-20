@@ -946,11 +946,11 @@ if __name__ == '__main__':
     output_file_2 = "./New_2_Scan.h5"
     with PixCap65TotalCap(scan_configuration, output_file_2) as pix:
         try:
-            pix.pixcap.binary_active = True
-            pix.pixcap[pix.pixcap.smu_setup_devices[pix.pixcap.primary_smu_key]].binary_format()
-            pix.scan(data_group_spec="biased_80_V")
+            # pix.pixcap.binary_active = True
+            # pix.pixcap[pix.pixcap.smu_setup_devices[pix.pixcap.primary_smu_key]].binary_format()
+            # pix.scan(data_group_spec="biased_80_V")
             # # pix.scan(data_group_spec="run_2")
-            # del scan_configuration["average_measurements"]
+            del scan_configuration["average_measurements"]
             # scan_configuration["bias_average_measurements"] = 3
             # scan_configuration['bias_range'] = -1 * np.arange(1, 400.1, 0.5)
             # # scan_configuration['bias_range'] = -1 * np.arange(1, 5.1, 0.5)
@@ -964,21 +964,21 @@ if __name__ == '__main__':
             # pix.bias_scan(data_group_spec="I_V_Characteristic")
             # pix.bias_cv_scan()
             # print(pix.out_file_h5)
-            # del scan_configuration["bias_average_measurements"]
-            # scan_configuration['bias_range'] = -1 * np.arange(1, 100.1, 0.5)
-            # scan_configuration['start_row'] = 22
-            # scan_configuration['stop_row'] = 26
-            # scan_configuration['start_column'] = 22
-            # scan_configuration['stop_column'] = 26
-            # pix.update_config(new_config=scan_configuration)
-            # pix.combined_bias_cv_scan(data_group_spec="C_V_Characteristic")
+            del scan_configuration["bias_average_measurements"]
+            del scan_configuration["bias"]
+            scan_configuration['bias_range'] = -1 * np.logspace(0, 1.6, 50)
+            scan_configuration['start_row'] = 20
+            scan_configuration['stop_row'] = 32
+            scan_configuration['start_column'] = 20
+            scan_configuration['stop_column'] = 32
+            pix.update_config(new_config=scan_configuration)
+            pix.combined_bias_cv_scan(data_group_spec="C_V_Characteristic_refined")
         finally:
             pix.pixcap[pix.pixcap.smu_setup_devices[pix.pixcap.primary_smu_key]].text_format()
 
     # Analyse and plot data
     # advanced_analysis(output_file_2, base_path="ATLAS ITk/unbiased_1")
     # plot_data(output_file_2, base_path="ATLAS ITk/unbiased_1")
-
     # analyze_data(output_file_2, base_path="ATLAS ITk/run_1")
     # plot_data(output_file_2, base_path="ATLAS ITk/run_1")
     # plot_bias_data(output_file_2, base_path="ATLAS ITk/I_V_Characteristic")
