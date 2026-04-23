@@ -84,6 +84,7 @@ def handle_minuit_advanced_options(fit_object, apply_contour, x_label, y_label, 
         pdf.savefig(current_fig, bbox_inches='tight')
         pdf.savefig(fig, bbox_inches='tight')
 
+
 def transform_covariance(cov):
     """
     transform_covariance
@@ -180,7 +181,8 @@ def advanced_analysis(raw_data, is_cv=False, base_path=None, full_model=True,
                 bias_name = f"bias_{bias_voltage}_V".replace('-', "M_").replace(".", "__")
                 data_group = base_group.biasing.measurements[bias_name]
                 ana_group = walk_to_node(base_group.biasing, str_join("/", "analysis", bias_name), create=True)
-                advanced_analysis_data_handle(in_file_h5, data_group, ana_group, full_model=full_model, is_inter_pixel=is_inter_pixel, **kwargs)
+                advanced_analysis_data_handle(in_file_h5, data_group, ana_group, full_model=full_model,
+                                              is_inter_pixel=is_inter_pixel, **kwargs)
                 cap_data = ana_group.HistCap[:]
                 cap_error_data = ana_group.HistCapErr[:]
                 cv_data[:, :, k] = cap_data[:, :]
@@ -206,11 +208,13 @@ def advanced_analysis(raw_data, is_cv=False, base_path=None, full_model=True,
                 base_group.total_cap.analysis._f_remove(recursive=True)
                 time.sleep(1)
             ana_group = walk_to_node(base_group.total_cap, "analysis", create=True)
-            advanced_analysis_data_handle(in_file_h5, base_group.total_cap.measurements, ana_group, full_model=full_model,
+            advanced_analysis_data_handle(in_file_h5, base_group.total_cap.measurements, ana_group,
+                                          full_model=full_model,
                                           is_inter_pixel=is_inter_pixel, **kwargs)
 
 
-def advanced_analysis_data_handle(file: tb.File, data_group: tb.Group, result_group: tb.Group, full_model=True, is_inter_pixel=False, **kwargs):
+def advanced_analysis_data_handle(file: tb.File, data_group: GroupType, result_group: GroupType, full_model=True,
+                                  is_inter_pixel=False, **kwargs):
     """
         advanced_analysis_delegate
 
@@ -261,7 +265,6 @@ def advanced_analysis_data_handle(file: tb.File, data_group: tb.Group, result_gr
 
         advanced_analysis_delegate(current_error_hist, current_hist, data_group, file, full_model, group,
                                    scan_parameters, **kwargs)
-
 
         inter_a_output_dict = {
             "cap_name": "HistCapInterA",
@@ -331,7 +334,7 @@ def advanced_analysis_data_handle(file: tb.File, data_group: tb.Group, result_gr
 
 
 def advanced_analysis_delegate(
-        current_error_hist: np.ndarray |Any, current_hist, data_group: Group, file: File, full_model: bool,
+        current_error_hist: np.ndarray | Any, current_hist, data_group: Group, file: File, full_model: bool,
         group: Group, scan_parameters, **kwargs):
     # extract the additional keyword arguments
     use_kafe2 = kwargs.get("use_kafe2", False)
@@ -365,6 +368,8 @@ def advanced_analysis_delegate(
     if plot:
         output_pdf_name = f"{file.filename[:-3]}_{data_group._v_pathname.replace('/', '----')}_fit_results.pdf"
         output_pdf = plot if isinstance(plot, PdfPages) else PdfPages(output_pdf_name)
+    else:
+        output_pdf = None
     # Fit pixel data in order to extract capacitance for each pixel
 
     for ii, jj in np.ndindex(current_hist.shape[:2]):
@@ -388,6 +393,7 @@ def advanced_analysis_delegate(
                     errors = current_error_hist[ii, jj, :]
                 else:
                     errors = np.full_like(current_error_hist, fill_value=1)
+                # noinspection PyTypeChecker
                 cost = LeastSquares(x=scan_parameters['frequency'], y=current_hist[ii, jj],
                                     yerror=errors, model=effective_model)
                 if full_model:
@@ -400,6 +406,7 @@ def advanced_analysis_delegate(
 
             # extract the fit parameters
             if use_kafe2:
+                from kafe2 import XYFit
                 assert fitter.did_fit
                 try:
                     cap = fitter.parameter_values[0] * 1e-6  # convert to F
@@ -581,7 +588,8 @@ def str_join(delimiter, *args):
     return delimiter.join(args)
 
 
-def analyze_data(raw_data, is_cv=False, base_path=None, first_boundaries=None, second_boundaries=None, is_inter_pixel=False,):
+def analyze_data(raw_data, is_cv=False, base_path=None, first_boundaries=None, second_boundaries=None,
+                 is_inter_pixel=False, ):
     """
     analyze data
 
@@ -654,7 +662,8 @@ def analyze_data(raw_data, is_cv=False, base_path=None, first_boundaries=None, s
             analyze_data_handle_data(in_file_h5, reference_group.measurements, ana_group, is_inter_pixel=is_inter_pixel)
 
 
-def analyze_data_handle_data(file: tb.File, data_group: tb.Group, result_group: tb.Group, is_inter_pixel=False, **kwargs):
+def analyze_data_handle_data(file: tb.File, data_group: GroupType, result_group: GroupType, is_inter_pixel=False,
+                             **kwargs):
     """
         analyze data_delegate
 
@@ -893,6 +902,8 @@ def analyze_depletion_delegate(data_group: GroupType, analysis_group: GroupType,
         if np.all(np.isfinite(first_cap_error_data)):
             from iminuit import Minuit
             from iminuit.cost import LeastSquares
+            from iminuit.cost import Model
+            assert isinstance(depletion_model, Model)
             cost = LeastSquares(first_voltage_data, first_cap_data, first_cap_error_data, depletion_model)
             m = Minuit(cost, a=1, b=0)
             m.migrad()
@@ -927,7 +938,7 @@ def analyze_depletion_delegate(data_group: GroupType, analysis_group: GroupType,
         dep_voltage = (first_dep_parameters[1] - second_dep_parameters[1]) / (first_dep_parameters[0] -
                                                                               second_dep_parameters[0])
         # combine both cov matrices into a single one:
-        full_cov = np.full((4,4), fill_value=np.nan)
+        full_cov = np.full((4, 4), fill_value=np.nan)
         full_cov[:2, :2] = first_dep_cov
         full_cov[2:, 2:] = second_dep_cov
 
@@ -959,6 +970,7 @@ def analyze_depletion_delegate(data_group: GroupType, analysis_group: GroupType,
 
     file_h5 = analysis_group._v_file
     assert isinstance(file_h5, tb.File)
+    assert isinstance(analysis_group, tb.Group)  # necessary as only groups could contain subelements.
     temp_array = file_h5.create_carray(where=analysis_group, name="DepletionHist",
                                        title="Histogram of the depletion voltages", obj=depletion_voltage,
                                        filters=tb.Filters(complevel=5, complib='blosc', fletcher32=False))
@@ -985,7 +997,7 @@ def analyze_depletion_delegate(data_group: GroupType, analysis_group: GroupType,
     # TODO: analyze the depletion depths and the charge carrier densities here; Write everything back into a table or something similar.
     if apply_doping and chip_group is not None and "PhysicalDimensions" in chip_group and chip_group.PhysicalDimensions.shape == (
             40, 40, 2) and np.all(np.isfinite(
-            chip_group.PhysicalDimensions[:])):
+        chip_group.PhysicalDimensions[:])):
 
         physical_dimensions_data = chip_group.PhysicalDimensions[:]
         pixel_areas = np.prod(physical_dimensions_data, axis=2)
@@ -1008,6 +1020,7 @@ def analyze_depletion_delegate(data_group: GroupType, analysis_group: GroupType,
         # the intrinisc bias voltage could be estimated from a fit to the forward bias I-V characteristic.
         NA, ND = 1e16, 1e16
         V_bi = SILICON_V_BIAS
+        assert isinstance(analysis_group, tb.Group)
         dep_table = file_h5.create_table(where=analysis_group, name="DepletionParamTable", description=DepletionData,
                                          filters=GLOBAL_FILTERS)
         entry = dep_table.row
@@ -1042,6 +1055,7 @@ def analyze_depletion_delegate(data_group: GroupType, analysis_group: GroupType,
                 "V": V_bi
             }
             if use_kafe2:
+                from kafe2 import XYFit, XYContainer
                 xy_data = XYContainer(x_data=bias_voltages, y_data=depletion_width_plate[col, row], )
                 xy_data.add_error(axis='y', err_val=depletion_width_plate_error[col, row])
                 # TODO: apply the error for the x-coordinates here, too
@@ -1067,9 +1081,12 @@ def analyze_depletion_delegate(data_group: GroupType, analysis_group: GroupType,
                 if plot:
                     assert isinstance(fitter, XYFit)
                     # what about the pdf pages object?
+                    # FIXME: incorrect parameter configuration
                     handle_kafe2_advanced_options(fitter, apply_contours, "$U_\\text{{bi}}$ in \\unit{{\\volt}}",
                                                   "$d$ in \\unit{{\\micro\\meter}}", "???", None, None)
             else:
+                from iminuit.cost import Model
+                assert isinstance(model_depletion, Model)
                 cost = LeastSquares(x=bias_voltages, y=depletion_width_plate[col, row],
                                     yerror=depletion_width_plate_error[col, row], model=model_depletion, )
                 fitter = Minuit(cost, **parameter_guess)
@@ -1085,6 +1102,7 @@ def analyze_depletion_delegate(data_group: GroupType, analysis_group: GroupType,
                 if plot:
                     assert isinstance(fitter, Minuit)
                     # what about the pdf pages object?
+                    # FIXME: incorrect parameter configuration
                     handle_minuit_advanced_options(fitter, apply_contours, "$U_\\text{{bi}}$ in \\unit{{\\volt}}",
                                                    "$d$ in \\unit{{\\micro\\meter}}", "???", None, None)
             depletion_fit_parameter_table[col, row] = depletion_fit_params
@@ -1130,6 +1148,7 @@ def analyze_depletion_delegate(data_group: GroupType, analysis_group: GroupType,
             ax[1].yscale('log')
 
         # save the computed information about the depletion behaviour
+        assert isinstance(analysis_group, tb.Group)
         temp_array = file_h5.create_carray(where=analysis_group, name="DepletionParameters",
                                            title="Depletion Parameters from fitting the depletion width",
                                            filters=GLOBAL_FILTERS, obj=depletion_fit_parameter_table)
@@ -1160,6 +1179,7 @@ def effective_doping(capacitances, bias_voltages, diode_area=None):
     if diode_area is None:
         diode_area = 50 * 50  # But what is the unit for this.
     temp_capacitances = np.reciprocal(capacitances ** 2)
+    # noinspection PyTypeChecker
     d_du = Diff(0, bias_voltages)
     derivative = d_du(temp_capacitances)
     Neff = 2 / (scipy.constants.elementary_charge * scipy.constants.epsilon_0 * (diode_area ** 2) * np.array(
@@ -1172,4 +1192,5 @@ if __name__ == '__main__':
     # advanced_analysis(raw_data='New_2_Scan.h5', base_path="ATLAS_Itk/X2/unbiased_1")
     # advanced_analysis(raw_data='Data/r13-measurement/R13_Initial_3_Scan.h5',base_path="ATLAS ITk/unbiased_1")
     # analyze_data(raw_data='Data/r13-measurement/R13_BIAS_CV_COMBI_6.h5', is_cv=True, first_boundaries=(-100,-40), second_boundaries=(-10, 0),)
-    analyze_data(raw_data='R13-Interpixel_Scan.h5', base_path="Reference/R13/demo_measurement_4_80_V", is_inter_pixel=True)
+    analyze_data(raw_data='R13-Interpixel_Scan.h5', base_path="Reference/R13/demo_measurement_4_80_V",
+                 is_inter_pixel=True)

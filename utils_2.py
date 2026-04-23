@@ -11,7 +11,7 @@ from tqdm.contrib import DummyTqdmFile
 GroupType = Union[tb.Group, tb.Node, tb.Leaf]
 
 
-def walk_to_node(parent: tb.Node, path: str, create=False, verify_create=False) -> GroupType | Tuple[GroupType, bool]:
+def walk_to_node(parent: GroupType, path: str, create=False, verify_create=False) -> GroupType | Tuple[GroupType, bool]:
     result = parent
     already_exits = True
     for element in path.split('/'):
@@ -69,6 +69,7 @@ def create_update_array(h5, where: tb.Group, name: str, *args, **kwargs):
         except tb.exceptions.NodeError as e:
             if "already has a child node named" in str(e):
                 logger.warning("Unexpectedly found that the child node already exists.")
+                assert hasattr(where[name], "rename")
                 where[name].rename("{old}_backing".format(old=name))
                 sleep(1)
             else:

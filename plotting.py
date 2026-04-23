@@ -654,6 +654,7 @@ def plot_current_model(ax: Axes, col, row, analysis_group: Group, actual_cap: An
     if resistor_name in analysis_group and np.isfinite(analysis_group.HistRes[col, row]):
         hist_resistance = analysis_group[resistor_name]
         from analysis import full_capacitance_model
+        assert isinstance(hist_resistance, tb.Array) or isinstance(hist_resistance,np.ndarray)
         ax.plot(f, full_capacitance_model(f, c=actual_cap * ADVANCED_CAPACITANCE_CONVERSION_FACTOR,
                                           r=hist_resistance[col, row],
                                           i=total_leak_hist[col, row] * 1.e-9, u0=1) * 1e9,

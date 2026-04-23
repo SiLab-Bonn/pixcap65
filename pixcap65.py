@@ -25,6 +25,7 @@ float_initialiser = np.float32
 
 logger = logging.getLogger(__name__)
 
+
 class BasilConfigKeys(StrEnum):
     TRANSFER_LAYER = 'transfer_layer'
     HARDWARE_LAYER = 'hw_drivers'
@@ -42,7 +43,7 @@ class Pixcap65(Dut):
     __mio_pll_key = 'MIO_PLL'
 
     __smu_keys = [__primary_smu_key, __vm1_smu_key, __vm2_smu_key, __vm3_smu_key, __bias_smu_key]
-    smu_setup_devices = {} # hold the keys for the access to parts of a smu which are not channel depend for each of the smu registers.
+    smu_setup_devices = {}  # hold the keys for the access to parts of a smu which are not channel depend for each of the smu registers.
 
     __seq_size = 1
     __current_cvm_frequency = 0
@@ -51,12 +52,12 @@ class Pixcap65(Dut):
     __source_settling_time = 0.2
     __frequency_settling = 0.2
     __n_measurements = {
-                        __primary_smu_key: 1,
-                        __vm1_smu_key: 1,
-                        __vm2_smu_key: 1,
-                        __vm3_smu_key: 1,
-                        __bias_smu_key: 1,
-                        }
+        __primary_smu_key: 1,
+        __vm1_smu_key: 1,
+        __vm2_smu_key: 1,
+        __vm3_smu_key: 1,
+        __bias_smu_key: 1,
+    }
 
     binary_active = False
 
@@ -92,9 +93,10 @@ class Pixcap65(Dut):
             # perform a power cycle if possible
             logger.error("An USB error occured try to solve the issue by a power cycle.")
             if "power" in list(self._hardware_layer.keys()):
+                # FIXME: type error
                 power_driver = self._hardware_layer["power"]
-                from basil.dut import Base
-                assert isinstance(power_driver, Base)
+                from basil.HL.tti_ql355tp import ttiQl355tp
+                assert isinstance(power_driver, ttiQl355tp)
                 if not power_driver._intf.is_initialized:
                     power_driver._intf.init()
                 if power_driver.is_initialized:
@@ -251,7 +253,8 @@ class Pixcap65(Dut):
     # Handle the SMU!
     # region Accesor methods for a general SMU
     # MARK: perhaps this functions should be shifted direct to a SMU type in the basil framework?
-    def smu_init(self, smu: str, current_limit: float, current_range, plc: int, src_u, voltage_range: float, kwargs=None):
+    def smu_init(self, smu: str, current_limit: float, current_range, plc: int, src_u, voltage_range: float,
+                 kwargs=None):
         if kwargs is None:
             kwargs = {}
         self[smu].off(**kwargs)
@@ -286,7 +289,7 @@ class Pixcap65(Dut):
         self[smu].set_current_limit(current_limit, **kwargs)
         self[smu].set_current_sense_range(current_range, **kwargs)
 
-    def smu_source_volt(self, smu:str, **kwargs):
+    def smu_source_volt(self, smu: str, **kwargs):
         if kwargs is None:
             kwargs = {}
         self[smu].source_volt(**kwargs)
@@ -364,7 +367,7 @@ class Pixcap65(Dut):
             raise ValueError("The current returned {current} was not recognised as a number.".format(current=voltage))
         return voltage
 
-    def smu_averaged_current(self, n: int, smu: str, kwargs=None) -> tuple[float, float]:
+    def smu_averaged_current(self, n: int, smu: str, kwargs=None) -> tuple[float, ...]:
         if kwargs is None:
             kwargs = {}
         try:
@@ -435,6 +438,7 @@ class Pixcap65(Dut):
             self[smu].disable_filter()
         except ValueError:
             pass
+
         def measurement_step():
             current = self.smu_measure_current(smu, kwargs=kwargs)
             time.sleep(1e-6)
@@ -450,6 +454,7 @@ class Pixcap65(Dut):
             self[smu].disable_filter()
         except ValueError:
             pass
+
         def measurement_step():
             current = self.smu_measure_voltage(smu, kwargs=kwargs)
             time.sleep(1e-6)
@@ -483,6 +488,7 @@ class Pixcap65(Dut):
             except ValueError:
                 pass
         self.__n_measurements[smu] = value
+
     # endregion
 
     # implementations for the different SMU's in use with pixcap
@@ -550,6 +556,7 @@ class Pixcap65(Dut):
         kargs['binary_enabled'] = self.binary_active
         kargs['data_points'] = self.n_measurements
         return self.smu_advanced_voltage_multiple(n, self.__primary_smu_key, kwargs=kargs)
+
     # endregion
 
     # region Handle the biasing supply.
@@ -612,6 +619,7 @@ class Pixcap65(Dut):
 
     def bias_advanced_voltage_multiple(self, n: int):
         return self.smu_advanced_voltage_multiple(n, self.__bias_smu_key, kwargs=self.smu_bias_kwargs)
+
     # endregion
 
     # region Handle the VM1 Connector SMU
@@ -670,6 +678,7 @@ class Pixcap65(Dut):
 
     def vm1_advanced_voltage_multiple(self, n: int):
         return self.smu_advanced_voltage_multiple(n, self.__vm1_smu_key, kwargs=self.smu_vm1_kwargs)
+
     # endregion
 
     # region Handle the VM2 Connector SMU
@@ -728,6 +737,7 @@ class Pixcap65(Dut):
 
     def vm2_advanced_voltage_multiple(self, n: int):
         return self.smu_advanced_voltage_multiple(n, self.__vm2_smu_key, kwargs=self.smu_vm2_kwargs)
+
     # endregion
 
     # region Handle the VM3 Connector SMU
@@ -786,6 +796,7 @@ class Pixcap65(Dut):
 
     def vm3_advanced_voltage_multiple(self, n: int):
         return self.smu_advanced_voltage_multiple(n, self.__vm3_smu_key, kwargs=self.smu_vm3_kwargs)
+
     # endregion
 
     # general properties!

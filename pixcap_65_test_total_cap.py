@@ -327,7 +327,7 @@ class PixCap65Measurement(object):
 
     # Handle the biasing supply
     def init_bias_voltage(self, voltage: float = -80.0):
-        self.pixcap.init_bias(voltage)
+        self.pixcap.init_bias(voltage, current_range=self.bias_sense_range)
 
     def set_bias_on(self):
         self.pixcap.bias_on()
@@ -344,7 +344,9 @@ class PixCap65Measurement(object):
 
     @base_group.setter
     def base_group(self, value):
-        self.__group = walk_to_node(self.out_file_h5.root, value, create=True)
+        temp_node = walk_to_node(self.out_file_h5.root, value, create=True)
+        assert isinstance(temp_node, tb.Group)
+        self.__group = temp_node
 
     @property
     def smu_kwargs(self):
@@ -506,6 +508,7 @@ class PixCap65TotalCap(PixCap65Measurement):
             self.post_scan_handler(group=data_group)
 
             # select the group to write the analysis results to
+            assert isinstance(data_group, tb.Group)
             _store_scan_par_values(h5_file=self.out_file_h5, scan_parameters=self.scan_parameters, group=data_group)
             if np.all(np.isnan(self.hist_current)):
                 raise ValueError("UNEXPECTED: All measurement entries are still NaN.")
