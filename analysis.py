@@ -3,12 +3,14 @@ Analysis of Pixcap65 data. Fits freq vs current to extract the capacitance. A 2D
 for each pixel is stored.
 """
 import time
+from typing import Any
 
 import numpy as np
 import tables as tb
 from iminuit import Minuit
 from iminuit.cost import LeastSquares
 from matplotlib.backends.backend_pdf import PdfPages
+from tables import File, Group
 
 from utils_2 import walk_to_node, GroupType
 
@@ -82,7 +84,6 @@ def handle_minuit_advanced_options(fit_object, apply_contour, x_label, y_label, 
         pdf.savefig(current_fig, bbox_inches='tight')
         pdf.savefig(fig, bbox_inches='tight')
 
-
 def transform_covariance(cov):
     """
     transform_covariance
@@ -143,7 +144,7 @@ def semi_bias_model(voltages, bias=SILICON_V_BIAS, thermic=1, i=1):
 
 
 def advanced_analysis(raw_data, is_cv=False, base_path=None, full_model=True,
-                      first_boundaries=None, second_boundaries=None, **kwargs):
+                      first_boundaries=None, second_boundaries=None, is_inter_pixel=False, **kwargs):
     """
     advanced_analysis
 
@@ -179,7 +180,7 @@ def advanced_analysis(raw_data, is_cv=False, base_path=None, full_model=True,
                 bias_name = f"bias_{bias_voltage}_V".replace('-', "M_").replace(".", "__")
                 data_group = base_group.biasing.measurements[bias_name]
                 ana_group = walk_to_node(base_group.biasing, str_join("/", "analysis", bias_name), create=True)
-                advanced_analysis_delegate(in_file_h5, data_group, ana_group, full_model=full_model, **kwargs)
+                advanced_analysis_data_handle(in_file_h5, data_group, ana_group, full_model=full_model, is_inter_pixel=is_inter_pixel, **kwargs)
                 cap_data = ana_group.HistCap[:]
                 cap_error_data = ana_group.HistCapErr[:]
                 cv_data[:, :, k] = cap_data[:, :]
@@ -205,11 +206,11 @@ def advanced_analysis(raw_data, is_cv=False, base_path=None, full_model=True,
                 base_group.total_cap.analysis._f_remove(recursive=True)
                 time.sleep(1)
             ana_group = walk_to_node(base_group.total_cap, "analysis", create=True)
-            advanced_analysis_delegate(in_file_h5, base_group.total_cap.measurements, ana_group, full_model=full_model,
-                                       **kwargs)
+            advanced_analysis_data_handle(in_file_h5, base_group.total_cap.measurements, ana_group, full_model=full_model,
+                                          is_inter_pixel=is_inter_pixel, **kwargs)
 
 
-def advanced_analysis_delegate(file: tb.File, data_group: tb.Group, result_group: tb.Group, full_model=True, **kwargs):
+def advanced_analysis_data_handle(file: tb.File, data_group: tb.Group, result_group: tb.Group, full_model=True, is_inter_pixel=False, **kwargs):
     """
         advanced_analysis_delegate
 
@@ -227,6 +228,111 @@ def advanced_analysis_delegate(file: tb.File, data_group: tb.Group, result_group
         :param apply_contour: boolean, indicates whether to determine the contours and try to plot them.
         :param full_model: boolean, True, indicates whether the full model for extended frequency range is to be used.
         """
+    # select the correct group to write the analysis results to
+    group = result_group
+    # select the correct group to read the data from
+    select_group = data_group
+
+    # Read pixel map
+    if is_inter_pixel:
+        defaultss = {
+            "cap_name": "HistCap",
+            "cap_title": "Capacitance Histogram",
+            "cap_err_name": "HistCapErr",
+            "cap_err_title": "Capacitance Error Histogram",
+            "leak_name": "HistLeak",
+            "leak_title": "Leakage Current Histogram",
+            "leak_error_name": "HistLeakErr",
+            "leak_error_title": "Leakage Current Error Histogram",
+            "resistor_name": "HistRes",
+            "resistor_title": "On-Resistance Histogram",
+            "resistor_error_name": "HistResErr",
+            "resistor_error_title": "On-Resistance Error Histogram",
+            "cov_name": "HistFitCov",
+            "cov_title": 'Fit Covariance Matrix'
+        }
+        current_hist = check_leaf_unit(select_group.TotalHistCurr, "A")
+        if "TotalHistCurr" in select_group:
+            current_error_hist = check_leaf_unit(select_group.TotalHistCurr, "A")
+        else:
+            current_error_hist = np.full_like(current_hist, fill_value=np.nan)
+        # Read scan parameters
+        scan_parameters = select_group.scan_params[:]
+
+        advanced_analysis_delegate(current_error_hist, current_hist, data_group, file, full_model, group,
+                                   scan_parameters, **kwargs)
+
+
+        inter_a_output_dict = {
+            "cap_name": "HistCapInterA",
+            "cap_title": "Capacitance Histogram of inter pixel A",
+            "cap_err_name": "HistCapErrInterA",
+            "cap_err_title": "Capacitance Error Histogram of inter pixel A",
+            "leak_name": "HistLeakInterA",
+            "leak_title": "Leakage Current Histogram of inter pixel A",
+            "leak_error_name": "HistLeakErrInterA",
+            "leak_error_title": "Leakage Current Error Histogram of inter pixel A",
+            "resistor_name": "HistResInterA",
+            "resistor_title": "On-Resistance Histogram of inter pixel A",
+            "resistor_error_name": "HistResInterA",
+            "resistor_error_title": "On-Resistance Error Histogram of inter pixel A",
+            "cov_name": "HistFitCovInterA",
+            "cov_title": 'Fit Covariance Matrix of inter pixel A'
+        }
+        kwargs.update(inter_a_output_dict)
+        current_hist = select_group.check_leaf_unit(select_group.InterHistCurrA, "A")
+        if "InterHistCurrErrA" in select_group:
+            current_error_hist = check_leaf_unit(select_group.InterHistCurrErrA, "A")
+        else:
+            current_error_hist = np.full_like(current_hist, fill_value=np.nan)
+
+        advanced_analysis_delegate(current_error_hist, current_hist, data_group, file, full_model, group,
+                                   scan_parameters, **kwargs)
+
+        inter_b_output_dict = {
+            "cap_name": "HistCapInterB",
+            "cap_title": "Capacitance Histogram of inter pixel B",
+            "cap_err_name": "HistCapErrInterB",
+            "cap_err_title": "Capacitance Error Histogram of inter pixel B",
+            "leak_name": "HistLeakInterB",
+            "leak_title": "Leakage Current Histogram of inter pixel B",
+            "leak_error_name": "HistLeakErrInterB",
+            "leak_error_title": "Leakage Current Error Histogram of inter pixel B",
+            "resistor_name": "HistResInterB",
+            "resistor_title": "On-Resistance Histogram of inter pixel B",
+            "resistor_error_name": "HistResInterB",
+            "resistor_error_title": "On-Resistance Error Histogram of inter pixel B",
+            "cov_name": "HistFitCovInterB",
+            "cov_title": 'Fit Covariance Matrix of inter pixel B'
+        }
+        kwargs.update(inter_b_output_dict)
+        check_leaf_unit(select_group.HistCurr, "A")
+        current_hist = check_leaf_unit(select_group.InterHistCurrB, "A")
+        if "InterHistCurrErrB" in select_group:
+            current_error_hist = check_leaf_unit(select_group.InterHistCurrErrB, "A")
+        else:
+            current_error_hist = np.full_like(current_hist, fill_value=np.nan)
+
+        advanced_analysis_delegate(current_error_hist, current_hist, data_group, file, full_model, group,
+                                   scan_parameters, **kwargs)
+    else:
+        check_leaf_unit(select_group.HistCurr, "A")
+        current_hist = select_group.HistCurr[:]
+        if "HistCurrErr" in select_group:
+            check_leaf_unit(select_group.HistCurrErr, "A")
+            current_error_hist = select_group.HistCurrErr[:]
+        else:
+            current_error_hist = np.full_like(current_hist, fill_value=np.nan)
+        # Read scan parameters
+        scan_parameters = select_group.scan_params[:]
+
+        advanced_analysis_delegate(current_error_hist, current_hist, data_group, file, full_model, group,
+                                   scan_parameters, **kwargs)
+
+
+def advanced_analysis_delegate(
+        current_error_hist: np.ndarray |Any, current_hist, data_group: Group, file: File, full_model: bool,
+        group: Group, scan_parameters, **kwargs):
     # extract the additional keyword arguments
     use_kafe2 = kwargs.get("use_kafe2", False)
     apply_contour = kwargs.get("apply_contour", False)
@@ -243,22 +349,6 @@ def advanced_analysis_delegate(file: tb.File, data_group: tb.Group, result_group
         fit_cov = np.full(shape=COVARIANCE_PIXCAP_SHAPE, fill_value=np.nan)
     else:
         fit_cov = np.full(shape=(40, 40, 3, 3), fill_value=np.nan)
-
-    # select the correct group to write the analysis results to
-    group = result_group
-    # select the correct group to read the data from
-    select_group = data_group
-
-    # Read pixel map
-    check_leaf_unit(select_group.HistCurr, "A")
-    current_hist = select_group.HistCurr[:]
-    if "HistCurrErr" in select_group:
-        check_leaf_unit(select_group.HistCurrErr, "A")
-        current_error_hist = select_group.HistCurrErr[:]
-    else:
-        current_error_hist = np.full_like(current_hist, fill_value=np.nan)
-    # Read scan parameters
-    scan_parameters = select_group.scan_params[:]
 
     # prepare the fit model
     if full_model:
@@ -417,9 +507,10 @@ def advanced_analysis_delegate(file: tb.File, data_group: tb.Group, result_group
     # Store capacitance values and specify the used units as an attribute.
     if plot and not isinstance(plot, PdfPages):
         output_pdf.close()
+
     temp_array = file.create_carray(group,
-                                    name='HistCap',
-                                    title='Capacitance Histogram',
+                                    name=kwargs.get("cap_name", "HistCap"),
+                                    title=kwargs.get("cap_title", "Capacitance Histogram"),
                                     obj=cap_hist,
                                     filters=tb.Filters(complib='blosc',
                                                        complevel=5,
@@ -427,8 +518,8 @@ def advanced_analysis_delegate(file: tb.File, data_group: tb.Group, result_group
     temp_array.attrs["Units"] = "F"
     temp_array.flush()
     temp_array = file.create_carray(group,
-                                    name='HistCapErr',
-                                    title='Capacitance Error Histogram',
+                                    name=kwargs.get("cap_err_name", "HistCapErr"),
+                                    title=kwargs.get("cap_err_title", "Capacitance Error Histogram"),
                                     obj=cap_error_hist,
                                     filters=tb.Filters(complib='blosc',
                                                        complevel=5,
@@ -437,8 +528,8 @@ def advanced_analysis_delegate(file: tb.File, data_group: tb.Group, result_group
     temp_array.flush()
 
     temp_array = file.create_carray(group,
-                                    name='HistLeak',
-                                    title='Leakage Current Histogram',
+                                    name=kwargs.get("leak_name", "HistLeak"),
+                                    title=kwargs.get("leak_title", "Leakage Current Histogram"),
                                     obj=leak_hist,
                                     filters=tb.Filters(complib='blosc',
                                                        complevel=5,
@@ -446,8 +537,8 @@ def advanced_analysis_delegate(file: tb.File, data_group: tb.Group, result_group
     temp_array.attrs["Units"] = "nA"
     temp_array.flush()
     temp_array = file.create_carray(group,
-                                    name='HistLeakErr',
-                                    title='Leakage Current Error Histogram',
+                                    name=kwargs.get("leak_error_name", "HistLeakErr"),
+                                    title=kwargs.get("leak_error_title", "Leakage Current Error Histogram"),
                                     obj=leak_error_hist,
                                     filters=tb.Filters(complib='blosc',
                                                        complevel=5,
@@ -456,8 +547,8 @@ def advanced_analysis_delegate(file: tb.File, data_group: tb.Group, result_group
     temp_array.flush()
 
     temp_array = file.create_carray(group,
-                                    name='HistRes',
-                                    title='On-Resistance Histogram',
+                                    name=kwargs.get("resistor_name", "HistRes"),
+                                    title=kwargs.get("resistor_title", "On-Resistance Histogram"),
                                     obj=resistor_hist,
                                     filters=tb.Filters(complib='blosc',
                                                        complevel=5,
@@ -465,8 +556,8 @@ def advanced_analysis_delegate(file: tb.File, data_group: tb.Group, result_group
     temp_array.attrs["Units"] = "O"
     temp_array.flush()
     temp_array = file.create_carray(group,
-                                    name='HistResErr',
-                                    title='On-Resistance Error Histogram',
+                                    name=kwargs.get("resistor_error_name", "HistResErr"),
+                                    title=kwargs.get("resistor_error_title", "On-Resistance Error Histogram"),
                                     obj=resistor_error_hist,
                                     filters=tb.Filters(complib='blosc',
                                                        complevel=5,
@@ -475,8 +566,8 @@ def advanced_analysis_delegate(file: tb.File, data_group: tb.Group, result_group
     temp_array.flush()
 
     temp_array = file.create_carray(group,
-                                    name='HistFitCov',
-                                    title='Fit Covariance Matrix',
+                                    name=kwargs.get("cov_name", "HistFitCov"),
+                                    title=kwargs.get("cov_title", 'Fit Covariance Matrix'),
                                     obj=fit_cov, filters=tb.Filters(complib='blosc',
                                                                     complevel=5,
                                                                     fletcher32=False)
@@ -490,7 +581,7 @@ def str_join(delimiter, *args):
     return delimiter.join(args)
 
 
-def analyze_data(raw_data, is_cv=False, base_path=None, first_boundaries=None, second_boundaries=None, ):
+def analyze_data(raw_data, is_cv=False, base_path=None, first_boundaries=None, second_boundaries=None, is_inter_pixel=False,):
     """
     analyze data
 
@@ -530,7 +621,7 @@ def analyze_data(raw_data, is_cv=False, base_path=None, first_boundaries=None, s
                 bias_name = f"bias_{bias_voltage}_V".replace('-', "M_").replace(".", "__")
                 data_group = base_group.biasing.measurements[bias_name]
                 ana_group = walk_to_node(base_group.biasing, str_join("/", "analysis", bias_name), create=True)
-                analyze_data_delegate(in_file_h5, data_group, ana_group)
+                analyze_data_handle_data(in_file_h5, data_group, ana_group, is_inter_pixel=is_inter_pixel)
                 cap_data = ana_group.HistCap[:]
                 cap_error_data = ana_group.HistCapErr[:]
                 cv_data[:, :, k] = cap_data[:, :]
@@ -552,14 +643,18 @@ def analyze_data(raw_data, is_cv=False, base_path=None, first_boundaries=None, s
                 analyze_depletion_delegate(base_group.biasing.measurements, base_group.biasing.analysis,
                                            first_boundaries, second_boundaries)
         else:
-            if "analysis" in base_group.total_cap:
-                base_group.total_cap.analysis._f_remove(recursive=True)
+            if is_inter_pixel:
+                reference_group = base_group.inter_cap
+            else:
+                reference_group = base_group.total_cap
+            if "analysis" in reference_group:
+                reference_group.analysis._f_remove(recursive=True)
                 time.sleep(1)
-            ana_group = walk_to_node(base_group.total_cap, "analysis", create=True)
-            analyze_data_delegate(in_file_h5, base_group.total_cap.measurements, ana_group)
+            ana_group = walk_to_node(reference_group, "analysis", create=True)
+            analyze_data_handle_data(in_file_h5, reference_group.measurements, ana_group, is_inter_pixel=is_inter_pixel)
 
 
-def analyze_data_delegate(file: tb.File, data_group: tb.Group, result_group: tb.Group):
+def analyze_data_handle_data(file: tb.File, data_group: tb.Group, result_group: tb.Group, is_inter_pixel=False, **kwargs):
     """
         analyze data_delegate
 
@@ -576,23 +671,76 @@ def analyze_data_delegate(file: tb.File, data_group: tb.Group, result_group: tb.
         :param data_group: hdf file's hierachy group containing the measured data.
         :param result_group: hdf file's hierachy group to write the analysis results to.
         """
-    # create array like objects to temporarily save the analysis results
-    cap_hist = np.full(shape=GENERAL_PIXCAP_SHAPE, fill_value=np.nan)  # capacitance for each pixel
-    cap_error_hist = np.full(shape=GENERAL_PIXCAP_SHAPE, fill_value=np.nan)
-    leak_hist = np.full(shape=GENERAL_PIXCAP_SHAPE, fill_value=np.nan)
-    leak_error_hist = np.full(shape=GENERAL_PIXCAP_SHAPE, fill_value=np.nan)
-    fit_cov = np.full(shape=(40, 40, 2, 2), fill_value=np.nan)
-
     # select the correct group to save the analysis results to
     group = result_group
     # select the correct group to read the data from
     select_group = data_group
 
     # Read pixel map
-    check_leaf_unit(select_group.HistCurr, "A")
-    current_hist = select_group.HistCurr[:]
-    # Read scan parameters
-    scan_parameters = select_group.scan_params[:]
+    if is_inter_pixel:
+        current_hist = check_leaf_unit(select_group.TotalHistCurr, "A")
+        # Read scan parameters
+        scan_parameters = select_group.scan_params[:]
+
+        analyze_data_delegate(current_hist, file, group, scan_parameters, **kwargs)
+
+        inter_a_output_dict = {
+            "cap_name": "HistCapInterA",
+            "cap_title": "Capacitance Histogram of inter pixel A",
+            "cap_err_name": "HistCapErrInterA",
+            "cap_err_title": "Capacitance Error Histogram of inter pixel A",
+            "leak_name": "HistLeakInterA",
+            "leak_title": "Leakage Current Histogram of inter pixel A",
+            "leak_error_name": "HistLeakErrInterA",
+            "leak_error_title": "Leakage Current Error Histogram of inter pixel A",
+            "resistor_name": "HistResInterA",
+            "resistor_title": "On-Resistance Histogram of inter pixel A",
+            "resistor_error_name": "HistResInterA",
+            "resistor_error_title": "On-Resistance Error Histogram of inter pixel A",
+            "cov_name": "HistFitCovInterA",
+            "cov_title": 'Fit Covariance Matrix of inter pixel A'
+        }
+        kwargs.update(inter_a_output_dict)
+        current_hist = check_leaf_unit(select_group.InterHistCurrA, "A")
+        analyze_data_delegate(current_hist, file, group, scan_parameters, **kwargs)
+
+        inter_b_output_dict = {
+            "cap_name": "HistCapInterB",
+            "cap_title": "Capacitance Histogram of inter pixel B",
+            "cap_err_name": "HistCapErrInterB",
+            "cap_err_title": "Capacitance Error Histogram of inter pixel B",
+            "leak_name": "HistLeakInterB",
+            "leak_title": "Leakage Current Histogram of inter pixel B",
+            "leak_error_name": "HistLeakErrInterB",
+            "leak_error_title": "Leakage Current Error Histogram of inter pixel B",
+            "resistor_name": "HistResInterB",
+            "resistor_title": "On-Resistance Histogram of inter pixel B",
+            "resistor_error_name": "HistResInterB",
+            "resistor_error_title": "On-Resistance Error Histogram of inter pixel B",
+            "cov_name": "HistFitCovInterB",
+            "cov_title": 'Fit Covariance Matrix of inter pixel B'
+        }
+        kwargs.update(inter_b_output_dict)
+        current_hist = check_leaf_unit(select_group.InterHistCurrB, "A")
+        analyze_data_delegate(current_hist, file, group, scan_parameters, **kwargs)
+
+
+    else:
+        current_hist = check_leaf_unit(select_group.HistCurr, "A")
+        # Read scan parameters
+        scan_parameters = select_group.scan_params[:]
+        analyze_data_delegate(current_hist, file, group, scan_parameters, **kwargs)
+
+
+def analyze_data_delegate(current_hist, file: File,
+                          group: Group,
+                          scan_parameters, **kwargs):
+    # create array like objects to temporarily save the analysis results
+    cap_hist = np.full(shape=GENERAL_PIXCAP_SHAPE, fill_value=np.nan)  # capacitance for each pixel
+    cap_error_hist = np.full(shape=GENERAL_PIXCAP_SHAPE, fill_value=np.nan)
+    leak_hist = np.full(shape=GENERAL_PIXCAP_SHAPE, fill_value=np.nan)
+    leak_error_hist = np.full(shape=GENERAL_PIXCAP_SHAPE, fill_value=np.nan)
+    fit_cov = np.full(shape=(40, 40, 2, 2), fill_value=np.nan)
 
     # Fit pixel data in order to extract capacitance for each pixel
     for col in range(current_hist.shape[0]):
@@ -632,8 +780,8 @@ def analyze_data_delegate(file: tb.File, data_group: tb.Group, result_group: tb.
 
     # Store capacitance values
     temp_array = file.create_carray(group,
-                                    name='HistCap',
-                                    title='Capacitance Histogram',
+                                    name=kwargs.get("cap_name", "HistCap"),
+                                    title=kwargs.get("cap_title", "Capacitance Histogram"),
                                     obj=cap_hist,
                                     filters=tb.Filters(complib='blosc',
                                                        complevel=5,
@@ -641,8 +789,8 @@ def analyze_data_delegate(file: tb.File, data_group: tb.Group, result_group: tb.
     temp_array.attrs["Units"] = "F"
     temp_array.flush()
     temp_array = file.create_carray(group,
-                                    name='HistCapErr',
-                                    title='Capacitance Error Histogram',
+                                    name=kwargs.get("cap_err_name", "HistCapErr"),
+                                    title=kwargs.get("cap_err_title", "Capacitance Error Histogram"),
                                     obj=cap_error_hist,
                                     filters=tb.Filters(complib='blosc',
                                                        complevel=5,
@@ -651,8 +799,8 @@ def analyze_data_delegate(file: tb.File, data_group: tb.Group, result_group: tb.
     temp_array.flush()
 
     temp_array = file.create_carray(group,
-                                    name='HistLeak',
-                                    title='Leakage Current Histogram',
+                                    name=kwargs.get("leak_name", "HistLeak"),
+                                    title=kwargs.get("leak_title", "Leakage Current Histogram"),
                                     obj=leak_hist,
                                     filters=tb.Filters(complib='blosc',
                                                        complevel=5,
@@ -660,8 +808,8 @@ def analyze_data_delegate(file: tb.File, data_group: tb.Group, result_group: tb.
     temp_array.attrs["Units"] = "nA"
     temp_array.flush()
     temp_array = file.create_carray(group,
-                                    name='HistLeakErr',
-                                    title='Leakage Current Error Histogram',
+                                    name=kwargs.get("leak_error_name", "HistLeakErr"),
+                                    title=kwargs.get("leak_error_title", "Leakage Current Error Histogram"),
                                     obj=leak_error_hist,
                                     filters=tb.Filters(complib='blosc',
                                                        complevel=5,
@@ -670,9 +818,11 @@ def analyze_data_delegate(file: tb.File, data_group: tb.Group, result_group: tb.
     temp_array.flush()
 
     temp_array = file.create_carray(group,
-                                    name='HistFitCov',
-                                    title='Fit Covariance Matrix',
-                                    obj=fit_cov, filters=tb.Filters(complib='blosc', complevel=5, fletcher32=False)
+                                    name=kwargs.get("cov_name", "HistFitCov"),
+                                    title=kwargs.get("cov_title", 'Fit Covariance Matrix'),
+                                    obj=fit_cov, filters=tb.Filters(complib='blosc',
+                                                                    complevel=5,
+                                                                    fletcher32=False)
                                     )
     temp_array.attrs["Units"] = "{{F^2, F nA},{nA F, nA^2}}"
     temp_array.flush()
@@ -1020,6 +1170,6 @@ def effective_doping(capacitances, bias_voltages, diode_area=None):
 if __name__ == '__main__':
     # analyze_data(raw_data='/home/silab/git/pixcap65/pixcap_full_data_image1.h5')
     # advanced_analysis(raw_data='New_2_Scan.h5', base_path="ATLAS_Itk/X2/unbiased_1")
-    advanced_analysis(raw_data='Data/r13-measurement/R13_Initial_3_Scan.h5',base_path="ATLAS ITk/unbiased_1")
+    # advanced_analysis(raw_data='Data/r13-measurement/R13_Initial_3_Scan.h5',base_path="ATLAS ITk/unbiased_1")
     # analyze_data(raw_data='Data/r13-measurement/R13_BIAS_CV_COMBI_6.h5', is_cv=True, first_boundaries=(-100,-40), second_boundaries=(-10, 0),)
-
+    analyze_data(raw_data='R13-Interpixel_Scan.h5', base_path="Reference/R13/demo_measurement_4_80_V", is_inter_pixel=True)

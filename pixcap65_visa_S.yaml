@@ -23,26 +23,26 @@ transfer_layer:
         avoid_download : True
 #        avoid_download : False
 
-  - name     : Serial
-    type     : Serial
+  - name     : Visa
+    type     : Visa
     init     :
-        port     : "/dev/ttyUSB2"
+        port     : "ASRL/dev/ttyUSB2"
         # hwid: USB VID:PID=067B:2303 LOCATION=4-10
         # for 2410 we need
         # read_termination : "\r"
         read_termination : "\n"
         baudrate : 19200
         # only necessary when 2602a is used as SMU
-        parity   : "E"
-        bytesize : 8
-        rtscts   : True
-        exclusive : False
-        timeout: 120
+        parity   : 2
+        data_bits : 8
+        flow_control: 2
+        access_mode: 0
+        backend: "@py"
 
-  - name: Serial2 
-    type: Serial
+  - name: Visa2
+    type: Visa
     init:
-      port: "/dev/ttyUSB0"
+      port: "ASRL/dev/ttyUSB0"
       # hwid: USB VID:PID=0403:6001 LOCATION=4-9
       # for power supply
       # read_termination: "\r\n"
@@ -56,11 +56,10 @@ transfer_layer:
       # for biasing smu
       read_termination: "\r"
       baudrate: 19200
-      parity: N
-      bytesize: 8
-      timeout: 120
+      parity: 0
+      data_bits: 8
 
-  - name: Serial3 
+  - name: Serial3
     type: Serial
     init:
       port: "/dev/ttyUSB1"
@@ -224,7 +223,7 @@ registers:
   - name: VM2
     type: FunctionalRegister
     hw_driver: SMU_Device
-    arg_add: { 'channel': 2 }
+    arg_add: { 'channel': -1 }
 
   - name: VM3
     type: FunctionalRegister

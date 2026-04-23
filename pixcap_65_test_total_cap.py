@@ -33,7 +33,7 @@ from tqdm import tqdm
 from tqdm.contrib import DummyTqdmFile
 
 import pixcap65_constants as c
-from analysis import advanced_analysis_delegate
+from analysis import advanced_analysis_data_handle
 from configs.config_handler import extract_smu_current_error
 from pixcap65 import Pixcap65, BasilConfigKeys
 from plotting import plot_data_delegate
@@ -216,6 +216,8 @@ class PixCap65Measurement(object):
         if "data_path" in self.scan_config:
             self.base_group = self.scan_config["data_path"]
 
+
+
     def configure(self):
         if "output_file" in self.scan_config and os.path.exists(self.scan_config["output_file"]):
             self.out_file_h5.close()
@@ -232,6 +234,8 @@ class PixCap65Measurement(object):
         else:
             self.pixcap[self.pixcap.bias_smu_key].set_number_measurements(self.n_measurements)
         self.pixcap[self.pixcap.bias_smu_key].drain_error_queue()
+
+        # init the primary smu or VM3
         self.init_smu()
         self.pixcap[self.pixcap.smu_setup_devices[self.pixcap.primary_smu_key]].drain_error_queue()
         print("fetch some configurations from the smu!")
@@ -266,6 +270,10 @@ class PixCap65Measurement(object):
         # granularity of the clock sequencer
         return self.pixcap.seq_size
 
+    @seq_size.setter
+    def seq_size(self, value):
+        self.pixcap.seq_size = value
+
     @property
     def filters(self):
         return tb.Filters(complib='blosc', complevel=5, fletcher32=False)
@@ -283,6 +291,12 @@ class PixCap65Measurement(object):
         print("Exited from the pixcap chip!")
         return False
 
+    def create_carray(self, where: tb.Group, name: str, *args, **kwargs):
+        from utils_2 import create_update_array
+        return create_update_array(self.out_file_h5, where, name, *args, **kwargs)
+
+
+
     @property
     def current_sense_range(self):
         return 0.000001
@@ -293,11 +307,11 @@ class PixCap65Measurement(object):
 
     # Handle the SMU!
     # these will now just forward the commands to the pixcap object
-    def init_smu(self, voltage_range=1.5, current_limit=0.001, plc=None):
+    def init_smu(self, voltage_range=1.5, current_limit=0.001, plc=None, **kwargs):
         if plc is None:
             plc = self.scan_config.get('plc_cycles', 10)
         self.pixcap.init_smu(self.scan_config[ScanConfigurationKeys.VIN], self.current_sense_range, voltage_range,
-                             current_limit, plc)
+                             current_limit, plc, **kwargs)
 
     def smu_on(self):
         self.pixcap.smu_on()
@@ -338,11 +352,11 @@ class PixCap65Measurement(object):
 
     @property
     def analysis_group(self):
-        return self.out_file_h5.root
+        return self.base_group.analysis
 
     @property
     def measurement_group(self):
-        return self.out_file_h5.root
+        return self.base_group
 
     @property
     def n_measurements(self):
@@ -465,8 +479,8 @@ class PixCap65TotalCap(PixCap65Measurement):
                 #     logger.info("Wait for settling of the bias supply.")
                 #     time.sleep(1)
             with logging_redirect_tqdm():
-                for i_row in tqdm(row_range, desc="Grid row Loop"):
-                    for i_col in tqdm(col_range, desc="Grid column Loop"):
+                for i_row in tqdm(row_range, desc="Grid row Loop", leave=not sequence_call):
+                    for i_col in tqdm(col_range, desc="Grid column Loop", leave=False):
                         logging.info(MEASURING_PIXEL_TEXT % (i_col, i_row))
                         logger.info(MEASURING_PIXEL_TEXT % (i_col, i_row))
                         self.dut.disable_all_pixels()
@@ -824,7 +838,7 @@ class PixCap65TotalCap(PixCap65Measurement):
             plot_data_delegate(self.out_file_h5.root, self.out_file_h5.root, output_pdf)
 
     def analyze(self):
-        advanced_analysis_delegate(self.out_file_h5, self.out_file_h5.root, self.out_file_h5.root)
+        advanced_analysis_data_handle(self.out_file_h5, self.out_file_h5.root, self.out_file_h5.root)
 
     def post_scan_handler(self, unit=None, **kwargs):
         if NUMBER_AVERAGE_MEASUREMENTS_KEY in self.scan_config and self.scan_config[NUMBER_AVERAGE_MEASUREMENTS_KEY] > 1:

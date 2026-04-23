@@ -5,25 +5,38 @@ Script for measuring Inter Pixel Capacitance
 import gc
 import logging
 import time
+from collections.abc import Iterable, Mapping
 
 import numpy as np
 import pylab as pl
 import tables as tb
 from bitarray import bitarray
+from tqdm import tqdm
 
 import pixcap65_constants as c
-from pixcap_65_test_total_cap import PixCap65Measurement
-from pixcap_65_test_total_cap import store_scan_par_values
+from configs.config_handler import extract_smu_current_error
+from pixcap_65_test_total_cap import PixCap65Measurement, ScanConfigurationKeys, MEASURING_PIXEL_TEXT, \
+    store_scan_par_values, _store_scan_par_values
+from tqdm_logging_utils import logging_redirect_tqdm
+
+UNCERT_ESTIMATION_ERROR_MSG = "Something went wrong during the estimation of the measurement errors."
 
 logging.getLogger().setLevel(logging.INFO)
+logger = logging.getLogger(__name__)
+logger.setLevel(logging.INFO)
 
 scan_configuration = {
-    'start_column': 1,
-    'stop_column': 38,
-    'start_row': 2,
-    'stop_row': 39,
+    'start_column': 15,
+    'stop_column': 35,
+    'start_row': 15,
+    'stop_row': 35,
 
-    'frequency_range': np.arange(1, 4.1, 1)  # .astype(np.float) # [MHz]
+    'Vin': 1.0,  # input voltage in V
+    'frequency_range': np.arange(1, 12.1, 1),  # .astype(np.float) # [MHz]
+    'bias': -80,
+
+    'data_path': "Reference/R13",
+    "out_file_mode": "append",
 }
 
 
@@ -39,35 +52,48 @@ class InterCap(tb.IsDescription):
 
 
 class Pixcap65InterCap(PixCap65Measurement):
-    def __init__(self, scan_config, output_file):
-        super(Pixcap65InterCap).__init__(scan_config, output_file)
+    def __init__(self, scan_config, output_file, **kwargs):
+        super(Pixcap65InterCap, self).__init__(scan_config, output_file, **kwargs)
 
         # prepare the data fields for the measurement
         self.inter_hist_current_1 = np.full(shape=(40, 40, self.n_frequencies),
                                             fill_value=np.nan)  # current value for each measured frequency per pixel
         self.inter_hist_current_2 = np.full(shape=(40, 40, self.n_frequencies),
                                             fill_value=np.nan)  # current value for each measured frequency per pixel
-        self.total_hist_current_2 = np.full(shape=(40, 40, self.n_frequencies),
+        self.total_hist_current = np.full(shape=(40, 40, self.n_frequencies),
+                                          fill_value=np.nan)  # current value for each measured frequency per pixel
+
+        self.inter_hist_current_1_error = np.full(shape=(40, 40, self.n_frequencies),
                                             fill_value=np.nan)  # current value for each measured frequency per pixel
+        self.inter_hist_current_2_error = np.full(shape=(40, 40, self.n_frequencies),
+                                            fill_value=np.nan)  # current value for each measured frequency per pixel
+        self.total_hist_current_error = np.full(shape=(40, 40, self.n_frequencies),
+                                          fill_value=np.nan)  # current value for each measured frequency per pixel
+        # this kind of setup is somewhat misplaced.
+        self.pixcap.seq_size = 4
 
     def configure(self):
-        self.pixcap['SMU3'].off()
-        self.pixcap['SMU3'].source_volt()
-        self.pixcap['SMU3'].set_voltage_range(1.5)
-        self.pixcap['SMU3'].set_current_nlpc(10)
-        self.pixcap['SMU3'].set_voltage(1.0)
-        self.pixcap['SMU3'].set_current_limit(0.001)
-        self.pixcap['SMU3'].set_current_sense_range(0.00001)
+        # already done by super-class
+        super(Pixcap65InterCap, self).configure()
+        # self.pixcap['SMU3'].off()
+        # self.pixcap['SMU3'].source_volt()
+        # self.pixcap['SMU3'].set_voltage_range(1.5)
+        # self.pixcap['SMU3'].set_current_nlpc(10)
+        # self.pixcap['SMU3'].set_voltage(1.0)
+        # self.pixcap['SMU3'].set_current_limit(0.001)
+        # self.pixcap['SMU3'].set_current_sense_range(0.00001)
 
-        self.pixcap['SMU2'].off()
-        self.pixcap['SMU2'].source_volt()
-        self.pixcap['SMU2'].set_voltage_range(1.5)
-        self.pixcap['SMU2'].set_current_nlpc(10)
-        self.pixcap['SMU2'].set_voltage(1.0)
-        self.pixcap['SMU2'].set_current_limit(0.001)
-        self.pixcap['SMU2'].set_current_sense_range(0.00001)
+        self.init_smu(smu=self.pixcap.vm2_smu_key)
+        # self.pixcap['SMU2'].off()
+        # self.pixcap['SMU2'].source_volt()
+        # self.pixcap['SMU2'].set_voltage_range(1.5)
+        # self.pixcap['SMU2'].set_current_nlpc(10)
+        # self.pixcap['SMU2'].set_voltage(1.0)
+        # self.pixcap['SMU2'].set_current_limit(0.001)
+        # self.pixcap['SMU2'].set_current_sense_range(0.00001)
 
         # settings for sensor depletion source
+        # self.init_smu(smu=self.pixcap.vm1_smu_key)
         # self.pixcap['SMU1'].off()
         # self.pixcap['SMU1'].source_volt()
         # self.pixcap['SMU1'].set_voltage_range(1.5)
@@ -89,13 +115,17 @@ class Pixcap65InterCap(PixCap65Measurement):
 
         self.pixcap['SEQ'].write()
         self.pixcap['SEQ'].start()
+        # self.pixcap.frequency_settling = 1
 
-        self.pixcap['SMU3'].on()
-        self.pixcap['SMU2'].on()
+        self.pixcap.vm3_on()
+        self.pixcap.vm2_on()
+        # self.pixcap.vm1_on()
+        # self.pixcap['SMU3'].on()
+        # self.pixcap['SMU2'].on()
         # self.pixcap['SMU1'].on()
 
         # Wherefore is this long sleep statement?
-        time.sleep(15)
+        # time.sleep(15)
 
         # measure some current values; avoid measuring incorrect currents due to initial oscillation effects of SMU
         logging.debug('Waiting for settling of SMU...')
@@ -106,74 +136,231 @@ class Pixcap65InterCap(PixCap65Measurement):
 
         # measure some current values; avoid measuring incorrect currents due to initial oscillation effects of SMU
         for _ in range(0, 20):
-            # I'm not sure whether this will work at all?
-            c3 = self.pixcap['SMU3'].get_reading()
-            c2 = self.pixcap['SMU2'].get_reading()
-            print('c3:', c3)
-            print('c2:', c2)
+            c3 = self.pixcap.vm3_measure_current()
+            c2 = self.pixcap.vm2_measure_current()
+            # c1 = self.pixcap.vm1_measure_current()
+            # c3 = self.pixcap['SMU3'].get_reading()
+            # c2 = self.pixcap['SMU2'].get_reading()
+            logging.debug('C3: {}'.format(c3))
+            logging.debug('C2: {}'.format(c2))
+            # logging.debug('C1: {}'.format(c1))
+            # print('c3:', c3)
+            # print('c2:', c2)
             time.sleep(1)
 
-    def scan(self):
-        for i_row in self.row_range:
-            for i_col in self.col_range:
-                current_array1 = []
-                current_array2 = []
-                self.pixcap.disable_all_pixels()
-                self.pixcap.disable_all_columns()
+    def scan(self, data_group_spec=None):
+        # some further setup to be done right before the measurement
+        from utils_2 import walk_to_node
+        if data_group_spec is not None and isinstance(data_group_spec, str):
+            data_group = walk_to_node(self.base_group, data_group_spec, create=True)
+        else:
+            data_group = self.base_group
 
-                # enable columns of pixel under test and surrounding pixels
-                self.pixcap.enable_column(i_col, c.EN_EOC_2 | c.EN_EOC_1 | c.EN_EOC_3)
-                self.pixcap.enable_column(i_col + 1 | i_col - 1, c.EN_EOC_1 | c.EN_EOC_3)
-                # self.pixcap.enable_column(i_col + 1, c.EN_EOC_1 | c.EN_EOC_3)
-                # self.pixcap.enable_column(i_col - 1, c.EN_EOC_1 | c.EN_EOC_3)
+        if isinstance(data_group_spec, tb.Node):
+            data_group = data_group_spec
+        else:
+            data_group, verify_creation = walk_to_node(data_group, "inter_cap/measurements", create=True,
+                                                       verify_create=True)
+            if not verify_creation:
+                for key, value in data_group._v_children.items():
+                    new_name = key
+                    while new_name in data_group:
+                        new_name = "{old}_backing".format(old=new_name)
+                    value.rename(new_name)
 
-                time.sleep(1)
+        data_group._f_setattr('frequencies', self.n_frequencies)
 
-                # enable pixel under test
-                self.pixcap.enable_pixel_clk(i_col, i_row, c.EN_CLK_2 | c.EN_CLK_0)
+        if 'bias' in self.scan_config:
+            self.pixcap.bias_voltage = -0.1
+            self.pixcap.bias_on()
+            self.pixcap.bias_voltage = float(self.scan_config["bias"])
+            # self.pixcap.bias_on()
+            # time.sleep(10)
+            data_group._f_setattr("bias_voltage", self.pixcap.get_smu_source_voltage(self.pixcap.bias_smu_key))
+            for i in range(40):
+                print(self.pixcap.get_smu_source_voltage(self.pixcap.bias_smu_key))
+                print(i, self.pixcap.bias_measure_volts(), self.pixcap.bias_measure_current())
+            # while not np.isclose(self.pixcap.bias_measure_volts(), self.pixcap.bias_voltage):
+            #     logger.info("Wait for settling of the bias supply.")
+            #     time.sleep(1)
 
-                # enable pixels surrounding pixel under test
-                self.pixcap.enable_pixel_clk(i_col, i_row + 1, c.EN_CLK_1 | c.EN_CLK_3)
-                self.pixcap.enable_pixel_clk(i_col + 1, i_row + 1, c.EN_CLK_1 | c.EN_CLK_3)
-                self.pixcap.enable_pixel_clk(i_col + 1, i_row, c.EN_CLK_1 | c.EN_CLK_3)
-                self.pixcap.enable_pixel_clk(i_col + 1, i_row - 1, c.EN_CLK_1 | c.EN_CLK_3)
-                self.pixcap.enable_pixel_clk(i_col, i_row - 1, c.EN_CLK_1 | c.EN_CLK_3)
-                self.pixcap.enable_pixel_clk(i_col - 1, i_row - 1, c.EN_CLK_1 | c.EN_CLK_3)
-                self.pixcap.enable_pixel_clk(i_col - 1, i_row, c.EN_CLK_1 | c.EN_CLK_3)
-                self.pixcap.enable_pixel_clk(i_col - 1, i_row + 1, c.EN_CLK_1 | c.EN_CLK_3)
+        try:
+            with logging_redirect_tqdm():
+                for i_row in tqdm(self.row_range, desc="Scanning column"):
+                    for i_col in tqdm(self.col_range, desc="Scanning column", leave=False):
+                        logging.info(MEASURING_PIXEL_TEXT % (i_col, i_row))
+                        logger.info(MEASURING_PIXEL_TEXT % (i_col, i_row))
 
-                for k, freq in enumerate(self.freq_sweep_array):
-                    temp = freq * self.seq_size
-                    self.pixcap['MIO_PLL'].setFrequency(temp)
 
-                    # TODO: Refactor the reading process of the SMU!
-                    result1 = self.pixcap['SMU3'].get_reading()
-                    self.inter_hist_current_1[i_col, i_row, k] = self.pixcap['SMU3'].get_reading().split(',')[1]
-                    current_array1.append(float(result1.split(',')[1]))
+                        # current_array1 = []
+                        # current_array2 = []
+                        self.pixcap.disable_all_pixels()
+                        self.pixcap.disable_all_columns()
 
-                    result2 = self.pixcap['SMU2'].get_reading()
-                    self.inter_hist_current_2[i_col, i_row, k] = self.pixcap['SMU2'].get_reading().split(',')[1]
-                    current_array2.append(float(result2.split(',')[1]))
-                    store_scan_par_values(scan_parameters=self.scan_parameters, scan_param_id=k, frequency=freq)
+                        # enable columns of pixel under test and surrounding pixels
+                        # self.pixcap.enable_column(i_col, c.EN_EOC_2 | c.EN_EOC_1 | c.EN_EOC_3)
+                        # self.pixcap.enable_column(i_col + 1 | i_col - 1, c.EN_EOC_1 | c.EN_EOC_3)
+                        self.pixcap.enable_column(i_col, c.EN_EOC_2 | c.EN_EOC_3)
+                        self.pixcap.enable_column(i_col + 1 | i_col - 1, c.EN_EOC_3)
+                        # Should the order have an inpact?
+                        # self.pixcap.enable_column(i_col + 1, c.EN_EOC_1 | c.EN_EOC_3)
+                        # self.pixcap.enable_column(i_col - 1, c.EN_EOC_1 | c.EN_EOC_3)
 
-            self.out_file_h5.create_carray(self.measurement_group,
-                                           name='TotalHistCurr',
-                                           title='Current Histogram for the total capacitance measurement',
-                                           obj=self.total_hist_current_2,
-                                           filters=self.filters).flush()
-            self.out_file_h5.create_carray(self.measurement_group,
-                                           name='InterHistCurrA',
-                                           title='Current Histogram for the inter capacitance measurement',
-                                           obj=self.inter_hist_current_1,
-                                           filters=self.filters).flush()
-            self.out_file_h5.create_carray(self.measurement_group,
-                                           name='InterHistCurrB',
-                                           title='Current Histogram for the inter capacitance measurement',
-                                           obj=self.inter_hist_current_2,
-                                           filters=self.filters).flush()
-            self.out_file_h5.flush()
-            # do some cleanup for the performance
-            gc.collect()
+                        # time.sleep(1)
+
+                        # enable pixel under test
+                        self.pixcap.enable_pixel_clk(i_col, i_row, c.EN_CLK_2 | c.EN_CLK_0)
+
+                        # enable pixels surrounding pixel under test
+                        # Should see whether the active clock 1 has any impact on the measurement.
+                        # self.pixcap.enable_pixel_clk(i_col, i_row + 1, c.EN_CLK_1 | c.EN_CLK_3)
+                        # self.pixcap.enable_pixel_clk(i_col + 1, i_row + 1, c.EN_CLK_1 | c.EN_CLK_3)
+                        # self.pixcap.enable_pixel_clk(i_col + 1, i_row, c.EN_CLK_1 | c.EN_CLK_3)
+                        # self.pixcap.enable_pixel_clk(i_col + 1, i_row - 1, c.EN_CLK_1 | c.EN_CLK_3)
+                        # self.pixcap.enable_pixel_clk(i_col, i_row - 1, c.EN_CLK_1 | c.EN_CLK_3)
+                        # self.pixcap.enable_pixel_clk(i_col - 1, i_row - 1, c.EN_CLK_1 | c.EN_CLK_3)
+                        # self.pixcap.enable_pixel_clk(i_col - 1, i_row, c.EN_CLK_1 | c.EN_CLK_3)
+                        # self.pixcap.enable_pixel_clk(i_col - 1, i_row + 1, c.EN_CLK_1 | c.EN_CLK_3)
+                        self.pixcap.enable_pixel_clk(i_col, i_row + 1, c.EN_CLK_3)
+                        self.pixcap.enable_pixel_clk(i_col + 1, i_row + 1, c.EN_CLK_3)
+                        self.pixcap.enable_pixel_clk(i_col + 1, i_row, c.EN_CLK_3)
+                        self.pixcap.enable_pixel_clk(i_col + 1, i_row - 1, c.EN_CLK_3)
+                        self.pixcap.enable_pixel_clk(i_col, i_row - 1, c.EN_CLK_3)
+                        self.pixcap.enable_pixel_clk(i_col - 1, i_row - 1, c.EN_CLK_3)
+                        self.pixcap.enable_pixel_clk(i_col - 1, i_row, c.EN_CLK_3)
+                        self.pixcap.enable_pixel_clk(i_col - 1, i_row + 1, c.EN_CLK_3)
+
+                        # Which SMU takes which role here?
+                        for k, freq in enumerate(self.freq_sweep_array):
+                            logging.info("Set the frequency to %f MHz for the measurement.", freq)
+                            self.pixcap.cvm_frequency = freq
+                            # temp = freq * self.seq_size
+                            # self.pixcap['MIO_PLL'].setFrequency(temp)
+
+                            # TODO: Refactor the reading process of the SMU!
+                            # Why read the value two times?
+                            # result1 = self.pixcap['SMU3'].get_reading()
+                            self.inter_hist_current_1[i_col, i_row, k] = self.pixcap.vm3_measure_current()
+                            # self.inter_hist_current_1[i_col, i_row, k] = self.pixcap['SMU3'].get_reading().split(',')[1]
+                            # current_array1.append(float(result1.split(',')[1]))
+
+                            # result2 = self.pixcap['SMU2'].get_reading()
+                            # perhaps the wrong capacitance!
+                            # self.inter_hist_current_2[i_col, i_row, k] = self.pixcap.vm_2_measure_current()
+                            # self.inter_hist_current_2[i_col, i_row, k] = self.pixcap['SMU2'].get_reading().split(',')[1]
+                            # current_array2.append(float(result2.split(',')[1]))
+                            self.total_hist_current[i_col, i_row, k] = self.pixcap.vm2_measure_current()
+
+                            # extract the inter pix current
+                            # self.inter_hist_current_2[i_col, i_row, k] = self.pixcap.vm_3_measure_current()
+                            if 'bias' in self.scan_config:
+                                store_scan_par_values(scan_parameters=self.scan_parameters, scan_param_id=k, frequency=freq, bias_voltage=
+                                self.pixcap["BIAS_SUPPLY"].get_source_voltage())
+                            else:
+                                store_scan_par_values(scan_parameters=self.scan_parameters, scan_param_id=k, frequency=freq)
+        finally:
+            # make sure that every possible measurement taken is also saved
+            try:
+                # make sure the measurement points will have uncertainties.
+                if np.all(np.isfinite(self.inter_hist_current_1)):
+                    try:
+                        self.inter_hist_current_1_error = extract_smu_current_error(
+                            self.smu_range_config[self.pixcap.vm3_smu_key], self.inter_hist_current_1,
+                                                                             self.current_sense_range)
+                    except Exception as e:
+                        logging.error(e.args)
+                        logging.exception(UNCERT_ESTIMATION_ERROR_MSG)
+                if np.all(np.isfinite(self.inter_hist_current_2)):
+                    try:
+                        self.inter_hist_current_2_error = extract_smu_current_error(
+                            self.smu_range_config[self.pixcap.vm1_smu_key], self.inter_hist_current_2,
+                            self.current_sense_range)
+                    except Exception as e:
+                        logging.error(e.args)
+                        logging.exception(UNCERT_ESTIMATION_ERROR_MSG)
+                if np.all(np.isfinite(self.total_hist_current)):
+                    try:
+                        self.total_hist_current_error = extract_smu_current_error(
+                            self.smu_range_config[self.pixcap.vm2_smu_key], self.total_hist_current,
+                            self.current_sense_range)
+                    except Exception as e:
+                        logging.error(e.args)
+                        logging.exception(UNCERT_ESTIMATION_ERROR_MSG)
+
+
+
+                data_group._f_setattr("freq_unit", "MHz")
+                data_group._f_setattr("current_unit", "A")
+                _store_scan_par_values(h5_file=self.out_file_h5, scan_parameters=self.scan_parameters, group=data_group)
+                temp_array = self.create_carray(data_group,
+                                               name='TotalHistCurr',
+                                               title='Current Histogram for the total capacitance measurement',
+                                               obj=self.total_hist_current,
+                                               filters=self.filters)
+                temp_array.attrs["Input"] = "VM2"
+                temp_array.attrs["Units"] = "A"
+                temp_array.flush()
+                temp_array = self.create_carray(data_group,
+                                                name='TotalHistCurrErr',
+                                                title='Error Histogram of the current for the total capacitance measurement',
+                                                obj=self.total_hist_current_error,
+                                                filters=self.filters)
+                temp_array.attrs["Input"] = "VM2"
+                temp_array.attrs["Units"] = "A"
+                temp_array.flush()
+                temp_array = self.create_carray(data_group,
+                                               name='InterHistCurrA',
+                                               title='Current Histogram for the inter capacitance measurement',
+                                               obj=self.inter_hist_current_1,
+                                               filters=self.filters)
+                temp_array.attrs["Input"] = "VM3"
+                temp_array.attrs["Units"] = "A"
+                temp_array.flush()
+                temp_array = self.create_carray(data_group,
+                                                name='InterHistCurrErrA',
+                                                title='Error Histogram of inter current A for the inter capacitance measurement',
+                                                obj=self.inter_hist_current_1_error,
+                                                filters=self.filters)
+                temp_array.attrs["Input"] = "VM3"
+                temp_array.attrs["Units"] = "A"
+                temp_array.flush()
+                temp_array = self.create_carray(data_group,
+                                               name='InterHistCurrB',
+                                               title='Current Histogram for the inter capacitance measurement',
+                                               obj=self.inter_hist_current_2,
+                                               filters=self.filters)
+                temp_array.attrs["Input"] = "NOT IN USED"
+                temp_array.attrs["Units"] = "A"
+                temp_array.flush()
+                temp_array = self.create_carray(data_group,
+                                                name='InterHistCurrErrB',
+                                                title='Error Histogram of inter current B for the inter capacitance measurement',
+                                                obj=self.inter_hist_current_2_error,
+                                                filters=self.filters)
+                temp_array.attrs["Input"] = "NOT USED"
+                temp_array.attrs["Units"] = "A"
+                temp_array.flush()
+
+                for config_key, config_setting in self.scan_config.items():
+                    if isinstance(config_setting, Iterable) or isinstance(config_setting, Mapping):
+                        continue
+                    logger.warning("The present keys for config attributes are: %s", str(data_group._v_attrs))
+                    attr_config_key = "configuration_{}".format(config_key)
+                    if attr_config_key in data_group._v_attrs and data_group._v_attrs[attr_config_key] != config_setting:
+                        logger.error("Unexpectedly the configuration key is already present.")
+                        temp_key = attr_config_key
+                        while temp_key in data_group._v_attrs:
+                            temp_key = "{}_backing".format(temp_key)
+                        data_group._f_setattr(temp_key, data_group._f_getattr(attr_config_key))
+                    try:
+                        data_group._f_setattr(attr_config_key, config_setting)
+                    except:
+                        logger.error("Failed to write scan configuration option %s as attribute.", config_key,
+                                     exc_info=True)
+            finally:
+                self.out_file_h5.flush()
+                # do some cleanup for the performance
+                gc.collect()
 
     @property
     def current_array1(self):
@@ -266,17 +453,19 @@ class Pixcap65InterCap(PixCap65Measurement):
                 pl.plot(self.freq_sweep_array_plot, fit_fn, label='c={a:.3E}, d={b:.3E}'.format(a=e, b=d))
 
     def close(self):
-        time.sleep(300)
+        # time.sleep(300)
 
+        # self.pixcap.vm1_off()
+        self.pixcap.vm2_off()
+        self.pixcap.vm3_off()
+        # self.pixcap['SMU2'].off()
+        # self.pixcap['SMU3'].off()
         super(Pixcap65InterCap, self).close()
 
-        self.pixcap['SMU2'].off()
-        self.pixcap['SMU3'].off()
-
-        pl.legend(loc='best')
-        pl.xlabel('Freq [MHz]')
-        pl.ylabel('I [A]')
-        pl.show()
+        # pl.legend(loc='best')
+        # pl.xlabel('Freq [MHz]')
+        # pl.ylabel('I [A]')
+        # pl.show()
 
     @property
     def pixcap(self):
@@ -285,20 +474,21 @@ class Pixcap65InterCap(PixCap65Measurement):
     # route through sensor matrix without edges
     @property
     def row_start(self):
-        return self.scan_config['start_row']
+        return self.scan_config[ScanConfigurationKeys.START_ROW]
 
     @property
     def row_stop(self):
-        return self.scan_config['stop_row']
+        return self.scan_config[ScanConfigurationKeys.STOP_ROW]
 
     @property
     def col_start(self):
-        return self.scan_config['start_column']
+        return self.scan_config[ScanConfigurationKeys.START_COLUMN]
 
     @property
     def col_stop(self):
-        return self.scan_config['stop_column']
+        return self.scan_config[ScanConfigurationKeys.STOP_COLUMN]
 
+    # specialized for the inter capacitance measurement.
     @property
     def col_range(self):
         return range(self.col_start, self.col_stop + 1)
@@ -309,7 +499,7 @@ class Pixcap65InterCap(PixCap65Measurement):
 
     @property
     def freq_sweep_array(self):
-        return self.scan_config['frequency_range']
+        return np.asarray(self.scan_config[ScanConfigurationKeys.FREQUENCY_RANGE])
 
 
 # Commented out this strange top level code instead of good scripting practice!
@@ -480,9 +670,11 @@ class Pixcap65InterCap(PixCap65Measurement):
 # dut.close()
 
 if __name__ == "__main__":
-    print("Currently the main script for this kind of measurement is missing!")
-    output_file = "./Test.h5"
-    with Pixcap65InterCap(scan_configuration, output_file) as pix:
-        pix.scan()
-        pix.analyze()
-        pix.plot()
+    output_file = "./R13-Interpixel_Scan.h5"
+    # with Pixcap65InterCap(scan_configuration, output_file) as pix:
+        # pix.scan(data_group_spec="demo_measurement_1_80_V")
+    from utils import PixCapSetup
+    with PixCapSetup(scan_configuration, output_file, measurement=Pixcap65InterCap) as pix:
+        pix.scan(data_group_spec="demo_measurement_5_80_V")
+
+

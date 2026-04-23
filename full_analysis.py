@@ -41,7 +41,7 @@ if __name__ == '__main__':
                  first_boundaries=(-60, -40), second_boundaries=(-5, 0),)
     advanced_analysis(raw_data='New_2_Scan.h5', base_path="ATLAS_Itk/X2/biased_80_V")
     advanced_analysis(raw_data='New_2_Scan.h5', base_path="ATLAS_Itk/X2/C_V_Characteristic_refined", is_cv=True,
-                 first_boundaries=(-60, -40), second_boundaries=(-5, 0),)
+                 first_boundaries=(-60, -20), second_boundaries=(-5, 0),)
 
 
     # correct all results for the parasitic and intrinsic capacitances
