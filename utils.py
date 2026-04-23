@@ -1,7 +1,7 @@
 import logging
 import time
 from enum import StrEnum
-from typing import Optional, OrderedDict
+from typing import Optional, OrderedDict, Union
 
 import numpy as np
 from basil.dut import Dut, Base
@@ -27,10 +27,12 @@ class PixcapMeasurements(StrEnum):
     TOTAL_CAPACITANCE = "total capacitance"
     INTER_CAPACITANCE = "inter-pixel capacitance"
 
+
 class PixCapSetup(Dut):
     pixcap: Optional[PixCap65Measurement]
 
-    def __init__(self, scan_config, output_file, config="pixcap65.yaml", name="PixcapSetup", measurement=None, hl_keys=None, tl_keys=None, rl_keys=None):
+    def __init__(self, scan_config, output_file, config="pixcap65.yaml", name="PixcapSetup", measurement: Union[
+        str, type, None] = None, hl_keys=None, tl_keys=None, rl_keys=None):
         if measurement is None:
             measurement = PixcapMeasurements.TOTAL_CAPACITANCE
         assert isinstance(measurement, PixcapMeasurements) or isinstance(measurement, str) or issubclass(measurement,
@@ -44,7 +46,7 @@ class PixCapSetup(Dut):
 
         if rl_keys is None:
             rl_keys = []
-        
+
         if hl_keys is None:
             hl_keys = []
 
@@ -145,15 +147,18 @@ class PixCapSetup(Dut):
         # check for conflicts betweent the setup delegation and the dut.
         for hardware, hw_idx in hl_mapping.items():
             if hardware not in hl_keys:
-                if "interface" in adjusted_config["hw_drivers"][hw_idx] and adjusted_config["hw_drivers"][hw_idx]["interface"] in tl_keys:
+                if "interface" in adjusted_config["hw_drivers"][hw_idx] and adjusted_config["hw_drivers"][hw_idx][
+                    "interface"] in tl_keys:
                     print(hardware)
                     print("upper")
                     print(hl_keys)
-                    raise RuntimeError("Detected attempt to use a common transfer layer for controlling the setup and the dut.")
-                elif "hw_driver" in adjusted_config["hw_drivers"][hw_idx] and adjusted_config["hw_drivers"][hw_idx]["hw_driver"] in hl_keys:
+                    raise RuntimeError(
+                        "Detected attempt to use a common transfer layer for controlling the setup and the dut.")
+                elif "hw_driver" in adjusted_config["hw_drivers"][hw_idx] and adjusted_config["hw_drivers"][hw_idx][
+                    "hw_driver"] in hl_keys:
                     print(hardware)
-                    raise RuntimeError("Detected attempt to use a common hardware layer for controlling the setup and the dut.")
-                
+                    raise RuntimeError(
+                        "Detected attempt to use a common hardware layer for controlling the setup and the dut.")
 
         tl_remove_indices.sort()
         hl_remove_indices.sort()
@@ -181,17 +186,16 @@ class PixCapSetup(Dut):
         logger.debug("For the handling of the setup, we'll use the config:\n %s", str(self._environ_config))
         super(PixCapSetup, self).__init__(conf=self._environ_config)
 
-
         # get the correct pixcap measurement class
         pix_args = {
-            "scan_config"   :   scan_config,
-            "output_file"   :   output_file,
-            "pix_config"    :   adjusted_config,
+            "scan_config": scan_config,
+            "output_file": output_file,
+            "pix_config": adjusted_config,
         }
         if isinstance(measurement, str):
             self.measurement_arguments = pix_args
             match (measurement):
-                case PixcapMeasurements.TOTAL_CAPACITANCE: 
+                case PixcapMeasurements.TOTAL_CAPACITANCE:
                     from pixcap_65_test_total_cap import PixCap65TotalCap
                     self.measurement_class = PixCap65TotalCap
                 case PixcapMeasurements.INTER_CAPACITANCE:
@@ -206,7 +210,7 @@ class PixCapSetup(Dut):
             self.pixcap = None
         else:
             raise ValueError("The provided measurement object is not suitable. No measurement object provided.")
-        
+
     def close(self):
         try:
             self["power"].set_enable(0, channel=1)
@@ -214,13 +218,13 @@ class PixCapSetup(Dut):
         except:
             logger.error("Failed to clean up the setup handling.")
         super(PixCapSetup, self).close()
-        
+
     def __enter__(self):
         Dut.init(self)
         from basil.HL.tti_ql355tp import ttiQl355tp
         assert isinstance(self["power"], ttiQl355tp)
         self["power"].identify_device()
-        
+
         try:
             # RESET the power distribution and therefore the boards
             self["power"].set_enable(0, channel=1)
@@ -254,7 +258,9 @@ class PixCapSetup(Dut):
 
 if __name__ == "__main__":
     from pixcap_65_test_total_cap import scan_configuration
-    with PixCapSetup(scan_configuration, "Setup_Demonstration.h5", measurement=PixcapMeasurements.TOTAL_CAPACITANCE) as setup:
+
+    with PixCapSetup(scan_configuration, "Setup_Demonstration.h5",
+                     measurement=PixcapMeasurements.TOTAL_CAPACITANCE) as setup:
         pass
     # dut = Dut("demo.yaml")
     # dut.init()

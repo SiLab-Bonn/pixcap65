@@ -291,6 +291,7 @@ class Pixcap65InterCap(PixCap65Measurement):
 
                 data_group._f_setattr("freq_unit", "MHz")
                 data_group._f_setattr("current_unit", "A")
+                assert isinstance(data_group, tb.Group)
                 _store_scan_par_values(h5_file=self.out_file_h5, scan_parameters=self.scan_parameters, group=data_group)
                 temp_array = self.create_carray(data_group,
                                                name='TotalHistCurr',
