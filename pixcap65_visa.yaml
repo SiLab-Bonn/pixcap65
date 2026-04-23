@@ -64,10 +64,6 @@ transfer_layer:
       chunk_size: 2097152
       backend: "@py"
 
-
-
-
-
 hw_drivers:
   - name: SMU
     type: scpi

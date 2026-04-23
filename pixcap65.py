@@ -142,7 +142,6 @@ class Pixcap65(Dut):
 
         print(self.smu_setup_devices)
 
-
     def close(self):
         self.switch_on_power_supply_voltages(0)
         try:
@@ -300,6 +299,7 @@ class Pixcap65(Dut):
     def set_smu_source_voltage(self, smu: str, voltage: float, kwargs=None):
         if kwargs is None:
             kwargs = {}
+        logger.warning("Requested the source voltage settings for smu %s to %f", smu, voltage)
         self[smu].set_voltage(voltage, **kwargs)
         time.sleep(self.source_settling_time)
 
@@ -312,6 +312,11 @@ class Pixcap65(Dut):
     def get_smu_source_voltage(self, smu: str, **kwargs):
         if kwargs is None:
             kwargs = {}
+        try:
+            name = self[self.smu_setup_devices[smu]].get_name()
+        except ValueError:
+            name = "UNIDENTIFIED"
+        logger.info("Attempting to get source voltage for smu %s (%s)" % (smu, name))
         return self[smu].get_source_voltage(**kwargs)
 
     def get_smu_source_current(self, smu: str, **kwargs):
@@ -351,7 +356,7 @@ class Pixcap65(Dut):
             print(type(result), result)
             raise TypeError("The current returned {result} which was not recognised as a format.".format(result=result))
         if isinstance(result, str) and ',' in result:
-            voltage = float_initialiser(result.split(',')[1])
+            voltage = float_initialiser(result.split(',')[0])
         else:
             voltage = float_initialiser(result)
         if np.isnan(voltage):
@@ -483,8 +488,9 @@ class Pixcap65(Dut):
     # implementations for the different SMU's in use with pixcap
     # region Primary SMU used for VM 3
     # primary smu used for VM 3
-    def init_smu(self, src_u, current_range, voltage_range=1.5, current_limit=0.001, plc=10):
-        self.smu_init(self.__primary_smu_key, current_limit, current_range, plc, src_u, voltage_range, kwargs=self.smu_kwargs)
+    def init_smu(self, src_u, current_range, voltage_range=1.5, current_limit=0.001, plc=10, **kwargs):
+        active_smu_key = kwargs.get("smu", self.__primary_smu_key)
+        self.smu_init(active_smu_key, current_limit, current_range, plc, src_u, voltage_range, kwargs=self.smu_kwargs)
 
     def smu_on(self):
         self.smu_output_on(self.__primary_smu_key, kwargs=self.smu_kwargs)
@@ -566,10 +572,13 @@ class Pixcap65(Dut):
 
     @property
     def bias_voltage(self):
+        # FIXME: fails with command not found. But interestingly it is immune to modifications of the scpi class.
+        logger.info("Attempted to read the bias voltage.")
         return self.get_smu_source_voltage(self.__bias_smu_key, kwargs=self.smu_bias_kwargs)
 
     @bias_voltage.setter
     def bias_voltage(self, value):
+        logger.info("Attempted to set the bias voltage to %f", value)
         self.set_smu_source_voltage(self.__bias_smu_key, value, kwargs=self.smu_bias_kwargs)
 
     @property

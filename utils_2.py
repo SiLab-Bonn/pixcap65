@@ -2,7 +2,7 @@ import contextlib
 import logging
 import sys
 from time import sleep
-from typing import Union
+from typing import Union, Tuple
 
 import numpy as np
 import tables as tb
@@ -11,7 +11,7 @@ from tqdm.contrib import DummyTqdmFile
 GroupType = Union[tb.Group, tb.Node, tb.Leaf]
 
 
-def walk_to_node(parent: tb.Node, path: str, create=False, verify_create=False):
+def walk_to_node(parent: tb.Node, path: str, create=False, verify_create=False) -> GroupType | Tuple[GroupType, bool]:
     result = parent
     already_exits = True
     for element in path.split('/'):
@@ -42,7 +42,7 @@ def std_out_err_redirect_tqdm():
 
 logger = logging.getLogger(__name__)
 
-def create_update_array(h5, where: tb.Group, name: str, **kwargs):
+def create_update_array(h5, where: tb.Group, name: str, *args, **kwargs):
     max_iter = kwargs.get("max_iter", 10)
     if name in where._v_children:
         current_array = where._v_children[name]
