@@ -19,7 +19,7 @@ except ImportError:
 
 import numpy as np
 import tables as tb
-from matplotlib import cm, pyplot as plt
+from matplotlib import pyplot as plt
 from matplotlib.backends.backend_agg import FigureCanvasAgg as FigureCanvas
 from matplotlib.backends.backend_pdf import PdfPages
 from matplotlib.figure import Figure
@@ -46,7 +46,7 @@ HIST_PIX_CAP_LABEL = 'Pixel Capacitance / fF'
 
 COUNTS_HIST_LABEL = 'Counts / #'
 
-SIMPLE_CAP_LABEL_PERCENT_FORMAT = '%sFit to data:\n$C_d = %.1f\,$fF'
+SIMPLE_CAP_LABEL_PERCENT_FORMAT = '%sFit to data:\n$C_d = %.1f\\,$fF'
 
 FREQUENCY_LABEL = 'Frequency / MHz'
 
@@ -58,7 +58,7 @@ CAPACITANCE_CONVERSION_FACTOR = 1e15
 
 ADVANCED_CAPACITANCE_CONVERSION_FACTOR = 1.0e-9
 
-cmap = cm.get_cmap('viridis')
+cmap = plt.get_cmap('viridis')
 
 
 def plot_data(interpreted_data, base_path=None, suffix="general_data", use_group=False, **kwargs):
