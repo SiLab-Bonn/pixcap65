@@ -2,30 +2,31 @@
 Analysis of Pixcap65 data. Fits freq vs current to extract the capacitance. A 2D histogram containing the capacitance
 for each pixel is stored.
 """
-import time
 from typing import Any
 
 import numpy as np
 import tables as tb
+import time
 from iminuit import Minuit
 from iminuit.cost import LeastSquares
+from matplotlib import pyplot as plt
 from matplotlib.backends.backend_pdf import PdfPages
-from tables import File, Group
+from tables import Group
 
-from utils_2 import walk_to_node, GroupType
+from analysis_util.physics_modelling import SILICON_V_BIAS, full_capacitance_model, simple_capacitance_model, \
+    depletion_model, model_depletion
+from analysis_util.utility import transform_covariance, str_join, check_leaf_unit, ANALYSIS_CORRECTED_GROUP_NAME, \
+    ANALYSIS_GROUP_NAME
+from utility.utils_2 import walk_to_node, GroupType
 
 GENERAL_PIXCAP_SHAPE = (40, 40)
 COVARIANCE_PIXCAP_SHAPE = (40, 40, 4, 4)
-SILICON_V_BIAS = 0.7
 FULL_MODEL_LABEL = "I_\\text{{full}}"
 SIMPLE_MODEL_LABEL = "I_\\text{{approximation}}"
 FULL_MODEL_EXPRESSION = "\\frac{{{u0}\\cdot{c}\\cdot{freq}+{i}}}{{1+{r}\\cdot{c}\\cdot{freq}}}"
 SIMPLE_MODEL_EXPRESSION = "{u0}\\cdot{c\\cdot{freq}+{i}}"
 FULL_MODEL_PARAMETER_DICT = {"c": "C", "r": "R", "i": "I_\\text{{Leakage}}", "u0": "U_{{0}}", "freq": "\\nu"}
 SIMPLE_MODEL_PARAMETER_DICT = {"c": "C", "i": "I", "u0": "U_{{0}}", "freq": "\\nu"}
-GENERAL_TRANSFORMATION_MATRIX = np.array(
-    [[1.e-12, 1.e-6, 1.e3, 1.e-6], [1.e-6, 1, 1.e9, 1], [1.e3, 1.e9, 1.e18, 1.e9], [1.e-6, 1, 1.e9, 1]])
-EPS_SILICON = 11.7
 GLOBAL_FILTERS = tb.Filters(complevel=5, complib='blosc', shuffle=False, fletcher32=False)
 
 
@@ -84,66 +85,7 @@ def handle_minuit_advanced_options(fit_object, apply_contour, x_label, y_label, 
         pdf.savefig(current_fig, bbox_inches='tight')
         pdf.savefig(fig, bbox_inches='tight')
 
-
-def transform_covariance(cov):
-    """
-    transform_covariance
-
-    Transforms the returned covariance such that the units match the specified ones.
-    For the more advanced fits also the contributions of the fixed reference voltage parameter are removed from the covariance matrix.
-
-    :param cov: covariance matrix to be transformed.
-    :return: transformed covariance matrix.
-    """
-    cov = np.asarray(cov)
-    match (cov.shape):
-        case (2, 2):
-            assert cov.shape == (2, 2)
-            mask = np.array([[True, False, True, False], [False, False, False, False], [True, False, True, False],
-                             [False, False, False, False]])
-            return cov * GENERAL_TRANSFORMATION_MATRIX[mask].reshape((2, 2))
-        case (3, 3):
-            assert cov.shape == (3, 3)
-            # here it is necessary to reduce the parts from the covariance of u0 to
-            mask = np.array([[True, False, True, False], [False, False, False, False], [True, False, True, False],
-                             [False, False, False, False]])
-            mask_reduction = np.array([[True, True, False], [True, True, False], [False, False, False]])
-            return cov[mask_reduction].reshape((2, 2)) * GENERAL_TRANSFORMATION_MATRIX[mask].reshape((2, 2))
-        case (4, 4):
-            assert cov.shape == (4, 4)
-            # here it is necessary to reduce the parts from the covariance of u0 to
-            mask = np.array([[True, True, True, False], [True, True, True, False], [True, True, True, False],
-                             [False, False, False, False]])
-            return cov[mask].reshape((3, 3)) * GENERAL_TRANSFORMATION_MATRIX[mask].reshape((3, 3))
-        case _:
-            raise ValueError(
-                "The dimension of the covariance matrix does not fit to any of the fitting functions and their parameters.")
-
-
-def full_capacitance_model(freq, c=1e-6, r=1e6, i=0, u0=1):
-    # ignores the reference voltage for now
-    return (u0 * c * freq + i) / (1 + r * c * freq)
-
-
-def simple_capacitance_model(freq, c=1e-6, i=0, u0=1):
-    return u0 * c * freq + i
-
-
-def depletion_model(x, a=1, b=0):
-    return a * x + b
-
-
-def model_depletion(voltages, NA=1e16, ND=1e16, V=SILICON_V_BIAS):
-    import scipy.constants as constants
-    # modified the sign as the bias voltages are saved with correct sign assigned to them.
-    return np.sqrt(2 * constants.epsilon_0 * EPS_SILICON / constants.e * (NA + ND) / (NA * ND) * (
-            V - np.array(voltages)))
-
-
-def semi_bias_model(voltages, bias=SILICON_V_BIAS, thermic=1, i=1):
-    return np.where(voltages >= 0, i * (np.exp((voltages - bias) / thermic) - 1), i)
-
-
+# TODO: combine both top_level analysis handler in a single function!
 def advanced_analysis(raw_data, is_cv=False, base_path=None, full_model=True,
                       first_boundaries=None, second_boundaries=None, is_inter_pixel=False, **kwargs):
     """
@@ -151,8 +93,9 @@ def advanced_analysis(raw_data, is_cv=False, base_path=None, full_model=True,
 
     Implementation of the advanced analysis strategy for the capacitance measurement of a pixel sensor.
     For determination of the capacitance values non-linear fit algorithms are used.
-    Depeneding on the choice of parameters either kafe2 or iminuit is used for least squares minimization.
-    But keep in mind that this function serves as a wrapper for file access and modification around the actual analysis implementation.
+    Depeneding on the choice of parameters either kafe2 or iminuit is used for least-squares minimization.
+    But keep in mind that this function serves as a wrapper for file access and modification around
+    the actual analysis implementation.
 
     For measurements of the C-V-Characteristic of a sensor, the fits will be applied for every bias voltage measured.
     :param raw_data: path to the hdf file containing the raw data.
@@ -162,62 +105,229 @@ def advanced_analysis(raw_data, is_cv=False, base_path=None, full_model=True,
     :param plot: boolean, indicates whether to plot the data. A output pdf object could be submitted here instead of an explicitly created one.
     :param apply_contour: boolean, indicates whether to determine the contours and try to plot them.
     :param full_model: boolean, True, indicates whether the full model for extended frequency range is to be used.
+    :param apply_correction: boolean, False, indicates whether the measured capacitances should be
+        corrected immediately;
+        Will require the presence of further arguments as information about the parasitics needs to be submitted.
+    :param use_corrected: boolean, False, indicates whether to use the corrected capacitances for the depletion analysis.
     """
     with tb.open_file(raw_data, mode='a') as in_file_h5:
         if base_path is None:
             base_group = in_file_h5.root
         else:
             base_group = walk_to_node(in_file_h5.root, base_path)
+
         if is_cv:
             # need to perform the analysis for every bias voltage
             cv_data = np.full(shape=(40, 40, base_group.biasing.measurements.BiasVoltageHist.shape[0]),
                               fill_value=np.nan)
             cv_err_data = np.full(shape=(40, 40, base_group.biasing.measurements.BiasVoltageHist.shape[0]),
                                   fill_value=np.nan)
+            cv_data_corrected = np.full(shape=(40, 40, base_group.biasing.measurements.BiasVoltageHist.shape[0]),
+                              fill_value=np.nan)
+            cv_err_data_correct = np.full(shape=(40, 40, base_group.biasing.measurements.BiasVoltageHist.shape[0]),
+                                  fill_value=np.nan)
+
+            # prevent mixing-up with a previous analysis try
             if "analysis" in base_group.biasing:
                 base_group.biasing.analysis._f_remove(recursive=True)
                 time.sleep(1)
+
             for k, bias_voltage in enumerate(base_group.biasing.measurements.BiasVoltageHist):
                 bias_name = f"bias_{bias_voltage}_V".replace('-', "M_").replace(".", "__")
                 data_group = base_group.biasing.measurements[bias_name]
-                ana_group = walk_to_node(base_group.biasing, str_join("/", "analysis", bias_name), create=True)
+                ana_group = walk_to_node(base_group.biasing, str_join("/", ANALYSIS_GROUP_NAME, bias_name), create=True)
                 advanced_analysis_data_handle(in_file_h5, data_group, ana_group, full_model=full_model,
                                               is_inter_pixel=is_inter_pixel, **kwargs)
+
+                # extract the capacitance data for tabular value; will also need coreected data.
                 cap_data = ana_group.HistCap[:]
                 cap_error_data = ana_group.HistCapErr[:]
                 cv_data[:, :, k] = cap_data[:, :]
                 cv_err_data[:, :, k] = cap_error_data[:, :]
+                if kwargs.get("apply_correction", False):
+                    ana_group_correction = walk_to_node(base_group.biasing,
+                                                str_join("/", ANALYSIS_CORRECTED_GROUP_NAME, bias_name),
+                                                create=True)
+                    cap_data = ana_group_correction.HistCap[:]
+                    cap_error_data = ana_group_correction.HistCapErr[:]
+                    cv_data_corrected[:, :, k] = cap_data[:, :]
+                    cv_err_data_correct[:, :, k] = cap_error_data[:, :]
 
             temp_array = in_file_h5.create_carray(base_group.biasing.analysis, name="UCHist",
                                                   title="Histogram of the U-C-curve",
-                                                  filters=tb.Filters(complib='blosc', complevel=5, fletcher32=False),
+                                                  filters=GLOBAL_FILTERS,
                                                   obj=cv_data)
             temp_array.attrs["Units"] = "F"
             temp_array.flush()
             temp_array = in_file_h5.create_carray(base_group.biasing.analysis, name="UCErrHist",
                                                   title="Error Histogram of the U-C-curve",
-                                                  filters=tb.Filters(complib='blosc', complevel=5, fletcher32=False),
+                                                  filters=GLOBAL_FILTERS,
                                                   obj=cv_err_data)
             temp_array.attrs["Units"] = "F"
             temp_array.flush()
+
+            # save also the corrected capacitance data if necessary
+            if kwargs.get("apply_correction", False):
+                temp_array = in_file_h5.create_carray(base_group.biasing.analysis_correction, name="UCHist",
+                                                      title="Histogram of the U-C-curve",
+                                                      filters=GLOBAL_FILTERS,
+                                                      obj=cv_data)
+                temp_array.attrs["Units"] = "F"
+                temp_array.flush()
+                temp_array = in_file_h5.create_carray(base_group.biasing.analysis_correction, name="UCErrHist",
+                                                      title="Error Histogram of the U-C-curve",
+                                                      filters=GLOBAL_FILTERS,
+                                                      obj=cv_err_data)
+                temp_array.attrs["Units"] = "F"
+                temp_array.flush()
+
             if first_boundaries is not None and second_boundaries is not None:
-                analyze_depletion_delegate(base_group.biasing.measurements, base_group.biasing.analysis,
+                from plotting import get_analysis_group
+                dep_ana_group = get_analysis_group(base_group.biasing, **kwargs)
+                if kwargs.pop("use_corrected", False):
+                    analyze_depletion_delegate(base_group.biasing.measurements,
+                                               base_group.biasing.analysis,
+                                               first_boundaries, second_boundaries, **kwargs)
+                analyze_depletion_delegate(base_group.biasing.measurements, dep_ana_group,
                                            first_boundaries, second_boundaries, **kwargs)
         else:
-            if "analysis" in base_group.total_cap:
-                base_group.total_cap.analysis._f_remove(recursive=True)
+            if is_inter_pixel:
+                reference_group = base_group.inter_cap
+            else:
+                reference_group = base_group.total_cap
+            if "analysis" in reference_group:
+                reference_group.analysis._f_remove(recursive=True)
                 time.sleep(1)
-            ana_group = walk_to_node(base_group.total_cap, "analysis", create=True)
-            advanced_analysis_data_handle(in_file_h5, base_group.total_cap.measurements, ana_group,
+            ana_group = walk_to_node(reference_group, "analysis", create=True)
+            assert isinstance(ana_group, tb.Group)
+            advanced_analysis_data_handle(in_file_h5, reference_group.measurements, ana_group,
                                           full_model=full_model,
                                           is_inter_pixel=is_inter_pixel, **kwargs)
+            # should already be done by the data handle delegation
+            # if kwargs.get("apply_correction", False):
+            #     apply_correction_simple(kwargs['bare_file'], kwargs['bare_hdf_path'], ana_group)
+
 
 
 def advanced_analysis_data_handle(file: tb.File, data_group: GroupType, result_group: GroupType, full_model=True,
                                   is_inter_pixel=False, **kwargs):
     """
+    advanced_analysis_data_handle
+
+    # FIXME: implement the correct doc string here.
+    Implementation of the advanced analysis strategy for the capacitance measurement of a pixel sensor.
+    For determination of the capacitance values non-linear fit algorithms are used.
+    Depeneding on the choice of parameters either kafe2 or iminuit is used for least squares minimization.
+    If requested the fit results will also be plotted to verify the convergence of the fit.
+
+    For measurements of the C-V-Characteristic of a sensor, the fits will be applied for every bias voltage measured.
+    :param file: h5 file object containing the data to be analysed.
+    :param data_group: hierachy group of the opend hdf file containing the raw data
+    :param result_group: hierachy group of the opened hdf file to write the analysis results to.
+    :param use_kafe2: boolean, indicates whether kafe2 is used.
+    :param plot: boolean, indicates whether to plot the data. A output pdf object could be submitted here instead of an explicitly created one.
+    :param apply_contour: boolean, indicates whether to determine the contours and try to plot them.
+    :param full_model: boolean, True, indicates whether the full model for extended frequency range is to be used.
+    :param apply_correction: boolean, False, indicates whether the measured capacitances should be
+        corrected immediately;
+        Will require the presence of further arguments as information about the parasitics needs to be submitted.
+    """
+    # Read pixel map
+    assert isinstance(data_group, tb.Group)
+    assert isinstance(result_group, tb.Group)
+    if is_inter_pixel:
+        current_hist = check_leaf_unit(data_group.TotalHistCurr, "A")
+        if "TotalHistCurr" in data_group:
+            current_error_hist = check_leaf_unit(data_group.TotalHistCurr, "A")
+        else:
+            current_error_hist = np.full_like(current_hist, fill_value=np.nan)
+        # Read scan parameters
+        scan_parameters = data_group.scan_params[:]
+
+        advanced_analysis_delegate(current_error_hist, current_hist, data_group, file, full_model, result_group,
+                                   scan_parameters, **kwargs)
+
+        inter_a_output_dict = {
+            "cap_name": "HistCapInterA",
+            "cap_title": "Capacitance Histogram of inter pixel A",
+            "cap_err_name": "HistCapErrInterA",
+            "cap_err_title": "Capacitance Error Histogram of inter pixel A",
+            "leak_name": "HistLeakInterA",
+            "leak_title": "Leakage Current Histogram of inter pixel A",
+            "leak_error_name": "HistLeakErrInterA",
+            "leak_error_title": "Leakage Current Error Histogram of inter pixel A",
+            "resistor_name": "HistResInterA",
+            "resistor_title": "On-Resistance Histogram of inter pixel A",
+            "resistor_error_name": "HistResErrInterA",
+            "resistor_error_title": "On-Resistance Error Histogram of inter pixel A",
+            "cov_name": "HistFitCovInterA",
+            "cov_title": 'Fit Covariance Matrix of inter pixel A'
+        }
+        kwargs.update(inter_a_output_dict)
+        current_hist = check_leaf_unit(data_group.InterHistCurrA, "A")
+        if "InterHistCurrErrA" in data_group:
+            current_error_hist = check_leaf_unit(data_group.InterHistCurrErrA, "A")
+        else:
+            current_error_hist = np.full_like(current_hist, fill_value=np.nan)
+
+        advanced_analysis_delegate(current_error_hist, current_hist, data_group, file, full_model, result_group,
+                                   scan_parameters, **kwargs)
+
+        inter_b_output_dict = {
+            "cap_name": "HistCapInterB",
+            "cap_title": "Capacitance Histogram of inter pixel B",
+            "cap_err_name": "HistCapErrInterB",
+            "cap_err_title": "Capacitance Error Histogram of inter pixel B",
+            "leak_name": "HistLeakInterB",
+            "leak_title": "Leakage Current Histogram of inter pixel B",
+            "leak_error_name": "HistLeakErrInterB",
+            "leak_error_title": "Leakage Current Error Histogram of inter pixel B",
+            "resistor_name": "HistResInterB",
+            "resistor_title": "On-Resistance Histogram of inter pixel B",
+            "resistor_error_name": "HistResErrInterB",
+            "resistor_error_title": "On-Resistance Error Histogram of inter pixel B",
+            "cov_name": "HistFitCovInterB",
+            "cov_title": 'Fit Covariance Matrix of inter pixel B'
+        }
+        kwargs.update(inter_b_output_dict)
+        current_hist = check_leaf_unit(data_group.InterHistCurrB, "A")
+        if "InterHistCurrErrB" in data_group:
+            current_error_hist = check_leaf_unit(data_group.InterHistCurrErrB, "A")
+        else:
+            current_error_hist = np.full_like(current_hist, fill_value=np.nan)
+
+        advanced_analysis_delegate(current_error_hist, current_hist, data_group, file, full_model, result_group,
+                                   scan_parameters, **kwargs)
+
+
+    else:
+        check_leaf_unit(data_group.HistCurr, "A")
+        current_hist = data_group.HistCurr[:]
+        if "HistCurrErr" in data_group:
+            check_leaf_unit(data_group.HistCurrErr, "A")
+            current_error_hist = data_group.HistCurrErr[:]
+        else:
+            current_error_hist = np.full_like(current_hist, fill_value=np.nan)
+        # Read scan parameters
+        scan_parameters = data_group.scan_params[:]
+
+        advanced_analysis_delegate(current_error_hist, current_hist, data_group, file, full_model, result_group,
+                                   scan_parameters, **kwargs)
+
+    # if necessary: directly apply the correction of the capacitance values
+    if "apply_correction" in kwargs and kwargs["apply_correction"]:
+        assert 'bare_file' in kwargs
+        assert 'bare_hdf_path' in kwargs
+        apply_correction_simple(kwargs['bare_file'], kwargs['bare_hdf_path'], result_group)
+
+
+def advanced_analysis_delegate(
+        current_error_hist: np.ndarray | Any, current_hist, data_group: tb.Group, file: tb.File, full_model: bool,
+        group: Group, scan_parameters, **kwargs):
+    """
         advanced_analysis_delegate
 
+        FIXME: Rework this doc string to provide accurate information
         Implementation of the advanced analysis strategy for the capacitance measurement of a pixel sensor.
         For determination of the capacitance values non-linear fit algorithms are used.
         Depeneding on the choice of parameters either kafe2 or iminuit is used for least squares minimization.
@@ -232,110 +342,7 @@ def advanced_analysis_data_handle(file: tb.File, data_group: GroupType, result_g
         :param apply_contour: boolean, indicates whether to determine the contours and try to plot them.
         :param full_model: boolean, True, indicates whether the full model for extended frequency range is to be used.
         """
-    # select the correct group to write the analysis results to
-    group = result_group
-    # select the correct group to read the data from
-    select_group = data_group
 
-    # Read pixel map
-    if is_inter_pixel:
-        defaultss = {
-            "cap_name": "HistCap",
-            "cap_title": "Capacitance Histogram",
-            "cap_err_name": "HistCapErr",
-            "cap_err_title": "Capacitance Error Histogram",
-            "leak_name": "HistLeak",
-            "leak_title": "Leakage Current Histogram",
-            "leak_error_name": "HistLeakErr",
-            "leak_error_title": "Leakage Current Error Histogram",
-            "resistor_name": "HistRes",
-            "resistor_title": "On-Resistance Histogram",
-            "resistor_error_name": "HistResErr",
-            "resistor_error_title": "On-Resistance Error Histogram",
-            "cov_name": "HistFitCov",
-            "cov_title": 'Fit Covariance Matrix'
-        }
-        current_hist = check_leaf_unit(select_group.TotalHistCurr, "A")
-        if "TotalHistCurr" in select_group:
-            current_error_hist = check_leaf_unit(select_group.TotalHistCurr, "A")
-        else:
-            current_error_hist = np.full_like(current_hist, fill_value=np.nan)
-        # Read scan parameters
-        scan_parameters = select_group.scan_params[:]
-
-        advanced_analysis_delegate(current_error_hist, current_hist, data_group, file, full_model, group,
-                                   scan_parameters, **kwargs)
-
-        inter_a_output_dict = {
-            "cap_name": "HistCapInterA",
-            "cap_title": "Capacitance Histogram of inter pixel A",
-            "cap_err_name": "HistCapErrInterA",
-            "cap_err_title": "Capacitance Error Histogram of inter pixel A",
-            "leak_name": "HistLeakInterA",
-            "leak_title": "Leakage Current Histogram of inter pixel A",
-            "leak_error_name": "HistLeakErrInterA",
-            "leak_error_title": "Leakage Current Error Histogram of inter pixel A",
-            "resistor_name": "HistResInterA",
-            "resistor_title": "On-Resistance Histogram of inter pixel A",
-            "resistor_error_name": "HistResInterA",
-            "resistor_error_title": "On-Resistance Error Histogram of inter pixel A",
-            "cov_name": "HistFitCovInterA",
-            "cov_title": 'Fit Covariance Matrix of inter pixel A'
-        }
-        kwargs.update(inter_a_output_dict)
-        current_hist = select_group.check_leaf_unit(select_group.InterHistCurrA, "A")
-        if "InterHistCurrErrA" in select_group:
-            current_error_hist = check_leaf_unit(select_group.InterHistCurrErrA, "A")
-        else:
-            current_error_hist = np.full_like(current_hist, fill_value=np.nan)
-
-        advanced_analysis_delegate(current_error_hist, current_hist, data_group, file, full_model, group,
-                                   scan_parameters, **kwargs)
-
-        inter_b_output_dict = {
-            "cap_name": "HistCapInterB",
-            "cap_title": "Capacitance Histogram of inter pixel B",
-            "cap_err_name": "HistCapErrInterB",
-            "cap_err_title": "Capacitance Error Histogram of inter pixel B",
-            "leak_name": "HistLeakInterB",
-            "leak_title": "Leakage Current Histogram of inter pixel B",
-            "leak_error_name": "HistLeakErrInterB",
-            "leak_error_title": "Leakage Current Error Histogram of inter pixel B",
-            "resistor_name": "HistResInterB",
-            "resistor_title": "On-Resistance Histogram of inter pixel B",
-            "resistor_error_name": "HistResInterB",
-            "resistor_error_title": "On-Resistance Error Histogram of inter pixel B",
-            "cov_name": "HistFitCovInterB",
-            "cov_title": 'Fit Covariance Matrix of inter pixel B'
-        }
-        kwargs.update(inter_b_output_dict)
-        check_leaf_unit(select_group.HistCurr, "A")
-        current_hist = check_leaf_unit(select_group.InterHistCurrB, "A")
-        if "InterHistCurrErrB" in select_group:
-            current_error_hist = check_leaf_unit(select_group.InterHistCurrErrB, "A")
-        else:
-            current_error_hist = np.full_like(current_hist, fill_value=np.nan)
-
-        advanced_analysis_delegate(current_error_hist, current_hist, data_group, file, full_model, group,
-                                   scan_parameters, **kwargs)
-    else:
-        check_leaf_unit(select_group.HistCurr, "A")
-        current_hist = select_group.HistCurr[:]
-        if "HistCurrErr" in select_group:
-            check_leaf_unit(select_group.HistCurrErr, "A")
-            current_error_hist = select_group.HistCurrErr[:]
-        else:
-            current_error_hist = np.full_like(current_hist, fill_value=np.nan)
-        # Read scan parameters
-        scan_parameters = select_group.scan_params[:]
-
-        advanced_analysis_delegate(current_error_hist, current_hist, data_group, file, full_model, group,
-                                   scan_parameters, **kwargs)
-
-
-def advanced_analysis_delegate(
-        current_error_hist: np.ndarray | Any, current_hist, data_group: Group, file: File, full_model: bool,
-        group: Group, scan_parameters, **kwargs):
     # extract the additional keyword arguments
     use_kafe2 = kwargs.get("use_kafe2", False)
     apply_contour = kwargs.get("apply_contour", False)
@@ -584,15 +591,13 @@ def advanced_analysis_delegate(
     temp_array.flush()
 
 
-def str_join(delimiter, *args):
-    return delimiter.join(args)
-
-
 def analyze_data(raw_data, is_cv=False, base_path=None, first_boundaries=None, second_boundaries=None,
-                 is_inter_pixel=False, ):
+                 is_inter_pixel=False, **kwargs):
     """
     analyze data
 
+
+    # FIXME: update the docstring
     Analze the provided raw data to determine the (total) capacitance of each pixel in the measurement.
     Due to its simplified analysis strategy this method is only valid for sufficiently small frequencies.
     What sufficiently smalls is, dependes on the measured capacitance and the on-resistance of the measurement circuit.
@@ -622,18 +627,35 @@ def analyze_data(raw_data, is_cv=False, base_path=None, first_boundaries=None, s
                               fill_value=np.nan)
             cv_err_data = np.full(shape=(40, 40, base_group.biasing.measurements.BiasVoltageHist.shape[0]),
                                   fill_value=np.nan)
+            cv_data_corrected = np.full(shape=(40, 40, base_group.biasing.measurements.BiasVoltageHist.shape[0]),
+                              fill_value=np.nan)
+            cv_err_data_corrected = np.full(shape=(40, 40, base_group.biasing.measurements.BiasVoltageHist.shape[0]),
+                                  fill_value=np.nan)
+
+            # make sure to not mix-up with previous analysis results
             if "analysis" in base_group.biasing:
                 base_group.biasing.analysis._f_remove(recursive=True)
                 time.sleep(1)
+
             for k, bias_voltage in enumerate(base_group.biasing.measurements.BiasVoltageHist):
                 bias_name = f"bias_{bias_voltage}_V".replace('-', "M_").replace(".", "__")
                 data_group = base_group.biasing.measurements[bias_name]
                 ana_group = walk_to_node(base_group.biasing, str_join("/", "analysis", bias_name), create=True)
-                analyze_data_handle_data(in_file_h5, data_group, ana_group, is_inter_pixel=is_inter_pixel)
+                analyze_data_handle_data(in_file_h5, data_group, ana_group, is_inter_pixel=is_inter_pixel, **kwargs)
+
+                # extract the capacitance data for tabular value; will also need coreected data.
                 cap_data = ana_group.HistCap[:]
                 cap_error_data = ana_group.HistCapErr[:]
                 cv_data[:, :, k] = cap_data[:, :]
                 cv_err_data[:, :, k] = cap_error_data[:, :]
+                if kwargs.get("apply_correction", False):
+                    ana_group_correction = walk_to_node(base_group.biasing,
+                                                        str_join("/", ANALYSIS_CORRECTED_GROUP_NAME, bias_name),
+                                                        create=True)
+                    cap_data = ana_group_correction.HistCap[:]
+                    cap_error_data = ana_group_correction.HistCapErr[:]
+                    cv_data_corrected[:, :, k] = cap_data[:, :]
+                    cv_err_data_corrected[:, :, k] = cap_error_data[:, :]
 
             temp_array = in_file_h5.create_carray(base_group.biasing.analysis, name="UCHist",
                                                   title="Histogram of the U-C-curve",
@@ -647,9 +669,31 @@ def analyze_data(raw_data, is_cv=False, base_path=None, first_boundaries=None, s
                                                   obj=cv_err_data)
             temp_array.attrs["Units"] = "F"
             temp_array.flush()
+
+            # save also the corrected capacitance data if necessary
+            if kwargs.get("apply_correction", False):
+                temp_array = in_file_h5.create_carray(base_group.biasing.analysis_correction, name="UCHist",
+                                                      title="Histogram of the U-C-curve",
+                                                      filters=GLOBAL_FILTERS,
+                                                      obj=cv_data)
+                temp_array.attrs["Units"] = "F"
+                temp_array.flush()
+                temp_array = in_file_h5.create_carray(base_group.biasing.analysis_correction, name="UCErrHist",
+                                                      title="Error Histogram of the U-C-curve",
+                                                      filters=GLOBAL_FILTERS,
+                                                      obj=cv_err_data)
+                temp_array.attrs["Units"] = "F"
+                temp_array.flush()
+
             if first_boundaries is not None and second_boundaries is not None:
-                analyze_depletion_delegate(base_group.biasing.measurements, base_group.biasing.analysis,
-                                           first_boundaries, second_boundaries)
+                from plotting import get_analysis_group
+                dep_ana_group = get_analysis_group(base_group.biasing, **kwargs)
+                if kwargs.pop("use_corrected", False):
+                    analyze_depletion_delegate(base_group.biasing.measurements,
+                                               base_group.biasing.analysis,
+                                               first_boundaries, second_boundaries, **kwargs)
+                analyze_depletion_delegate(base_group.biasing.measurements, dep_ana_group,
+                                           first_boundaries, second_boundaries, **kwargs)
         else:
             if is_inter_pixel:
                 reference_group = base_group.inter_cap
@@ -659,7 +703,7 @@ def analyze_data(raw_data, is_cv=False, base_path=None, first_boundaries=None, s
                 reference_group.analysis._f_remove(recursive=True)
                 time.sleep(1)
             ana_group = walk_to_node(reference_group, "analysis", create=True)
-            analyze_data_handle_data(in_file_h5, reference_group.measurements, ana_group, is_inter_pixel=is_inter_pixel)
+            analyze_data_handle_data(in_file_h5, reference_group.measurements, ana_group, is_inter_pixel=is_inter_pixel, **kwargs)
 
 
 def analyze_data_handle_data(file: tb.File, data_group: GroupType, result_group: GroupType, is_inter_pixel=False,
@@ -667,6 +711,7 @@ def analyze_data_handle_data(file: tb.File, data_group: GroupType, result_group:
     """
         analyze data_delegate
 
+        # FIXME: implement the correct doc string here.
         Analze the provided raw data to determine the (total) capacitance of each pixel in the measurement.
         Due to its simplified analysis strategy this method is only valid for sufficiently small frequencies.
         What sufficiently smalls is, dependes on the measured capacitance and the on-resistance of the measurement circuit.
@@ -680,18 +725,15 @@ def analyze_data_handle_data(file: tb.File, data_group: GroupType, result_group:
         :param data_group: hdf file's hierachy group containing the measured data.
         :param result_group: hdf file's hierachy group to write the analysis results to.
         """
-    # select the correct group to save the analysis results to
-    group = result_group
-    # select the correct group to read the data from
-    select_group = data_group
-
     # Read pixel map
+    assert isinstance(data_group, tb.Group)
+    assert isinstance(result_group, tb.Group)
     if is_inter_pixel:
-        current_hist = check_leaf_unit(select_group.TotalHistCurr, "A")
+        current_hist = check_leaf_unit(data_group.TotalHistCurr, "A")
         # Read scan parameters
-        scan_parameters = select_group.scan_params[:]
+        scan_parameters = data_group.scan_params[:]
 
-        analyze_data_delegate(current_hist, file, group, scan_parameters, **kwargs)
+        analyze_data_delegate(current_hist, file, result_group, scan_parameters, **kwargs)
 
         inter_a_output_dict = {
             "cap_name": "HistCapInterA",
@@ -710,8 +752,8 @@ def analyze_data_handle_data(file: tb.File, data_group: GroupType, result_group:
             "cov_title": 'Fit Covariance Matrix of inter pixel A'
         }
         kwargs.update(inter_a_output_dict)
-        current_hist = check_leaf_unit(select_group.InterHistCurrA, "A")
-        analyze_data_delegate(current_hist, file, group, scan_parameters, **kwargs)
+        current_hist = check_leaf_unit(data_group.InterHistCurrA, "A")
+        analyze_data_delegate(current_hist, file, result_group, scan_parameters, **kwargs)
 
         inter_b_output_dict = {
             "cap_name": "HistCapInterB",
@@ -730,20 +772,27 @@ def analyze_data_handle_data(file: tb.File, data_group: GroupType, result_group:
             "cov_title": 'Fit Covariance Matrix of inter pixel B'
         }
         kwargs.update(inter_b_output_dict)
-        current_hist = check_leaf_unit(select_group.InterHistCurrB, "A")
-        analyze_data_delegate(current_hist, file, group, scan_parameters, **kwargs)
+        current_hist = check_leaf_unit(data_group.InterHistCurrB, "A")
+        analyze_data_delegate(current_hist, file, result_group, scan_parameters, **kwargs)
 
 
     else:
-        current_hist = check_leaf_unit(select_group.HistCurr, "A")
+        current_hist = check_leaf_unit(data_group.HistCurr, "A")
         # Read scan parameters
-        scan_parameters = select_group.scan_params[:]
-        analyze_data_delegate(current_hist, file, group, scan_parameters, **kwargs)
+        scan_parameters = data_group.scan_params[:]
+        analyze_data_delegate(current_hist, file, result_group, scan_parameters, **kwargs)
+
+    # if necessary: directly apply the correction of the capacitance values
+    if "apply_correction" in kwargs and kwargs["apply_correction"]:
+        assert 'bare_file' in kwargs
+        assert 'bare_hdf_path' in kwargs
+        apply_correction_simple(kwargs['bare_file'], kwargs['bare_hdf_path'], result_group)
 
 
-def analyze_data_delegate(current_hist, file: File,
-                          group: Group,
+def analyze_data_delegate(current_hist, file: tb.File,
+                          group: tb.Group,
                           scan_parameters, **kwargs):
+    # TODO: doc string is still missing
     # create array like objects to temporarily save the analysis results
     cap_hist = np.full(shape=GENERAL_PIXCAP_SHAPE, fill_value=np.nan)  # capacitance for each pixel
     cap_error_hist = np.full(shape=GENERAL_PIXCAP_SHAPE, fill_value=np.nan)
@@ -835,23 +884,6 @@ def analyze_data_delegate(current_hist, file: File,
                                     )
     temp_array.attrs["Units"] = "{{F^2, F nA},{nA F, nA^2}}"
     temp_array.flush()
-
-
-def check_leaf_unit(leaf, unit: str):
-    """
-    check_leaf_unit(leaf, unit)
-
-    Verify that the table or array has a units attribute and the unit is the one expected.
-    As last step return the data structure requested.
-
-    This may not work for tables with multiple units (one per column)
-    :param leaf: Data structure to be verified and extracted.
-    :param unit: Expected unit for the data structure.
-    :return: array_like of the data structures contents.
-    """
-    if "Units" not in leaf.attrs or leaf.attrs["Units"] != unit:
-        raise AssertionError
-    return leaf[:]
 
 
 def analyze_depletion_delegate(data_group: GroupType, analysis_group: GroupType, first_boundaries, second_boundaries,
@@ -1186,11 +1218,146 @@ def effective_doping(capacitances, bias_voltages, diode_area=None):
         derivative))
     return Neff
 
+def analyze_capacitance_distribution(raw_data, base_path=None, **kwargs):
+    with tb.open_file(raw_data, mode='a') as in_file_h5:
+        if base_path is None:
+            base_group = in_file_h5.root
+        else:
+            base_group = walk_to_node(in_file_h5.root, base_path)
+        analyze_capacitance_distribution_delegate(base_group.analysis, None, **kwargs)
+
+def analyze_capacitance_distribution_delegate(analysis_group, output_pdf, **kwargs):
+    from plotting import DEFAULT_TEST_CAP_EXCLUSION
+    from plotting import CAPACITANCE_CONVERSION_FACTOR
+    from plotting import DEFAULT_BIN_NUMBER
+    from plotting import COUNTS_HIST_LABEL
+    from plotting import HIST_PIX_CAP_LABEL
+
+    # we want to fit a binned distribution; but some bins might be empty
+    cap_hist = check_leaf_unit(analysis_group.HistCap, "F")
+    fig, ax = plt.subplots()
+    hist_cap_hist = cap_hist[:, 1:] if kwargs.get("exclude_cap_hist", DEFAULT_TEST_CAP_EXCLUSION) else cap_hist
+    if "mask_pixel" in kwargs:
+        cap_mask = np.full_like(hist_cap_hist, fill_value=True)
+        for mask in kwargs["mask_pixel"]:
+            cap_mask[mask[0], mask[1]] = False
+
+        hist_cap_hist = hist_cap_hist[cap_mask]
+    temp_hist_back_data = hist_cap_hist[~np.isnan(hist_cap_hist)].reshape(-1) * CAPACITANCE_CONVERSION_FACTOR
+    hist_data, bins, _ = ax.hist(temp_hist_back_data,
+            bins=kwargs.get("hist_bins", DEFAULT_BIN_NUMBER))
+    bin_positions = (bins[:-1] + np.diff(bins))/2.
+
+    # now fit this to a gauss function
+    from iminuit import Minuit
+    from iminuit.cost import LeastSquares
+    def gauss_model(x, u=0, s=1, a=1):
+        return a* 1/np.sqrt(2*np.pi*s**2) * np.exp(-(x-u)**2/(2*s**2))
+
+    cost  = LeastSquares(None, hist_data, np.sqrt(hist_data), gauss_model)
+    fitter = Minuit(cost, u=np.mean(temp_hist_back_data), s=np.std(temp_hist_back_data), a=np.sum(hist_data))
+    fitter.migrad()
+    fitter.hesse()
+    mean_value = fitter.values["u"]
+    std_value = fitter.values["s"]
+    analysis_group._f_setattr("parasitic", mean_value)
+    analysis_group._f_setattr("parasitic_error", std_value)
+
+    binning_span = np.linspace(bin_positions[0], bin_positions[-1], 1000)
+    model_data = gauss_model(binning_span, mean_value, std_value, fitter.values["a"])
+    ax.plot(binning_span, model_data, "o-", label="Model")
+    ax.set_ylabel(COUNTS_HIST_LABEL)
+    ax.set_xlabel(HIST_PIX_CAP_LABEL)
+    ax.grid()
+    if output_pdf is None:
+        plt.show()
+    else:
+        output_pdf.savefig(fig, bbox_inches='tight')
+
+def apply_correction(raw_data, base_path=None, bare_data_path=None, bare_group=None):
+    # first extract the parasitic capacitances
+    assert bare_data_path is not None
+    with tb.open_file(raw_data, mode='a') as in_file_h5_inner:
+        if base_path is None:
+            base_group = in_file_h5_inner.root
+        else:
+            base_group = walk_to_node(in_file_h5_inner.root, base_path)
+
+        apply_correction_simple(bare_data_path, bare_group, base_group.analysis)
+
+def apply_correction_simple(bare_data_path: str, bare_path: str, analysis_group: tb.Group):
+    with tb.open_file(bare_data_path, mode='r') as in_file_h5:
+        if bare_path is None:
+            bare_group = in_file_h5.root
+        else:
+            bare_group = walk_to_node(in_file_h5.root, bare_path)
+        assert "parasitic" in bare_group.analysis._v_attrs
+        assert "parasitic_error" in bare_group.analysis._v_attrs
+        parasitic = bare_group.analysis._f_getattr("parasitic")
+        parasitic_error = bare_group.analysis._f_getattr("parasitic_error")
+
+        # second perform correction of the capacitance data
+        # FIXME: What about the case that the correction group did already exist?
+        analysis_group._v_file.create_group(where=analysis_group._v_parent, name="analysis_correction")
+        apply_correction_delegate(parasitic, parasitic_error, analysis_group)
+
+def apply_correction_delegate(parasitic, parasitic_error, group: GroupType):
+    assert isinstance(group, tb.Group)
+    # define the corrected analysis group
+    if "analysis_correction" in group._v_parent:
+        group._v_parent.analysis_correction.remove(recursive=True)
+        time.sleep(2)
+
+    correction_group = group._v_file.create_group(where=group._v_parent, name="analysis_correction")
+
+    # first extract the capacitance histograms (errors shall be copied to the new group
+    for key, value in group._v_leaves.items():
+        if "Cap" in key:
+            if "Err" in key:
+                value._f_copy(newparent=correction_group)
+            else:
+
+                cap_data_hist = value[:]
+                assert isinstance(cap_data_hist, tb.Array)
+                corrected_cap_data = cap_data_hist - parasitic
+                corrected_cap_systemtatics = np.full_like(corrected_cap_data, fill_value=parasitic_error)
+                temp_data_array = group._v_file.create_carray(where=correction_group, name=key, title=value.title,
+                                                              filters=value.filters, obj=corrected_cap_data)
+                temp_error_array = group._v_file.create_carray(where=correction_group, name="{}Systematics".format(key), title=value.title,
+                                                               filters=value.filters, obj=corrected_cap_systemtatics)
+                for name in value.attrs._f_list:
+                    temp_data_array.attrs[name] = value.attrs[name]
+                    temp_error_array.attrs[name] = value.attrs[name]
+        else:
+            value._f_copy(newparent=correction_group)
+
+    # will need to handle also the subgroups (only one level down)!
+    for key, next_group in group._v_groups.items():
+        next_correction_group = group._v_file.create_group(where=correction_group, name=key)
+        for key, value in next_group._v_leaves.items():
+            if "Cap" in key:
+                if "Err" in key:
+                    value._f_copy(newparent=next_correction_group)
+                else:
+                    cap_data_hist = value[:]
+                    corrected_cap_data = cap_data_hist - parasitic
+                    corrected_cap_systemtatics = np.full_like(corrected_cap_data, fill_value=parasitic_error)
+                    temp_data_array = group._v_file.create_carray(where=next_correction_group, name=key, title=value.title,
+                                                                  filters=value.filters, obj=corrected_cap_data)
+                    temp_error_array = group._v_file.create_carray(where=next_correction_group,
+                                                                   name="{}Systematics".format(key), title=value.title,
+                                                                   filters=value.filters,
+                                                                   obj=corrected_cap_systemtatics)
+                    for name in value.attrs._f_list:
+                        temp_data_array.attrs[name] = value.attrs[name]
+                        temp_error_array.attrs[name] = value.attrs[name]
+            else:
+                value._f_copy(newparent=next_correction_group)
 
 if __name__ == '__main__':
     # analyze_data(raw_data='/home/silab/git/pixcap65/pixcap_full_data_image1.h5')
     # advanced_analysis(raw_data='New_2_Scan.h5', base_path="ATLAS_Itk/X2/unbiased_1")
     # advanced_analysis(raw_data='Data/r13-measurement/R13_Initial_3_Scan.h5',base_path="ATLAS ITk/unbiased_1")
     # analyze_data(raw_data='Data/r13-measurement/R13_BIAS_CV_COMBI_6.h5', is_cv=True, first_boundaries=(-100,-40), second_boundaries=(-10, 0),)
-    analyze_data(raw_data='R13-Interpixel_Scan.h5', base_path="Reference/R13/demo_measurement_4_80_V",
+    advanced_analysis(raw_data='R13-Interpixel_Scan.h5', base_path="Reference/R13/demo_measurement_12_80_V",
                  is_inter_pixel=True)

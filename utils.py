@@ -1,9 +1,9 @@
 import logging
-import time
 from enum import StrEnum
 from typing import Optional, OrderedDict, Union
 
 import numpy as np
+import time
 from basil.dut import Dut, Base
 
 from pixcap_65_test_total_cap import PixCap65Measurement
@@ -186,6 +186,7 @@ class PixCapSetup(Dut):
         logger.debug("For the handling of the setup, we'll use the config:\n %s", str(self._environ_config))
         super(PixCapSetup, self).__init__(conf=self._environ_config)
 
+
         # get the correct pixcap measurement class
         pix_args = {
             "scan_config": scan_config,
@@ -215,6 +216,7 @@ class PixCapSetup(Dut):
         try:
             self["power"].set_enable(0, channel=1)
             self["power"].set_enable(0, channel=2)
+            self["power"].set_enable(0, channel=3)
         except:
             logger.error("Failed to clean up the setup handling.")
         super(PixCapSetup, self).close()
@@ -229,9 +231,15 @@ class PixCapSetup(Dut):
             # RESET the power distribution and therefore the boards
             self["power"].set_enable(0, channel=1)
             self["power"].set_enable(0, channel=2)
+            self["power"].set_enable(0, channel=3)
+            self["power"].set_voltage(5.0, channel=1)
+            self["power"].set_voltage(1.0, channel=2)
+            self["power"].set_current_limit(0.800, channel=1)
+            self["power"].set_current_limit(0.001, channel=2)
             time.sleep(5)
             self["power"].set_enable(1, channel=1)
             self["power"].set_enable(1, channel=2)
+            self["power"].set_enable(1, channel=3)
             time.sleep(7)
             print(self["power"].get_current(channel=1))
 
@@ -258,9 +266,7 @@ class PixCapSetup(Dut):
 
 if __name__ == "__main__":
     from pixcap_65_test_total_cap import scan_configuration
-
-    with PixCapSetup(scan_configuration, "Setup_Demonstration.h5",
-                     measurement=PixcapMeasurements.TOTAL_CAPACITANCE) as setup:
+    with PixCapSetup(scan_configuration, "Setup_Demonstration.h5", measurement=PixcapMeasurements.TOTAL_CAPACITANCE) as setup:
         pass
     # dut = Dut("demo.yaml")
     # dut.init()

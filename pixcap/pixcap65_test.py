@@ -4,14 +4,14 @@ Script for small tests
 
 import logging
 import os
-import time
 
 import numpy as np
 import pylab as pl
+import time
 from bitarray import bitarray
 
-import pixcap65_constants as c
-from pixcap65 import Pixcap65
+from pixcap.pixcap65 import Pixcap65
+from utility import pixcap65_constants as c
 
 logging.getLogger().setLevel(logging.DEBUG)
 

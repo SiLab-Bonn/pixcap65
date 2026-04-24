@@ -12,6 +12,7 @@ DEFAULT_BIN_NUMBER = 50
 DEFAULT_TEST_CAP_EXCLUSION = True
 
 try:
+    # noinspection PyCompatibility
     from collections.abc import Iterable
 except ImportError:
     # python 2.7
@@ -24,46 +25,49 @@ from matplotlib.backends.backend_agg import FigureCanvasAgg as FigureCanvas
 from matplotlib.backends.backend_pdf import PdfPages
 from matplotlib.figure import Figure
 from mpl_toolkits.axes_grid1 import make_axes_locatable
-
-from analysis import check_leaf_unit, GENERAL_PIXCAP_SHAPE
-from utils_2 import walk_to_node, GroupType
+from analysis import GENERAL_PIXCAP_SHAPE
+from analysis_util.utility import check_leaf_unit
+from utility.utils_2 import walk_to_node, GroupType
 
 HISTOGRAM_SHAPE_FORMAT = "The histograms shape is {}"
-
 HIST_BIAS_MEAS_UNIT = "V"
-
 HIST_LEAK_CURRENT_UNIT = "nA"
-
 HIST_CAP_UNIT = "F"
-
 HIST_CURRENT_MEAS_UNIT = "A"
-
 ROW_LABEL = 'Row'
-
 COLUMN_LABEL = 'Column'
-
 HIST_PIX_CAP_LABEL = 'Pixel Capacitance / fF'
-
 COUNTS_HIST_LABEL = 'Counts / #'
-
 SIMPLE_CAP_LABEL_PERCENT_FORMAT = '%sFit to data:\n$C_d = %.1f\\,$fF'
-
 FREQUENCY_LABEL = 'Frequency / MHz'
-
 CURRENT_LABEL = 'Current / nA'
-
 SIMPLE_PIXEL_LABEL = '{prefix}Pixel({i_col},{i_row})'
-
 CAPACITANCE_CONVERSION_FACTOR = 1e15
-
 ADVANCED_CAPACITANCE_CONVERSION_FACTOR = 1.0e-9
-
 cmap = plt.get_cmap('viridis')
+
+def get_analysis_group(base_group, **kwargs):
+    # TODO: Add the doc string of this function
+    if kwargs.get('use_corrected', False):
+        return base_group.analysis_correction
+    return base_group.analysis
+
+
+def get_pdf_name(base_path, interpreted_data, suffix: str, use_group: bool) -> str:
+    # TODO: Add the docstring of this function
+    if use_group and base_path is not None:
+        _, group_component = os.path.split(base_path)
+        pdf_name = "{file}_{s}_{group}.pdf".format(s=suffix, file=interpreted_data[:-3], group=group_component)
+    else:
+        pdf_name = "{file}_{s}.pdf".format(s=suffix, file=interpreted_data[:-3])
+    return pdf_name
 
 
 def plot_data(interpreted_data, base_path=None, suffix="general_data", use_group=False, **kwargs):
     """
     plot_data
+
+    FIXME: update the docstring
 
     Helper function to graphical present/plot the analysis results of a simple pixel capacitance scan.
     The plotting is only performed for the pixels which contribute a usable capacitance measurement.
@@ -78,32 +82,26 @@ def plot_data(interpreted_data, base_path=None, suffix="general_data", use_group
     :param hist_bins: integer, number of bins to use for the histogram.
     :param mask_pixel: iterable of pixel positions on the grid to ignore for evaluations.
     :param extract_pixel: iterable of pixel positions on the grid to extract the figures from.
+    :param use_corrected: boolean, False, indicating whether to use the corrected capacitances for plotting.
     """
     # determine the pdf file
     pdf_name = get_pdf_name(base_path, interpreted_data, suffix, use_group)
     with PdfPages(pdf_name) as output_pdf:
         with tb.open_file(interpreted_data, mode='r') as in_file_h5:
-            # actual plotting.
             if base_path is None:
                 base_group = in_file_h5.root
             else:
                 base_group = walk_to_node(in_file_h5.root, base_path)
-            plot_data_delegate(base_group.total_cap.measurements, base_group.total_cap.analysis, output_pdf, **kwargs)
-
-
-def get_pdf_name(base_path, interpreted_data, suffix: str, use_group: bool) -> str:
-    if use_group and base_path is not None:
-        _, group_component = os.path.split(base_path)
-        pdf_name = "{file}_{s}_{group}.pdf".format(s=suffix, file=interpreted_data[:-3], group=group_component)
-    else:
-        pdf_name = "{file}_{s}.pdf".format(s=suffix, file=interpreted_data[:-3])
-    return pdf_name
+            # actual plotting.
+            # FIXME: the simple replacement of the analysis group will break the plotting of the model function!
+            plot_data_delegate(base_group.total_cap.measurements, get_analysis_group(base_group.total_cap, **kwargs),
+                               output_pdf, **kwargs)
 
 
 def plot_inter_pix_data(interpreted_data, base_path=None, suffix="general_inter_pix_data", use_group=False, **kwargs):
     """
     plot_data
-    FIXME:
+    FIXME: update the docstring.
     Helper function to graphical present/plot the analysis results of a simple pixel capacitance scan.
     The plotting is only performed for the pixels which contribute a usable capacitance measurement.
     In Addition to the fits for estimating the capacitance also the capacitance distribution and frequency is plotted.
@@ -118,12 +116,14 @@ def plot_inter_pix_data(interpreted_data, base_path=None, suffix="general_inter_
     pdf_name = get_pdf_name(base_path, interpreted_data, suffix, use_group)
     with PdfPages(pdf_name) as output_pdf:
         with tb.open_file(interpreted_data, mode='r') as in_file_h5:
-            # actual plotting.
             if base_path is None:
                 base_group = in_file_h5.root
             else:
                 base_group = walk_to_node(in_file_h5.root, base_path)
-            plot_inter_pix_data_delegate(base_group.inter_cap.measurements, base_group.inter_cap.analysis, output_pdf,
+            # actual plotting.
+            # FIXME: the simple replacement of the analysis group will break the plotting of the model function
+            plot_inter_pix_data_delegate(base_group.inter_cap.measurements,
+                                         get_analysis_group(base_group.inter_cap, **kwargs), output_pdf,
                                          **kwargs)
 
 
@@ -139,13 +139,12 @@ def plot_bias_data(interpreted_data, base_path=None, suffix="bias_curve", use_gr
     """
     pdf_name = get_pdf_name(base_path, interpreted_data, suffix, use_group)
     with PdfPages(pdf_name) as output_pdf:
-        # with PdfPages(interpreted_data[:-3] + '.pdf') as output_pdf:
         with tb.open_file(interpreted_data, mode='r') as in_file_h5:
             if base_path is None:
                 base_group = in_file_h5.root
             else:
                 base_group = walk_to_node(in_file_h5.root, base_path)
-            plot_bias_delegate(base_group.biasing.measurements, output_pdf, **kwargs)
+            plot_bias_delegate(base_group.biasing.measurements, output_pdf)
 
 
 def plot_cv_data(interpreted_data, base_path=None, first_upper=None, first_lower=None, second_upper=None,
@@ -176,14 +175,18 @@ def plot_cv_data(interpreted_data, base_path=None, first_upper=None, first_lower
                 base_group = in_file_h5.root
             else:
                 base_group = walk_to_node(in_file_h5.root, base_path)
-            plot_cv_data_delegate(base_group.biasing.measurements, base_group.biasing.analysis, output_pdf, first_upper,
-                                  first_lower, second_upper, second_lower, **kwargs)
+
+            plot_cv_data_delegate(base_group.biasing.measurements,
+                                  get_analysis_group(base_group.biasing, **kwargs), output_pdf,
+                                  first_upper, first_lower, second_upper, second_lower)
 
 
 def plot_combined_data(interpreted_data, base_path=None, first_upper=None, first_lower=None, second_upper=None,
                        second_lower=None, suffix="combined_bias_cv_curve", use_group=False, **kwargs):
     """
     plot_combined_data
+
+    FIXME: update the docstring
 
     Plot the data acquired for the pixel-diodes I-V characterization and the C-V characterization of the pixels.
     Plot the results of the C-V characterization of the scanned pixels.
@@ -209,12 +212,12 @@ def plot_combined_data(interpreted_data, base_path=None, first_upper=None, first
                 base_group = in_file_h5.root
             else:
                 base_group = walk_to_node(in_file_h5.root, base_path)
-            plot_bias_delegate(base_group.biasing.measurements, output_pdf, **kwargs)
-            plot_cv_data_delegate(base_group.biasing.measurements, base_group.biasing.analysis, output_pdf, first_upper,
-                                  first_lower, second_upper, second_lower, **kwargs)
+            plot_bias_delegate(base_group.biasing.measurements, output_pdf)
+            plot_cv_data_delegate(base_group.biasing.measurements, get_analysis_group(base_group.biasing, **kwargs),
+                                  output_pdf, first_upper, first_lower, second_upper, second_lower)
 
 
-def plot_bias_delegate(data_group, output_pdf: PdfPages, **kwargs):
+def plot_bias_delegate(data_group, output_pdf: PdfPages):
     """
     plot_bias_delegate
 
@@ -237,7 +240,7 @@ def plot_bias_delegate(data_group, output_pdf: PdfPages, **kwargs):
 
 
 def plot_cv_data_delegate(data_group, analysis_group, output_pdf, first_upper=None, first_lower=None, second_upper=None,
-                          second_lower=None, **kwargs):
+                          second_lower=None):
     """
     plot_cv_data_delegate
 
@@ -303,6 +306,8 @@ def plot_cv_data_delegate(data_group, analysis_group, output_pdf, first_upper=No
             second_dep_cov = np.asarray(second_result[1])
             print("The result of the second fit is:")
             print(second_result)
+
+            # MARK: perhaps use an improved implementation utilizing matrix-vector multiplication from numpy?
             dep_voltage = (first_dep_parameters[1] - second_dep_parameters[1]) / (first_dep_parameters[0] -
                                                                                   second_dep_parameters[0])
             first_norm_factor = first_dep_parameters[0] - second_dep_parameters[0]
@@ -338,12 +343,14 @@ def plot_cv_data_delegate(data_group, analysis_group, output_pdf, first_upper=No
 
         fig, ax = plt.subplots(ncols=2, figsize=(20, 10))
         if approx_depletion:
+            # TODO: adjust the plotting ranges such that the intersection is clearly visible.
             first_voltage_x = np.linspace(first_lower, 0, 1000)
             second_voltage_x = np.linspace(second_lower, second_upper, 100)
             first_cap_calc = first_dep_parameters[0] * first_voltage_x + first_dep_parameters[1]
             second_cap_calc = second_dep_parameters[0] * second_voltage_x + second_dep_parameters[1]
             ax[1].plot(first_voltage_x, first_cap_calc, '-', label="First section fit")
             ax[1].plot(second_voltage_x, second_cap_calc, '-', label="Second section fit")
+
         effective_capacitance_error_data = np.reciprocal(cap_data[ii, jj, :] * CAPACITANCE_CONVERSION_FACTOR) ** 3 * cap_errors[
             ii, jj, :] if np.all(np.isfinite(cap_errors[ii, jj, :])) else None
         eff_cap_errors = cap_errors[ii, jj, :] if np.all(np.isfinite(cap_errors[ii, jj, :])) else None
@@ -405,6 +412,7 @@ def plot_data_delegate(data_group: tb.Group, analysis_group: tb.Group, output_pd
     ax.set_ylabel(COLUMN_LABEL)
     ax.set_xlabel(ROW_LABEL)
     output_pdf.savefig(fig, bbox_inches='tight')
+
     # 1D Pixel Capacitance Hist
     fig = Figure()
     _ = FigureCanvas(fig)
@@ -422,6 +430,7 @@ def plot_data_delegate(data_group: tb.Group, analysis_group: tb.Group, output_pd
     ax.set_xlabel(HIST_PIX_CAP_LABEL)
     ax.grid()
     output_pdf.savefig(fig, bbox_inches='tight')
+
     # Current vs. frequency
     print(HISTOGRAM_SHAPE_FORMAT.format(current_hist.shape))
     verify_pixel_mask = "mask_pixel" in kwargs and isinstance(kwargs["mask_pixel"], Iterable) and len(
@@ -436,6 +445,7 @@ def plot_data_delegate(data_group: tb.Group, analysis_group: tb.Group, output_pd
             # res = np.polyfit(scan_parameters['frequency'], current_hist[col, row] * 1e9, deg=1, cov=True)
             f = np.arange(0, scan_parameters['frequency'].max() * 1.1, 0.1)
             actual_cap = cap_hist[col, row] * CAPACITANCE_CONVERSION_FACTOR
+            # FIXME: this will break when supplying the corrected capacitance values analysis group!
             plot_current_model(ax, col, row, analysis_group, actual_cap, leak_hist, f)
             plot_current_data(ax, col, row, scan_parameters, current_hist, current_err_hist, marker='o', ls='')
             ax.set_ylabel(CURRENT_LABEL)
@@ -533,7 +543,7 @@ def plot_inter_pix_data_delegate(data_group: tb.Group, analysis_group: tb.Group,
 
     # 1D Pixel Capacitance Hist
     n_bins = kwargs.get("hist_bins", DEFAULT_BIN_NUMBER)
-    if np.count_nonzero(np.isfinite(total_cap_hist)) > n_bins:
+    if np.count_nonzero(np.isfinite(total_cap_hist)) > 2:
         fig = Figure()
         _ = FigureCanvas(fig)
         ax = fig.add_subplot(111)
@@ -552,7 +562,7 @@ def plot_inter_pix_data_delegate(data_group: tb.Group, analysis_group: tb.Group,
         ax.grid()
         output_pdf.savefig(fig, bbox_inches='tight')
 
-    if np.count_nonzero(np.isfinite(inter_a_current_hist)) > n_bins:
+    if np.count_nonzero(np.isfinite(inter_a_current_hist)) > 2:
         fig = Figure()
         _ = FigureCanvas(fig)
         ax = fig.add_subplot(111)
@@ -571,7 +581,7 @@ def plot_inter_pix_data_delegate(data_group: tb.Group, analysis_group: tb.Group,
         ax.grid()
         output_pdf.savefig(fig, bbox_inches='tight')
 
-    if np.count_nonzero(np.isfinite(inter_b_current_hist)) > n_bins:
+    if np.count_nonzero(np.isfinite(inter_b_current_hist)) > 2:
         fig = Figure()
         _ = FigureCanvas(fig)
         ax = fig.add_subplot(111)
@@ -602,6 +612,7 @@ def plot_inter_pix_data_delegate(data_group: tb.Group, analysis_group: tb.Group,
             ax = fig.add_subplot(111)
             f = np.arange(0, scan_parameters['frequency'].max() * 1.1, 0.1)
             actual_cap = total_cap_hist[col, row] * CAPACITANCE_CONVERSION_FACTOR
+            # FIXME: these will break when supplying the correct capacitance values analysis group.
             plot_current_model(ax, col, row, analysis_group, actual_cap, total_leak_hist, f, prefix="Total ")
             plot_current_data(ax, col, row, scan_parameters, total_current_hist, total_current_err_hist,
                               prefix="Total current for ", marker='o', ls='')
@@ -653,7 +664,7 @@ def plot_current_model(ax: Axes, col, row, analysis_group: Group, actual_cap: An
     assert 'prefix' not in plot_args
     if resistor_name in analysis_group and np.isfinite(analysis_group.HistRes[col, row]):
         hist_resistance = analysis_group[resistor_name]
-        from analysis import full_capacitance_model
+        from analysis_util.physics_modelling import full_capacitance_model
         assert isinstance(hist_resistance, tb.Array) or isinstance(hist_resistance,np.ndarray)
         ax.plot(f, full_capacitance_model(f, c=actual_cap * ADVANCED_CAPACITANCE_CONVERSION_FACTOR,
                                           r=hist_resistance[col, row],
@@ -691,7 +702,7 @@ def plot_compare_delegate(first_group: GroupType, second_group: GroupType, outpu
 if __name__ == '__main__':
     # plot_data(interpreted_data=os.path.expanduser('~/git/pixcap65/pixcap_LF_50x50_DC_R3_80V_HV.h5'))
     # plot_data(interpreted_data='Data/r13-measurement/R13_Initial_3_Scan.h5', base_path="ATLAS ITk/unbiased_1", suffix="unbiased_full_measurement", use_group=True)
-    plot_inter_pix_data(interpreted_data='R13-Interpixel_Scan.h5', base_path="Reference/R13/demo_measurement_4_80_V",
-                        use_group=True, suffix="inter_pix_3")
+    plot_inter_pix_data(interpreted_data='R13-Interpixel_Scan.h5', base_path="Reference/R13/demo_measurement_12_80_V",
+                        use_group=True, suffix="inter_pix_12")
     # plot_bias_data(interpreted_data='Data/r13-measurement/R13_BIAS_2.h5')
     # plot_combined_data(interpreted_data='Data/r13-measurement/R13_BIAS_CV_COMBI_6.h5', first_lower=-100,first_upper=-40, second_lower=-10, second_upper=0)
