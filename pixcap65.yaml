@@ -26,7 +26,7 @@ transfer_layer:
   - name     : Serial
     type     : Serial
     init     :
-        port     : "/dev/ttyUSB2"
+        port     : "/dev/ttyUSB0"
         # hwid: USB VID:PID=067B:2303 LOCATION=4-10
         # for 2410 we need
         # read_termination : "\r"
@@ -42,7 +42,7 @@ transfer_layer:
   - name: Serial2 
     type: Serial
     init:
-      port: "/dev/ttyUSB0"
+      port: "/dev/ttyUSB2"
       # hwid: USB VID:PID=0403:6001 LOCATION=4-9
       # for power supply
       # read_termination: "\r\n"
@@ -215,11 +215,13 @@ registers:
     type: FunctionalRegister
     hw_driver: BIAS_SMU
     arg_add: { }
+    init:
+      active: False
 
   - name: VM1
     type: FunctionalRegister
     hw_driver: SMU_Device
-    arg_add: { 'channel': -1 }
+    arg_add: {  }
 
   - name: VM2
     type: FunctionalRegister

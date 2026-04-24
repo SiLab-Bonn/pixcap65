@@ -1,7 +1,7 @@
-import time
 from typing import Iterable
 
 import numpy as np
+import time
 
 from pixcap_65_test_total_cap import scan_configuration, NUMBER_AVERAGE_MEASUREMENTS_KEY, PixCap65TotalCap
 

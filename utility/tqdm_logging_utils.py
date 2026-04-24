@@ -1,8 +1,8 @@
 import logging
-import sys
 from contextlib import contextmanager, redirect_stdout, redirect_stderr
 from typing import Union
 
+import sys
 from tqdm.contrib import DummyTqdmFile as StdTqdmFile
 from tqdm.std import tqdm as std_tqdm
 

@@ -5,13 +5,13 @@ Calculate t_charge with t_charge = m/seq_size * 1/f_rep
 """
 
 import logging
-import time
 
 import numpy as np
+import time
 from bitarray import bitarray
 
-import pixcap65_constants as c
 from pixcap_65_test_total_cap import PixCap65Measurement
+from utility import pixcap65_constants as c
 
 logger = logging.getLogger()
 logger.setLevel(logging.DEBUG)

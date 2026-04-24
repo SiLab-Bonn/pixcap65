@@ -20,25 +20,26 @@ Changes compared to first/second modification:
 
 import logging
 import os
-import time
 from collections import OrderedDict
 from collections.abc import Mapping, Iterable
 from enum import StrEnum
 
 import numpy as np
 import tables as tb
+import time
 import yaml
 from bitarray import bitarray
 from tqdm import tqdm
 from tqdm.contrib import DummyTqdmFile
 
-import pixcap65_constants as c
 from analysis import advanced_analysis_data_handle
 from configs.config_handler import extract_smu_current_error
-from pixcap65 import Pixcap65, BasilConfigKeys
+from pixcap.pixcap65 import Pixcap65
+from pixcap.pixcap_structure import BasilConfigKeys
 from plotting import plot_data_delegate
-from tqdm_logging_utils import logging_redirect_tqdm
-from utils_2 import walk_to_node
+from utility import pixcap65_constants as c
+from utility.tqdm_logging_utils import logging_redirect_tqdm
+from utility.utils_2 import walk_to_node
 
 # constants for structuring of config readouts.
 TOTAL_CAP_SEQ_SIZE = 4
@@ -137,10 +138,13 @@ class BiasTable(tb.IsDescription):
 
 
 class PixCap65Measurement(object):
-    smu_range_config = {}
-    __group: tb.Group = None
+    # smu_range_config = {}
+    # __group: tb.Group = None
 
     def __init__(self, scan_config, output_file, pix_config="pixcap65.yaml", **kwargs):
+        self.smu_range_config = {}
+        self.__group: tb.Group = None
+
         self.dut = Pixcap65(pix_config)
         self.dut.init()
 
@@ -207,6 +211,8 @@ class PixCap65Measurement(object):
 
         self.n_frequencies = len(scan_config[ScanConfigurationKeys.FREQUENCY_RANGE])
 
+        self.has_bias_suppy = self.pixcap.has_bias_suppy
+
     def update_config(self, new_config=None):
         if new_config is not None:
             self.scan_config.update(new_config)
@@ -224,16 +230,21 @@ class PixCap65Measurement(object):
             self.out_file_h5 = tb.open_file(self.scan_config["output_file"], mode='a')
 
         # settings for sensor depletion source
-        self.pixcap.init_bias(voltage=-0.1, voltage_range=1000, current_range=self.bias_sense_range, current_limit=0.000000050)
-        self.pixcap[self.pixcap.bias_smu_key].drain_error_queue()
-        self.pixcap.bias_voltage = -0.1
-        self.pixcap[self.pixcap.bias_smu_key].select_data_format()
-        self.pixcap[self.pixcap.bias_smu_key].set_number_triggers(1)
-        if self.n_measurements == -1:
-            self.pixcap[self.pixcap.bias_smu_key].set_number_measurements(1)
+        if ScanConfigurationKeys.BIAS_AVERAGE_MEASUREMENTS in self.scan_config or \
+            ScanConfigurationKeys.BIAS_VOLTAGE_SINGLE in self.scan_config or \
+            ScanConfigurationKeys.BIAS_VOLTAGE_RANGE in self.scan_config:
+            self.pixcap.init_bias(voltage=-0.1, voltage_range=1000, current_range=self.bias_sense_range, current_limit=0.000000050)
+            self.pixcap[self.pixcap.bias_smu_key].drain_error_queue()
+            self.pixcap.bias_voltage = -0.1
+            self.pixcap[self.pixcap.bias_smu_key].select_data_format()
+            self.pixcap[self.pixcap.bias_smu_key].set_number_triggers(1)
+            if self.n_measurements == -1:
+                self.pixcap[self.pixcap.bias_smu_key].set_number_measurements(1)
+            else:
+                self.pixcap[self.pixcap.bias_smu_key].set_number_measurements(self.n_measurements)
+            self.pixcap[self.pixcap.bias_smu_key].drain_error_queue()
         else:
-            self.pixcap[self.pixcap.bias_smu_key].set_number_measurements(self.n_measurements)
-        self.pixcap[self.pixcap.bias_smu_key].drain_error_queue()
+            self.has_bias_suppy = False
 
         # init the primary smu or VM3
         self.init_smu()
@@ -292,7 +303,7 @@ class PixCap65Measurement(object):
         return False
 
     def create_carray(self, where: tb.Group, name: str, *args, **kwargs):
-        from utils_2 import create_update_array
+        from utility.utils_2 import create_update_array
         return create_update_array(self.out_file_h5, where, name, *args, **kwargs)
 
 
@@ -307,7 +318,7 @@ class PixCap65Measurement(object):
 
     # Handle the SMU!
     # these will now just forward the commands to the pixcap object
-    def init_smu(self, voltage_range=1.5, current_limit=0.001, plc=None, **kwargs):
+    def init_smu(self, voltage_range=1.5, current_limit=0.0001, plc=None, **kwargs):
         if plc is None:
             plc = self.scan_config.get('plc_cycles', 10)
         self.pixcap.init_smu(self.scan_config[ScanConfigurationKeys.VIN], self.current_sense_range, voltage_range,

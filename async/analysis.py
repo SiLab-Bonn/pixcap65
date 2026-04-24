@@ -2,14 +2,13 @@
 Analysis of Pixcap65 data. Fits freq vs current to extract the capacitance. A 2D histogram containing the capacitance
 for each pixel is stored.
 """
-import time
-
 import numpy as np
 import tables as tb
+import time
 from iminuit import Minuit
 from iminuit.cost import LeastSquares
 
-from utils_2 import walk_to_node
+from utility.utils_2 import walk_to_node
 
 
 def full_capacitance_model(freq, c=1e-6, r=1e6, i=0, u0=1):

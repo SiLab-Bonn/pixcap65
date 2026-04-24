@@ -46,7 +46,7 @@ def adjust_cap_measurement(group, has_values=False):
 # FIXME: Why are there no error estimations for I-V curves?
 
 if __name__ == "__main__":
-    with tb.open_file("New_2_Scan.h5", "a") as h5_file:
+    with tb.open_file("../New_2_Scan.h5", "a") as h5_file:
         adjust_cap_measurement(h5_file.root.ATLAS_Itk.X2.unbiased_1.total_cap.measurements, has_values=True)
         adjust_cap_measurement(h5_file.root.ATLAS_Itk.X2.biased_80_V.total_cap.measurements, has_values=True)
         adjust_i_v_measurement(h5_file.root.ATLAS_Itk.X2.I_V_Characteristic.biasing.measurements)

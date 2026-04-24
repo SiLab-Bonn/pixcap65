@@ -10,15 +10,15 @@
 #
 
 import logging
-import time
-from enum import StrEnum
 from typing import Any
 
 import numpy as np
+import time
+from basil.RL.FunctionalRegister import FunctionalRegister
 from basil.dut import Dut
 from numpy import ndarray
 
-import pixcap65_constants as c
+from utility import pixcap65_constants as c
 
 # perhaps add the channel information to the pixcap config file and extract it from here!
 float_initialiser = np.float32
@@ -26,40 +26,48 @@ float_initialiser = np.float32
 logger = logging.getLogger(__name__)
 
 
-class BasilConfigKeys(StrEnum):
-    TRANSFER_LAYER = 'transfer_layer'
-    HARDWARE_LAYER = 'hw_drivers'
-    REGISTER_LAYER = 'registers'
-
-
 class Pixcap65(Dut):
-    __smu_kwargs = {}
-    __bias_kwargs = {}
-    __bias_smu_key = 'BIAS_SUPPLY'
-    __primary_smu_key = 'SMU'
-    __vm1_smu_key = 'VM1'
-    __vm2_smu_key = 'VM2'
-    __vm3_smu_key = 'VM3'
-    __mio_pll_key = 'MIO_PLL'
+    __slots__ = ["binary_active"]
 
-    __smu_keys = [__primary_smu_key, __vm1_smu_key, __vm2_smu_key, __vm3_smu_key, __bias_smu_key]
-    smu_setup_devices = {}  # hold the keys for the access to parts of a smu which are not channel depend for each of the smu registers.
+    def __init__(self, conf):
+        Dut.__init__(self, conf)
 
-    __seq_size = 1
-    __current_cvm_frequency = 0
-    # __source_settling_time = 1
-    # __frequency_settling = 1
-    __source_settling_time = 0.2
-    __frequency_settling = 0.2
-    __n_measurements = {
-        __primary_smu_key: 1,
-        __vm1_smu_key: 1,
-        __vm2_smu_key: 1,
-        __vm3_smu_key: 1,
-        __bias_smu_key: 1,
-    }
+        self.__smu_kwargs = {}
+        self.__bias_kwargs = {}
+        self.__bias_smu_key = 'BIAS_SUPPLY'
+        self.__primary_smu_key = 'SMU'
+        self.__vm1_smu_key = 'VM1'
+        self.__vm2_smu_key = 'VM2'
+        self.__vm3_smu_key = 'VM3'
+        self.__mio_pll_key = 'MIO_PLL'
 
-    binary_active = False
+        self.__smu_keys = [self.__primary_smu_key, self.__vm1_smu_key, self.__vm2_smu_key, self.__vm3_smu_key, self.__bias_smu_key]
+        self.smu_setup_devices = {}  # hold the keys for the access to parts of a smu which are not channel depend for each of the smu registers.
+
+        self.__seq_size = 1
+        self.__current_cvm_frequency = 0
+        self.__source_settling_time = 0.2
+        self.__frequency_settling = 0.2
+        self.__n_measurements = {
+            self.__primary_smu_key: 1,
+            self.__vm1_smu_key: 1,
+            self.__vm2_smu_key: 1,
+            self.__vm3_smu_key: 1,
+            self.__bias_smu_key: 1,
+        }
+        self.binary_active = False
+
+        # MARK: perhaps this guard should be generalised for every smu!
+        if "active" in self[self.__bias_smu_key]._init and self[self.__bias_smu_key]._init["active"]:
+            self.__has_bias_suppy = True
+        else:
+            self.__has_bias_suppy = False
+        if isinstance(self[self.__bias_smu_key], FunctionalRegister) and self[self.__bias_smu_key]._drv is None:
+            self.__has_bias_suppy = False
+
+    @property
+    def has_bias_suppy(self):
+        return self.__has_bias_suppy
 
     @property
     def frequency_settling(self):
@@ -125,6 +133,8 @@ class Pixcap65(Dut):
                 Dut.init(self, init_conf=init_conf, **kwargs)
             else:
                 raise
+
+
 
         # setup the chip
         self.switch_on_power_supply_voltages(1)
@@ -562,63 +572,102 @@ class Pixcap65(Dut):
     # region Handle the biasing supply.
     # Handle the biasing supply
     def init_bias(self, voltage, current_range, voltage_range=1.5, current_limit=0.001, plc=10):
-        self.smu_init(self.__bias_smu_key, current_limit, current_range, plc, voltage, voltage_range,
-                      kwargs=self.smu_bias_kwargs)
+        if self.has_bias_suppy:
+            self.smu_init(self.__bias_smu_key, current_limit, current_range, plc, voltage, voltage_range,
+                          kwargs=self.smu_bias_kwargs)
 
     def bias_on(self):
-        self.smu_output_on(self.__bias_smu_key, kwargs=self.smu_bias_kwargs)
+        if self.has_bias_suppy:
+            self.smu_output_on(self.__bias_smu_key, kwargs=self.smu_bias_kwargs)
 
     def bias_off(self):
-        self.smu_output_off(self.__bias_smu_key, kwargs=self.smu_bias_kwargs)
+        if self.has_bias_suppy:
+            self.smu_output_off(self.__bias_smu_key, kwargs=self.smu_bias_kwargs)
 
     def bias_current_source(self):
-        self.smu_source_current(self.__bias_smu_key, kwargs=self.smu_bias_kwargs)
+        if self.has_bias_suppy:
+            self.smu_source_current(self.__bias_smu_key, kwargs=self.smu_bias_kwargs)
 
     def bias_voltage_source(self):
-        self.smu_source_volt(self.__bias_smu_key, kwargs=self.smu_bias_kwargs)
+        if self.has_bias_suppy:
+            self.smu_source_volt(self.__bias_smu_key, kwargs=self.smu_bias_kwargs)
 
     @property
     def bias_voltage(self):
-        # FIXME: fails with command not found. But interestingly it is immune to modifications of the scpi class.
-        logger.info("Attempted to read the bias voltage.")
-        return self.get_smu_source_voltage(self.__bias_smu_key, kwargs=self.smu_bias_kwargs)
+        if self.has_bias_suppy:
+            # FIXME: fails with command not found. But interestingly it is immune to modifications of the scpi class.
+            logger.info("Attempted to read the bias voltage.")
+            return self.get_smu_source_voltage(self.__bias_smu_key, kwargs=self.smu_bias_kwargs)
+        return 0.0
 
     @bias_voltage.setter
     def bias_voltage(self, value):
-        logger.info("Attempted to set the bias voltage to %f", value)
-        self.set_smu_source_voltage(self.__bias_smu_key, value, kwargs=self.smu_bias_kwargs)
+        if self.has_bias_suppy:
+            logger.info("Attempted to set the bias voltage to %f", value)
+            self.set_smu_source_voltage(self.__bias_smu_key, value, kwargs=self.smu_bias_kwargs)
 
     @property
     def bias_current(self):
-        return self.get_smu_source_current(self.__bias_smu_key, kwargs=self.smu_bias_kwargs)
+        if self.has_bias_suppy:
+            return self.get_smu_source_current(self.__bias_smu_key, kwargs=self.smu_bias_kwargs)
+        return np.nan
 
     @bias_current.setter
     def bias_current(self, value):
-        self.set_smu_source_current(self.__bias_smu_key, value, kwargs=self.smu_bias_kwargs)
+        if self.has_bias_suppy:
+            self.set_smu_source_current(self.__bias_smu_key, value, kwargs=self.smu_bias_kwargs)
 
     def bias_measure_current(self) -> float:
-        return self.smu_measure_current(self.__bias_smu_key, kwargs=self.smu_bias_kwargs)
+        if self.has_bias_suppy:
+            return self.smu_measure_current(self.__bias_smu_key, kwargs=self.smu_bias_kwargs)
+        return np.nan
 
     def bias_measure_volts(self):
-        return self.smu_measure_voltage(self.__bias_smu_key, kwargs=self.smu_bias_kwargs)
+        if self.has_bias_suppy:
+            return self.smu_measure_voltage(self.__bias_smu_key, kwargs=self.smu_bias_kwargs)
+        return np.nan
 
     def bias_averaged_current(self, n: int = 10):
-        return self.smu_averaged_current(n, self.__bias_smu_key, kwargs=self.smu_bias_kwargs)
+        if self.has_bias_suppy:
+            return self.smu_averaged_current(n, self.__bias_smu_key, kwargs=self.smu_bias_kwargs)
+        elif n is None:
+            return np.full(10, fill_value=np.nan)
+        return np.full(n, fill_value=np.nan)
 
     def bias_averaged_voltage(self, n: int = 10):
-        return self.smu_averaged_voltage(n, self.__bias_smu_key, kwargs=self.smu_bias_kwargs)
+        if self.has_bias_suppy:
+            return self.smu_averaged_voltage(n, self.__bias_smu_key, kwargs=self.smu_bias_kwargs)
+        elif n is None:
+            return np.full(10, fill_value=np.nan)
+        return np.full(n, fill_value=np.nan)
 
     def bias_current_multiple(self, n: int):
-        return self.general_smu_current_multiple(self.__bias_smu_key, n, kwargs=self.smu_bias_kwargs)
+        if self.has_bias_suppy:
+            return self.general_smu_current_multiple(self.__bias_smu_key, n, kwargs=self.smu_bias_kwargs)
+        elif n is None:
+            return np.full(10, fill_value=np.nan)
+        return np.full(n, fill_value=np.nan)
 
     def bias_voltage_multiple(self, n: int):
-        return self.general_smu_voltage_multiple(self.__bias_smu_key, n, kwargs=self.smu_bias_kwargs)
+        if self.has_bias_suppy:
+            return self.general_smu_voltage_multiple(self.__bias_smu_key, n, kwargs=self.smu_bias_kwargs)
+        elif n is None:
+            return np.full(10, fill_value=np.nan)
+        return np.full(n, fill_value=np.nan)
 
     def bias_advanced_current_multiple(self, n: int):
-        return self.smu_advanced_current_multiple(n, self.__bias_smu_key, kwargs=self.smu_bias_kwargs)
+        if self.has_bias_suppy:
+            return self.smu_advanced_current_multiple(n, self.__bias_smu_key, kwargs=self.smu_bias_kwargs)
+        elif n is None:
+            return np.full(10, fill_value=np.nan)
+        return np.full(n, fill_value=np.nan)
 
     def bias_advanced_voltage_multiple(self, n: int):
-        return self.smu_advanced_voltage_multiple(n, self.__bias_smu_key, kwargs=self.smu_bias_kwargs)
+        if self.has_bias_suppy:
+            return self.smu_advanced_voltage_multiple(n, self.__bias_smu_key, kwargs=self.smu_bias_kwargs)
+        elif n is None:
+            return np.full(10, fill_value=np.nan)
+        return np.full(n, fill_value=np.nan)
 
     # endregion
 
