@@ -7,6 +7,12 @@ from typing import Any
 from matplotlib.axes import Axes
 from tables import Group
 
+from analysis_util.physics_modelling import model_depletion
+
+BIAS_CURVE_Y_LABEL = "I in nA"
+
+BIAS_CURVE_X_LABEL = "U in V"
+
 DEFAULT_BIN_NUMBER = 50
 
 DEFAULT_TEST_CAP_EXCLUSION = True
@@ -25,19 +31,16 @@ from matplotlib.backends.backend_agg import FigureCanvasAgg as FigureCanvas
 from matplotlib.backends.backend_pdf import PdfPages
 from matplotlib.figure import Figure
 from mpl_toolkits.axes_grid1 import make_axes_locatable
-from analysis import GENERAL_PIXCAP_SHAPE
-from analysis_util.utility import check_leaf_unit
-from utility.utils_2 import walk_to_node, GroupType
+from analysis_util.utility import check_leaf_unit, GENERAL_PIXCAP_SHAPE, HIST_BIAS_MEAS_UNIT, HIST_LEAK_CURRENT_UNIT, \
+    HIST_CAP_UNIT, HIST_CURRENT_MEAS_UNIT, extract_parasitic_capacitance, CURRENT_CONVERSION_FACTOR, get_base_group, \
+    get_analysis_group, TABLES_LEAF_COMPAT_TYPE
+from utility.utils_2 import GroupType
 
 HISTOGRAM_SHAPE_FORMAT = "The histograms shape is {}"
-HIST_BIAS_MEAS_UNIT = "V"
-HIST_LEAK_CURRENT_UNIT = "nA"
-HIST_CAP_UNIT = "F"
-HIST_CURRENT_MEAS_UNIT = "A"
 ROW_LABEL = 'Row'
 COLUMN_LABEL = 'Column'
 HIST_PIX_CAP_LABEL = 'Pixel Capacitance / fF'
-COUNTS_HIST_LABEL = 'Counts / #'
+COUNTS_HIST_LABEL = 'Counts / \\#'
 SIMPLE_CAP_LABEL_PERCENT_FORMAT = '%sFit to data:\n$C_d = %.1f\\,$fF'
 FREQUENCY_LABEL = 'Frequency / MHz'
 CURRENT_LABEL = 'Current / nA'
@@ -46,15 +49,19 @@ CAPACITANCE_CONVERSION_FACTOR = 1e15
 ADVANCED_CAPACITANCE_CONVERSION_FACTOR = 1.0e-9
 cmap = plt.get_cmap('viridis')
 
-def get_analysis_group(base_group, **kwargs):
-    # TODO: Add the doc string of this function
-    if kwargs.get('use_corrected', False):
-        return base_group.analysis_correction
-    return base_group.analysis
-
-
+# TODO: Implement the extraction of particular figures for certain pixels while performing the plotting for all pixels.
 def get_pdf_name(base_path, interpreted_data, suffix: str, use_group: bool) -> str:
-    # TODO: Add the docstring of this function
+    """
+    get_pdf_name
+
+    Helper function to generate a pdf name for a given hdf file to export the created figures to.
+
+    :param base_path: basic group descriptor for the anaylsis and measurements within the hdf file.
+    :param interpreted_data: path to the hdf file used for measurement and analysis.
+    :param suffix: actual suffix to use to identify the pdf file.
+    :param use_group: boolean, False, indicates whether to append the group name to the pdf name.
+    :return: name of the pdf file to use
+    """
     if use_group and base_path is not None:
         _, group_component = os.path.split(base_path)
         pdf_name = "{file}_{s}_{group}.pdf".format(s=suffix, file=interpreted_data[:-3], group=group_component)
@@ -67,12 +74,50 @@ def plot_data(interpreted_data, base_path=None, suffix="general_data", use_group
     """
     plot_data
 
-    FIXME: update the docstring
-
     Helper function to graphical present/plot the analysis results of a simple pixel capacitance scan.
     The plotting is only performed for the pixels which contribute a usable capacitance measurement.
     In Addition to the fits for estimating the capacitance also the capacitance distribution and frequency is plotted.
     The name of the resulting pdf is derived from the file name with the measurement data.
+
+    :param interpreted_data: path to the hdf file which holds the raw data and the analysis results.
+    :param base_path: path to the base group in the hdf files hierarchy.
+    :param suffix: additonal suffix to use for naming the pdf containing the plots.
+    :param use_group: boolean, whether to append the group name of the measurements to the pdf name.
+    :param use_corrected: boolean, False, indicating whether to use the corrected capacitances for plotting.
+    :param exclude_test_cap: boolean, whether to exclude the test capacitator row from the histograms.
+    :param hist_bins: integer, number of bins to use for the histogram.
+    :param mask_pixel: iterable of pixel positions on the grid to ignore for evaluations.
+    :param extract_pixel: iterable of pixel positions on the grid to extract the figures from.
+    """
+    if kwargs.get("use_corrected", False):
+        suffix = "{}_corrected".format(suffix)
+    # determine the pdf file
+    pdf_name = get_pdf_name(base_path, interpreted_data, suffix, use_group)
+    with PdfPages(pdf_name) as output_pdf:
+        with tb.open_file(interpreted_data, mode='r') as in_file_h5:
+            base_group = get_base_group(base_path, in_file_h5)
+            plot_data_delegate(base_group.total_cap.measurements, get_analysis_group(base_group.total_cap, **kwargs),
+                               output_pdf, **kwargs)
+
+
+def plot_inter_pix_data(interpreted_data, base_path=None, suffix="general_inter_pix_data", use_group=False, **kwargs):
+    """
+    plot_data
+
+    Helper function to graphical present/plot the analysis results of a inter-pixel capacitance scan.
+    The plotting is only performed for the pixels which contribute a usable capacitance measurement.
+    In Addition to the fits for estimating the capacitance also the capacitance distribution and frequency is plotted.
+    The name of the resulting pdf is derived from the file name with the measurement data.
+
+    Besides the naming it is not just plotting but also a bit of analysis as the distribution of the capacitances
+    over the pixel and in general for all three currents is investigated, as well.
+    The current-frequency dependency will plotted for each scanned pixel with finite currents.
+    Also the capacitance distribution over the whole sensor and the frequency of capacitance values are plotted for all
+    three current measurements. Besides the naming of the plots the capacitance are not directly the inter-pixel or
+    total-pixel capacitance values.
+
+    The modelling process is automatically corrected to use the bare capacitance if corrected capacitance values are
+    supplied. If the correction is not applied by the functions from the analysis module then this may not work.
 
     :param interpreted_data: path to the hdf file which holds the raw data and the analysis results.
     :param base_path: path to the base group in the hdf files hierarchy.
@@ -82,46 +127,12 @@ def plot_data(interpreted_data, base_path=None, suffix="general_data", use_group
     :param hist_bins: integer, number of bins to use for the histogram.
     :param mask_pixel: iterable of pixel positions on the grid to ignore for evaluations.
     :param extract_pixel: iterable of pixel positions on the grid to extract the figures from.
-    :param use_corrected: boolean, False, indicating whether to use the corrected capacitances for plotting.
     """
     # determine the pdf file
     pdf_name = get_pdf_name(base_path, interpreted_data, suffix, use_group)
     with PdfPages(pdf_name) as output_pdf:
         with tb.open_file(interpreted_data, mode='r') as in_file_h5:
-            if base_path is None:
-                base_group = in_file_h5.root
-            else:
-                base_group = walk_to_node(in_file_h5.root, base_path)
-            # actual plotting.
-            # FIXME: the simple replacement of the analysis group will break the plotting of the model function!
-            plot_data_delegate(base_group.total_cap.measurements, get_analysis_group(base_group.total_cap, **kwargs),
-                               output_pdf, **kwargs)
-
-
-def plot_inter_pix_data(interpreted_data, base_path=None, suffix="general_inter_pix_data", use_group=False, **kwargs):
-    """
-    plot_data
-    FIXME: update the docstring.
-    Helper function to graphical present/plot the analysis results of a simple pixel capacitance scan.
-    The plotting is only performed for the pixels which contribute a usable capacitance measurement.
-    In Addition to the fits for estimating the capacitance also the capacitance distribution and frequency is plotted.
-    The name of the resulting pdf is derived from the file name with the measurement data.
-
-    :param interpreted_data: path to the hdf file which holds the raw data and the analysis results.
-    :param base_path: path to the base group in the hdf files hierarchy.
-    :param suffix: additonal suffix to use for naming the pdf containing the plots.
-    :param use_group: boolean, whether to append the group name of the measurements to the pdf name.
-    """
-    # determine the pdf file
-    pdf_name = get_pdf_name(base_path, interpreted_data, suffix, use_group)
-    with PdfPages(pdf_name) as output_pdf:
-        with tb.open_file(interpreted_data, mode='r') as in_file_h5:
-            if base_path is None:
-                base_group = in_file_h5.root
-            else:
-                base_group = walk_to_node(in_file_h5.root, base_path)
-            # actual plotting.
-            # FIXME: the simple replacement of the analysis group will break the plotting of the model function
+            base_group = get_base_group(base_path, in_file_h5)
             plot_inter_pix_data_delegate(base_group.inter_cap.measurements,
                                          get_analysis_group(base_group.inter_cap, **kwargs), output_pdf,
                                          **kwargs)
@@ -132,6 +143,7 @@ def plot_bias_data(interpreted_data, base_path=None, suffix="bias_curve", use_gr
     plot_bias_data
 
     Plot the data acquired for the pixel-diodes I-V characterization.
+
     :param interpreted_data: path to the hdf file which holds the raw data.
     :param base_path: path within the files hierarchy for the base group.
     :param suffix: additonal suffix to use for naming the pdf containing the plots.
@@ -140,10 +152,7 @@ def plot_bias_data(interpreted_data, base_path=None, suffix="bias_curve", use_gr
     pdf_name = get_pdf_name(base_path, interpreted_data, suffix, use_group)
     with PdfPages(pdf_name) as output_pdf:
         with tb.open_file(interpreted_data, mode='r') as in_file_h5:
-            if base_path is None:
-                base_group = in_file_h5.root
-            else:
-                base_group = walk_to_node(in_file_h5.root, base_path)
+            base_group = get_base_group(base_path, in_file_h5)
             plot_bias_delegate(base_group.biasing.measurements, output_pdf)
 
 
@@ -171,22 +180,16 @@ def plot_cv_data(interpreted_data, base_path=None, first_upper=None, first_lower
     pdf_name = get_pdf_name(base_path, interpreted_data, suffix, use_group)
     with PdfPages(pdf_name) as output_pdf:
         with tb.open_file(interpreted_data, mode='r') as in_file_h5:
-            if base_path is None:
-                base_group = in_file_h5.root
-            else:
-                base_group = walk_to_node(in_file_h5.root, base_path)
-
+            base_group = get_base_group(base_path, in_file_h5)
             plot_cv_data_delegate(base_group.biasing.measurements,
                                   get_analysis_group(base_group.biasing, **kwargs), output_pdf,
-                                  first_upper, first_lower, second_upper, second_lower)
+                                  first_upper, first_lower, second_upper, second_lower, apply_doping=kwargs.get('apply_doping', False))
 
 
 def plot_combined_data(interpreted_data, base_path=None, first_upper=None, first_lower=None, second_upper=None,
                        second_lower=None, suffix="combined_bias_cv_curve", use_group=False, **kwargs):
     """
     plot_combined_data
-
-    FIXME: update the docstring
 
     Plot the data acquired for the pixel-diodes I-V characterization and the C-V characterization of the pixels.
     Plot the results of the C-V characterization of the scanned pixels.
@@ -204,17 +207,16 @@ def plot_combined_data(interpreted_data, base_path=None, first_upper=None, first
     :param suffix: additonal suffix to use for naming the pdf containing the plots.
     :param use_group: boolean, whether to append the group name of the measurements to the pdf name.
     """
+    if kwargs.get("use_corrected", False):
+        suffix = "{}_corrected".format(suffix)
     pdf_name = get_pdf_name(base_path, interpreted_data, suffix, use_group)
     with PdfPages(pdf_name) as output_pdf:
         # with PdfPages(interpreted_data[:-3] + '.pdf') as output_pdf:
         with tb.open_file(interpreted_data, mode='r') as in_file_h5:
-            if base_path is None:
-                base_group = in_file_h5.root
-            else:
-                base_group = walk_to_node(in_file_h5.root, base_path)
+            base_group = get_base_group(base_path, in_file_h5)
             plot_bias_delegate(base_group.biasing.measurements, output_pdf)
             plot_cv_data_delegate(base_group.biasing.measurements, get_analysis_group(base_group.biasing, **kwargs),
-                                  output_pdf, first_upper, first_lower, second_upper, second_lower)
+                                  output_pdf, first_upper, first_lower, second_upper, second_lower, apply_doping=kwargs.get("apply_doping", False))
 
 
 def plot_bias_delegate(data_group, output_pdf: PdfPages):
@@ -222,6 +224,8 @@ def plot_bias_delegate(data_group, output_pdf: PdfPages):
     plot_bias_delegate
 
     Actual implementation for presenting the results of the I-V characterization.
+    It's just a simple plot with error bars for the different quantities.
+
     :param data_group: hdf file's hierarchy group containing the raw data.
     :param output_pdf: pdf object to write the plots to.
     """
@@ -233,23 +237,24 @@ def plot_bias_delegate(data_group, output_pdf: PdfPages):
     if not np.all(np.isfinite(voltage_data)):
         current_errors = None
     fig, ax = plt.subplots()
-    ax.set(title="Bias data from the measurement", xlabel="U in V", ylabel="I in A")
-    ax.errorbar(voltage_data, current_data, yerr=current_errors, fmt='o', label="Bias data")
+    ax.set(title="Bias data from the measurement", xlabel=BIAS_CURVE_X_LABEL, ylabel=BIAS_CURVE_Y_LABEL)
+    ax.errorbar(voltage_data, current_data * CURRENT_CONVERSION_FACTOR,
+                yerr=current_errors, xerr=None, fmt='o', label="Bias data")
     output_pdf.savefig(fig, bbox_inches='tight')
     plt.close(fig)
 
 
 def plot_cv_data_delegate(data_group, analysis_group, output_pdf, first_upper=None, first_lower=None, second_upper=None,
-                          second_lower=None):
+                          second_lower=None, apply_doping=False):
     """
     plot_cv_data_delegate
 
-    Actual implementation for presenting the results of the C-V characterization and if necessary the determination of the full depletion voltage.
-    For each with an successful capacitance measurement for each bias voltage in use the C-V-curve will be plotted.
-    If necessary, meaning if the bounaries for the two fit ranges for the two physically distinc regions of the c-v-curve are provided the
-    full depletion voltage will be calculated and the necessary fits be plotted.
-    If the analysis results provided already contain the necessary data sets for the estimation of the full depletion voltage,
-    these will be used and the fit will be plotted, as well.
+    Actual implementation for presenting the results of the C-V characterization and if necessary the determination of
+    the full depletion voltage. For each with an successful capacitance measurement for each bias voltage in use
+    the C-V-curve will be plotted. If necessary, meaning if the bounaries for the two fit ranges for the
+    two physically distinct regions of the c-v-curve are provided the full depletion voltage will be calculated and
+    the necessary fits be plotted. If the analysis results provided already contain the necessary data sets for the
+    estimation of the full depletion voltage, these will be used and the fit will be plotted, as well.
 
     :param data_group: hdf files hierarchy group containing the raw measurement data.
     :param analysis_group: hdf files hierarchy group containing the analysis results.
@@ -258,6 +263,7 @@ def plot_cv_data_delegate(data_group, analysis_group, output_pdf, first_upper=No
     :param first_lower: lower limit of the first fit range
     :param second_upper: upper limit of the second fit range
     :param second_lower: lower limit of the second fit range
+    :param apply_doping: boolean, False, indicates whether to plot the depletiond data
     """
     # extract the bias data
     voltage_data = check_leaf_unit(data_group.BiasVoltageHist, HIST_BIAS_MEAS_UNIT)
@@ -336,16 +342,17 @@ def plot_cv_data_delegate(data_group, analysis_group, output_pdf, first_upper=No
             approx_depletion = True
             first_dep_parameters = analysis_group.DepFitParamHist[ii, jj, :2]
             second_dep_parameters = analysis_group.DepFitParamHist[ii, jj, 2:]
+            dep_voltage = analysis_group.DepletionHist[ii, jj]
         else:
             approx_depletion = False
             first_dep_parameters = None
             second_dep_parameters = None
+            dep_voltage = 0
 
         fig, ax = plt.subplots(ncols=2, figsize=(20, 10))
         if approx_depletion:
-            # TODO: adjust the plotting ranges such that the intersection is clearly visible.
-            first_voltage_x = np.linspace(first_lower, 0, 1000)
-            second_voltage_x = np.linspace(second_lower, second_upper, 100)
+            first_voltage_x = np.linspace(first_lower, - dep_voltage / 1.1, 1000)
+            second_voltage_x = np.linspace(np.where(-dep_voltage < second_lower, -dep_voltage, second_lower) * 1.1, second_upper, 100)
             first_cap_calc = first_dep_parameters[0] * first_voltage_x + first_dep_parameters[1]
             second_cap_calc = second_dep_parameters[0] * second_voltage_x + second_dep_parameters[1]
             ax[1].plot(first_voltage_x, first_cap_calc, '-', label="First section fit")
@@ -354,17 +361,27 @@ def plot_cv_data_delegate(data_group, analysis_group, output_pdf, first_upper=No
         effective_capacitance_error_data = np.reciprocal(cap_data[ii, jj, :] * CAPACITANCE_CONVERSION_FACTOR) ** 3 * cap_errors[
             ii, jj, :] if np.all(np.isfinite(cap_errors[ii, jj, :])) else None
         eff_cap_errors = cap_errors[ii, jj, :] if np.all(np.isfinite(cap_errors[ii, jj, :])) else None
-        # TODO: Refactor this format strings
-        ax[0].set(title=f"Bias data from the \nmeasurement for pixel ({ii},{jj})", xlabel="U in V", ylabel="C in fF")
-        ax[0].errorbar(voltage_data, cap_data[ii, jj, :] * CAPACITANCE_CONVERSION_FACTOR, yerr=eff_cap_errors, fmt='o', label="Bias data")
-        ax[1].set(title=f"Suited Bias data from the \nmeasurement for pixel ({ii},{jj})", xlabel="U in V",
-                  ylabel="1/ C^2 in 1/(fF)^2")
-        ax[1].errorbar(voltage_data, 1 / (cap_data[ii, jj, :] * CAPACITANCE_CONVERSION_FACTOR) ** 2, yerr=effective_capacitance_error_data,
+        ax[0].set(title="Bias data from the \nmeasurement for pixel ({col},{row})".format(col=ii, row=jj),
+                  xlabel=BIAS_CURVE_X_LABEL, ylabel="C in fF")
+        ax[0].errorbar(voltage_data, cap_data[ii, jj, :] * CAPACITANCE_CONVERSION_FACTOR, yerr=eff_cap_errors,
                        fmt='o', label="Bias data")
+        ax[1].set(title="Suited Bias data from the \nmeasurement for pixel ({col},{row})".format(col=ii, row=jj),
+                  xlabel=BIAS_CURVE_X_LABEL, ylabel="$1/ C^2$ in $1/(fF)^2$")
+        ax[1].errorbar(voltage_data, 1 / (cap_data[ii, jj, :] * CAPACITANCE_CONVERSION_FACTOR) ** 2,
+                       yerr=effective_capacitance_error_data, fmt='o', label="Bias data", alpha=0.5)
         ax[0].legend()
         ax[1].legend()
         output_pdf.savefig(fig, bbox_inches='tight')
         plt.close(fig)
+
+        if apply_doping:
+            depletion_width_plate = check_leaf_unit(analysis_group.DepletionWidth, "um")
+            depletion_width_plate_error = check_leaf_unit(analysis_group.DepletionWidthErr, "um")
+            effective_doping_table = check_leaf_unit(analysis_group.DepletionEffDoping, "cm^-3")
+            bias_voltages = check_leaf_unit(data_group.BiasVoltageHist, HIST_BIAS_MEAS_UNIT)
+            table = analysis_group.DepletionParamTable
+            plot_depletion_pixel_delegate(bias_voltages, ii, depletion_width_plate, depletion_width_plate_error,
+                                          effective_doping_table, output_pdf, jj, table)
 
     # for k, bias_voltage in enumerate(voltage_data):
     #     fig, ax = plt.subplots()
@@ -378,11 +395,11 @@ def plot_data_delegate(data_group: tb.Group, analysis_group: tb.Group, output_pd
     """
     plot_data_delegate
 
-    Actual implementation to plot the results of the analysis of simple pixel capacitance scan.
-    Besides the naming it is not just plotting but also a bit of analysis as the distribution of the capacitances is investigated
-    in this function.
-    The current-frequency dependendy will plotted for each scanned pixel with finite currents.
-    Also the capacitance distribution over the whole sensor and the frequency of capacitance values are plotted.
+    Actual implementation to plot the results of the analysis of simple pixel capacitance scan (total capacitance).
+    Besides the naming it is not just plotting but also a bit of analysis as the distribution of the capacitances is
+    investigated in this function. The current-frequency dependency will be plotted for each scanned pixel with finite
+    currents. Also the capacitance distribution over the whole sensor and the frequency of capacitance values are
+    plotted.
 
     :param data_group: hdf files hierarchy group containing the raw measurement data.
     :param analysis_group: hdf files hierarchy group containing the analysis results.
@@ -390,7 +407,7 @@ def plot_data_delegate(data_group: tb.Group, analysis_group: tb.Group, output_pd
     :param exclude_test_cap: boolean, whether to exclude the test capacitator row from the histograms.
     :param hist_bins: integer, number of bins to use for the histogram.
     :param mask_pixel: iterable of pixel positions on the grid to ignore for evaluations.
-    :param extract_pixel: iterable of pixel positions on the grid to extract the figures from. TODO: implement this!
+    :param extract_pixel: iterable of pixel positions on the grid to extract the figures from.
     """
     # Read pixel map
     current_hist = check_leaf_unit(data_group.HistCurr, HIST_CURRENT_MEAS_UNIT)
@@ -445,8 +462,8 @@ def plot_data_delegate(data_group: tb.Group, analysis_group: tb.Group, output_pd
             # res = np.polyfit(scan_parameters['frequency'], current_hist[col, row] * 1e9, deg=1, cov=True)
             f = np.arange(0, scan_parameters['frequency'].max() * 1.1, 0.1)
             actual_cap = cap_hist[col, row] * CAPACITANCE_CONVERSION_FACTOR
-            # FIXME: this will break when supplying the corrected capacitance values analysis group!
-            plot_current_model(ax, col, row, analysis_group, actual_cap, leak_hist, f)
+            plot_current_model(ax, col, row, analysis_group, actual_cap, leak_hist, f,
+                               parasitic_correction=extract_parasitic_capacitance(analysis_group.HistCap))
             plot_current_data(ax, col, row, scan_parameters, current_hist, current_err_hist, marker='o', ls='')
             ax.set_ylabel(CURRENT_LABEL)
             ax.set_xlabel(FREQUENCY_LABEL)
@@ -474,12 +491,18 @@ def plot_data_delegate(data_group: tb.Group, analysis_group: tb.Group, output_pd
 def plot_inter_pix_data_delegate(data_group: tb.Group, analysis_group: tb.Group, output_pdf: PdfPages, **kwargs):
     """
     plot_inter_pix_data_delegate
-    TODO: this doc string is false.
-    Actual implementation to plot the results of the analysis of simple pixel capacitance scan.
-    Besides the naming it is not just plotting but also a bit of analysis as the distribution of the capacitances is investigated
-    in this function.
-    The current-frequency dependendy will plotted for each scanned pixel with finite currents.
-    Also the capacitance distribution over the whole sensor and the frequency of capacitance values are plotted.
+
+    Actual implementation to plot the results of the analysis of the inter-pixel capacitance scan.
+    Besides the naming it is not just plotting but also a bit of analysis as the distribution of the capacitances
+    over the pixel and in general for all three currents is investigated, as well.
+    The current-frequency dependency will plotted for each scanned pixel with finite currents.
+    Also the capacitance distribution over the whole sensor and the frequency of capacitance values are plotted for all
+    three current measurements. Besides the naming of the plots the capacitance are not directly the inter-pixel or
+    total-pixel capacitance values.
+
+    The modelling process is automatically corrected to use the bare capacitance if corrected capacitance values are
+    supplied. If the correction is not applied by the functions from the analysis module then this may not work.
+
 
     :param data_group: hdf files hierarchy group containing the raw measurement data.
     :param analysis_group: hdf files hierarchy group containing the analysis results.
@@ -487,7 +510,7 @@ def plot_inter_pix_data_delegate(data_group: tb.Group, analysis_group: tb.Group,
     :param exclude_test_cap: boolean, whether to exclude the test capacitator row from the histograms.
     :param hist_bins: integer, number of bins to use for the histogram.
     :param mask_pixel: iterable of pixel positions on the grid to ignore for evaluations.
-    :param extract_pixel: iterable of pixel positions on the grid to extract the figures from. TODO: implement this!
+    :param extract_pixel: iterable of pixel positions on the grid to extract the figures from.
     """
     # Read pixel map
     total_current_hist = check_leaf_unit(data_group.TotalHistCurr, HIST_CURRENT_MEAS_UNIT)
@@ -612,20 +635,22 @@ def plot_inter_pix_data_delegate(data_group: tb.Group, analysis_group: tb.Group,
             ax = fig.add_subplot(111)
             f = np.arange(0, scan_parameters['frequency'].max() * 1.1, 0.1)
             actual_cap = total_cap_hist[col, row] * CAPACITANCE_CONVERSION_FACTOR
-            # FIXME: these will break when supplying the correct capacitance values analysis group.
-            plot_current_model(ax, col, row, analysis_group, actual_cap, total_leak_hist, f, prefix="Total ")
+            plot_current_model(ax, col, row, analysis_group, actual_cap, total_leak_hist, f, prefix="Total ",
+                               parasitic_correction=extract_parasitic_capacitance(analysis_group.HistCap))
             plot_current_data(ax, col, row, scan_parameters, total_current_hist, total_current_err_hist,
                               prefix="Total current for ", marker='o', ls='')
             if np.isfinite(inter_a_current_hist[col, row, 0]):
                 plot_current_model(ax, col, row, analysis_group,
                                    inter_a_cap_hist[col, row] * CAPACITANCE_CONVERSION_FACTOR, inter_a_leak_hist, f,
-                                   resistor_name="HistResInterA", prefix="Inter A ", ls='-.')
+                                   resistor_name="HistResInterA", prefix="Inter A ", ls='-.',
+                                   parasitic_correction=extract_parasitic_capacitance(analysis_group.HistCapInterA))
                 plot_current_data(ax, col, row, scan_parameters, inter_a_current_hist, inter_a_current_err_hist,
                                   prefix="Inter A current for", marker='v')
             if np.isfinite(inter_b_current_hist[col, row, 0]):
                 plot_current_model(ax, col, row, analysis_group,
                                    inter_b_cap_hist[col, row] * CAPACITANCE_CONVERSION_FACTOR, inter_b_leak_hist, f,
-                                   resistor_name="HistResInterB", prefix="Inter B ", ls=':')
+                                   resistor_name="HistResInterB", prefix="Inter B ", ls=':',
+                                   parasitic_correction=extract_parasitic_capacitance(analysis_group.HistCapInterB))
                 plot_current_data(ax, col, row, scan_parameters, inter_b_current_hist, inter_b_current_err_hist,
                                   prefix="Inter B current for", marker='s')
             ax.set_ylabel(CURRENT_LABEL)
@@ -639,6 +664,26 @@ def plot_inter_pix_data_delegate(data_group: tb.Group, analysis_group: tb.Group,
 
 def plot_current_data(ax: Axes, col, row, scan_parameters, current_hist, current_err_hist, color=0.2, prefix="",
                       **plot_args):
+    """
+    plot_current_data
+
+    Helper function to plot the measured current data (used for determining the pixel capacitance).
+    It will decide on it's own whether to use a errorbar plot or not.
+    The decision will depend on whether uncertainty data for the currents is present or not.
+
+    Parameters
+    ----------------------
+    :param ax: axes object to plot the model to
+    :param col: column coordinate of the pixel for which to plot the model
+    :param row: row coordinate of the pixel for which to plot the model
+    :param scan_parameters: table of the scan parameters used for measuring and investigating the pixels capacitance.
+    :param current_hist: table/data set with the current measurements used.
+    :param current_err_hist: table/data set of the uncertainties of the used current measurements.
+    :param color: color code for the data points to be plotted.
+    :param prefix: prefix for the plots legends to distinguish them from other kinds of current-frequency plots.
+    :param plot_args: further arguments directly provided to the fit object.
+    """
+    assert "parasitic_correction" not in plot_args
     plot_args.setdefault('marker', 'o')
     plot_args.setdefault('ls', '')
     assert "prefix" not in plot_args
@@ -659,6 +704,28 @@ def plot_current_data(ax: Axes, col, row, scan_parameters, current_hist, current
 
 def plot_current_model(ax: Axes, col, row, analysis_group: Group, actual_cap: Any, total_leak_hist, f: np.ndarray,
                        resistor_name="HistRes", prefix="", color=0.6, **plot_args):
+    """
+        plot_current_model
+
+        Helper function to plot the current model from the specified parameters.
+        It will decide on execution whether the complete advanced model has to be used depending on whether on-resistance
+        estimators are present.
+
+        :param ax: axes object to plot the model to
+        :param col: column coordinate of the pixel for which to plot the model
+        :param row: row coordinate of the pixel for which to plot the model
+        :param analysis_group: Group containing the analysis data
+        :param actual_cap: Actual capacitance (correction may already be applied)
+        :param total_leak_hist: table with estimators for the detector/dut leakage current form CBCM method.
+        :param f: Frequency (MHz) to use for the model functions plot.
+        :param resistor_name: Name of resistance estimator to use for the model functions plot.
+        :param color: color code to use for plotted model.
+        :param prefix: prefix for title and legend to use.
+        :param parasitic_correction: if present, it should be the capacitance subtracted during capacitacne correction
+            procedure.
+        """
+    parasitic_correction = plot_args.pop('parasitic_correction', 0.0)
+    assert "parasitic_correction" not in plot_args
     plot_args.setdefault('marker', '')
     plot_args.setdefault('ls', '--')
     assert 'prefix' not in plot_args
@@ -666,18 +733,29 @@ def plot_current_model(ax: Axes, col, row, analysis_group: Group, actual_cap: An
         hist_resistance = analysis_group[resistor_name]
         from analysis_util.physics_modelling import full_capacitance_model
         assert isinstance(hist_resistance, tb.Array) or isinstance(hist_resistance,np.ndarray)
-        ax.plot(f, full_capacitance_model(f, c=actual_cap * ADVANCED_CAPACITANCE_CONVERSION_FACTOR,
-                                          r=hist_resistance[col, row],
-                                          i=total_leak_hist[col, row] * 1.e-9, u0=1) * 1e9,
+        ax.plot(f,
+            full_capacitance_model(f, c=(actual_cap + parasitic_correction) * ADVANCED_CAPACITANCE_CONVERSION_FACTOR,
+                                      r=hist_resistance[col, row],
+                                      i=total_leak_hist[col, row] * 1.e-9, u0=1) * 1e9,
                 color=cmap(color),
                 label=SIMPLE_CAP_LABEL_PERCENT_FORMAT % (prefix, actual_cap), **plot_args)
     else:
-        ax.plot(f, actual_cap * f + total_leak_hist[col, row],
+        ax.plot(f, (actual_cap + parasitic_correction) * f + total_leak_hist[col, row],
                 color=cmap(color),
                 label=SIMPLE_CAP_LABEL_PERCENT_FORMAT % (prefix, actual_cap), **plot_args)
 
 
-def plot_compare_delegate(first_group: GroupType, second_group: GroupType, output_pdf: PdfPages, **kwargs):
+def plot_compare_delegate(first_group: GroupType, second_group: GroupType, output_pdf: PdfPages):
+    """
+    plot_compare_delegate
+
+    Actual implementation of the comparison of two pixel capacitance measurements.
+
+    :param first_group: group containing the capacitance data of the first measurement to compare.
+    :param second_group: group containing the capacitance data of the second measurement to compare.
+    :param output_pdf: pdf file to write the figures to for long-term storage
+    """
+    # extract the data
     first_cap_hist = first_group.HistCurr[:]
     second_cap_hist = second_group.HistCurr[:]
     first_nan_mask = np.isfinite(first_cap_hist)
@@ -685,18 +763,83 @@ def plot_compare_delegate(first_group: GroupType, second_group: GroupType, outpu
     full_mask = np.logical_and(first_nan_mask, second_nan_mask)
     diff_cap_hist = np.where(full_mask, first_cap_hist - second_cap_hist, np.nan)
 
+    # create the figure
     fig = Figure()
     _ = FigureCanvas(fig)
     ax = fig.add_subplot(111)
-
     im = ax.imshow(diff_cap_hist * CAPACITANCE_CONVERSION_FACTOR,)
-
     divider = make_axes_locatable(ax)
     cax = divider.append_axes('right', size='5%', pad=0.05)
     fig.colorbar(im, cax=cax, label=HIST_PIX_CAP_LABEL)
     ax.set_ylabel(COLUMN_LABEL)
     ax.set_xlabel(ROW_LABEL)
     output_pdf.savefig(fig, bbox_inches='tight')
+
+def plot_depletion_delegate(data_group: GroupType, analysis_group: GroupType, output_pdf: PdfPages):
+    """
+    plot_depletion_delegate
+
+    Actual implementation of the depletion investigation plotting.
+    This function will plot the depletion profile and the doping profile which was extracted from the
+    C-V characterization previously.
+
+    :param data_group: hdf files group where to find the measurement data
+    :param analysis_group: hdf files group where to find the analysis results
+    :param output_pdf: pdf file to write the figures to for long-term storage
+    """
+    assert isinstance(analysis_group, tb.Group)
+    # extract the depletion parameters
+    depletion_width_plate = check_leaf_unit(analysis_group.DepletionWidth, "um")
+    depletion_width_plate_error = check_leaf_unit(analysis_group.DepletionWidthErr, "um")
+    effective_doping_table = check_leaf_unit(analysis_group.DepletionEffDoping, "cm^-3")
+    bias_voltages = check_leaf_unit(data_group.BiasVoltageHist, HIST_BIAS_MEAS_UNIT)
+    table = analysis_group.DepletionParamTable
+
+    for col, row in np.ndindex(GENERAL_PIXCAP_SHAPE):
+        plot_depletion_pixel_delegate(bias_voltages, col, depletion_width_plate, depletion_width_plate_error,
+                                      effective_doping_table, output_pdf, row, table)
+
+
+def plot_depletion_pixel_delegate(bias_voltages: TABLES_LEAF_COMPAT_TYPE, i_col,
+                                  depletion_width_plate: TABLES_LEAF_COMPAT_TYPE,
+                                  depletion_width_plate_error: TABLES_LEAF_COMPAT_TYPE,
+                                  effective_doping_table: TABLES_LEAF_COMPAT_TYPE, output_pdf: PdfPages, i_row, table):
+    if np.all(np.isfinite(depletion_width_plate[i_col, i_row])):
+        condition = """(row == {}) & (col == {})""".format(i_row, i_col)
+        for x in table.where(condition):
+            depletion_fit_propagate_parameters = {
+                "NA": x["NA"],
+                "ND": x["ND"],
+                "V": x["V"],
+            }
+            break
+        NA = depletion_fit_propagate_parameters["NA"]
+        ND = depletion_fit_propagate_parameters["ND"]
+        Neff = effective_doping_table[i_col, i_row]
+        fig, ax = plt.subplots(2)
+        if np.all(np.isfinite(depletion_width_plate_error[i_col, i_row])):
+            ax[0].errorbar(bias_voltages, depletion_width_plate[i_col, i_row],
+                           yerr=depletion_width_plate_error[i_col, i_row], label='d-measurement')
+        else:
+            ax[0].plot(bias_voltages, depletion_width_plate, label='d-measurement')
+
+        sample_voltage = -1 * np.linspace(np.min(-bias_voltages), np.max(-bias_voltages) * 1.1, 1000)
+        ax[0].plot(-sample_voltage, model_depletion(sample_voltage, **depletion_fit_propagate_parameters),
+                   label=f'd-theory,NA={NA},ND={ND}')
+        ax[0].set_xlabel('Bias Voltage [V]')
+        ax[0].set_ylabel('Depletion Width [µm]')
+        ax[0].set_title(f"Analysis of the depletion width for pixel ({i_col}, {i_row}).")
+        ax[0].grid(True)
+        ax[0].legend()
+        ax[1].plot(-bias_voltages, Neff)
+        ax[1].set_xlabel('Bias Voltage [V]')
+        ax[1].set_ylabel('Effective doping concentration [cm-3]')
+        ax[1].set_title("Analysis of the effective doping for pixel ({col}, {row}).")
+        ax[1].grid(True)
+        # assert isinstance(ax[1], plt.Axes)
+        ax[1].set_yscale('log')
+        # ax[1].yscale('log')
+        output_pdf.savefig(fig, bbox_inches='tight')
 
 
 if __name__ == '__main__':

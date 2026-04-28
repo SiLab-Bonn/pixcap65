@@ -1,11 +1,11 @@
 import contextlib
 import logging
-import sys
-from time import sleep
 from typing import Union, Tuple
 
 import numpy as np
+import sys
 import tables as tb
+from time import sleep
 from tqdm.contrib import DummyTqdmFile
 
 GroupType = Union[tb.Group, tb.Node, tb.Leaf]
@@ -21,6 +21,7 @@ def walk_to_node(parent: GroupType, path: str, create=False, verify_create=False
             already_exits = False
             result = parent._v_file.create_group(where=result, name=element)
         else:
+            print(parent._v_file)
             raise AssertionError("The requested path does not exist and creating the path is disabled.")
     if verify_create:
         return result, not already_exits
@@ -85,3 +86,6 @@ def create_update_array(h5, where: tb.Group, name: str, *args, **kwargs):
 
         logger.warning(f"Failed to create or update the array {name}")
         return None
+
+
+UNITS_ATTRIBUTE_KEY = "Units"

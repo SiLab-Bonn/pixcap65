@@ -13,3 +13,5 @@ pyserial
 
 -r gui_requirements.txt
 -r advanced_requirements.txt
+
+jacobi
