@@ -220,7 +220,7 @@ registers:
 
   - name: VM1
     type: FunctionalRegister
-    hw_driver: SMU_Device
+    hw_driver: BIAS_SMU
     arg_add: {  }
 
   - name: VM2
