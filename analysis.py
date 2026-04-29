@@ -13,9 +13,9 @@ from analysis_util.physics_modelling import SILICON_V_BIAS, depletion_model, mod
 from analysis_util.utility import check_leaf_unit, str_join, ANALYSIS_CORRECTED_GROUP_NAME, ANALYSIS_GROUP_NAME, \
     GENERAL_PIXCAP_SHAPE, GLOBAL_FILTERS, DepletionData, handle_kafe2_advanced_options, handle_minuit_advanced_options, \
     PARASITIC_SUBTRACTION, get_base_group, handle_analysis_mix_up, HIST_CAP_UNIT, HIST_CURRENT_MEAS_UNIT, \
-    HIST_BIAS_MEAS_UNIT, get_analysis_group, investigate_fit_convergence
+    HIST_BIAS_MEAS_UNIT, get_analysis_group, investigate_fit_convergence, TABLES_LEAF_COMPAT_TYPE
 from plotting import CAPACITANCE_CONVERSION_FACTOR
-from utility.utils_2 import walk_to_node, GroupType
+from utility.utils_2 import walk_to_node, GroupType, create_carray
 
 UNITS_ATTRIBUTE_KEY = "Units"
 
@@ -142,27 +142,27 @@ def analyze_data(raw_data, base_path=None, is_advanced=False, is_cv=False,
     :param is_inter_pixel: boolean, False, indicating whether the measurement to be analysed is a inter-pixel
         capacitance measurement. In this case more fits will be applied, adjusted to the specific structure of this
         problem
-    :param use_kafe2: boolean, indicates whether kafe2 is used for the fit. (Only used for the advanced procedure)
-    :param plot: boolean, indicates whether to plot the data. A output pdf object could be submitted here
+    :key use_kafe2: boolean, indicates whether kafe2 is used for the fit. (Only used for the advanced procedure)
+    :key plot: boolean, indicates whether to plot the data. A output pdf object could be submitted here
          instead of an explicitly created one. (Only used for the advanced procedure)
-    :param apply_contour: boolean, indicates whether to determine the contours and try to plot them.
+    :key apply_contour: boolean, indicates whether to determine the contours and try to plot them.
         (Only used for the advanced procedure)
-    :param full_model: boolean, True, indicates whether the full model for extended frequency range is to be used.
+    :key full_model: boolean, True, indicates whether the full model for extended frequency range is to be used.
         Otherwise, the linear model is used. (Only used for the advanced procedure)
-    :param apply_correction: boolean, False, indicates whether the measured capacitances should be
+    :key apply_correction: boolean, False, indicates whether the measured capacitances should be
         corrected immediately;
         Will require the presence of further arguments as information about the parasitics needs to be submitted.
-    :param use_corrected: boolean, False, indicates whether to use the corrected capacitances for the depletion
+    :key use_corrected: boolean, False, indicates whether to use the corrected capacitances for the depletion
         analysis.
-    :param fit_plot_pdf_name:  Name of the pdf file to save fitting figures from the advanced procedures to.
+    :key fit_plot_pdf_name:  Name of the pdf file to save fitting figures from the advanced procedures to.
         (Only used for the advanced procedure)
-    :param bare_file: hdf file containing the measurements and investigation of a bare pixcap sample to obtain
+    :key bare_file: hdf file containing the measurements and investigation of a bare pixcap sample to obtain
         information about intrinisc and parasitic capacitances. (Only required for the correction procedure, but in
         this case it must be present)
-    :param bare_hdf_path: hdf files hierarchy path to the group containing the bare pixcap analysis with the information
+    :key bare_hdf_path: hdf files hierarchy path to the group containing the bare pixcap analysis with the information
         about the parasitic after investigating the capacitance distribution. (Only required for
         the correction procedure, but in this case it must be present)
-    :param chip_group_name: HDF files hierarchy group with the data/specifications of the pixels on the current sensor.
+    :key chip_group_name: HDF files hierarchy group with the data/specifications of the pixels on the current sensor.
         (Will only be usd if the depletion behaviour is investigated)
     """
     # handle the additonal pdf file in case of plotting enabled
@@ -231,40 +231,37 @@ def analyze_data(raw_data, base_path=None, is_advanced=False, is_cv=False,
                     cv_data_corrected[:, :, k] = cap_data[:, :]
                     cv_err_data_corrected[:, :, k] = cap_error_data[:, :]
 
-            temp_array = in_file_h5.create_carray(base_group.biasing.analysis, name="UCHist",
-                                                  title="Histogram of the U-C-curve",
+            create_carray(in_file_h5, base_group.biasing.analysis, name="UCHist", title="Histogram of the U-C-curve", filters=GLOBAL_FILTERS, obj=cv_data, unit=HIST_CAP_UNIT)
+            create_carray(in_file_h5, base_group.biasing.analysis, name="UCErrHist",
+                                                   title="Error Histogram of the U-C-curve",
                                                   filters=GLOBAL_FILTERS,
-                                                  obj=cv_data)
-            temp_array.attrs["Units"] = HIST_CAP_UNIT
-            temp_array.flush()
-            temp_array = in_file_h5.create_carray(base_group.biasing.analysis, name="UCErrHist",
-                                                  title="Error Histogram of the U-C-curve",
-                                                  filters=GLOBAL_FILTERS,
-                                                  obj=cv_err_data)
-            temp_array.attrs["Units"] = HIST_CAP_UNIT
-            temp_array.flush()
+                                                  obj=cv_err_data,
+                                                    unit=HIST_CAP_UNIT)
 
             # save also the corrected capacitance data if necessary
             if apply_correction_arg:
-                temp_array = in_file_h5.create_carray(base_group.biasing.analysis_correction, name="UCHist",
-                                                      title="Histogram of the U-C-curve",
-                                                      filters=GLOBAL_FILTERS,
-                                                      obj=cv_data)
-                temp_array.attrs["Units"] = HIST_CAP_UNIT
-                temp_array.flush()
-                temp_array = in_file_h5.create_carray(base_group.biasing.analysis_correction, name="UCErrHist",
-                                                      title="Error Histogram of the U-C-curve",
-                                                      filters=GLOBAL_FILTERS,
-                                                      obj=cv_err_data)
-                temp_array.attrs["Units"] = HIST_CAP_UNIT
-                temp_array.flush()
+                create_carray(in_file_h5, base_group.biasing.analysis_correction, name="UCHist",
+                              title="Histogram of the U-C-curve",
+                              filters=GLOBAL_FILTERS,
+                              obj=cv_data, unit=HIST_CAP_UNIT)
+                create_carray(in_file_h5, base_group.biasing.analysis_correction, name="UCErrHist",
+                              title="Error Histogram of the U-C-curve",
+                              filters=GLOBAL_FILTERS,
+                              obj=cv_err_data, unit=HIST_CAP_UNIT)
 
             if first_boundaries is not None and second_boundaries is not None:
+                print("THIS HERE IS THE BOUNDARY TEST EVALUATION SCRIPT")
+                print("We'll need to investigate the keyword arguments provided.")
+                print(kwargs)
                 dep_ana_group = get_analysis_group(base_group.biasing, **kwargs)
+                assert isinstance(dep_ana_group, tb.Group)
+                print(dep_ana_group._v_pathname)
                 chip_name = kwargs.pop("chip_group_name", None)
                 if chip_name is not None:
                     chip_spec_group = walk_to_node(in_file_h5.root, chip_name, create=False)
                     kwargs['chip_group'] = chip_spec_group
+
+                # Anyway it is necessary to perform this analysis also on a sensor-average basis!
                 if kwargs.pop("use_corrected", False):
                     analyze_depletion_delegate(base_group.biasing.measurements,
                                                base_group.biasing.analysis,
@@ -486,6 +483,104 @@ def analysis_data_handle(file: tb.File, data_group: GroupType, result_group: Gro
         assert 'bare_hdf_path' in kwargs
         apply_correction_simple(kwargs['bare_file'], kwargs['bare_hdf_path'], result_group)
 
+class DepletionDataStore:
+    def store_data(self, key, data):
+        pass
+
+    def flush_data(self):
+        pass
+
+class DepletionTableStore(DepletionDataStore):
+    def __init__(self, table: tb.Table):
+        self.table = table
+        self.entry = self.table.row
+
+    def store_data(self, key, data):
+        match (key):
+            case "depletion":
+                self.entry["Ubi"] = data
+            case "depletion_error":
+                self.entry["Ubi_error"] = data
+            case "fit_result_first":
+                self.entry["a"] = data[0]
+                self.entry["b"] = data[1]
+            case "fit_error_first":
+                self.entry["a_error"] = data[1]
+                self.entry["b_error"] = data[2]
+            case "fit_result_second":
+                self.entry["c"] = data[0]
+                self.entry["d"] = data[1]
+            case "fit_error_second":
+                self.entry["c_error"] = data[0]
+                self.entry["d_error"] = data[1]
+            case _:
+                raise ValueError(f"The provided storage key is unknown: {key}")
+
+    def flush_data(self):
+        self.entry.append()
+
+class DepletionArrayStore(DepletionDataStore):
+    def __init__(self):
+        self.depletion_voltage = np.full(shape=GENERAL_PIXCAP_SHAPE, fill_value=np.nan)
+        self.depletion_error = np.full(shape=GENERAL_PIXCAP_SHAPE, fill_value=np.nan)
+        self.fit_parameter_estimators = np.full(shape=(40, 40, 4), fill_value=np.nan)
+        self.fit_parameter_errors = np.full(shape=(40, 40, 4), fill_value=np.nan)
+        self.pixel_row = 1
+        self.pixel_col = 1
+
+    def set_pixel(self, i_row, i_col):
+        self.pixel_row = i_row
+        self.pixel_col = i_col
+
+    def store_data(self, key, data):
+        match (key):
+            case "depletion":
+                self.depletion_voltage[self.pixel_col, self.pixel_row] = data
+            case "depletion_error":
+                self.depletion_error[self.pixel_col, self.pixel_row] = data
+            case "fit_result_first":
+                self.fit_parameter_estimators[self.pixel_col, self.pixel_row, :2] = data
+            case "fit_error_first":
+                self.fit_parameter_errors[self.pixel_col, self.pixel_row, :2] = data
+            case "fit_result_second":
+                self.fit_parameter_estimators[self.pixel_col, self.pixel_row, 2:] = data
+            case "fit_error_second":
+                self.fit_parameter_errors[self.pixel_col, self.pixel_row, 2:] = data
+            case _:
+                raise ValueError(f"The provided storage key is unknown: {key}")
+
+class DopingArrayStore(DepletionDataStore):
+    def __init__(self, doping_shape):
+        self.pixel_row = 1
+        self.pixel_col = 1
+        self.depletion_width_plate = np.full(shape=doping_shape, fill_value=np.nan)
+        self.depletion_width_plate_error = np.full(shape=doping_shape, fill_value=np.nan)
+        self.depletion_fit_parameter_table = np.full((40, 40, 3), fill_value=np.nan)
+        self.depletion_fit_parameter_error_table = np.full((40, 40, 3), fill_value=np.nan)
+        self.depletion_fit_covariance_table = np.full((40, 40, 3, 3), fill_value=np.nan)
+        self.effective_doping_table = np.full(shape=doping_shape, fill_value=np.nan)
+
+    def set_pixel(self, i_row, i_col):
+        self.pixel_row = i_row
+        self.pixel_col = i_col
+
+    def store_data(self, key, data):
+        match (key):
+            case "width":
+                self.depletion_width_plate[self.pixel_col, self.pixel_row] = data
+            case "width_error":
+                self.depletion_width_plate_error[self.pixel_col, self.pixel_row] = data
+            case "fit_parameters":
+                self.depletion_fit_parameter_table[self.pixel_col, self.pixel_row] = data
+            case "fit_parameters_error":
+                self.depletion_fit_parameter_error_table[self.pixel_col, self.pixel_row] = data
+            case "fit_covariance":
+                self.depletion_fit_covariance_table[self.pixel_col, self.pixel_row] = data
+            case "doping":
+                self.effective_doping_table[self.pixel_col, self.pixel_row] = data
+            case _:
+                raise ValueError(f"Unknown data storage key {key}")
+
 
 def analyze_depletion_delegate(data_group: GroupType, analysis_group: GroupType, first_boundaries: Optional[Tuple],
                                second_boundaries: Optional[Tuple], chip_group: GroupType = None, apply_doping=False,
@@ -540,10 +635,7 @@ def analyze_depletion_delegate(data_group: GroupType, analysis_group: GroupType,
     voltage_data = check_leaf_unit(data_group.BiasVoltageHist, HIST_BIAS_MEAS_UNIT)
     first_lower, first_upper = first_boundaries
     second_lower, second_upper = second_boundaries
-    depletion_voltage = np.full(shape=GENERAL_PIXCAP_SHAPE, fill_value=np.nan)
-    depletion_error = np.full(shape=GENERAL_PIXCAP_SHAPE, fill_value=np.nan)
-    fit_parameter_estimators = np.full(shape=(40, 40, 4), fill_value=np.nan)
-    fit_parameter_errors = np.full(shape=(40, 40, 4), fill_value=np.nan)
+    fit_result_storage = DepletionArrayStore()
 
     # verify and extract the raw data for further analysis
     check_leaf_unit(analysis_group.UCHist, HIST_CAP_UNIT)
@@ -551,215 +643,34 @@ def analyze_depletion_delegate(data_group: GroupType, analysis_group: GroupType,
     cap_data = analysis_group.UCHist[:, :, :]
     cap_error_data = analysis_group.UCErrHist[:, :, :]
     for ii, jj in np.ndindex(GENERAL_PIXCAP_SHAPE):
+        pixel_cap_data = cap_data[ii, jj, :]
+        pixel_cap_error_data = cap_error_data[ii, jj, :]
         # could only perform the analysis for pixels with trustable measurements.
-        if np.any(~np.isfinite(cap_data[ii, jj, :])):
+        if np.any(~np.isfinite(pixel_cap_data)):
             continue
-
-        # extract the information about the depletion voltage
-        assert not isinstance(voltage_data, tb.Leaf)
-        first_section_upper_mask = voltage_data <= first_upper
-        first_section_lower_mask = voltage_data >= first_lower
-        first_section_mask = np.logical_and(first_section_upper_mask, first_section_lower_mask)
-
-        second_section_upper_mask = voltage_data <= second_upper
-        second_section_lower_mask = voltage_data >= second_lower
-        second_section_mask = np.logical_and(second_section_upper_mask, second_section_lower_mask)
-
-        # extract and select the usable voltage and capacitance data for the two fit ranges.
-        effective_capacitance_data = np.reciprocal(cap_data[ii, jj, :] * CAPACITANCE_CONVERSION_FACTOR) ** 2
-        effective_capacitance_error_data = np.reciprocal(cap_data[ii, jj, :] * CAPACITANCE_CONVERSION_FACTOR) ** 3 * cap_error_data[
-            ii, jj, :] if np.all(np.isfinite(cap_error_data[ii, jj, :])) else cap_error_data[ii, jj, :]
-        first_voltage_data = voltage_data[first_section_mask]
-        second_voltage_data = voltage_data[second_section_mask]
-        first_cap_data = effective_capacitance_data[first_section_mask]
-        second_cap_data = effective_capacitance_data[second_section_mask]
-        first_cap_error_data = effective_capacitance_error_data[first_section_mask]
-        second_cap_error_data = effective_capacitance_error_data[second_section_mask]
-
-        # perform fits to the two boundary regions specified to estimate the two distinc behaviours.
-        if np.all(np.isfinite(first_cap_error_data)):
-            if use_kafe2:
-                # perform the fit
-                from kafe2 import XYContainer, XYFit
-                data_container = XYContainer(first_voltage_data, first_cap_data)
-                data_container.add_error(axis='y', err_val=first_cap_error_data)
-                m = XYFit(data_container, model_function=depletion_model)
-                m.do_fit()
-
-                # extract the fit parameters
-                assert m.did_fit
-                first_dep_parameters = np.array([m.parameter_values[0], m.parameter_values[1]])
-                print(first_dep_parameters)
-                first_dep_errors = np.array([m.parameter_errors[0], m.parameter_errors[1]])
-                first_dep_cov = m.parameter_cov_mat
-                if plot:
-                    handle_kafe2_advanced_options(m, apply_contours, "U in V", "\\frac{{1}}{{C^2}}",
-                                                  "First Fit for Pixel ({col},{row})".format(col=ii, row=jj),
-                                                  output_pdf,
-                                                  "First Contour for Pixel ({col},{row})".format(col=ii, row=jj))
-
-            else:
-                # perform the fit
-                from iminuit import Minuit
-                from iminuit.cost import LeastSquares
-                from iminuit.cost import Model
-                assert isinstance(depletion_model, Model)
-                cost = LeastSquares(first_voltage_data, first_cap_data, first_cap_error_data, depletion_model)
-                m = Minuit(cost, a=1, b=0)
-                m.migrad()
-                m.hesse()
-
-                # extract the parameters
-                first_dep_parameters = np.array([m.values['a'], m.values['b']])
-                print(first_dep_parameters)
-                first_dep_errors = np.array([m.errors['a'], m.errors['b']])
-                first_dep_cov = m.covariance
-                if plot:
-                    handle_minuit_advanced_options(m, apply_contours, "U in V", "\\frac{{1}}{{C^2}}",
-                                                   "First Fit for Pixel ({col},{row})".format(col=ii, row=jj),
-                                                   output_pdf,
-                                                   "First Contour for Pixel ({col},{row})".format(col=ii, row=jj))
-            # MARK: What about an analysis of the fits convergence properties.
-        else:
-            first_result = np.polyfit(first_voltage_data, first_cap_data, deg=1, cov=True)
-
-            # extract the parameters and fit results.
-            first_dep_parameters = np.asarray(first_result[0])
-            first_dep_cov = np.asarray(first_result[1])
-            first_dep_errors = np.sqrt(np.diag(first_dep_cov))
-
-        if np.all(np.isfinite(second_cap_error_data)):
-            if use_kafe2:
-                # perform the fit
-                from kafe2 import XYContainer, XYFit
-                data_container = XYContainer(second_voltage_data, second_cap_data)
-                data_container.add_error(axis='y', err_val=second_cap_error_data)
-                m = XYFit(data_container, model_function=depletion_model)
-                m.do_fit()
-
-                # extract the fit parameters
-                assert m.did_fit
-                second_dep_parameters = np.array([m.parameter_values[0], m.parameter_values[1]])
-                print(second_dep_parameters)
-                second_dep_errors = np.array([m.parameter_errors[0], m.parameter_errors[1]])
-                second_dep_cov = m.parameter_cov_mat
-                if plot:
-                    handle_kafe2_advanced_options(m, apply_contours, "U in V", "\\frac{{1}}{{C^2}}",
-                                                  "Second Fit for Pixel ({col},{row})".format(col=ii, row=jj),
-                                                  output_pdf,
-                                                  "Second Contour for Pixel ({col},{row})".format(col=ii, row=jj))
-
-            else:
-                # perform the fit
-                from iminuit import Minuit
-                from iminuit.cost import LeastSquares
-                from iminuit.cost import Model
-                assert isinstance(depletion_model, Model)
-                cost = LeastSquares(second_voltage_data, second_cap_data, second_cap_error_data, depletion_model)
-                m = Minuit(cost, a=1, b=0)
-                m.migrad()
-                m.hesse()
-
-                # extract the parameters
-                second_dep_parameters = np.array([m.values['a'], m.values['b']])
-                second_dep_errors = np.array([m.errors['a'], m.errors['b']])
-                second_dep_cov = m.covariance
-                if plot:
-                    handle_minuit_advanced_options(m, apply_contours, "U in V", "\\frac{{1}}{{C^2}}",
-                                                   "Second Fit for Pixel ({col},{row})".format(col=ii, row=jj),
-                                                   output_pdf,
-                                                   "Second Contour for Pixel ({col},{row})".format(col=ii, row=jj))
-            # MARK: What about an analysis of the fits convergence properties.
-        else:
-            second_result = np.polyfit(second_voltage_data, second_cap_data, deg=1, cov=True)
-
-            # extract the parameters and fit results.
-            second_dep_parameters = np.asarray(second_result[0])
-            second_dep_cov = np.asarray(second_result[1])
-            second_dep_errors = np.sqrt(np.diag(second_dep_cov))
-
-        # estimate the depletion voltage
-        # TODO: improve the error estimation for directly using the covariance matrices and make use of numpy mat-multiplication
-        d = first_dep_parameters[1]
-        b = second_dep_parameters[1]
-        c = first_dep_parameters[0]
-        a = second_dep_parameters[0]
-        dep_voltage = (d - b) / (c - a)
-        dep_voltage_2 = (d - b) / (a - c)
-
-        dep_voltage_jacobian = np.array([
-            (b - d) / ((a - c) ** 2),
-            1 / (c - a),
-            (d - b) / ((a - c) ** 2),
-            1 / (a - c)
-        ])
-
-        # combine both cov matrices into a single one:
-        full_cov = np.full((4, 4), fill_value=0)
-        full_cov_2 = np.zeros((4, 4))   # cross correlations between the two fits are not known
-        full_cov[:2, :2] = first_dep_cov
-        full_cov[2:, 2:] = second_dep_cov
-        full_cov_2[:2, :2] = second_dep_cov
-        full_cov_2[2:, 2:] = second_dep_cov
-
-        # perform the full error calculation with matrix methods:
-        dep_voltage_error_2 = np.sqrt(dep_voltage_jacobian @ full_cov_2 @ dep_voltage_jacobian)
-
-        # old version of the error propagation
-        first_norm_factor = c - a
-        dxx = first_dep_cov[0][0]
-        dxy = first_dep_cov[0][1]
-        dyx = first_dep_cov[1][0]
-        dyy = first_dep_cov[1][1]
-        dvv = second_dep_cov[0][0]
-        dvw = second_dep_cov[0][1]
-        dwv = second_dep_cov[1][0]
-        dww = second_dep_cov[1][1]
-        first_error_term = (dww * first_norm_factor + dvw * (
-                b - d)) / first_norm_factor ** 3
-        second_error_term = (dyy * first_norm_factor + dxy * (
-                b - d)) / first_norm_factor ** 3
-        third_error_term = (dvv * (b - d) - dwv * first_norm_factor) * (
-                b - d) / first_norm_factor ** 4
-        fourth_error_term = (dyx * first_norm_factor + dxx * (b - d)) * (
-                b - d) / first_norm_factor ** 4
-        dep_voltage_error = np.sqrt(first_error_term + second_error_term + third_error_term + fourth_error_term)
-        depletion_voltage[ii, jj] = dep_voltage
-        depletion_error[ii, jj] = dep_voltage_error
-        print("The depletion voltage is {voltage}+-{error}".format(voltage=dep_voltage, error=dep_voltage_error))
-        print("The depletion voltage is {voltage}+-{error} [[ALTERNATIVE]]".format(voltage=dep_voltage_2,
-                                                                                   error=dep_voltage_error_2))
-        fit_parameter_estimators[ii, jj, :2] = first_dep_parameters
-        fit_parameter_estimators[ii, jj, 2:] = second_dep_parameters
-        fit_parameter_errors[ii, jj, :2] = first_dep_errors
-        fit_parameter_errors[ii, jj, 2:] = second_dep_errors
+        fit_result_storage.set_pixel(jj, ii)
+        analyze_pixel_depletion(first_lower, first_upper, pixel_cap_data, pixel_cap_error_data, second_lower,
+                                second_upper, voltage_data, fit_result_storage, use_kafe2=use_kafe2,
+                                apply_contours=apply_contours, plot=plot, output_pdf=output_pdf, fit_description_text=" for Pixel ({col},{row})".format(col=ii, row=jj))
 
     # save the depletion voltage data.
     file_h5 = analysis_group._v_file
     assert isinstance(file_h5, tb.File)
     assert isinstance(analysis_group, tb.Group)  # necessary as only groups could contain subelements.
-    temp_array = file_h5.create_carray(where=analysis_group, name="DepletionHist",
-                                       title="Histogram of the depletion voltages", obj=depletion_voltage,
-                                       filters=GLOBAL_FILTERS)
-    temp_array.attrs[UNITS_ATTRIBUTE_KEY] = HIST_BIAS_MEAS_UNIT
-    temp_array.flush()
-    temp_array = file_h5.create_carray(where=analysis_group, name="DepletionErrHist",
-                                       title="Histogram of the depletion voltage erors", obj=depletion_error,
-                                       filters=GLOBAL_FILTERS)
-    temp_array.attrs[UNITS_ATTRIBUTE_KEY] = HIST_BIAS_MEAS_UNIT
-    temp_array.flush()
-    temp_array = file_h5.create_carray(where=analysis_group, name="DepFitParamHist",
-                                       title="Histogram of the depletion voltages fit parameters",
-                                       obj=fit_parameter_estimators,
-                                       filters=GLOBAL_FILTERS)
-    temp_array.attrs[UNITS_ATTRIBUTE_KEY] = "NONE"
-    temp_array.flush()
-    temp_array = file_h5.create_carray(where=analysis_group, name="DepFitParamErrHist",
-                                       title="Histogram of the depletion voltages fit parameter errors",
-                                       obj=fit_parameter_errors,
-                                       filters=GLOBAL_FILTERS)
-    temp_array.attrs[UNITS_ATTRIBUTE_KEY] = "NONE"
-    temp_array.flush()
+    create_carray(file_h5, where=analysis_group, name="DepletionHist",
+                  title="Histogram of the depletion voltages", obj=fit_result_storage.depletion_voltage,
+                  filters=GLOBAL_FILTERS, unit=HIST_BIAS_MEAS_UNIT)
+    create_carray(file_h5, where=analysis_group, name="DepletionErrHist",
+                  title="Histogram of the depletion voltage erors", obj=fit_result_storage.depletion_error,
+                  filters=GLOBAL_FILTERS, unit=HIST_BIAS_MEAS_UNIT)
+    create_carray(file_h5, where=analysis_group, name="DepFitParamHist",
+                  title="Histogram of the depletion voltages fit parameters",
+                  obj=fit_result_storage.fit_parameter_estimators,
+                  filters=GLOBAL_FILTERS, unit="NONE")
+    create_carray(file_h5, where=analysis_group, name="DepFitParamErrHist",
+                  title="Histogram of the depletion voltages fit parameter errors",
+                  obj=fit_result_storage.fit_parameter_errors,
+                  filters=GLOBAL_FILTERS, unit="NONE")
 
     if apply_doping and chip_group is not None and "PhysicalDimensions" in chip_group and chip_group.PhysicalDimensions.shape == (
             40, 40, 2) and np.all(np.isfinite(chip_group.PhysicalDimensions[:])):
@@ -767,12 +678,7 @@ def analyze_depletion_delegate(data_group: GroupType, analysis_group: GroupType,
         physical_dimensions_data = chip_group.PhysicalDimensions[:]
         pixel_areas = np.prod(physical_dimensions_data, axis=2)
         doping_shape = (40, 40, voltage_data.shape[0])
-        depletion_width_plate = np.full(shape=doping_shape, fill_value=np.nan)
-        depletion_width_plate_error = np.full(shape=doping_shape, fill_value=np.nan)
-        depletion_fit_parameter_table = np.full((40, 40, 3), fill_value=np.nan)
-        depletion_fit_parameter_error_table = np.full((40, 40, 3), fill_value=np.nan)
-        depletion_fit_covariance_table = np.full((40, 40, 3, 3), fill_value=np.nan)
-        effective_doping_table = np.full(shape=doping_shape, fill_value=np.nan)
+        doping_result_storage = DopingArrayStore(doping_shape)
 
         # some further definitions for the loop
         from findiff import Diff
@@ -786,145 +692,329 @@ def analyze_depletion_delegate(data_group: GroupType, analysis_group: GroupType,
                                          filters=GLOBAL_FILTERS)
         entry = dep_table.row
         bias_voltages = check_leaf_unit(data_group.BiasVoltageHist, HIST_BIAS_MEAS_UNIT)
+        bias_voltage_errors = np.full_like(bias_voltages, fill_value=np.nan)
+
         for col, row in np.ndindex(GENERAL_PIXCAP_SHAPE):
+            kwargs['fit_description_text'] = ' for Pixel ({col},{row})'.format(col=col, row=row)
             # make sure the provided data is useful for further investigation.
             if not np.all(np.isfinite(physical_dimensions_data[col, row])):
                 continue
-            if not np.all(np.isfinite(cap_data[col, row])):
+            pixel_cap_data = cap_data[col, row]
+            pixel_cap_error_data = cap_error_data[col, row]
+            pixel_area = pixel_areas[col, row]
+            if not np.all(np.isfinite(pixel_cap_data)):
                 continue
-
-            # extract some further quantities from previous measurements and analysis.
-            if np.all(np.isfinite(cap_error_data[col, row])):
-                effective_cap_errors = cap_error_data[col, row]
-            else:
-                effective_cap_errors = np.full_like(bias_voltages, 1)
-
-            # compute the depletion width from the sensor properties.
-            # What is the unit of this result
-            # I assume this will result in wrong
-            depletion_width_plate[col, row] = (constants.epsilon_0 * pixel_areas[col, row]) / (
-                np.array(cap_data[col, row])) * 1.e-6  # provides the width in um
-            depletion_width_plate_error[col, row] = (constants.epsilon_0 * pixel_areas[col, row] * effective_cap_errors) / (np.array(cap_data[col, row]) ** 2) * 1.e-6  # provides the width in um
-
-            # fit the theoretical expected depletion width to determine some of the properties of the pixel diode
-            parameter_guess = {
-                "NA": NA,
-                "ND": ND,
-                "V": V_bi
-            }
-            # this model fits may fail due to two indistinguishable parameters.
-            if use_kafe2:
-                from kafe2 import XYFit, XYContainer
-                assert isinstance(bias_voltages, np.ndarray) or isinstance(bias_voltages, tb.CArray)
-                xy_data = XYContainer(x_data=bias_voltages, y_data=depletion_width_plate[col, row])
-                xy_data.add_error(axis='y', err_val=depletion_width_plate_error[col, row])
-                # TODO: apply the error for the x-coordinates here, too
-
-                fitter = XYFit(xy_data, model_function=model_depletion, minimizer="iminuit")
-                fitter.assign_parameter_latex_names(voltages="U_\\text{{bi}}", NA="N_\\text{{A}}", ND="N_\\text{{D}}",
-                                                    V="U_\\text{{th}}", )
-                fitter.assign_model_function_latex_name("d_\\text{{depletion}}")
-                fitter.assign_model_function_latex_expression(
-                    "\\sqrt{{\\frac{{2\\epsilon_0\\epsilon}}{{e}}\\cdot\\frac{{{NA}+{ND}}}{{{NA}\\cdot{ND}}}\\cdot ({V}+{voltages})}}")
-                fitter.set_parameter_values(**parameter_guess)
-                fitter.limit_parameter(name="V", lower=0.0)
-                fitter.limit_parameter(name="NA", lower=0.0)
-                fitter.limit_parameter(name="ND", lower=0.0)
-                fitter.do_fit()
-                assert fitter.did_fit
-                depletion_fit_propagate_parameters = fitter.parameter_name_value_dict
-                depletion_fit_params = fitter.parameter_values
-                depletion_fit_errors = fitter.parameter_errors
-                depletion_fit_cov = fitter.parameter_cov_mat
-                if plot:
-                    assert isinstance(fitter, XYFit)
-                    handle_kafe2_advanced_options(fitter, apply_contours, "$U_\\text{{bi}}$ in \\unit{{\\volt}}",
-                                                  "$d$ in \\unit{{\\micro\\meter}}",
-                                                  "Depletion Width fit for Pixel ({col},{row})".format(col=col,
-                                                                                                       row=row),
-                                                  output_pdf,
-                                                  "Depletion Width contours for Pixel ({col},{row})".format(col=col,
-                                                                                                            row=row))
-            else:
-                from iminuit import Minuit
-                from iminuit.cost import LeastSquares, Model
-                assert isinstance(model_depletion, Model)
-                cost = LeastSquares(x=bias_voltages, y=depletion_width_plate[col, row],
-                                    yerror=depletion_width_plate_error[col, row], model=model_depletion)
-                fitter = Minuit(cost, **parameter_guess)
-                fitter.limits["V"] = (0.0, None)
-                fitter.limits["NA"] = (0.0, None)
-                fitter.limits["ND"] = (0.0, None)
-                fitter.migrad()
-                fitter.hesse()
-                depletion_fit_propagate_parameters = fitter.values.to_dict()
-                depletion_fit_params = np.array(fitter.values)
-                depletion_fit_errors = np.array(fitter.errors)
-                depletion_fit_cov = np.asarray(fitter.covariance)
-                if plot:
-                    assert isinstance(fitter, Minuit)
-                    handle_minuit_advanced_options(fitter, apply_contours, "$U_\\text{{bi}}$ in \\unit{{\\volt}}",
-                                                   "$d$ in \\unit{{\\micro\\meter}}",
-                                                   "Depletion Width fit for Pixel ({col},{row})".format(col=col,
-                                                                                                        row=row),
-                                                   output_pdf,
-                                                   "Depletion Width contours for Pixel ({col},{row})".format(col=col,
-                                                                                                             row=row))
-            depletion_fit_parameter_table[col, row] = depletion_fit_params
-            depletion_fit_parameter_error_table[col, row] = depletion_fit_errors
-            depletion_fit_covariance_table[col, row] = depletion_fit_cov
-
-            # calculate the effective doping profile of the sensor.
-            Neff = effective_doping(cap_data[col, row], -bias_voltages,
-                                    diode_area=pixel_areas[col, row])  # -> 10^(12) 1/m
-            effective_doping_table[col, row] = Neff
-            pos_min = np.argmin(Neff)
-            print(
-                f"The minimum concentration is {Neff[pos_min]} and depth {depletion_width_plate[col, row, pos_min]} for pixel ({col}, {row})")
-
+            doping_result_storage.set_pixel(row, col)
             entry["row"] = row
             entry["col"] = col
-            for key, value in depletion_fit_propagate_parameters.items():
-                entry[key] = value
-            entry.append()
+
+            Neff, depletion_width_data, pos_min = analyze_doping_profile(bias_voltages, bias_voltage_errors,
+                                                                         doping_result_storage, entry, NA, ND, V_bi,
+                                                                         pixel_area, pixel_cap_data,
+                                                                         pixel_cap_error_data,
+                                                                         use_kafe2=use_kafe2,
+                                                                        plot=plot, apply_contours=apply_contours, fit_plot_pdf=output_pdf, **kwargs)
+
+            print(
+                f"The minimum concentration is {Neff[pos_min]} and depth {depletion_width_data[pos_min]} for pixel ({col}, {row})")
 
         # save the computed information about the depletion behaviour
         assert isinstance(analysis_group, tb.Group)
-        temp_array = file_h5.create_carray(where=analysis_group, name="DepletionWidth",
-                                           title="Depletion width from the pixel capacitances",
-                                           filters=GLOBAL_FILTERS, obj=depletion_width_plate)
-        temp_array.attrs[UNITS_ATTRIBUTE_KEY] = "um"
-        temp_array.flush()
-        temp_array = file_h5.create_carray(where=analysis_group, name="DepletionWidthErr",
-                                           title="Uncertainty of the depletion width from the pixel capacitances",
-                                           filters=GLOBAL_FILTERS, obj=depletion_width_plate_error)
-        temp_array.attrs[UNITS_ATTRIBUTE_KEY] = "um"
-        temp_array.flush()
+        create_carray(file_h5, where=analysis_group, name="DepletionWidth",
+                      title="Depletion width from the pixel capacitances",
+                      filters=GLOBAL_FILTERS, obj=doping_result_storage.depletion_width_plate, unit="um")
+        create_carray(file_h5, where=analysis_group, name="DepletionWidthErr",
+                      title="Uncertainty of the depletion width from the pixel capacitances",
+                      filters=GLOBAL_FILTERS, obj=doping_result_storage.depletion_width_plate_error, unit="um")
 
-        temp_array = file_h5.create_carray(where=analysis_group, name="DepletionParameters",
-                                           title="Depletion Parameters from fitting the depletion width",
-                                           filters=GLOBAL_FILTERS, obj=depletion_fit_parameter_table)
-        # these units might be incorrect!
-        temp_array.attrs[UNITS_ATTRIBUTE_KEY] = "cm^-3; cm^-3; V"
-        temp_array.flush()
-        temp_array = file_h5.create_carray(where=analysis_group, name="DepletionErrors",
-                                           title="Depletion Parameters from fitting the depletion width",
-                                           filters=GLOBAL_FILTERS, obj=depletion_fit_parameter_error_table)
-        temp_array.attrs[UNITS_ATTRIBUTE_KEY] = "cm^-3; cm^-3; V"
-        temp_array.flush()
-        temp_array = file_h5.create_carray(where=analysis_group, name="DepletionCovariance",
-                                           title="Covariance matrices for Depletion Parameters from fitting the depletion width",
-                                           filters=GLOBAL_FILTERS, obj=depletion_fit_covariance_table)
-        temp_array.attrs[UNITS_ATTRIBUTE_KEY] = "{{cm^-6, cm^-6, cm^-3 V},{cm^-6, cm^-6, cm^-3 V},{V cm^-3, V cm^-3, V^2}}"
-        temp_array.flush()
-        temp_array = file_h5.create_carray(where=analysis_group, name="DepletionEffDoping",
-                                           title="Data for the effective doping from the cv-analysis",
-                                           filters=GLOBAL_FILTERS, obj=effective_doping_table)
-        temp_array.attrs[UNITS_ATTRIBUTE_KEY] = "cm^-3"
-        temp_array.flush()  # TODO: is the unit correct?
+        create_carray(file_h5, where=analysis_group, name="DepletionParameters",
+                      title="Depletion Parameters from fitting the depletion width",
+                      filters=GLOBAL_FILTERS, obj=doping_result_storage.depletion_fit_parameter_table, unit="cm^-3; cm^-3; V")
+        create_carray(file_h5, where=analysis_group, name="DepletionErrors",
+                      title="Depletion Parameters from fitting the depletion width",
+                      filters=GLOBAL_FILTERS, obj=doping_result_storage.depletion_fit_parameter_error_table, unit="cm^-3; cm^-3; V")
+        create_carray(file_h5, where=analysis_group, name="DepletionCovariance",
+                      title="Covariance matrices for Depletion Parameters from fitting the depletion width",
+                      filters=GLOBAL_FILTERS, obj=doping_result_storage.depletion_fit_covariance_table, unit="{{cm^-6, cm^-6, cm^-3 V},{cm^-6, cm^-6, cm^-3 V},{V cm^-3, V cm^-3, V^2}}")
+        create_carray(file_h5, where=analysis_group, name="DepletionEffDoping",
+                      title="Data for the effective doping from the cv-analysis",
+                      filters=GLOBAL_FILTERS, obj=doping_result_storage.effective_doping_table, unit="cm^-3")
+        # TODO: is the unit correct?
 
 
-def effective_doping(capacitances, bias_voltages, diode_area=None):
+def analyze_doping_profile(bias_voltages: TABLES_LEAF_COMPAT_TYPE,
+                           bias_voltage_errors: np.ndarray,
+                           doping_result_storage: DopingArrayStore, entry, NA: float, ND: float, V_bi: float,
+                           pixel_area, pixel_cap_data, pixel_cap_error_data, **kwargs) -> tuple[np.ndarray, np.ndarray, int]:
+    from scipy import constants
+    # Begin of the extraction part
+    use_kafe2 = kwargs.pop("use_kafe2", False)
+    apply_contours = kwargs.pop("apply_contours", False)
+    plot = kwargs.pop("plot", False)
+    output_pdf = kwargs.pop("fit_plot_pdf", None)
+    fit_description_text = kwargs.pop("fit_description_text", "")
+
+    # extract some further quantities from previous measurements and analysis.
+    if np.all(np.isfinite(pixel_cap_error_data)):
+        effective_cap_errors = pixel_cap_error_data
+    else:
+        effective_cap_errors = np.full_like(bias_voltages, 1)
+
+    # compute the depletion width from the sensor properties.
+    # What is the unit of this result
+    # I assume this will result in wrong
+    depletion_width_data = (constants.epsilon_0 * pixel_area) / (
+        np.array(pixel_cap_data)) * 1.e-6  # provides the width in um
+    depletion_width_error_data = (constants.epsilon_0 * pixel_area * effective_cap_errors) / (np.array(
+        pixel_cap_data) ** 2) * 1.e-6  # provides the width in um
+
+    # fit the theoretical expected depletion width to determine some of the properties of the pixel diode
+    parameter_guess = {
+        "NA": NA,
+        "ND": ND,
+        "V": V_bi
+    }
+    # this model fits may fail due to two indistinguishable parameters.
+    if use_kafe2:
+        from kafe2 import XYFit, XYContainer
+        assert isinstance(bias_voltages, np.ndarray) or isinstance(bias_voltages, tb.CArray)
+        xy_data = XYContainer(x_data=bias_voltages, y_data=depletion_width_data)
+        xy_data.add_error(axis='y', err_val=depletion_width_error_data)
+        if np.all(bias_voltage_errors[np.isfinite(bias_voltages)]):
+            xy_data.add_error(axis='x', err_val=bias_voltage_errors)
+
+        fitter = XYFit(xy_data, model_function=model_depletion, minimizer="iminuit")
+        fitter.assign_parameter_latex_names(voltages="U_\\text{{bi}}", NA="N_\\text{{A}}", ND="N_\\text{{D}}",
+                                            V="U_\\text{{th}}", )
+        fitter.assign_model_function_latex_name("d_\\text{{depletion}}")
+        fitter.assign_model_function_latex_expression(
+            "\\sqrt{{\\frac{{2\\epsilon_0\\epsilon}}{{e}}\\cdot\\frac{{{NA}+{ND}}}{{{NA}\\cdot{ND}}}\\cdot ({V}+{voltages})}}")
+        fitter.set_parameter_values(**parameter_guess)
+        fitter.limit_parameter(name="V", lower=0.0)
+        fitter.limit_parameter(name="NA", lower=0.0)
+        fitter.limit_parameter(name="ND", lower=0.0)
+        fitter.do_fit()
+        assert fitter.did_fit
+        depletion_fit_propagate_parameters = fitter.parameter_name_value_dict
+        depletion_fit_params = fitter.parameter_values
+        depletion_fit_errors = fitter.parameter_errors
+        depletion_fit_cov = fitter.parameter_cov_mat
+        if plot:
+            assert isinstance(fitter, XYFit)
+            handle_kafe2_advanced_options(fitter, apply_contours, "$U_\\text{{bi}}$ in \\unit{{\\volt}}",
+                                          "$d$ in \\unit{{\\micro\\meter}}",
+                                          "Depletion Width fit{}}".format(fit_description_text),
+                                          output_pdf,
+                                          "Depletion Width contours{}".format(fit_description_text))
+    else:
+        from iminuit import Minuit
+        from iminuit.cost import LeastSquares, Model
+        assert isinstance(model_depletion, Model)
+        cost = LeastSquares(x=bias_voltages, y=depletion_width_data,
+                            yerror=depletion_width_error_data, model=model_depletion)
+        fitter = Minuit(cost, **parameter_guess)
+        fitter.limits["V"] = (0.0, None)
+        fitter.limits["NA"] = (0.0, None)
+        fitter.limits["ND"] = (0.0, None)
+        fitter.migrad()
+        fitter.hesse()
+        depletion_fit_propagate_parameters = fitter.values.to_dict()
+        depletion_fit_params = np.array(fitter.values)
+        depletion_fit_errors = np.array(fitter.errors)
+        depletion_fit_cov = np.asarray(fitter.covariance)
+        if plot:
+            assert isinstance(fitter, Minuit)
+            handle_minuit_advanced_options(fitter, apply_contours, "$U_\\text{{bi}}$ in \\unit{{\\volt}}",
+                                           "$d$ in \\unit{{\\micro\\meter}}",
+                                           "Depletion Width fit{}".format(fit_description_text),
+                                           output_pdf,
+                                           "Depletion Width contours{}".format(fit_description_text))
+
+    doping_result_storage.store_data("width", depletion_width_data)
+    doping_result_storage.store_data("width_error", depletion_width_error_data)
+    doping_result_storage.store_data("fit_parameters", depletion_fit_params)
+    doping_result_storage.store_data("fit_parameters_error", depletion_fit_errors)
+    doping_result_storage.store_data("fit_covariance", depletion_fit_cov)
+
+    # calculate the effective doping profile of the sensor.
+    Neff = effective_doping(pixel_cap_data, -bias_voltages,
+                            diode_area=pixel_area)  # -> 10^(12) 1/m
+    doping_result_storage.store_data("doping", Neff)
+    pos_min = np.argmin(Neff)
+    for key, value in depletion_fit_propagate_parameters.items():
+        entry[key] = value
+    entry.append()
+    return Neff, depletion_width_data, pos_min
+
+
+def analyze_pixel_depletion(first_lower, first_upper,
+                            pixel_cap_data: np.ndarray,
+                            pixel_cap_error_data: np.ndarray, second_lower, second_upper, voltage_data: TABLES_LEAF_COMPAT_TYPE,
+                            result: DepletionDataStore, **kwargs):
+    # extract the additional parameters for advanced fitting procedures
+    use_kafe2 = kwargs.pop("use_kafe2", False)
+    apply_contours = kwargs.pop("apply_contours", False)
+    plot = kwargs.pop("plot", False)
+    output_pdf = kwargs.pop("fit_plot_pdf", None)
+    fit_description_text = kwargs.pop("fit_description_text", "")
+    # extract the information about the depletion voltage
+    assert not isinstance(voltage_data, tb.Leaf)
+    first_section_upper_mask = voltage_data <= first_upper
+    first_section_lower_mask = voltage_data >= first_lower
+    first_section_mask = np.logical_and(first_section_upper_mask, first_section_lower_mask)
+
+    second_section_upper_mask = voltage_data <= second_upper
+    second_section_lower_mask = voltage_data >= second_lower
+    second_section_mask = np.logical_and(second_section_upper_mask, second_section_lower_mask)
+
+    # extract and select the usable voltage and capacitance data for the two fit ranges.
+    effective_capacitance_data = np.reciprocal(pixel_cap_data * CAPACITANCE_CONVERSION_FACTOR) ** 2
+    effective_capacitance_error_data = np.reciprocal(
+        pixel_cap_data * CAPACITANCE_CONVERSION_FACTOR) ** 3 * pixel_cap_error_data if np.all(np.isfinite(
+        pixel_cap_error_data)) else pixel_cap_error_data
+    first_voltage_data = voltage_data[first_section_mask]
+    second_voltage_data = voltage_data[second_section_mask]
+    first_cap_data = effective_capacitance_data[first_section_mask]
+    second_cap_data = effective_capacitance_data[second_section_mask]
+    first_cap_error_data = effective_capacitance_error_data[first_section_mask]
+    second_cap_error_data = effective_capacitance_error_data[second_section_mask]
+
+    # perform fits to the two boundary regions specified to estimate the two distinc behaviours.
+    if np.all(np.isfinite(first_cap_error_data)):
+        if use_kafe2:
+            # perform the fit
+            from kafe2 import XYContainer, XYFit
+            data_container = XYContainer(first_voltage_data, first_cap_data)
+            data_container.add_error(axis='y', err_val=first_cap_error_data)
+            m = XYFit(data_container, model_function=depletion_model)
+            m.do_fit()
+
+            # extract the fit parameters
+            assert m.did_fit
+            first_dep_parameters = np.array([m.parameter_values[0], m.parameter_values[1]])
+            print(first_dep_parameters)
+            first_dep_errors = np.array([m.parameter_errors[0], m.parameter_errors[1]])
+            first_dep_cov = m.parameter_cov_mat
+            if plot:
+                handle_kafe2_advanced_options(m, apply_contours, "U in V", "\\frac{{1}}{{C^2}}",
+                                              "First Fit{}".format(fit_description_text),
+                                              output_pdf,
+                                              "First Contour{}".format(fit_description_text))
+
+        else:
+            # perform the fit
+            from iminuit import Minuit
+            from iminuit.cost import LeastSquares, Model
+            assert isinstance(depletion_model, Model)
+            cost = LeastSquares(first_voltage_data, first_cap_data, first_cap_error_data, depletion_model)
+            m = Minuit(cost, a=1, b=0)
+            m.migrad()
+            m.hesse()
+
+            # extract the parameters
+            first_dep_parameters = np.array([m.values['a'], m.values['b']])
+            print(first_dep_parameters)
+            first_dep_errors = np.array([m.errors['a'], m.errors['b']])
+            first_dep_cov = m.covariance
+            if plot:
+                handle_minuit_advanced_options(m, apply_contours, "U in V", "\\frac{{1}}{{C^2}}",
+                                               "First Fit{}}".format(fit_description_text),
+                                               output_pdf,
+                                               "First Contour{}".format(fit_description_text))
+    else:
+        first_result = np.polyfit(first_voltage_data, first_cap_data, deg=1, cov=True)
+
+        # extract the parameters and fit results.
+        first_dep_parameters = np.asarray(first_result[0])
+        first_dep_cov = np.asarray(first_result[1])
+        first_dep_errors = np.sqrt(np.diag(first_dep_cov))
+
+    if np.all(np.isfinite(second_cap_error_data)):
+        if use_kafe2:
+            # perform the fit
+            from kafe2 import XYContainer, XYFit
+            data_container = XYContainer(second_voltage_data, second_cap_data)
+            data_container.add_error(axis='y', err_val=second_cap_error_data)
+            m = XYFit(data_container, model_function=depletion_model)
+            m.do_fit()
+
+            # extract the fit parameters
+            assert m.did_fit
+            second_dep_parameters = np.array([m.parameter_values[0], m.parameter_values[1]])
+            print(second_dep_parameters)
+            second_dep_errors = np.array([m.parameter_errors[0], m.parameter_errors[1]])
+            second_dep_cov = m.parameter_cov_mat
+            if plot:
+                handle_kafe2_advanced_options(m, apply_contours, "U in V", "\\frac{{1}}{{C^2}}",
+                                              "Second Fit{}".format(fit_description_text),
+                                              output_pdf,
+                                              "Second Contour{}".format(fit_description_text))
+
+        else:
+            # perform the fit
+            from iminuit import Minuit
+            from iminuit.cost import LeastSquares
+            from iminuit.cost import Model
+            assert isinstance(depletion_model, Model)
+            cost = LeastSquares(second_voltage_data, second_cap_data, second_cap_error_data, depletion_model)
+            m = Minuit(cost, a=1, b=0)
+            m.migrad()
+            m.hesse()
+
+            # extract the parameters
+            second_dep_parameters = np.array([m.values['a'], m.values['b']])
+            second_dep_errors = np.array([m.errors['a'], m.errors['b']])
+            second_dep_cov = m.covariance
+            if plot:
+                handle_minuit_advanced_options(m, apply_contours, "U in V", "\\frac{{1}}{{C^2}}",
+                                               "Second Fit{}".format(fit_description_text),
+                                               output_pdf,
+                                               "Second Contour{}".format(fit_description_text))
+        # MARK: What about an analysis of the fits convergence properties.
+    else:
+        second_result = np.polyfit(second_voltage_data, second_cap_data, deg=1, cov=True)
+
+        # extract the parameters and fit results.
+        second_dep_parameters = np.asarray(second_result[0])
+        second_dep_cov = np.asarray(second_result[1])
+        second_dep_errors = np.sqrt(np.diag(second_dep_cov))
+
+    # estimate the depletion voltage
+    d = first_dep_parameters[1]
+    b = second_dep_parameters[1]
+    c = first_dep_parameters[0]
+    a = second_dep_parameters[0]
+    dep_voltage_2 = (d - b) / (a - c)
+
+    dep_voltage_jacobian = np.array([
+        (b - d) / ((a - c) ** 2),
+        1 / (c - a),
+        (d - b) / ((a - c) ** 2),
+        1 / (a - c)
+    ])
+
+    # combine both cov matrices into a single one:
+    full_cov = np.full((4, 4), fill_value=0)
+    full_cov_2 = np.zeros((4, 4))  # cross correlations between the two fits are not known
+    full_cov[:2, :2] = first_dep_cov
+    full_cov[2:, 2:] = second_dep_cov
+    full_cov_2[:2, :2] = second_dep_cov
+    full_cov_2[2:, 2:] = second_dep_cov
+
+    # perform the full error calculation with matrix methods:
+    dep_voltage_error_2 = np.sqrt(dep_voltage_jacobian @ full_cov_2 @ dep_voltage_jacobian)
+    result.store_data("depletion", dep_voltage_2)
+    result.store_data("depletion_error", dep_voltage_error_2)
+    print("The depletion voltage is {voltage}+-{error}".format(voltage=dep_voltage_2,
+                                                               error=dep_voltage_error_2))
+    result.store_data("fit_result_first", first_dep_parameters)
+    result.store_data("fit_result_second", second_dep_parameters)
+    result.store_data("fit_error_first", first_dep_errors)
+    result.store_data("fit_error_second", second_dep_errors)
+    result.flush_data()
+
+
+def effective_doping(capacitances, bias_voltages, diode_area=None) -> np.ndarray:
     """
     effective doping
 
@@ -968,15 +1058,15 @@ def analyze_capacitance_distribution(raw_data, base_path=None, corrected_distrib
     :param corrected_distribution: boolean, False, indicates whether the corrected capacitance distribution
         should be analysed.
     :param base_path: hdf files group witht the measurement data.
-    :param fit_plot_pdf: PdfPages object, to save the fit plot figures to (will override the plot object if provided,
+    :key fit_plot_pdf: PdfPages object, to save the fit plot figures to (will override the plot object if provided,
         Only used for the advanced procedure)
-    :param output_pdf: PdfPages object, to save the fit plot figures to (will override the plot object if provided,
+    :key output_pdf: PdfPages object, to save the fit plot figures to (will override the plot object if provided,
         Only used for the advanced procedure)
-    :param fit_plot_pdf_name:  Name of the pdf file to save fitting figures from the advanced procedures to.
+    :key fit_plot_pdf_name:  Name of the pdf file to save fitting figures from the advanced procedures to.
         (Only used for the advanced procedure)
-    :param mask_pixel: iterable of pixel positions on the grid to ignore for evaluations.
-    :param exclude_cap_hist: boolean, whether to exclude the test capacitator row from the histograms.
-    :param hist_bins: integer, number of bins to use for the histogram.
+    :key mask_pixel: iterable of pixel positions on the grid to ignore for evaluations.
+    :key exclude_cap_hist: boolean, whether to exclude the test capacitator row from the histograms.
+    :key hist_bins: integer, number of bins to use for the histogram.
     """
     temp_plot_name = kwargs.pop("fit_plot_pdf_name", None)
     if temp_plot_name is not None:
@@ -1010,9 +1100,10 @@ def analyze_capacitance_distribution_delegate(analysis_group, output_pdf, **kwar
 
     :param analysis_group: hdf file's group where to find the capactiances to be analyzed.
     :param output_pdf: pdf object to write the created figures to for long-term saving.
-    :param mask_pixel: iterable of pixel positions on the grid to ignore for evaluations.
-    :param exclude_cap_hist: boolean, whether to exclude the test capacitator row from the histograms.
-    :param hist_bins: integer, number of bins to use for the histogram.
+    :key mask_pixel: iterable of pixel positions on the grid to ignore for evaluations.
+    :key exclude_cap_hist: boolean, whether to exclude the test capacitator row from the histograms.
+    :key hist_bins: integer, number of bins to use for the histogram.
+    :key capacitance: histogram of the capacitances
     """
     from plotting import DEFAULT_TEST_CAP_EXCLUSION
     from plotting import CAPACITANCE_CONVERSION_FACTOR
@@ -1027,7 +1118,9 @@ def analyze_capacitance_distribution_delegate(analysis_group, output_pdf, **kwar
         output_pdf = kwargs.pop("fit_plot_pdf", None)
 
     # we want to fit a binned distribution; but some bins might be empty
-    cap_hist = check_leaf_unit(analysis_group.HistCap, HIST_CAP_UNIT)
+    cap_hist = kwargs.pop("capacitance", None)
+    if cap_hist is None or not isinstance(cap_hist, np.ndarray):
+        cap_hist = check_leaf_unit(analysis_group.HistCap, HIST_CAP_UNIT)
     fig, ax = plt.subplots()
     hist_cap_hist = cap_hist[:, 1:] if kwargs.get("exclude_cap_hist", DEFAULT_TEST_CAP_EXCLUSION) else cap_hist
     if "mask_pixel" in kwargs:

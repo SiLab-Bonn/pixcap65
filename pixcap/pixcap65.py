@@ -647,7 +647,7 @@ class Pixcap65(Dut):
         except ValueError:
             name = "UNIDENTIFIED"
         logger.info("Attempting to get source voltage for smu %s (%s)" % (smu, name))
-        return self[smu].get_source_voltage(**kwargs)
+        return float(self[smu].get_source_voltage(**kwargs))
 
     def get_smu_source_current(self, smu: str, **kwargs):
         """
@@ -701,7 +701,7 @@ class Pixcap65(Dut):
             raise ValueError("The current returned {current} was not recognised as a number.".format(current=current))
         return current
 
-    def smu_measure_voltage(self, smu: str, kwargs=None) -> Any:
+    def smu_measure_voltage(self, smu: str, kwargs=None) -> float:
         """
         smu_measure_voltage
 

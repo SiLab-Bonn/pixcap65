@@ -30,11 +30,11 @@ if __name__ == '__main__':
 
     analyze_data(raw_data='Data/r13-measurement/data.h5', is_advanced=False, **bare_correction_args)
     # r13-measurements/R13_BIAS_CV_2.h5 could not be directly investigated as it is incomplete.
-    analyze_data(raw_data='Data/r13-measurement/R13_BIAS_CV_COMBI_2.h5', is_advanced=False, is_cv=True,
+    analyze_data(raw_data='Data/r13-measurement/R13_BIAS_CV_COMBI_2.h5', is_advanced=False, is_cv=True, use_corrected=True,
                  **bare_correction_args)
     # Data/r13-measurement/R13_BIAS_CV_COMBI_3.h5 no further investigation possible as data set is incomplete!
     analyze_data(raw_data='Data/r13-measurement/R13_BIAS_CV_COMBI_5.h5', is_advanced=False, is_cv=True, first_boundaries=(-100, -40),
-                 second_boundaries=(-8, -0), **bare_correction_args)
+                 second_boundaries=(-8, -0), use_corrected=True, **bare_correction_args)
     analyze_data(raw_data='Data/r13-measurement/R13_BIAS_CV_COMBI_6.h5', is_advanced=False, is_cv=True, first_boundaries=(-100, -40),
                  second_boundaries=(-10, 0), apply_doping=True, chip_group_name="sensor", use_corrected=True, **bare_correction_args)
     analyze_data(raw_data='Data/r13-measurement/R13_Full_Scan_80V.h5', is_advanced=True, **bare_correction_args)
@@ -59,18 +59,18 @@ if __name__ == '__main__':
     analyze_data(raw_data='Data/New_1_Initial_6_Scan.h5', base_path="ATLAS ITk/unbiased_4",
                  is_advanced=False, **bare_correction_args)
     analyze_data(raw_data='Data/New_1_Initial_6_Scan.h5', base_path="ATLAS ITk/C_V_Characteristic",
-                 is_advanced=False, is_cv=True,
+                 is_advanced=False, is_cv=True, use_corrected=True,
                  first_boundaries=(-60, -40), second_boundaries=(-5, 0), **bare_correction_args)
     analyze_data(raw_data='Data/New_1_Initial_6_Scan.h5', base_path="ATLAS ITk/full_biased_80_V", is_advanced=True,
                  **bare_correction_args)
 
     analyze_data(raw_data='New_2_Scan.h5', base_path="ATLAS_Itk/X2/unbiased_1", is_advanced=True, **bare_correction_args)
     analyze_data(raw_data='New_2_Scan.h5', base_path="ATLAS_Itk/X2/C_V_Characteristic", is_advanced=True, is_cv=True,
-                 first_boundaries=(-60, -40), second_boundaries=(-5, 0), **bare_correction_args)
+                 first_boundaries=(-60, -40), second_boundaries=(-5, 0), use_corrected=True, **bare_correction_args)
     analyze_data(raw_data='New_2_Scan.h5', base_path="ATLAS_Itk/X2/biased_80_V", is_advanced=True,
                  **bare_correction_args)
     analyze_data(raw_data='New_2_Scan.h5', base_path="ATLAS_Itk/X2/C_V_Characteristic_refined", is_advanced=True, is_cv=True,
-                 first_boundaries=(-60, -20), second_boundaries=(-5, 0), **bare_correction_args)
+                 first_boundaries=(-60, -20), second_boundaries=(-5, 0), use_corrected=True, **bare_correction_args)
 
 
     # correct all results for the parasitic and intrinsic capacitances
@@ -160,9 +160,9 @@ if __name__ == '__main__':
     plot_combined_data(interpreted_data='New_2_Scan.h5', base_path="ATLAS_Itk/X2/C_V_Characteristic",
                        use_group=True, first_lower=-60, first_upper=-40, second_lower=-5, second_upper=0, use_corrected=True)
     plot_combined_data(interpreted_data='New_2_Scan.h5', base_path="ATLAS_Itk/X2/C_V_Characteristic_refined",
-                       use_group=True, first_lower=-60, first_upper=-40, second_lower=-5, second_upper=0)
-    # plot_combined_data(interpreted_data='New_2_Scan.h5', base_path="ATLAS_Itk/X2/C_V_Characteristic_refined",
-    #                    use_group=True, first_lower=-60, first_upper=-40, second_lower=-5, second_upper=0, use_corrected=True)
+                       use_group=True, first_lower=-60, first_upper=-20, second_lower=-5, second_upper=0)
+    plot_combined_data(interpreted_data='New_2_Scan.h5', base_path="ATLAS_Itk/X2/C_V_Characteristic_refined",
+                       use_group=True, first_lower=-60, first_upper=-20, second_lower=-5, second_upper=0, use_corrected=True)
     plot_data(interpreted_data='New_2_Scan.h5', base_path="ATLAS_Itk/X2/biased_80_V", suffix="general_data_80V",
               use_group=True)
     plot_data(interpreted_data='New_2_Scan.h5', base_path="ATLAS_Itk/X2/biased_80_V", suffix="general_data_80V",

@@ -20,14 +20,14 @@ logger = logging.getLogger(__name__)
 logger.setLevel(logging.INFO)
 
 scan_configuration = {
-    'start_column': 15,
-    'stop_column': 35,
-    'start_row': 15,
-    'stop_row': 35,
+    'start_column': 1,
+    'stop_column': 38,
+    'start_row': 5,
+    'stop_row': 38,
 
     'Vin': 1.0,  # input voltage in V
-    'frequency_range': np.arange(1, 8.1, 1),  # .astype(np.float) # [MHz]
-    # 'bias': -80,
+    'frequency_range': np.arange(1, 12.1, 0.5),  # .astype(np.float) # [MHz]
+    'bias': -80,
 
     'data_path': "Reference/R13",
     "out_file_mode": "append",
@@ -76,7 +76,9 @@ class Pixcap65InterCap(PixCap65Measurement):
         self.init_smu(smu=self.pixcap.vm2_smu_key)
         self.init_smu(smu=self.pixcap.vm1_smu_key)
 
-        self.pixcap.seq_init(clk_0='0100', clk_1='0100', clk_2='0001', clk_3='0001')
+        # self.pixcap.seq_init(clk_0='0100', clk_1='0100', clk_2='0001', clk_3='0001')
+        # simplify switch the order of the clocks for once.
+        self.pixcap.seq_init(clk_0='0100', clk_1='0001', clk_2='0001', clk_3='0100')
 
         self.pixcap.vm3_on()
         self.pixcap.vm2_on()
@@ -372,6 +374,6 @@ if __name__ == "__main__":
         # pix.scan(data_group_spec="demo_measurement_1_80_V")
     from utils import PixCapSetup
     with PixCapSetup(scan_configuration, output_file, measurement=Pixcap65InterCap) as pix:
-        pix.scan(data_group_spec="demo_measurement_18_unbiased_V")
+        pix.scan(data_group_spec="demo_measurement_51_biased_80_V_1_charge")
 
 
