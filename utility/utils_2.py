@@ -43,7 +43,30 @@ def std_out_err_redirect_tqdm():
 
 logger = logging.getLogger(__name__)
 
-def create_update_array(h5, where: tb.Group, name: str, *args, **kwargs):
+def create_carray(h5: tb.File, where: tb.Group | str, name: str, *args, **kwargs):
+    input = kwargs.pop('input', None)
+    unit = kwargs.pop('unit', None)
+    if isinstance(where, str):
+        where = h5._get_or_create_path(where)
+        assert isinstance(where, tb.Group)
+    result = create_update_array(h5, where, name, *args, **kwargs)
+    if result is None:
+        logger.error("Failed to create or update the array. Could not adjust the attriubutes.")
+    elif isinstance(result, tb.Leaf):
+        if input is not None:
+            result.attrs["Input"] = input
+        if unit is not None:
+            result.attrs[UNITS_ATTRIBUTE_KEY] = unit
+    elif isinstance(result, tb.Group):
+        if input is not None:
+            result._f_setattr("Input", input)
+        if unit is not None:
+            result._f_setattr(UNITS_ATTRIBUTE_KEY, unit)
+    return result
+
+
+
+def create_update_array(h5, where: tb.Group, name: str, *args,  **kwargs):
     max_iter = kwargs.get("max_iter", 10)
     if name in where._v_children:
         current_array = where._v_children[name]

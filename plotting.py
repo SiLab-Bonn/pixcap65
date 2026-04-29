@@ -10,11 +10,8 @@ from tables import Group
 from analysis_util.physics_modelling import model_depletion
 
 BIAS_CURVE_Y_LABEL = "I in nA"
-
 BIAS_CURVE_X_LABEL = "U in V"
-
 DEFAULT_BIN_NUMBER = 50
-
 DEFAULT_TEST_CAP_EXCLUSION = True
 
 try:
@@ -206,6 +203,7 @@ def plot_combined_data(interpreted_data, base_path=None, first_upper=None, first
     :param second_lower: lower limit of the second fit range
     :param suffix: additonal suffix to use for naming the pdf containing the plots.
     :param use_group: boolean, whether to append the group name of the measurements to the pdf name.
+    :key use_corrected: boolean, whether to use corrected data
     """
     if kwargs.get("use_corrected", False):
         suffix = "{}_corrected".format(suffix)
@@ -383,12 +381,15 @@ def plot_cv_data_delegate(data_group, analysis_group, output_pdf, first_upper=No
             plot_depletion_pixel_delegate(bias_voltages, ii, depletion_width_plate, depletion_width_plate_error,
                                           effective_doping_table, output_pdf, jj, table)
 
-    # for k, bias_voltage in enumerate(voltage_data):
-    #     fig, ax = plt.subplots()
-    #     ax.set(title=f"Capacitance distribution for bias voltage {bias_voltage}", xlabel="C in fF")
-    #     ax.hist(analysis_group.UCHist[:, :, k] * 1e15, bins=50)
-    #     output_pdf.savefig(fig, bbox_inches='tight')
-    #     plt.close(fig)
+    assert isinstance(voltage_data, Iterable)
+    for k, bias_voltage in enumerate(voltage_data):
+        if voltage_data.shape[0] > 10 and k % 10 != 0:
+            continue
+        fig, ax = plt.subplots()
+        ax.set(title="Capacitance distribution for bias voltage {}".format(bias_voltage), xlabel="C in fF")
+        ax.hist(analysis_group.UCHist[:, :, k].reshape(-1) * 1e15, bins=50)
+        output_pdf.savefig(fig, bbox_inches='tight')
+        plt.close(fig)
 
 
 def plot_data_delegate(data_group: tb.Group, analysis_group: tb.Group, output_pdf: PdfPages, **kwargs):
@@ -404,10 +405,11 @@ def plot_data_delegate(data_group: tb.Group, analysis_group: tb.Group, output_pd
     :param data_group: hdf files hierarchy group containing the raw measurement data.
     :param analysis_group: hdf files hierarchy group containing the analysis results.
     :param output_pdf: pdf object to write the created figures to for long-term saving.
-    :param exclude_test_cap: boolean, whether to exclude the test capacitator row from the histograms.
-    :param hist_bins: integer, number of bins to use for the histogram.
-    :param mask_pixel: iterable of pixel positions on the grid to ignore for evaluations.
-    :param extract_pixel: iterable of pixel positions on the grid to extract the figures from.
+    :key exclude_test_cap: boolean, whether to exclude the test capacitator row from the histograms.
+    :key hist_bins: integer, number of bins to use for the histogram.
+    :key mask_pixel: iterable of pixel positions on the grid to ignore for evaluations.
+    :key extract_pixel: iterable of pixel positions on the grid to extract the figures from.
+    :key distribution: boolean, indicating whether to investigate the capacitance distribution over the whole sensor.
     """
     # Read pixel map
     current_hist = check_leaf_unit(data_group.HistCurr, HIST_CURRENT_MEAS_UNIT)
@@ -429,6 +431,7 @@ def plot_data_delegate(data_group: tb.Group, analysis_group: tb.Group, output_pd
     ax.set_ylabel(COLUMN_LABEL)
     ax.set_xlabel(ROW_LABEL)
     output_pdf.savefig(fig, bbox_inches='tight')
+    plt.close(fig)
 
     # 1D Pixel Capacitance Hist
     fig = Figure()
@@ -447,6 +450,10 @@ def plot_data_delegate(data_group: tb.Group, analysis_group: tb.Group, output_pd
     ax.set_xlabel(HIST_PIX_CAP_LABEL)
     ax.grid()
     output_pdf.savefig(fig, bbox_inches='tight')
+    plt.close(fig)
+    if kwargs.pop("distribution", False):
+        from analysis import analyze_capacitance_distribution_delegate
+        analyze_capacitance_distribution_delegate(analysis_group, output_pdf, **kwargs)
 
     # Current vs. frequency
     print(HISTOGRAM_SHAPE_FORMAT.format(current_hist.shape))
@@ -470,9 +477,9 @@ def plot_data_delegate(data_group: tb.Group, analysis_group: tb.Group, output_pd
             ax.legend()
             ax.grid()
             output_pdf.savefig(fig, bbox_inches='tight')
+            plt.close(fig)
+
             # ax.plot(freq_sweep_array, fit_fn, label = 'a={a:.3E}, b={b:.3E}'.format(a=a, b=b))
-        else:
-            continue
 
         # #apply linear fit to measured current values; also returns covariance matrix
         # matrix = np.polyfit(freq_sweep_array, current_array, 1, cov=True)
@@ -507,10 +514,11 @@ def plot_inter_pix_data_delegate(data_group: tb.Group, analysis_group: tb.Group,
     :param data_group: hdf files hierarchy group containing the raw measurement data.
     :param analysis_group: hdf files hierarchy group containing the analysis results.
     :param output_pdf: pdf object to write the created figures to for long-term saving.
-    :param exclude_test_cap: boolean, whether to exclude the test capacitator row from the histograms.
-    :param hist_bins: integer, number of bins to use for the histogram.
-    :param mask_pixel: iterable of pixel positions on the grid to ignore for evaluations.
-    :param extract_pixel: iterable of pixel positions on the grid to extract the figures from.
+    :key exclude_test_cap: boolean, whether to exclude the test capacitator row from the histograms.
+    :key hist_bins: integer, number of bins to use for the histogram.
+    :key mask_pixel: iterable of pixel positions on the grid to ignore for evaluations.
+    :key extract_pixel: iterable of pixel positions on the grid to extract the figures from.
+    :key distribution: boolean, indicating whether to analyze also the capacitance distribution. TODO: implement it.
     """
     # Read pixel map
     total_current_hist = check_leaf_unit(data_group.TotalHistCurr, HIST_CURRENT_MEAS_UNIT)
@@ -526,6 +534,8 @@ def plot_inter_pix_data_delegate(data_group: tb.Group, analysis_group: tb.Group,
     inter_b_cap_hist = check_leaf_unit(analysis_group.HistCapInterB, HIST_CAP_UNIT)
     inter_b_leak_hist = check_leaf_unit(analysis_group.HistLeakInterB, HIST_LEAK_CURRENT_UNIT)
 
+
+    need_distribution = kwargs.get("distribution", False)
     # Read scan parameters
     scan_parameters = data_group.scan_params[:]
 
@@ -541,6 +551,8 @@ def plot_inter_pix_data_delegate(data_group: tb.Group, analysis_group: tb.Group,
     ax.set_xlabel(ROW_LABEL)
     ax.set_title("Total Pixel Capacitance")
     output_pdf.savefig(fig, bbox_inches='tight')
+    plt.close(fig)
+
     fig = Figure()
     _ = FigureCanvas(fig)
     ax = fig.add_subplot(111)
@@ -552,6 +564,8 @@ def plot_inter_pix_data_delegate(data_group: tb.Group, analysis_group: tb.Group,
     ax.set_xlabel(ROW_LABEL)
     ax.set_title("Inter-Pixel Capacitance A")
     output_pdf.savefig(fig, bbox_inches='tight')
+    plt.close(fig)
+
     fig = Figure()
     _ = FigureCanvas(fig)
     ax = fig.add_subplot(111)
@@ -563,6 +577,7 @@ def plot_inter_pix_data_delegate(data_group: tb.Group, analysis_group: tb.Group,
     ax.set_xlabel(ROW_LABEL)
     ax.set_title("Inter-Pixel Capacitance B")
     output_pdf.savefig(fig, bbox_inches='tight')
+    plt.close(fig)
 
     # 1D Pixel Capacitance Hist
     n_bins = kwargs.get("hist_bins", DEFAULT_BIN_NUMBER)
@@ -584,6 +599,10 @@ def plot_inter_pix_data_delegate(data_group: tb.Group, analysis_group: tb.Group,
         ax.set_title("Pixel Total Capacitance Distribution")
         ax.grid()
         output_pdf.savefig(fig, bbox_inches='tight')
+        plt.close(fig)
+        if need_distribution:
+            from analysis import analyze_capacitance_distribution_delegate
+            analyze_capacitance_distribution_delegate(analysis_group, output_pdf, capacitance=total_cap_hist, **kwargs)
 
     if np.count_nonzero(np.isfinite(inter_a_current_hist)) > 2:
         fig = Figure()
@@ -603,6 +622,10 @@ def plot_inter_pix_data_delegate(data_group: tb.Group, analysis_group: tb.Group,
         ax.set_title("Inter-Pixel A Capacitance Distribution")
         ax.grid()
         output_pdf.savefig(fig, bbox_inches='tight')
+        plt.close(fig)
+        if need_distribution:
+            from analysis import analyze_capacitance_distribution_delegate
+            analyze_capacitance_distribution_delegate(analysis_group, output_pdf, capacitance=inter_a_cap_hist, **kwargs)
 
     if np.count_nonzero(np.isfinite(inter_b_current_hist)) > 2:
         fig = Figure()
@@ -622,6 +645,10 @@ def plot_inter_pix_data_delegate(data_group: tb.Group, analysis_group: tb.Group,
         ax.set_title("Inter-Pixel B Capacitance Distribution")
         ax.grid()
         output_pdf.savefig(fig, bbox_inches='tight')
+        plt.close(fig)
+        if need_distribution:
+            from analysis import analyze_capacitance_distribution_delegate
+            analyze_capacitance_distribution_delegate(analysis_group, output_pdf, capacitance=inter_b_cap_hist, **kwargs)
 
     # Current vs. frequency (Will try to plot all into just one coordinate system)
     print(HISTOGRAM_SHAPE_FORMAT.format(total_current_hist.shape))
@@ -658,8 +685,7 @@ def plot_inter_pix_data_delegate(data_group: tb.Group, analysis_group: tb.Group,
             ax.legend()
             ax.grid()
             output_pdf.savefig(fig, bbox_inches='tight')
-        else:
-            continue
+            plt.close(fig)
 
 
 def plot_current_data(ax: Axes, col, row, scan_parameters, current_hist, current_err_hist, color=0.2, prefix="",
@@ -775,6 +801,9 @@ def plot_compare_delegate(first_group: GroupType, second_group: GroupType, outpu
     ax.set_xlabel(ROW_LABEL)
     output_pdf.savefig(fig, bbox_inches='tight')
 
+    # close the figures at last to not waste any memory resources
+    plt.close(fig)
+
 def plot_depletion_delegate(data_group: GroupType, analysis_group: GroupType, output_pdf: PdfPages):
     """
     plot_depletion_delegate
@@ -840,6 +869,8 @@ def plot_depletion_pixel_delegate(bias_voltages: TABLES_LEAF_COMPAT_TYPE, i_col,
         ax[1].set_yscale('log')
         # ax[1].yscale('log')
         output_pdf.savefig(fig, bbox_inches='tight')
+        # close the figures at last, to not waste any memory resources
+        plt.close(fig)
 
 
 if __name__ == '__main__':

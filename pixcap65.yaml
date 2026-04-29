@@ -210,28 +210,36 @@ registers:
     type: FunctionalRegister
     hw_driver: SMU_Device
     arg_add: { 'channel': 1 }
+    init:
+      active: True
 
   - name: BIAS_SUPPLY
     type: FunctionalRegister
     hw_driver: BIAS_SMU
     arg_add: { }
     init:
-      active: False
+      active: True
 
   - name: VM1
     type: FunctionalRegister
     hw_driver: BIAS_SMU
     arg_add: {  }
+    init:
+      active: False
 
   - name: VM2
     type: FunctionalRegister
     hw_driver: SMU_Device
     arg_add: { 'channel': 2 }
+    init:
+      active: True
 
   - name: VM3
     type: FunctionalRegister
     hw_driver: SMU_Device
     arg_add: { 'channel': 1 }
+    init:
+      active: True
 
   - name: SMU_SETUP
     type: FunctionalRegister

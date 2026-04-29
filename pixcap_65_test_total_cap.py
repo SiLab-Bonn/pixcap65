@@ -357,13 +357,15 @@ class PixCap65Measurement(object, metaclass=ABCMeta):
         :param kwargs: further arguments for pytables implementation
         :return: if the array/data set could be created, the created array, None otherwise.
         """
-        from utility.utils_2 import create_update_array
-        result = create_update_array(self.out_file_h5, where, name, *args, **kwargs)
-        if input is not None:
-            result.attrs["Input"] = input
-        if unit is not None:
-            result.attrs[UNITS_ATTRIBUTE_KEY] = unit
-        return result
+        from utility.utils_2 import create_carray
+        return create_carray(where, name, *args, input=input, unit=unit, **kwargs)
+        # from utility.utils_2 import create_update_array
+        # result = create_update_array(self.out_file_h5, where, name, *args, **kwargs)
+        # if input is not None:
+        #     result.attrs["Input"] = input
+        # if unit is not None:
+        #     result.attrs[UNITS_ATTRIBUTE_KEY] = unit
+        # return result
 
     # region Pixcap measurement properties
     @property
@@ -594,8 +596,8 @@ class PixCap65Measurement(object, metaclass=ABCMeta):
             except Exception as e:
                 logging.error(e.args)
                 logging.exception(UNCERT_ESTIMATION_ERROR_MSG)
+        return np.full_like(temp_data, fill_value=np.nan)
 
-    @abstractmethod
     def handle_cv_compaction(self, kwargs, unit):
         pass
 
@@ -648,7 +650,6 @@ class PixCap65Measurement(object, metaclass=ABCMeta):
 
 class PixCap65TotalCap(PixCap65Measurement):
     __slots__ = ["current_smu_config"]
-    current_smu_config = {}
 
     def update_config(self, new_config=None):
         super(PixCap65TotalCap, self).update_config(new_config)
@@ -661,6 +662,7 @@ class PixCap65TotalCap(PixCap65Measurement):
     def __init__(self, scan_config, output_file, **kwargs):
         super(PixCap65TotalCap, self).__init__(scan_config, output_file, **kwargs)
 
+        self.current_smu_config = {}
         self.n_voltages = None
         if "double_sweep" in scan_config and scan_config["double_sweep"]:
             self.n_frequencies *= 2
@@ -863,12 +865,12 @@ class PixCap65TotalCap(PixCap65Measurement):
             self.store_configuration(data_group)
             logger.info("Done bias measurements.")
 
+    # why exactly is this measurement routine down here?
     def bias_scan(self, data_group_spec=None):
         """
         bias_scan
 
         Scan different bias voltages and measure the detector leakage current.
-
 
         :param data_group_spec: specifier of the data group in hdf file where the measurements are stored.
         """
@@ -878,6 +880,7 @@ class PixCap65TotalCap(PixCap65Measurement):
         # prepare the scan
         bias_voltages = np.asarray(self.scan_config[ScanConfigurationKeys.BIAS_VOLTAGE_RANGE])
         self.n_voltages = bias_voltages.shape[0]
+        # noinspection PyProtectedMember
         data_group._f_setattr('voltages', self.n_voltages)
         self.hist_bias_current = np.full(shape=self.n_voltages,
                                          fill_value=np.nan)  # current value for each measured frequency per pixel
