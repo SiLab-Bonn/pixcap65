@@ -6,12 +6,14 @@ import logging
 import os
 
 import numpy as np
+# it is a part of matplotlib (or was it is now deprecated)
+# noinspection PyPackageRequirements
 import pylab as pl
 import time
 from bitarray import bitarray
 
 from pixcap.pixcap65 import Pixcap65
-from utility import pixcap65_constants as c
+from pixcap65.utility import pixcap65_constants as c
 
 logging.getLogger().setLevel(logging.DEBUG)
 
@@ -52,7 +54,7 @@ col_stop = 9
 row_range = range(row_stop, row_start - 1, -1)
 col_range = range(col_start, col_stop + 1)
 
-freq_sweep_array = np.arange(1, 4.1, 1)  #.astype(np.float) # [MHz]
+freq_sweep_array = np.arange(1, 4.1, 1)  # .astype(np.float) # [MHz]
 table_first_row = ["row\\col"]
 table_first_row.extend(col_range)
 table_row = []

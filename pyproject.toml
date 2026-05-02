@@ -1,15 +1,17 @@
 [project]
-name = "pixcap65"
-version = "0.1.0"
+name = "pixcap65_DOMI1279"
+dynamic = ["version"]
+description = "Host software for the PixCap65 chip control system based on MIO2 + GPAC hardware."
 authors = [
     { name = "Hans Krüger", email = "krueger@physik.uni-bonn.de" },
 ]
 maintainers = [
-    { name = "Yannick Dieter", email = "dieter@physik.uni-bonn.de",
-      name = "Dominik Fischer", email = "s6dkfisc@uni-bonn.de" },
+    { name = "Yannick Dieter", email = "dieter@physik.uni-bonn.de"},
+    { name = "Dominik Fischer", email = "s6dkfisc@uni-bonn.de" },
 ]
 
-readme = "README.md"
+license = "MIT AND BSD-3-Clause"
+readme = {file = "README.md", content-type = "text/markdown"}
 requires-python = ">=3.9"
 dependencies = [
     "numpy>=2.3",
@@ -18,25 +20,47 @@ dependencies = [
     "pyyaml",
     "bitarray>=3.4.0",
     "coloredlogs",
-    "basil_daq @ git+https://...@revion to use",
+    "basil-daq==3.1.0",
+    "tqdm",
 ]
 
 [project.urls]
-Homepage = ""
-Issues = ""
+Homepage = "https://github.com/SiLab-Bonn/pixcap65/"
+Issues = "https://github.com/SiLab-Bonn/pixcap65/issues/"
+# no documentation present.
 
 [project.optional-dependencies]
 advanced = [
     "iminuit>2.30.0",
     "kafe2>2.10.0",
     "scipy>=1.15.0",
-    "numpy>=2.3"
+    "numpy>=2.3",
+    "jacobi",
+    "findiff"
 ]
 visualization = [
     "pyqt5",
-    "vitables"
+    "vitables",
+    "matplotlib"
+]
+dut = [
+    "pyserial",
+    "pyvisa",
+    "pyusb",
+    "pysilibusb"
 ]
 
 [build-system]
 requires = ["setuptools >= 77.0.3"]
 build-backend = "setuptools.build_meta"
+
+[tool.setuptools]
+include-package-data = true
+packages = ["pixcap65", "pixcap", "configs", "analysis_util"]
+
+[tool.setuptools.dynamic]
+version = { attr = "pixcap.__version__" }
+
+
+#[tool.setuptools.exclude-package-data]
+#mypkg = [".gitattributes", ".gitignore", "**.h5"]
