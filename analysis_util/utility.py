@@ -6,12 +6,14 @@ from typing import Union, Mapping, AnyStr, LiteralString
 
 import numpy as np
 import tables as tb
-import time
-from iminuit.minuit import _cl_to_errordef
+# FIXME: optional dependence should not be imported anyway!
+# from iminuit import Minuit
+# noinspection PyProtectedMember
+# from iminuit.minuit import _cl_to_errordef
 from tables import File
 from tables.group import RootGroup
 
-from utility.utils_2 import walk_to_node, UNITS_ATTRIBUTE_KEY
+from pixcap65.utility.utils_2 import walk_to_node, UNITS_ATTRIBUTE_KEY, prevent_group_mix_up
 
 # some utility constants to simplify expressions for the analysis
 # region Analysis constants
@@ -62,7 +64,7 @@ def transform_covariance(cov):
     cov = np.asarray(cov)
 
     # missing compatibility layer here!
-    match (cov.shape):
+    match cov.shape:
         case (2, 2):
             assert cov.shape == (2, 2)
             mask = np.array([[True, False, True, False], [False, False, False, False], [True, False, True, False],
@@ -83,7 +85,8 @@ def transform_covariance(cov):
             return cov[mask].reshape((3, 3)) * GENERAL_TRANSFORMATION_MATRIX[mask].reshape((3, 3))
         case _:
             raise ValueError(
-                "The dimension of the covariance matrix does not fit to any of the fitting functions and their parameters.")
+                "The dimension of the covariance matrix does not fit to any of the fitting functions and their "
+                "parameters.")
 
 
 def str_join(delimiter: AnyStr, *args: AnyStr) -> LiteralString | bytes:
@@ -137,18 +140,23 @@ def handle_kafe2_advanced_options(fit_object, apply_contour, x_label, y_label, t
     :param contours_title: title of the contour plot.
     """
     from kafe2 import Plot, FitBase
+    from matplotlib import pyplot as plt
     assert isinstance(fit_object, FitBase)
     fit_plot = Plot(fit_object)
     fit_plot.x_label = x_label
     fit_plot.y_label = y_label
     fit_plot.plot(residual=True)
-    for fig_dict in fit_plot.axes:
-        for ax in fig_dict.values():
-            ax.set_title(title)
+    conv_invest = investigate_fit_convergence(fit_object)
     for (fig, axes) in zip(fit_plot.figures, fit_plot.axes):
-        for ax in axes.values():
+        for ax_k, ax in enumerate(axes.values()):
+            if ax_k >= 1:
+                print("We are now at iteration ", ax_k)
             ax.set_title(title)
+            ax.text(0, 0.9, f"Fit with cost={conv_invest['x']:.4f} and \np={conv_invest['p']:.4f}", transform=ax.transAxes)
+            break
         pdf.savefig(fig, bbox_inches='tight')
+    for fig in fit_plot.figures:
+        plt.close(fig)
 
     if apply_contour:
         from kafe2 import ContoursProfiler
@@ -158,6 +166,14 @@ def handle_kafe2_advanced_options(fit_object, apply_contour, x_label, y_label, t
         assert isinstance(cpf_figure, Figure)
         cpf_figure.axes[0].set_title(contours_title)
         pdf.savefig(cpf_figure, bbox_inches='tight')
+        plt.close(cpf_figure)
+
+
+# noinspection PyProtectedMember
+def extract_iminuit_cost_object(fit):
+    from iminuit import Minuit
+    assert isinstance(fit, Minuit)
+    return fit.fcn._fcn
 
 
 def handle_minuit_advanced_options(fit_object, apply_contour, x_label, y_label, title, pdf,
@@ -179,31 +195,43 @@ def handle_minuit_advanced_options(fit_object, apply_contour, x_label, y_label, 
     """
     from matplotlib import pyplot as plt
     from iminuit import Minuit
+    # noinspection PyProtectedMember
+    from iminuit.minuit import _cl_to_errordef
     assert isinstance(fit_object, Minuit)
     fig, ax = plt.subplots()
     ax.set_title(title)
     ax.set_xlabel(x_label)
     ax.set_ylabel(y_label)
     fit_object.visualize()
+    conv_result = investigate_fit_convergence(fit_object)
+    model_parameters = ""
+    for key, value in fit_object.values.to_dict().items():
+        model_parameters += f"{key} = {value:.4f}\n"
+    ax.legend(["data", f"model",],
+              title=f"{model_parameters}\nGoF={conv_result['x']:.4f}\nndf={conv_result['ndf']}\np={conv_result['p']:.4f}", frameon=False)
+
     # for error bands we must perform something similar
-    if hasattr(fit_object.fcn._fcn, "model"):
+    if hasattr(extract_iminuit_cost_object(fit_object), "model"):
         try:
             from jacobi import propagate
-            x, _, _ = fit_object.fcn._fcn._masked.T
-            y, ycov = propagate(lambda p: fit_object.fcn._fcn.model(x, p), fit_object.values, fit_object.covariance)
+            # noinspection PyProtectedMember
+            x, _, _ = extract_iminuit_cost_object(fit_object)._masked.T
+            y, ycov = propagate(lambda p: extract_iminuit_cost_object(fit_object).model(x, p), fit_object.values,
+                                fit_object.covariance)
             yerr_prop = np.diag(ycov) ** 0.5
             plt.fill_between(x, y - yerr_prop, y + yerr_prop, facecolor="C1", alpha=0.5)
         except:
             pass
 
     pdf.savefig(fig, bbox_inches='tight')
+    plt.close(fig)
     cls = [0.68, 0.9, 0.99]
 
-    if apply_contour:
+    if apply_contour and fit_object.valid:
         # will need 'to do' it on our selves
         pars = [p for p in fit_object.parameters if not fit_object.fixed[p]]
         npar = len(pars)
-        figsize=None
+        figsize = None
         fig, ax = plt.subplots(
             npar,
             npar,
@@ -236,19 +264,20 @@ def handle_minuit_advanced_options(fit_object, apply_contour, x_label, y_label, 
         # fit_object.draw_mncontour()
         fig.suptitle(contours_title)
         pdf.savefig(fig, bbox_inches='tight')
+        plt.close(fig)
 
 
 def investigate_fit_convergence(fitter):
     from kafe2 import FitBase
     from iminuit import Minuit
     if isinstance(fitter, Minuit):
-        print(fitter.fval, fitter.fmin.fval, fitter.fmin.reduced_chi2)
+        # print(fitter.fval, fitter.fmin.fval, fitter.fmin.reduced_chi2)
         cost_value = fitter.fval
         ndf = fitter.ndof
     elif isinstance(fitter, FitBase):
         cost_value = fitter.goodness_of_fit
         ndf = fitter.ndf
-        print(fitter.chi2_probability)
+        # print(fitter.chi2_probability)
     else:
         raise TypeError("Fitter must be either a Minuit or XYFit object.")
     from scipy.stats.distributions import chi2
@@ -256,7 +285,6 @@ def investigate_fit_convergence(fitter):
     p_value = 1 - chi2.cdf(regular_cost, df=ndf)
     convergence = dict(x=cost_value, xn=regular_cost, ndf=ndf, p=p_value)
     print(convergence)
-    # print(-2*np.log(cost_value))
     return convergence
 
 
@@ -292,10 +320,7 @@ def handle_analysis_mix_up(group):
 
     :param group: group for which analysis mix-up has to be prevented.
     """
-    if "analysis" in group:
-        # TODO: will need a handler to back previous analysis iterations away without loosing them.
-        group.analysis._f_remove(recursive=True)
-        time.sleep(1)
+    prevent_group_mix_up(group, "analysis")
 
 
 def extract_parasitic_capacitance(hist):
@@ -354,6 +379,7 @@ class DepletionData(tb.IsDescription):
     col = tb.Int64Col(pos=0)
     row = tb.Int64Col(pos=1)
     V = tb.Float32Col(pos=2)
-    NA = tb.Float32Col(pos=3)
-    ND = tb.Float32Col(pos=4)
+    NAD = tb.Float32Col(pos=3)
+    dep = tb.Float32Col(pos=4)
+    sat = tb.Float32Col(pos=5)
 # endregion
