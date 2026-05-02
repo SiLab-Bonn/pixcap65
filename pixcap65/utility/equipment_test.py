@@ -44,9 +44,11 @@ def test_frequency_settling(settling_range: Iterable, file_name: str):
                             print("operating for pixel {i_col},{i_row}".format(i_col=col, i_row=row))
                             print(current_hist[col, row, :n_freq] - np.flip(current_hist[col, row, n_freq:]))
                             print(frequencies[:n_freq] - np.flip(frequencies[n_freq:]))
-                            print(pix.out_file_h5.root[settling_name].total_cap.measurements.HistCurrValues[col, row, 1, :])
+                            print(pix.out_file_h5.root[settling_name].total_cap.measurements.HistCurrValues[
+                                      col, row, 1, :])
                             print(
-                                pix.out_file_h5.root[settling_name].total_cap.measurements.HistCurrValues[col, row, -2, :])
+                                pix.out_file_h5.root[settling_name].total_cap.measurements.HistCurrValues[
+                                    col, row, -2, :])
                             ax.set_ylabel('Current / nA')
                             ax.set_xlabel('Frequency / MHz')
                             ax.set_title(f"Frequency settling test for currents and settling time {t}")
@@ -54,8 +56,9 @@ def test_frequency_settling(settling_range: Iterable, file_name: str):
                             ax.grid()
                             output_pdf.savefig(fig, bbox_inches='tight')
 
-def test_source_settling(setlling_range: Iterable, file_name: str):
-    settling_times = np.asarray(setlling_range)
+
+def test_source_settling(settling_range: Iterable, file_name: str):
+    settling_times = np.asarray(settling_range)
     with PixCap65TotalCap(scan_configuration, file_name) as pix:
         from matplotlib import pyplot as plt
         pix.pixcap.bias_voltage = -0.1
@@ -92,6 +95,7 @@ def test_source_settling(setlling_range: Iterable, file_name: str):
         ax.plot(settling_times, current_data)
         fig.savefig("source_settling_test.png")
 
+
 def test_reading_speed(smu, file_name: str, config: dict, reading_range: Iterable, n_tests=10):
     reading_range = np.asarray(reading_range)
     with PixCap65TotalCap(config, file_name) as pix:
@@ -112,10 +116,11 @@ def test_reading_speed(smu, file_name: str, config: dict, reading_range: Iterabl
             for _ in range(n_tests):
                 pix.pixcap.smu_advanced_current_multiple(n_readings, smu)
             diff = time.time() - start
-            print(f"{n_readings} take {diff/n_tests} seconds each.")
+            print(f"{n_readings} take {diff / n_tests} seconds each.")
 
         pix.pixcap[pix.pixcap.smu_setup_devices[smu]].drain_error_queue()
         pix.pixcap.bias_off()
+
 
 def test_reading_speed_adv(smu, file_name: str, config: dict, reading_range: Iterable, n_tests=10):
     reading_range = np.asarray(reading_range)
@@ -153,23 +158,14 @@ def test_reading_speed_adv(smu, file_name: str, config: dict, reading_range: Ite
             pix.pixcap[pix.pixcap.smu_setup_devices[smu]].drain_error_queue()
             internal_smu.set_current_nlpc(10)
 
+
 if __name__ == "__main__":
-    # test_frequency_settling(np.linspace(0, 1, 20), "freq_settling_test.h5")
-    # print(np.linspace(0, 2, 30))
-    # test_source_settling(np.linspace(0, 2, 30), "source_settling_test.h5")
+    test_frequency_settling(np.linspace(0, 1, 20), "freq_settling_test.h5")
+    print(np.linspace(0, 2, 30))
+    test_source_settling(np.linspace(0, 2, 30), "source_settling_test.h5")
 
-    # print("start reading test.")
-    # test_reading_speed("VM3", "reading_speed_test.h5", scan_configuration, np.arange(3,20.1,1), n_tests=20)
-    # print("start advanced test")
-    test_reading_speed_adv("VM3", "reading_speed_test_advanced.h5", scan_configuration, np.arange(3, 20.1, 1), n_tests=20)
-    # print("Test the bias smu!")
-    # test_reading_speed("BIAS_SUPPLY", "reading_speed_test_bias.h5", scan_configuration, np.arange(3, 20.1, 1), n_tests=20)
-
-    # with tb.open_file("./R13_Initial_3_Scan.h5", "r") as f:
-    #     group = walk_to_node(f.root, "ATLAS ITk/unbiased_1/total_cap/measurements")
-    #     print(group._v_children)
-    #     for key, value in group._v_children.items():
-    #         print(key, value, sep=";;; ")
-
-
-
+    print("start reading test.")
+    test_reading_speed("VM3", "reading_speed_test.h5", scan_configuration, np.arange(3, 20.1, 1), n_tests=20)
+    print("start advanced test")
+    test_reading_speed_adv("VM3", "reading_speed_test_advanced.h5", scan_configuration,
+                           np.arange(3, 20.1, 1), n_tests=20)
