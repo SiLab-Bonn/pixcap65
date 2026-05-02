@@ -4,8 +4,8 @@ from typing import Optional, OrderedDict, Union
 
 import numpy as np
 import time
-from basil.dut import Dut, Base
 
+from basil.dut import Dut, Base
 from pixcap_65_test_total_cap import PixCap65Measurement
 
 logger = logging.getLogger(__name__)
@@ -37,6 +37,21 @@ class PixCapSetup(Dut):
             measurement = PixcapMeasurements.TOTAL_CAPACITANCE
         assert isinstance(measurement, PixcapMeasurements) or isinstance(measurement, str) or issubclass(measurement,
                                                                                                          PixCap65Measurement)
+        if isinstance(config, str) and config.endswith(".yaml"):
+            # verify the path and modify the configuration if necessary!
+            import os
+            if not os.path.exists(config):
+                if os.path.isdir("pixcap"):
+                    new_path = os.path.join("pixcap", config)
+                    assert os.path.exists(new_path)
+                    config = new_path
+                elif os.path.dirname(config) == "pixcap":
+                    new_path = os.path.join("..", config)
+                    new_path = os.path.normpath(new_path)
+                    assert os.path.exists(new_path)
+                    config = new_path
+
+        # CHECK: should the configuration be updated right here for further usage?
         temp_dut = Base(config)
         adjusted_config = temp_dut._conf.copy()
         self._environ_config = OrderedDict()
@@ -186,7 +201,6 @@ class PixCapSetup(Dut):
         logger.debug("For the handling of the setup, we'll use the config:\n %s", str(self._environ_config))
         super(PixCapSetup, self).__init__(conf=self._environ_config)
 
-
         # get the correct pixcap measurement class
         pix_args = {
             "scan_config": scan_config,
@@ -195,7 +209,7 @@ class PixCapSetup(Dut):
         }
         if isinstance(measurement, str):
             self.measurement_arguments = pix_args
-            match (measurement):
+            match measurement:
                 case PixcapMeasurements.TOTAL_CAPACITANCE:
                     from pixcap_65_test_total_cap import PixCap65TotalCap
                     self.measurement_class = PixCap65TotalCap
@@ -266,7 +280,9 @@ class PixCapSetup(Dut):
 
 if __name__ == "__main__":
     from pixcap_65_test_total_cap import scan_configuration
-    with PixCapSetup(scan_configuration, "Setup_Demonstration.h5", measurement=PixcapMeasurements.TOTAL_CAPACITANCE) as setup:
+
+    with PixCapSetup(scan_configuration, "Setup_Demonstration.h5",
+                     measurement=PixcapMeasurements.TOTAL_CAPACITANCE) as setup:
         pass
     # dut = Dut("demo.yaml")
     # dut.init()

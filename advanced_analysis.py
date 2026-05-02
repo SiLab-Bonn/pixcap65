@@ -2,7 +2,7 @@ from warnings import deprecated
 
 import numpy as np
 import tables as tb
-import time
+from matplotlib.backends.backend_pdf import PdfPages
 
 # from iminuit import Minuit
 # from iminuit.cost import LeastSquares
@@ -15,7 +15,8 @@ from analysis_util.utility import str_join, check_leaf_unit, \
     SIMPLE_MODEL_LABEL, FULL_MODEL_EXPRESSION, SIMPLE_MODEL_EXPRESSION, FULL_MODEL_PARAMETER_DICT, \
     SIMPLE_MODEL_PARAMETER_DICT, GLOBAL_FILTERS, handle_kafe2_advanced_options, handle_minuit_advanced_options, \
     FARAD_CONVERSION_FACTOR, CURRENT_CONVERSION_FACTOR, TABLES_TABLE_TYPE, get_analysis_group
-from utility.utils_2 import walk_to_node, GroupType
+from pixcap65.utility.tables_util import get_node_pathname
+from pixcap65.utility.utils_2 import walk_to_node, GroupType, prevent_group_mix_up
 
 ANALYSIS_FIT_Y_LABEL = "$I$ in A"
 ANALYSIS_FIT_X_LABEL = "$\\nu$ in MHz"
@@ -24,6 +25,8 @@ ANALYSIS_FIT_PLOT_LEGEND = "Fit of the frequency dependence for pixel ({col}, {r
 ANALYSIS_GROUP_NAME = "analysis"
 ANALYSIS_CORRECTED_GROUP_NAME = "analysis_correction"
 
+
+# noinspection PyIncorrectDocstring,PyDeprecation
 @deprecated("Use the general implementation of analysis.analyze_data_temporary_replacement instead.")
 def advanced_analysis(raw_data, base_path=None, is_cv=False, first_boundaries=None, second_boundaries=None,
                       is_inter_pixel=False, **kwargs):
@@ -41,13 +44,15 @@ def advanced_analysis(raw_data, base_path=None, is_cv=False, first_boundaries=No
     :param use_kafe2: boolean, indicates whether kafe2 is used.
     :param is_cv: boolean, indicates whether this is a C-V characterization.
     :param base_path: path to the base group to look for the data.
-    :param plot: boolean, indicates whether to plot the data. A output pdf object could be submitted here instead of an explicitly created one.
+    :param plot: boolean, indicates whether to plot the data. A output pdf object could be submitted here instead of an
+        explicitly created one.
     :param apply_contour: boolean, indicates whether to determine the contours and try to plot them.
     :param full_model: boolean, True, indicates whether the full model for extended frequency range is to be used.
     :param apply_correction: boolean, False, indicates whether the measured capacitances should be
         corrected immediately;
         Will require the presence of further arguments as information about the parasitics needs to be submitted.
-    :param use_corrected: boolean, False, indicates whether to use the corrected capacitances for the depletion analysis.
+    :param use_corrected: boolean, False, indicates whether to use the corrected capacitances for
+        the depletion analysis.
     """
     with tb.open_file(raw_data, mode='a') as in_file_h5:
         if base_path is None:
@@ -65,21 +70,18 @@ def advanced_analysis(raw_data, base_path=None, is_cv=False, first_boundaries=No
             cv_err_data = np.full(shape=(40, 40, base_group.biasing.measurements.BiasVoltageHist.shape[0]),
                                   fill_value=np.nan)
             cv_data_corrected = np.full(shape=(40, 40, base_group.biasing.measurements.BiasVoltageHist.shape[0]),
-                              fill_value=np.nan)
+                                        fill_value=np.nan)
             cv_err_data_corrected = np.full(shape=(40, 40, base_group.biasing.measurements.BiasVoltageHist.shape[0]),
-                                  fill_value=np.nan)
+                                            fill_value=np.nan)
 
             # make sure to not mix-up with previous analysis results
-            if "analysis" in base_group.biasing:
-                base_group.biasing.analysis._f_remove(recursive=True)
-                time.sleep(1)
+            prevent_group_mix_up(base_group.biasing, "analysis")
 
             for k, bias_voltage in enumerate(base_group.biasing.measurements.BiasVoltageHist):
                 bias_name = f"bias_{bias_voltage}_V".replace('-', "M_").replace(".", "__")
                 data_group = base_group.biasing.measurements[bias_name]
                 ana_group = walk_to_node(base_group.biasing, str_join("/", ANALYSIS_GROUP_NAME, bias_name), create=True)
                 assert isinstance(ana_group, tb.Group)
-
 
                 advanced_analysis_data_handle(in_file_h5, data_group, ana_group,
                                               is_inter_pixel=is_inter_pixel, **kwargs)
@@ -91,8 +93,8 @@ def advanced_analysis(raw_data, base_path=None, is_cv=False, first_boundaries=No
                 cv_err_data[:, :, k] = cap_error_data[:, :]
                 if kwargs.get("apply_correction", False):
                     ana_group_correction = walk_to_node(base_group.biasing,
-                                                str_join("/", ANALYSIS_CORRECTED_GROUP_NAME, bias_name),
-                                                create=True)
+                                                        str_join("/", ANALYSIS_CORRECTED_GROUP_NAME, bias_name),
+                                                        create=True)
                     cap_data = ana_group_correction.HistCap[:]
                     cap_error_data = ana_group_correction.HistCapErr[:]
                     cv_data_corrected[:, :, k] = cap_data[:, :]
@@ -139,12 +141,9 @@ def advanced_analysis(raw_data, base_path=None, is_cv=False, first_boundaries=No
                 reference_group = base_group.inter_cap
             else:
                 reference_group = base_group.total_cap
-            if "analysis" in reference_group:
-                reference_group.analysis._f_remove(recursive=True)
-                time.sleep(1)
+            prevent_group_mix_up(reference_group, "analysis")
             ana_group = walk_to_node(reference_group, "analysis", create=True)
             assert isinstance(ana_group, tb.Group)
-
 
             advanced_analysis_data_handle(in_file_h5, reference_group.measurements, ana_group,
                                           is_inter_pixel=is_inter_pixel, **kwargs)
@@ -153,6 +152,7 @@ def advanced_analysis(raw_data, base_path=None, is_cv=False, first_boundaries=No
             #     apply_correction_simple(kwargs['bare_file'], kwargs['bare_hdf_path'], ana_group)
 
 
+# noinspection PyIncorrectDocstring
 @deprecated("Use the general implementation of analysis.analysis_data_handle_temporary_replacement instead.")
 def advanced_analysis_data_handle(file: tb.File, data_group: GroupType, result_group: GroupType,
                                   is_inter_pixel=False, **kwargs):
@@ -188,7 +188,8 @@ def advanced_analysis_data_handle(file: tb.File, data_group: GroupType, result_g
         # Read scan parameters
         scan_parameters = data_group.scan_params[:]
 
-        advanced_analysis_delegate(file, result_group, current_hist, scan_parameters, current_error_hist=current_error_hist,
+        advanced_analysis_delegate(file, result_group, current_hist, scan_parameters,
+                                   current_error_hist=current_error_hist,
                                    **kwargs)
 
         inter_a_output_dict = {
@@ -214,7 +215,8 @@ def advanced_analysis_data_handle(file: tb.File, data_group: GroupType, result_g
         else:
             current_error_hist = np.full_like(current_hist, fill_value=np.nan)
 
-        advanced_analysis_delegate(file, result_group, current_hist, scan_parameters, current_error_hist=current_error_hist,
+        advanced_analysis_delegate(file, result_group, current_hist, scan_parameters,
+                                   current_error_hist=current_error_hist,
                                    **kwargs)
 
         inter_b_output_dict = {
@@ -240,7 +242,8 @@ def advanced_analysis_data_handle(file: tb.File, data_group: GroupType, result_g
         else:
             current_error_hist = np.full_like(current_hist, fill_value=np.nan)
 
-        advanced_analysis_delegate(file, result_group, current_hist, scan_parameters, current_error_hist=current_error_hist,
+        advanced_analysis_delegate(file, result_group, current_hist, scan_parameters,
+                                   current_error_hist=current_error_hist,
                                    **kwargs)
 
 
@@ -254,7 +257,8 @@ def advanced_analysis_data_handle(file: tb.File, data_group: GroupType, result_g
         # Read scan parameters
         scan_parameters = data_group.scan_params[:]
 
-        advanced_analysis_delegate(file, result_group, current_hist, scan_parameters, current_error_hist=current_error_hist,
+        advanced_analysis_delegate(file, result_group, current_hist, scan_parameters,
+                                   current_error_hist=current_error_hist,
                                    **kwargs)
 
     # if necessary: directly apply the correction of the capacitance values
@@ -280,15 +284,15 @@ def advanced_analysis_delegate(file: tb.File, group: tb.Group, current_hist: TAB
         :param current_hist: 2D-Array for the current data to fit the model to.
         :param scan_parameters: table of the scan parameters used for each measurement point within the frequency and/or
             voltage scan.
-        :param full_model: boolean, True, indicates whether the full model for extended frequency range is to be used.
+        :key full_model: boolean, True, indicates whether the full model for extended frequency range is to be used.
             Otherwise, the linear model is used.
-        :param current_error_hist: 2D-Array for the errors of the current data. This keyword argument must be present
+        :key current_error_hist: 2D-Array for the errors of the current data. This keyword argument must be present
             for the advanced analysis strategy.
-        :param use_kafe2: boolean, indicates whether kafe2 is used for the fit.
-        :param plot: boolean, indicates whether to plot the data. A output pdf object could be submitted here
+        :key use_kafe2: boolean, indicates whether kafe2 is used for the fit.
+        :key plot: boolean, indicates whether to plot the data. A output pdf object could be submitted here
              instead of an explicitly created one.
-        :param apply_contour: boolean, indicates whether to determine the contours and try to plot them.
-        :param fit_plot_pdf: PdfPages object, to save the fit plot figures to (will override the plot object if provided)
+        :key apply_contour: boolean, indicates whether to determine the contours and try to plot them.
+        :key fit_plot_pdf: PdfPages object, to save the fit plot figures to (will override the plot object if provided)
         """
 
     # extract the additional keyword arguments
@@ -325,8 +329,7 @@ def advanced_analysis_delegate(file: tb.File, group: tb.Group, current_hist: TAB
         effective_parameter_dict = SIMPLE_MODEL_PARAMETER_DICT
 
     if plot:
-        from matplotlib.backends.backend_pdf import PdfPages
-        output_pdf_name = f"{file.filename[:-3]}_{group._v_pathname.replace('/', '----')}_fit_results.pdf"
+        output_pdf_name = f"{file.filename[:-3]}_{get_node_pathname(group).replace('/', '----')}_fit_results.pdf"
         fit_plot_pdf = kwargs.get("fit_plot_pdf", None)
         if fit_plot_pdf is not None and isinstance(fit_plot_pdf, PdfPages):
             output_pdf = fit_plot_pdf

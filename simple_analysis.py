@@ -2,15 +2,15 @@ from warnings import deprecated
 
 import numpy as np
 import tables as tb
-import time
 
 from analysis import analyze_depletion_delegate, apply_correction_simple
 from analysis_util import analyze_data_delegate
 from analysis_util.utility import str_join, ANALYSIS_CORRECTED_GROUP_NAME, check_leaf_unit, ANALYSIS_GROUP_NAME, \
     GLOBAL_FILTERS, get_analysis_group
-from utility.utils_2 import walk_to_node, GroupType
+from pixcap65.utility.utils_2 import walk_to_node, GroupType, prevent_group_mix_up
 
 
+# noinspection PyIncorrectDocstring,PyDeprecation
 @deprecated("Use the general implementation of analysis.analyze_data_temporary_replacement instead.")
 def analyze_data(raw_data, base_path=None, is_cv=False, first_boundaries=None, second_boundaries=None,
                  is_inter_pixel=False, **kwargs):
@@ -49,21 +49,18 @@ def analyze_data(raw_data, base_path=None, is_cv=False, first_boundaries=None, s
             cv_err_data = np.full(shape=(40, 40, base_group.biasing.measurements.BiasVoltageHist.shape[0]),
                                   fill_value=np.nan)
             cv_data_corrected = np.full(shape=(40, 40, base_group.biasing.measurements.BiasVoltageHist.shape[0]),
-                              fill_value=np.nan)
+                                        fill_value=np.nan)
             cv_err_data_corrected = np.full(shape=(40, 40, base_group.biasing.measurements.BiasVoltageHist.shape[0]),
-                                  fill_value=np.nan)
+                                            fill_value=np.nan)
 
             # make sure to not mix-up with previous analysis results
-            if "analysis" in base_group.biasing:
-                base_group.biasing.analysis._f_remove(recursive=True)
-                time.sleep(1)
+            prevent_group_mix_up(base_group.biasing, "analysis")
 
             for k, bias_voltage in enumerate(base_group.biasing.measurements.BiasVoltageHist):
                 bias_name = f"bias_{bias_voltage}_V".replace('-', "M_").replace(".", "__")
                 data_group = base_group.biasing.measurements[bias_name]
                 ana_group = walk_to_node(base_group.biasing, str_join("/", ANALYSIS_GROUP_NAME, bias_name), create=True)
                 assert isinstance(ana_group, tb.Group)
-
 
                 analyze_data_handle_data(in_file_h5, data_group, ana_group, is_inter_pixel=is_inter_pixel, **kwargs)
 
@@ -74,8 +71,8 @@ def analyze_data(raw_data, base_path=None, is_cv=False, first_boundaries=None, s
                 cv_err_data[:, :, k] = cap_error_data[:, :]
                 if kwargs.get("apply_correction", False):
                     ana_group_correction = walk_to_node(base_group.biasing,
-                                                str_join("/", ANALYSIS_CORRECTED_GROUP_NAME, bias_name),
-                                                create=True)
+                                                        str_join("/", ANALYSIS_CORRECTED_GROUP_NAME, bias_name),
+                                                        create=True)
                     cap_data = ana_group_correction.HistCap[:]
                     cap_error_data = ana_group_correction.HistCapErr[:]
                     cv_data_corrected[:, :, k] = cap_data[:, :]
@@ -122,19 +119,21 @@ def analyze_data(raw_data, base_path=None, is_cv=False, first_boundaries=None, s
                 reference_group = base_group.inter_cap
             else:
                 reference_group = base_group.total_cap
-            if "analysis" in reference_group:
-                reference_group.analysis._f_remove(recursive=True)
-                time.sleep(1)
+            prevent_group_mix_up(reference_group, "analysis")
+            # if "analysis" in reference_group:
+            #     reference_group.analysis._f_remove(recursive=True)
+            #     time.sleep(1)
             ana_group = walk_to_node(reference_group, "analysis", create=True)
             assert isinstance(ana_group, tb.Group)
 
+            analyze_data_handle_data(in_file_h5, reference_group.measurements, ana_group, is_inter_pixel=is_inter_pixel,
+                                     **kwargs)
 
-            analyze_data_handle_data(in_file_h5, reference_group.measurements, ana_group, is_inter_pixel=is_inter_pixel, **kwargs)
 
-
+# noinspection PyIncorrectDocstring
 @deprecated("Use the general implementation of analysis.analysis_data_handle_temporary_replacement instead.")
 def analyze_data_handle_data(file: tb.File, data_group: GroupType, result_group: GroupType,
-                             is_inter_pixel=False,  **kwargs):
+                             is_inter_pixel=False, **kwargs):
     """
         analyze data_delegate
 
@@ -214,5 +213,3 @@ def analyze_data_handle_data(file: tb.File, data_group: GroupType, result_group:
         assert 'bare_file' in kwargs
         assert 'bare_hdf_path' in kwargs
         apply_correction_simple(kwargs['bare_file'], kwargs['bare_hdf_path'], result_group)
-
-

@@ -2,6 +2,8 @@
 iminuit
 kafe2
 scipy
+jacobi
+findiff
 
 # equipment tests
 tqdm

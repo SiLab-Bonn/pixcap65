@@ -2,12 +2,14 @@ import enum
 import logging.config
 import logging.handlers
 import os
+
 import sys
 
 try:
     from collections.abc import Iterable
 except ImportError:
     # python 2.7 and < python 3.3
+    # noinspection PyProtectedMember
     from collections import Iterable
 
 from typing import Callable
@@ -165,7 +167,9 @@ def extract_smu_range_error(smu_config: dict, data, range_spec: float, kind: str
     for entry in smu_config[kind]:
         if np.isclose(effective_floating_type(entry[ConfigElements.NORMALISED_RANGE]), range_spec):
             reading_error = result_floating_type(entry[ConfigElements.RESOLUTION][ResolutionElements.ACCURACY])
-            absolute_error = result_floating_type(entry[ConfigElements.RESOLUTION][ResolutionElements.ACCURACY.AMPS]) * range_spec
+            absolute_error = result_floating_type(
+                entry[ConfigElements.RESOLUTION][ResolutionElements.ACCURACY.AMPS]
+            ) * range_spec
             break
     else:
         raise ValueError(f"Could not find range {range_spec} in SMU configuration")
