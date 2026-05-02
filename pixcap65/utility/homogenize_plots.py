@@ -11,6 +11,7 @@ import numpy as np
 ORIG_MATPLOTLIB_CONF = dict(matplotlib.rcParams)
 
 
+# noinspection PyUnboundLocalVariable
 def set_params(fig_width=None, fig_height=None, columns=1, fontsize=8, dpi=300,
                serif='serif', font=None, latex=True, latex_extra='',
                ticks='', minor=False):

@@ -3,6 +3,7 @@ from contextlib import contextmanager, redirect_stdout, redirect_stderr
 from typing import Union
 
 import sys
+# noinspection PyProtectedMember
 from tqdm.contrib import DummyTqdmFile as StdTqdmFile
 from tqdm.std import tqdm as std_tqdm
 
@@ -46,10 +47,11 @@ class DummyTqdmFile(object):
             self.progress.write(x.strip(), file=self.file)
 
     def flush(self):
-        return getattr(self.file, "flush", lambda: None)()
+        getattr(self.file, "flush", lambda: None)()
 
 
 DummyFileType = Union[StdTqdmFile, DummyTqdmFile]
+
 
 def _is_console_logging_handler(handler):
     if not isinstance(handler, logging.StreamHandler):
@@ -71,11 +73,13 @@ def _is_console_logging_handler(handler):
 
 
 def _get_first_found_console_logging_handler(handlers):
+    # noinspection PyInconsistentReturns
     for handler in handlers:
         if _is_console_logging_handler(handler):
             return handler
 
 
+# noinspection PyUnusedLocal
 @contextmanager
 def tqdm_redirect(progress):
     orig_out_err = sys.stdout, sys.stderr
@@ -90,17 +94,20 @@ def tqdm_redirect(progress):
         sys.stdout, sys.stderr = orig_out_err
 
 
+# noinspection PyUnusedLocal
 @contextmanager
 def new_tqdm_redirect(progress):
-    if not (isinstance(sys.stdout,DummyFileType) or isinstance(sys.stderr, DummyFileType)):
+    if not (isinstance(sys.stdout, DummyFileType) or isinstance(sys.stderr, DummyFileType)):
         dummy_file = StdTqdmFile(sys.stdout)
         dummy_error = StdTqdmFile(sys.stderr)
-        with redirect_stdout(dummy_file) as orig_out, redirect_stderr(dummy_error) as orig_err:
+        with redirect_stdout(dummy_file) as orig_out, redirect_stderr(dummy_error):
             yield orig_out
     elif isinstance(sys.stdout, DummyTqdmFile):
         yield sys.stdout.file
     elif isinstance(sys.stdout, StdTqdmFile):
+        # noinspection PyProtectedMember
         yield sys.stdout._wrapped
+
 
 @contextmanager
 def logging_redirect_tqdm(
@@ -118,6 +125,7 @@ def logging_redirect_tqdm(
     loggers  : list, optional
       Which handlers to redirect (default: [logging.root]).
     tqdm_class  : optional
+    dummy_file  : optional
 
     Example
     -------
@@ -159,12 +167,15 @@ def logging_redirect_tqdm(
         for logger, original_handlers in zip(loggers, original_handlers_list):
             logger.handlers = original_handlers
 
+
 @contextmanager
 def logging_writing_redirect(loggers=None, tqdm_class=std_tqdm, **kwargs):
     with logging_redirect_tqdm(loggers=loggers, tqdm_class=tqdm_class):
         with new_tqdm_redirect(tqdm_class) as orig_stream:
             yield orig_stream
 
+
+# noinspection PyIncorrectDocstring
 @contextmanager
 def tqdm_logging_redirect(
         *args,
