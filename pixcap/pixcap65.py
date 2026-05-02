@@ -9,7 +9,7 @@
 #  $Date:: 2015-01-04 10:56:36 #$:
 #
 import logging
-from typing import Any, Dict
+from typing import Any
 
 import numpy as np
 import time
@@ -17,7 +17,7 @@ from numpy import ndarray
 
 from basil.RL.FunctionalRegister import FunctionalRegister
 from basil.dut import Dut
-from utility import pixcap65_constants as c
+from pixcap65.utility import pixcap65_constants as c
 
 # perhaps add the channel information to the pixcap config file and extract it from here!
 float_initialiser = np.float32
@@ -39,10 +39,13 @@ class Pixcap65(Dut):
         self.__vm2_smu_key = 'VM2'
         self.__vm3_smu_key = 'VM3'
         self.__mio_pll_key = 'MIO_PLL'
-        self.__has_smu: Dict[str, bool] = {}
+        self.__has_smu = {}
 
-        self.__smu_keys = [self.__primary_smu_key, self.__vm1_smu_key, self.__vm2_smu_key, self.__vm3_smu_key, self.__bias_smu_key]
-        self.smu_setup_devices = {}  # hold the keys for the access to parts of a smu which are not channel depend for each of the smu registers.
+        self.__smu_keys = [
+            self.__primary_smu_key, self.__vm1_smu_key, self.__vm2_smu_key, self.__vm3_smu_key, self.__bias_smu_key
+        ]
+        self.smu_setup_devices = {}  # hold the keys for the access to parts of a smu which are not channel depend
+        # for each of the smu registers.
 
         self.__seq_size = 1
         self.__current_cvm_frequency = 0
@@ -133,8 +136,8 @@ class Pixcap65(Dut):
         return self.__source_settling_time
 
     @source_settling_time.setter
-    def source_settling_time(self, time):
-        self.__source_settling_time = time
+    def source_settling_time(self, s_time):
+        self.__source_settling_time = s_time
 
     @property
     def has_smu(self):
@@ -200,6 +203,21 @@ class Pixcap65(Dut):
         else:
             self[self.primary_smu_key].set_number_measurements(value, **self.smu_kwargs)
         self.__n_measurements[self.primary_smu_key] = value
+
+    @property
+    def n_bias_measurements(self):
+        """Gets the number of measurements to be performed by the primary SMU."""
+        return self.__n_measurements[self.bias_smu_key]
+
+    @n_bias_measurements.setter
+    def n_bias_measurements(self, value):
+        if value == -1:
+            self[self.bias_smu_key].set_number_measurements(1, **self.__bias_kwargs)
+        else:
+            self[self.bias_smu_key].set_number_measurements(value, **self.__bias_kwargs)
+        self.__n_measurements[self.bias_smu_key] = value
+
+
     # endregion
 
     def init(self, init_conf=None, **kwargs):
@@ -343,6 +361,7 @@ class Pixcap65(Dut):
         self['SPI']['COL'][c.COL_NMAX - i_col]['PIX'][c.PIX_NMAX - i_pix]['SEL'] = bias_mask
         self.update_spi()
 
+    # noinspection PyPep8Naming
     def enable_column(self, i_col, EOC_MASK):
         """
         enable_column
@@ -2151,8 +2170,8 @@ class Pixcap65(Dut):
         """
         vm3_advanced_voltage_multiple
 
-        Performs a voltage measurement by reading multiple voltage values from the SMU connected to the PCBs VM3 port. The full dataset of
-        measurements will be returned.
+        Performs a voltage measurement by reading multiple voltage values from the SMU connected to the PCBs VM3 port.
+        The full dataset of measurements will be returned.
         The call to the SMU is only performed when the SMU is connected and active.
         If no number of measurements is explicitly specified the number of measurements properties for the
         smu is used.

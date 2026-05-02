@@ -10,8 +10,8 @@ import numpy as np
 import time
 from bitarray import bitarray
 
+from pixcap65.utility import pixcap65_constants as c
 from pixcap_65_test_total_cap import PixCap65Measurement
-from utility import pixcap65_constants as c
 
 logger = logging.getLogger()
 logger.setLevel(logging.DEBUG)
@@ -30,6 +30,12 @@ scan_configuration = {
 
 
 class Pixcap65LoadLine(PixCap65Measurement):
+    def handle_measurement_errors(self, unit):
+        raise NotImplementedError("Pixcap65LoadLine.handle_measurement_errors")
+
+    def store_measurement_data(self, data_group, sequence_call, unit=None):
+        raise NotImplementedError("Pixcap65LoadLine.store_measurement_data")
+
     def __init__(self, scan_config, output_file):
         super(Pixcap65LoadLine).__init__(scan_config, output_file)
 
@@ -47,7 +53,7 @@ class Pixcap65LoadLine(PixCap65Measurement):
         self.dut['SMU3'].set_current_limit(0.001)
         self.dut['SMU3'].set_current_sense_range(0.00001)
 
-    def scan(self):
+    def scan(self, data_group_spec=None, sequence_call=False):
         m = self.seq_size / 2 - 1  # define index of the last 1 in order to create a non-overlapping clock sequence
         assert isinstance(m, int), "m has to be an integer!"
         # I do not see the point of a second variable of the same value?
@@ -188,7 +194,8 @@ class Pixcap65LoadLine(PixCap65Measurement):
 # bit_array_CLK_0.setall(0)
 # bit_array_CLK_0[m+1:-1] = 1
 #
-# # vary charging time by looping over the number of bits in bit_array_CLK_3 that are set to 1; number is reduced by one in every step
+# # vary charging time by looping over the number of bits in bit_array_CLK_3 that are set to 1;
+# # number is reduced by one in every step
 # for i in range(m , 0 , -1):
 #
 #     dut['SEQ'].reset()
