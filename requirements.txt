@@ -12,5 +12,10 @@ pySiLibUSB
 pyserial
 
 -r gui_requirements.txt
--r advanced_requirements.txt
+-r advanced-requirements.txt
 tqdm
+scipy
+kafe2
+iminuit
+jacobi
+findiff

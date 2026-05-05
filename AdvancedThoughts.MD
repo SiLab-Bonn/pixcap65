@@ -17,7 +17,7 @@ Here the columns are ordered by the coordinates of the pixel on the grid, so the
 into this direction
 There is also no need for a ´Event` block.
 But we should separate the advancements from investigation and data taking from each other.
-Also, it should be possible to either switch the file fast or create a own group/table within one file for each bias
+Also, it should be possible to either switch the file fast or create an own group/table within one file for each bias
 voltage investigated or other differences.
 
 ### Root Tree

@@ -10,11 +10,6 @@ from tables import Group
 
 from pixcap65.analysis_util.physics_modelling import model_depletion
 
-BIAS_CURVE_Y_LABEL = "I in nA"
-BIAS_CURVE_X_LABEL = "U in V"
-DEFAULT_BIN_NUMBER = 50
-DEFAULT_TEST_CAP_EXCLUSION = True
-
 try:
     # noinspection PyCompatibility
     from collections.abc import Iterable
@@ -30,11 +25,11 @@ from matplotlib.backends.backend_agg import FigureCanvasAgg as FigureCanvas
 from matplotlib.backends.backend_pdf import PdfPages
 from matplotlib.figure import Figure
 from mpl_toolkits.axes_grid1 import make_axes_locatable
-from analysis_util.utility import check_leaf_unit, GENERAL_PIXCAP_SHAPE, HIST_BIAS_MEAS_UNIT, \
+from pixcap65.analysis_util.utility import check_leaf_unit, GENERAL_PIXCAP_SHAPE, HIST_BIAS_MEAS_UNIT, \
     HIST_LEAK_CURRENT_UNIT, \
     HIST_CAP_UNIT, HIST_CURRENT_MEAS_UNIT, extract_parasitic_capacitance, CURRENT_CONVERSION_FACTOR, get_base_group, \
     get_analysis_group, TABLES_LEAF_COMPAT_TYPE
-from utility.utils_2 import GroupType
+from pixcap65.utility.utils_2 import GroupType
 
 HISTOGRAM_SHAPE_FORMAT = "The histograms shape is {}"
 ROW_LABEL = 'Row'
@@ -48,6 +43,10 @@ SIMPLE_PIXEL_LABEL = '{prefix}Pixel({i_col},{i_row})'
 CAPACITANCE_CONVERSION_FACTOR = 1e15
 ADVANCED_CAPACITANCE_CONVERSION_FACTOR = 1.0e-9
 cmap = plt.get_cmap('viridis')
+BIAS_CURVE_Y_LABEL = "I in nA"
+BIAS_CURVE_X_LABEL = "U in V"
+DEFAULT_BIN_NUMBER = 50
+DEFAULT_TEST_CAP_EXCLUSION = True
 logger = logging.getLogger(__name__)
 
 
@@ -369,7 +368,6 @@ Optional[float] = None, second_upper: Optional[float] = None,
                 logger.debug("The result of the second fit is:")
                 logger.debug(str(second_result))
 
-            # MARK: perhaps use an improved implementation utilizing matrix-vector multiplication from numpy?
             # estimate the depletion voltage
             d = first_dep_parameters[1]
             b = second_dep_parameters[1]
@@ -526,7 +524,7 @@ def plot_data_delegate(data_group: tb.Group, analysis_group: tb.Group, output_pd
     output_pdf.savefig(fig, bbox_inches='tight')
     plt.close(fig)
     if kwargs.pop("distribution", False):
-        from analysis import analyze_capacitance_distribution_delegate
+        from pixcap65.analysis import analyze_capacitance_distribution_delegate
         analyze_capacitance_distribution_delegate(analysis_group, output_pdf, **kwargs)
 
     # Current vs. frequency
@@ -683,7 +681,7 @@ def plot_inter_pix_data_delegate(data_group: tb.Group, analysis_group: tb.Group,
         output_pdf.savefig(fig, bbox_inches='tight')
         plt.close(fig)
         if need_distribution:
-            from analysis import analyze_capacitance_distribution_delegate
+            from pixcap65.analysis import analyze_capacitance_distribution_delegate
             analyze_capacitance_distribution_delegate(analysis_group, output_pdf, capacitance=total_cap_hist, **kwargs)
 
         if total_ref_cap_hist is not None:
@@ -701,7 +699,7 @@ def plot_inter_pix_data_delegate(data_group: tb.Group, analysis_group: tb.Group,
             output_pdf.savefig(fig, bbox_inches='tight')
             plt.close(fig)
             if need_distribution:
-                from analysis import analyze_capacitance_distribution_delegate
+                from pixcap65.analysis import analyze_capacitance_distribution_delegate
                 analyze_capacitance_distribution_delegate(analysis_group, output_pdf,
                                                           capacitance=effective_inter_cap_hist, **kwargs)
 
@@ -719,7 +717,7 @@ def plot_inter_pix_data_delegate(data_group: tb.Group, analysis_group: tb.Group,
         output_pdf.savefig(fig, bbox_inches='tight')
         plt.close(fig)
         if need_distribution:
-            from analysis import analyze_capacitance_distribution_delegate
+            from pixcap65.analysis import analyze_capacitance_distribution_delegate
             analyze_capacitance_distribution_delegate(analysis_group, output_pdf, capacitance=inter_a_cap_hist,
                                                       **kwargs)
 
@@ -737,7 +735,7 @@ def plot_inter_pix_data_delegate(data_group: tb.Group, analysis_group: tb.Group,
         output_pdf.savefig(fig, bbox_inches='tight')
         plt.close(fig)
         if need_distribution:
-            from analysis import analyze_capacitance_distribution_delegate
+            from pixcap65.analysis import analyze_capacitance_distribution_delegate
             analyze_capacitance_distribution_delegate(analysis_group, output_pdf, capacitance=inter_b_cap_hist,
                                                       **kwargs)
 
@@ -848,7 +846,7 @@ def plot_current_model(ax: Axes, col, row, analysis_group: Group, actual_cap: An
     assert 'prefix' not in plot_args
     if resistor_name in analysis_group and np.isfinite(analysis_group.HistRes[col, row]):
         hist_resistance = analysis_group[resistor_name]
-        from analysis_util.physics_modelling import full_capacitance_model
+        from pixcap65.analysis_util.physics_modelling import full_capacitance_model
         assert isinstance(hist_resistance, tb.Array) or isinstance(hist_resistance, np.ndarray)
         ax.plot(f,
                 full_capacitance_model(f,
@@ -971,10 +969,10 @@ def plot_depletion_pixel_delegate(bias_voltages: TABLES_LEAF_COMPAT_TYPE, i_col,
 if __name__ == '__main__':
     # plot_data(interpreted_data=os.path.expanduser('~/git/pixcap65/pixcap_LF_50x50_DC_R3_80V_HV.h5'))
     # plot_data(interpreted_data='Data/r13-measurement/R13_Initial_3_Scan.h5', base_path="ATLAS ITk/unbiased_1", suffix="unbiased_full_measurement", use_group=True)
-    plot_inter_pix_data(interpreted_data='R13-Interpixel_Scan.h5',
-                        base_path="Reference/R13/demo_measurement_65_unbiased_1_discharge",
-                        use_group=True, suffix="inter_pix_65", total_data="Data/r13-measurement/TEST.h5",
-                        distribution=True, set_parasitic=False)
+    # plot_inter_pix_data(interpreted_data='R13-Interpixel_Scan.h5',
+    #                     base_path="Reference/R13/demo_measurement_65_unbiased_1_discharge",
+    #                     use_group=True, suffix="inter_pix_65", total_data="Data/r13-measurement/TEST.h5",
+    #                     distribution=True, set_parasitic=False)
     # plot_inter_pix_data(interpreted_data='R13-Interpixel_Scan.h5', base_path="Reference/R13/demo_measurement_64_unbiased_1_discharge",
     #                     use_group=True, suffix="inter_pix_64")
     # plot_data(interpreted_data="Reference_Evelyn_Scan.h5", base_path="Reference/E1/unbiased_3_test", use_group=True)

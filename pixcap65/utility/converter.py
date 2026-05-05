@@ -1,7 +1,7 @@
 import numpy as np
 import tables as tb
 
-from analysis_util.utility import HIST_BIAS_MEAS_UNIT, HIST_CURRENT_MEAS_UNIT
+from pixcap65.analysis_util.utility import HIST_BIAS_MEAS_UNIT, HIST_CURRENT_MEAS_UNIT
 from pixcap65.utility.tables_util import set_group_attribute, group_get_file, get_groups
 from pixcap65.utility.utils_2 import UNITS_ATTRIBUTE_KEY, create_carray, prevent_group_mix_up
 
@@ -23,7 +23,7 @@ def adjust_i_v_measurement(group, has_values=False):
 
 def regenerate_i_v_errors(group):
     if "HistCurrValues" not in group and "HistCurr" in group:
-        from configs.config_handler import extract_smu_current_error
+        from pixcap65.configs.config_handler import extract_smu_current_error
         import yaml
         with open("/configs/keithley_2410_range.yaml") as f:
             config = yaml.safe_load(f)
@@ -74,7 +74,7 @@ def adjust_c_v_measurement(group, iv_values=False, cv_values=False):
 def adjust_cap_measurement(group, has_values=False):
     group.HistCurr.attrs["Units"] = "A"
     if "HistCurrErr" not in group:
-        from configs.config_handler import extract_smu_current_error
+        from pixcap65.configs.config_handler import extract_smu_current_error
         import yaml
         with open("/configs/keithley_2602a_range.yaml") as f:
             config = yaml.safe_load(f)
@@ -102,7 +102,7 @@ def generate_pixel_dimensions(group):
 
 def regenerate_measurement_errors(group):
     if "HistCurrValues" not in group:
-        from configs.config_handler import extract_smu_current_error
+        from pixcap65.configs.config_handler import extract_smu_current_error
         import yaml
         with open("/configs/keithley_2602a_range.yaml") as f:
             config = yaml.safe_load(f)

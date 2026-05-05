@@ -1,0 +1,15 @@
+version : "1.0"
+
+profile:
+  base:
+    name: qodana.starter
+
+  inspections:
+    - inspection: PyPep8Inspection
+      options:
+        ignoredErrors:
+          - E722
+    - inspection: PyBroadException
+      enabled: False
+    - inspection: PyBroadExceptionInspection
+      enabled: False

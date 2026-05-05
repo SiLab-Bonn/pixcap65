@@ -1,6 +1,6 @@
 import logging
 from contextlib import contextmanager, redirect_stdout, redirect_stderr
-from typing import Union
+from typing import Union, Optional, Type, List, Iterator
 
 import sys
 # noinspection PyProtectedMember
@@ -155,7 +155,8 @@ def logging_redirect_tqdm(
                 print("compare the process wrappers")
                 print(dummy_file.progress, tqdm_handler.tqdm_class)
             orig_handler = _get_first_found_console_logging_handler(logger.handlers)
-            if orig_handler is not None:
+            if orig_handler is not None and isinstance(orig_handler, logging.StreamHandler):
+                assert hasattr(orig_handler, 'stream')
                 # print(f"Redirect the logging for logger: {logger.name}")
                 tqdm_handler.setFormatter(orig_handler.formatter)
                 tqdm_handler.stream = orig_handler.stream
@@ -168,6 +169,7 @@ def logging_redirect_tqdm(
             logger.handlers = original_handlers
 
 
+# noinspection PyUnusedLocal
 @contextmanager
 def logging_writing_redirect(loggers=None, tqdm_class=std_tqdm, **kwargs):
     with logging_redirect_tqdm(loggers=loggers, tqdm_class=tqdm_class):

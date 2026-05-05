@@ -3,9 +3,10 @@ from warnings import deprecated
 import numpy as np
 import tables as tb
 
-from analysis import analyze_depletion_delegate, apply_correction_simple
-from analysis_util import analyze_data_delegate
-from analysis_util.utility import str_join, ANALYSIS_CORRECTED_GROUP_NAME, check_leaf_unit, ANALYSIS_GROUP_NAME, \
+from pixcap65.analysis import analyze_depletion_delegate, apply_correction_simple
+from pixcap65.analysis_util import analyze_data_delegate
+from pixcap65.analysis_util.utility import str_join, ANALYSIS_CORRECTED_GROUP_NAME, check_leaf_unit, \
+    ANALYSIS_GROUP_NAME, \
     GLOBAL_FILTERS, get_analysis_group
 from pixcap65.utility.utils_2 import walk_to_node, GroupType, prevent_group_mix_up
 
@@ -19,26 +20,26 @@ def analyze_data(raw_data, base_path=None, is_cv=False, first_boundaries=None, s
 
 
     # FIXME: update the docstring
-    Analze the provided raw data to determine the (total) capacitance of each pixel in the measurement.
+    Analyze the provided raw data to determine the (total) capacitance of each pixel in the measurement.
     Due to its simplified analysis strategy this method is only valid for sufficiently small frequencies.
-    What sufficiently smalls is, dependes on the measured capacitance and the on-resistance of the measurement circuit.
+    What sufficiently smalls is, depends on the measured capacitance and the on-resistance of the measurement circuit.
     Please note, this function is only a wrapper around the actual analysis to handle files and output strategy.
 
-    The capacitances are determined by a simple linear fit without paying attention to measurement uncertainties.
+    The capacitance are determined by a simple linear fit without paying attention to measurement uncertainties.
 
     This function could also be used for the investigation of a C-V curve.
     In this case the fits are performed for every bias voltage used for the characterization.
 
     :param raw_data: path to the hdf file containing the raw data.
     :param is_cv: boolean, indicating whether this a C-V- characterization instead of a simple pixel scan.
-    :param base_path: path to the base group withing the hdf files hierachry.
+    :param base_path: path to the base group withing the hdf files hierarchy.
     """
     with tb.open_file(raw_data, mode='a') as in_file_h5:
         if base_path is None:
             base_group = in_file_h5.root
         else:
             try:
-                base_group = walk_to_node(in_file_h5.root, base_path)
+                base_group, _ = walk_to_node(in_file_h5.root, base_path, verify_create=True)
             except:
                 print(in_file_h5)
                 raise
@@ -59,20 +60,20 @@ def analyze_data(raw_data, base_path=None, is_cv=False, first_boundaries=None, s
             for k, bias_voltage in enumerate(base_group.biasing.measurements.BiasVoltageHist):
                 bias_name = f"bias_{bias_voltage}_V".replace('-', "M_").replace(".", "__")
                 data_group = base_group.biasing.measurements[bias_name]
-                ana_group = walk_to_node(base_group.biasing, str_join("/", ANALYSIS_GROUP_NAME, bias_name), create=True)
+                ana_group, _ = walk_to_node(base_group.biasing, str_join("/", ANALYSIS_GROUP_NAME, bias_name), create=True, verify_create=True)
                 assert isinstance(ana_group, tb.Group)
 
                 analyze_data_handle_data(in_file_h5, data_group, ana_group, is_inter_pixel=is_inter_pixel, **kwargs)
 
-                # extract the capacitance data for tabular value; will also need coreected data.
+                # extract the capacitance data for tabular value; will also need corrected data.
                 cap_data = ana_group.HistCap[:]
                 cap_error_data = ana_group.HistCapErr[:]
                 cv_data[:, :, k] = cap_data[:, :]
                 cv_err_data[:, :, k] = cap_error_data[:, :]
                 if kwargs.get("apply_correction", False):
-                    ana_group_correction = walk_to_node(base_group.biasing,
+                    ana_group_correction, _ = walk_to_node(base_group.biasing,
                                                         str_join("/", ANALYSIS_CORRECTED_GROUP_NAME, bias_name),
-                                                        create=True)
+                                                        create=True, verify_create=True)
                     cap_data = ana_group_correction.HistCap[:]
                     cap_error_data = ana_group_correction.HistCapErr[:]
                     cv_data_corrected[:, :, k] = cap_data[:, :]
@@ -123,7 +124,7 @@ def analyze_data(raw_data, base_path=None, is_cv=False, first_boundaries=None, s
             # if "analysis" in reference_group:
             #     reference_group.analysis._f_remove(recursive=True)
             #     time.sleep(1)
-            ana_group = walk_to_node(reference_group, "analysis", create=True)
+            ana_group, _ = walk_to_node(reference_group, "analysis", create=True, verify_create=True)
             assert isinstance(ana_group, tb.Group)
 
             analyze_data_handle_data(in_file_h5, reference_group.measurements, ana_group, is_inter_pixel=is_inter_pixel,
@@ -138,18 +139,18 @@ def analyze_data_handle_data(file: tb.File, data_group: GroupType, result_group:
         analyze data_delegate
 
         # FIXME: implement the correct doc string here.
-        Analze the provided raw data to determine the (total) capacitance of each pixel in the measurement.
+        Analyze the provided raw data to determine the (total) capacitance of each pixel in the measurement.
         Due to its simplified analysis strategy this method is only valid for sufficiently small frequencies.
-        What sufficiently smalls is, dependes on the measured capacitance and the on-resistance of the measurement circuit.
+        What sufficiently smalls is, depends on the measured capacitance and the on-resistance of the measurement circuit.
 
-        The capacitances are determined by a simple linear fit without paying attention to measurement uncertainties.
+        The capacitance are determined by a simple linear fit without paying attention to measurement uncertainties.
 
         This function could also be used for the investigation of a C-V curve.
         In this case the fits are performed for every bias voltage used for the characterization.
 
         :param file: open hdf file to write the analysis results to.
-        :param data_group: hdf file's hierachy group containing the measured data.
-        :param result_group: hdf file's hierachy group to write the analysis results to.
+        :param data_group: hdf file's hierarchy group containing the measured data.
+        :param result_group: hdf file's hierarchy group to write the analysis results to.
         """
     # Read pixel map
     assert isinstance(data_group, tb.Group)

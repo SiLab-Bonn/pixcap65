@@ -4,13 +4,9 @@ import numpy as np
 import tables as tb
 from matplotlib.backends.backend_pdf import PdfPages
 
-# from iminuit import Minuit
-# from iminuit.cost import LeastSquares
-# from matplotlib.backends.backend_pdf import PdfPages
-# from tables import Group
 from analysis import analyze_depletion_delegate, apply_correction_simple
-from analysis_util.physics_modelling import full_capacitance_model, simple_capacitance_model
-from analysis_util.utility import str_join, check_leaf_unit, \
+from pixcap65.analysis_util.physics_modelling import full_capacitance_model, simple_capacitance_model
+from pixcap65.analysis_util.utility import str_join, check_leaf_unit, \
     transform_covariance, TABLES_ARRAY_TYPE, GENERAL_PIXCAP_SHAPE, COVARIANCE_PIXCAP_SHAPE, FULL_MODEL_LABEL, \
     SIMPLE_MODEL_LABEL, FULL_MODEL_EXPRESSION, SIMPLE_MODEL_EXPRESSION, FULL_MODEL_PARAMETER_DICT, \
     SIMPLE_MODEL_PARAMETER_DICT, GLOBAL_FILTERS, handle_kafe2_advanced_options, handle_minuit_advanced_options, \
@@ -35,7 +31,7 @@ def advanced_analysis(raw_data, base_path=None, is_cv=False, first_boundaries=No
 
     Implementation of the advanced analysis strategy for the capacitance measurement of a pixel sensor.
     For determination of the capacitance values non-linear fit algorithms are used.
-    Depeneding on the choice of parameters either kafe2 or iminuit is used for least-squares minimization.
+    Depending on the choice of parameters either kafe2 or iminuit is used for least-squares minimization.
     But keep in mind that this function serves as a wrapper for file access and modification around
     the actual analysis implementation.
 
@@ -44,14 +40,14 @@ def advanced_analysis(raw_data, base_path=None, is_cv=False, first_boundaries=No
     :param use_kafe2: boolean, indicates whether kafe2 is used.
     :param is_cv: boolean, indicates whether this is a C-V characterization.
     :param base_path: path to the base group to look for the data.
-    :param plot: boolean, indicates whether to plot the data. A output pdf object could be submitted here instead of an
+    :param plot: boolean, indicates whether to plot the data. An output PDF object could be submitted here instead of an
         explicitly created one.
     :param apply_contour: boolean, indicates whether to determine the contours and try to plot them.
     :param full_model: boolean, True, indicates whether the full model for extended frequency range is to be used.
-    :param apply_correction: boolean, False, indicates whether the measured capacitances should be
+    :param apply_correction: boolean, False, indicates whether the measured capacitance should be
         corrected immediately;
-        Will require the presence of further arguments as information about the parasitics needs to be submitted.
-    :param use_corrected: boolean, False, indicates whether to use the corrected capacitances for
+        Will require the presence of further arguments as information about the parasitic capacitance needs to be submitted.
+    :param use_corrected: boolean, False, indicates whether to use the corrected capacitance for
         the depletion analysis.
     """
     with tb.open_file(raw_data, mode='a') as in_file_h5:
@@ -59,7 +55,7 @@ def advanced_analysis(raw_data, base_path=None, is_cv=False, first_boundaries=No
             base_group = in_file_h5.root
         else:
             try:
-                base_group = walk_to_node(in_file_h5.root, base_path)
+                base_group, _ = walk_to_node(in_file_h5.root, base_path, verify_create=True)
             except:
                 print(in_file_h5)
                 raise
@@ -77,28 +73,30 @@ def advanced_analysis(raw_data, base_path=None, is_cv=False, first_boundaries=No
             # make sure to not mix-up with previous analysis results
             prevent_group_mix_up(base_group.biasing, "analysis")
 
+            # we need to prepare a table for the results of the distribution analysis
+
             for k, bias_voltage in enumerate(base_group.biasing.measurements.BiasVoltageHist):
                 bias_name = f"bias_{bias_voltage}_V".replace('-', "M_").replace(".", "__")
                 data_group = base_group.biasing.measurements[bias_name]
-                ana_group = walk_to_node(base_group.biasing, str_join("/", ANALYSIS_GROUP_NAME, bias_name), create=True)
+                ana_group, _ = walk_to_node(base_group.biasing, str_join("/", ANALYSIS_GROUP_NAME, bias_name), create=True, verify_create=True)
                 assert isinstance(ana_group, tb.Group)
-
                 advanced_analysis_data_handle(in_file_h5, data_group, ana_group,
                                               is_inter_pixel=is_inter_pixel, **kwargs)
 
-                # extract the capacitance data for tabular value; will also need coreected data.
+                # extract the capacitance data for tabular value; will also need corrected data.
                 cap_data = ana_group.HistCap[:]
                 cap_error_data = ana_group.HistCapErr[:]
                 cv_data[:, :, k] = cap_data[:, :]
                 cv_err_data[:, :, k] = cap_error_data[:, :]
                 if kwargs.get("apply_correction", False):
-                    ana_group_correction = walk_to_node(base_group.biasing,
+                    ana_group_correction, _ = walk_to_node(base_group.biasing,
                                                         str_join("/", ANALYSIS_CORRECTED_GROUP_NAME, bias_name),
-                                                        create=True)
+                                                        create=True, verify_create=True)
                     cap_data = ana_group_correction.HistCap[:]
                     cap_error_data = ana_group_correction.HistCapErr[:]
                     cv_data_corrected[:, :, k] = cap_data[:, :]
                     cv_err_data_corrected[:, :, k] = cap_error_data[:, :]
+
 
             temp_array = in_file_h5.create_carray(base_group.biasing.analysis, name="UCHist",
                                                   title="Histogram of the U-C-curve",
@@ -136,13 +134,14 @@ def advanced_analysis(raw_data, base_path=None, is_cv=False, first_boundaries=No
                                                first_boundaries, second_boundaries, **kwargs)
                 analyze_depletion_delegate(base_group.biasing.measurements, dep_ana_group,
                                            first_boundaries, second_boundaries, **kwargs)
+
         else:
             if is_inter_pixel:
                 reference_group = base_group.inter_cap
             else:
                 reference_group = base_group.total_cap
             prevent_group_mix_up(reference_group, "analysis")
-            ana_group = walk_to_node(reference_group, "analysis", create=True)
+            ana_group, _ = walk_to_node(reference_group, "analysis", create=True, verify_create=True)
             assert isinstance(ana_group, tb.Group)
 
             advanced_analysis_data_handle(in_file_h5, reference_group.measurements, ana_group,
@@ -161,20 +160,20 @@ def advanced_analysis_data_handle(file: tb.File, data_group: GroupType, result_g
 
     Implementation of the advanced analysis strategy for the capacitance measurement of a pixel sensor.
     For determination of the capacitance values non-linear fit algorithms are used.
-    Depeneding on the choice of parameters either kafe2 or iminuit is used for least squares minimization.
+    Depending on the choice of parameters either kafe2 or iminuit is used for least squares minimization.
     If requested the fit results will also be plotted to verify the convergence of the fit.
 
     For measurements of the C-V-Characteristic of a sensor, the fits will be applied for every bias voltage measured.
     :param file: h5 file object containing the data to be analysed.
-    :param data_group: hierachy group of the opend hdf file containing the raw data
-    :param result_group: hierachy group of the opened hdf file to write the analysis results to.
+    :param data_group: hierarchy group of the opened hdf file containing the raw data
+    :param result_group: hierarchy group of the opened hdf file to write the analysis results to.
     :param use_kafe2: boolean, indicates whether kafe2 is used.
-    :param plot: boolean, indicates whether to plot the data. A output pdf object could be submitted here instead of an explicitly created one.
+    :param plot: boolean, indicates whether to plot the data. AN output PDF object could be submitted here instead of an explicitly created one.
     :param apply_contour: boolean, indicates whether to determine the contours and try to plot them.
     :param full_model: boolean, True, indicates whether the full model for extended frequency range is to be used.
-    :param apply_correction: boolean, False, indicates whether the measured capacitances should be
+    :param apply_correction: boolean, False, indicates whether the measured capacitance should be
         corrected immediately;
-        Will require the presence of further arguments as information about the parasitics needs to be submitted.
+        Will require the presence of further arguments as information about the parasitic capacitance needs to be submitted.
     """
     # Read pixel map
     assert isinstance(data_group, tb.Group)
@@ -275,12 +274,12 @@ def advanced_analysis_delegate(file: tb.File, group: tb.Group, current_hist: TAB
 
         Implementation of the advanced analysis strategy for the capacitance measurement of a pixel sensor.
         For determination of the capacitance values non-linear fit algorithms are used.
-        Depeneding on the choice of parameters either kafe2 or iminuit is used for least squares minimization.
+        Depending on the choice of parameters either kafe2 or iminuit is used for least squares minimization.
         If requested the fit results will also be plotted to verify the convergence of the fit.
         If this mode is activated, additional keyword arguments must be present to specify the output of the plots.
 
         :param file: h5 file object containing the data to be analysed.
-        :param group: hierachy group of the opened hdf file to write the analysis results to.
+        :param group: hierarchy group of the opened hdf file to write the analysis results to.
         :param current_hist: 2D-Array for the current data to fit the model to.
         :param scan_parameters: table of the scan parameters used for each measurement point within the frequency and/or
             voltage scan.
@@ -289,7 +288,7 @@ def advanced_analysis_delegate(file: tb.File, group: tb.Group, current_hist: TAB
         :key current_error_hist: 2D-Array for the errors of the current data. This keyword argument must be present
             for the advanced analysis strategy.
         :key use_kafe2: boolean, indicates whether kafe2 is used for the fit.
-        :key plot: boolean, indicates whether to plot the data. A output pdf object could be submitted here
+        :key plot: boolean, indicates whether to plot the data. AN output PDF object could be submitted here
              instead of an explicitly created one.
         :key apply_contour: boolean, indicates whether to determine the contours and try to plot them.
         :key fit_plot_pdf: PdfPages object, to save the fit plot figures to (will override the plot object if provided)
@@ -401,26 +400,6 @@ def advanced_analysis_delegate(file: tb.File, group: tb.Group, current_hist: TAB
                                                   ANALYSIS_FIT_PLOT_LEGEND.format(col=ii, row=jj),
                                                   output_pdf,
                                                   ANALYSIS_FIT_CONTOUR_LEGEND.format(col=ii, row=jj))
-                # if plot:
-                #     from kafe2 import Plot
-                #     fit_plot = Plot(fitter)
-                #     fit_plot.x_label = "$\\nu$ in MHz"
-                #     fit_plot.y_label = "$I$ in A"
-                #     fit_plot.plot(residual=True)
-                #     fit_plot.axes.set_title(f"Fit of the frequency dependence for pixel ({ii}, {jj})")
-                #     for (fig, axes) in zip(fit_plot.figures, fit_plot.axes):
-                #         for ax in axes.values():
-                #             ax.set_title(f"Fit of the frequency dependence for pixel ({ii}, {jj})")
-                #         output_pdf.savefig(fig, bbox_inches='tight')
-                #
-                # if apply_contour and plot:
-                #     from kafe2 import ContoursProfiler
-                #     cpf = ContoursProfiler(fitter)
-                #     cpf_figure = cpf.plot_profiles_contours_matrix()
-                #     from matplotlib.figure import Figure
-                #     assert isinstance(cpf_figure, Figure)
-                #     cpf_figure.axes[0][0].set_title(f"Contour profiles for pixel ({ii}, {jj})")
-                #     output_pdf.savefig(cpf_figure, bbox_inches='tight')
 
             else:
                 from iminuit import Minuit
@@ -478,11 +457,12 @@ def advanced_analysis_delegate(file: tb.File, group: tb.Group, current_hist: TAB
         resistor_hist[ii, jj] = resistor
         resistor_error_hist[ii, jj] = resistor_error
 
-        # make sure that no plots/figures are opened anymore.
+        # make sure that no plots/figures are opened any more.
         from matplotlib import pyplot as plt
         plt.close('all')
 
     if plot and not (isinstance(plot, PdfPages) or isinstance(kwargs.get("fit_plot_pdf", None), PdfPages)):
+        assert output_pdf is not None
         output_pdf.close()
 
     # Store capacitance values and specify the used units as an attribute.

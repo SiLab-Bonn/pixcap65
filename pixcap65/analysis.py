@@ -9,12 +9,16 @@ from warnings import deprecated
 import numpy as np
 import tables as tb
 
-from analysis_util.physics_modelling import SILICON_V_BIAS, depletion_model, model_depletion, EPS_SILICON, gauss_model, \
+from pixcap65.analysis_util.physics_modelling import SILICON_V_BIAS, depletion_model, model_depletion, EPS_SILICON, \
+    gauss_model, \
     extended_gauss_integral
-from analysis_util.utility import check_leaf_unit, str_join, ANALYSIS_CORRECTED_GROUP_NAME, ANALYSIS_GROUP_NAME, \
-    GENERAL_PIXCAP_SHAPE, GLOBAL_FILTERS, DepletionData, handle_kafe2_advanced_options, handle_minuit_advanced_options, \
+from pixcap65.analysis_util.utility import check_leaf_unit, str_join, ANALYSIS_CORRECTED_GROUP_NAME, \
+    ANALYSIS_GROUP_NAME, \
+    GENERAL_PIXCAP_SHAPE, GLOBAL_FILTERS, DepletionData, DepletionWidthData, handle_kafe2_advanced_options, \
+    handle_minuit_advanced_options, \
     PARASITIC_SUBTRACTION, get_base_group, handle_analysis_mix_up, HIST_CAP_UNIT, HIST_CURRENT_MEAS_UNIT, \
-    HIST_BIAS_MEAS_UNIT, get_analysis_group, investigate_fit_convergence, TABLES_LEAF_COMPAT_TYPE
+    HIST_BIAS_MEAS_UNIT, get_analysis_group, investigate_fit_convergence, TABLES_LEAF_COMPAT_TYPE, \
+    TABLES_PART_LEAF_TYPE, CVDistributionData, CVDepletionCapacitanceData
 from pixcap65.utility.tables_util import get_groups, get_leaves, copy_node, list_attributes, group_get_file, \
     set_group_attribute, get_group_attribute, get_group_attributes, get_parent_group
 from pixcap65.utility.utils_2 import walk_to_node, GroupType, create_carray, prevent_group_mix_up
@@ -36,14 +40,14 @@ def analyze_data_temporary_replacement(raw_data, base_path=None, is_advanced=Fal
     Implementation of the analysis strategy for the capacitance measurement of a pixel sensor.
     But keep in mind that this function serves as a wrapper to handle file access and modification around
     the actual analysis implementation.
-    The capacitances of the pixels are measured and investigated individually. For determination of the
+    The capacitance of the pixels are measured and investigated individually. For determination of the
     capacitance values either a linear fit or non-linear least square fit algorithms are used.
     Depending on the choice of the ´is_advanced` parameter non-linear techniques are used.
-    In this case either 'kafe2' or 'iminuit' are used for the least-squares minimiztation depending on the choice
+    In this case either 'kafe2' or 'iminuit' are used for the least-squares minimization depending on the choice
     of parameters.
     When using the advanced least-squares procedure the fit results will be plotted to verify the convergence of the
     fit.
-    Thus, it is possible to use this wrapper to handle the pdf file to save fit-plot figures to instead of doing this
+    Thus, it is possible to use this wrapper to handle the PDF file to save fit-plot figures to instead of doing this
     individually for each analysis call.
 
     Afterwards, it is possible to directly correct the results for the capacitance by the connection and the
@@ -59,7 +63,7 @@ def analyze_data_temporary_replacement(raw_data, base_path=None, is_advanced=Fal
     If additional fit boundaries are supplied, it will be tried to also determine the depletion behaviour of the
     pixel sensor including the depletion voltage and the corresponding capacitance.
     When doing this, also the doping profile and some intrinsic properties could be investigated.
-    Currently the C-V characterization for the inter-pixel measurements is not implemented yet.
+    Currently, the C-V characterization for the inter-pixel measurements is not implemented yet.
 
 
     :param raw_data: path to the hdf file containing the raw data.
@@ -71,25 +75,25 @@ def analyze_data_temporary_replacement(raw_data, base_path=None, is_advanced=Fal
         the depletion voltage of the pixel. Depletion voltage will only be estimated if this argument is provided.
     :param second_boundaries: tuple of bounds for the low voltage limit of the capacitance behaviour to estimate
         the depletion voltage of the pixel. Depletion voltage will be estimated if this argument is provided.
-    :param is_inter_pixel: boolean, False, indicating whether the measurement to be analysed is a inter-pixel
+    :param is_inter_pixel: boolean, False, indicating whether the measurement to be analyzed is an inter-pixel
         capacitance measurement. In this case more fits will be applied, adjusted to the specific structure of this
         problem
     :key use_kafe2: boolean, indicates whether kafe2 is used for the fit. (Only used for the advanced procedure)
-    :key plot: boolean, indicates whether to plot the data. A output pdf object could be submitted here
+    :key plot: boolean, indicates whether to plot the data. An output PDF object could be submitted here
          instead of an explicitly created one. (Only used for the advanced procedure)
     :key apply_contour: boolean, indicates whether to determine the contours and try to plot them.
         (Only used for the advanced procedure)
     :key full_model: boolean, True, indicates whether the full model for extended frequency range is to be used.
         Otherwise, the linear model is used. (Only used for the advanced procedure)
-    :key apply_correction: boolean, False, indicates whether the measured capacitances should be
+    :key apply_correction: boolean, False, indicates whether the measured capacitance should be
         corrected immediately;
-        Will require the presence of further arguments as information about the parasitics needs to be submitted.
-    :key use_corrected: boolean, False, indicates whether to use the corrected capacitances for the depletion
+        Will require the presence of further arguments as information about the parasitic capacitance needs to be submitted.
+    :key use_corrected: boolean, False, indicates whether to use the corrected capacitance for the depletion
         analysis.
-    :key fit_plot_pdf_name:  Name of the pdf file to save fitting figures from the advanced procedures to.
+    :key fit_plot_pdf_name:  Name of the PDF file to save fitting figures from the advanced procedures to.
         (Only used for the advanced procedure)
     :key bare_file: hdf file containing the measurements and investigation of a bare pixcap sample to obtain
-        information about intrinisc and parasitic capacitances. (Only required for the correction procedure, but in
+        information about intrinsic and parasitic capacitance. (Only required for the correction procedure, but in
         this case it must be present)
     :key bare_path: hdf files hierarchy path to the group containing the bare pixcap analysis with the information
         about the parasitic after investigating the capacitance distribution. (Only required for
@@ -110,14 +114,14 @@ def analyze_data(raw_data, base_path=None, is_advanced=False, is_cv=False,
     Implementation of the analysis strategy for the capacitance measurement of a pixel sensor.
     But keep in mind that this function serves as a wrapper to handle file access and modification around
     the actual analysis implementation.
-    The capacitances of the pixels are measured and investigated individually. For determination of the
+    The capacitance of the pixels are measured and investigated individually. For determination of the
     capacitance values either a linear fit or non-linear least square fit algorithms are used.
     Depending on the choice of the ´is_advanced` parameter non-linear techniques are used.
-    In this case either 'kafe2' or 'iminuit' are used for the least-squares minimiztation depending on the choice
+    In this case either 'kafe2' or 'iminuit' are used for the least-squares minimization depending on the choice
     of parameters.
     When using the advanced least-squares procedure the fit results will be plotted to verify the convergence of the
     fit.
-    Thus, it is possible to use this wrapper to handle the pdf file to save fit-plot figures to instead of doing this
+    Thus, it is possible to use this wrapper to handle the PDF file to save fit-plot figures to instead of doing this
     individually for each analysis call.
 
     Afterwards, it is possible to directly correct the results for the capacitance by the connection and the
@@ -133,7 +137,7 @@ def analyze_data(raw_data, base_path=None, is_advanced=False, is_cv=False,
     If additional fit boundaries are supplied, it will be tried to also determine the depletion behaviour of the
     pixel sensor including the depletion voltage and the corresponding capacitance.
     When doing this, also the doping profile and some intrinsic properties could be investigated.
-    Currently the C-V characterization for the inter-pixel measurements is not implemented yet.
+    Currently, the C-V characterization for the inter-pixel measurements is not implemented yet.
 
 
     :param raw_data: path to the hdf file containing the raw data.
@@ -145,41 +149,42 @@ def analyze_data(raw_data, base_path=None, is_advanced=False, is_cv=False,
         the depletion voltage of the pixel. Depletion voltage will only be estimated if this argument is provided.
     :param second_boundaries: tuple of bounds for the low voltage limit of the capacitance behaviour to estimate
         the depletion voltage of the pixel. Depletion voltage will be estimated if this argument is provided.
-    :param is_inter_pixel: boolean, False, indicating whether the measurement to be analysed is a inter-pixel
+    :param is_inter_pixel: boolean, False, indicating whether the measurement to be analyzed is an inter-pixel
         capacitance measurement. In this case more fits will be applied, adjusted to the specific structure of this
         problem
     :key use_kafe2: boolean, indicates whether kafe2 is used for the fit. (Only used for the advanced procedure)
-    :key plot: boolean, indicates whether to plot the data. A output pdf object could be submitted here
+    :key plot: boolean, indicates whether to plot the data. An output PDF object could be submitted here
          instead of an explicitly created one. (Only used for the advanced procedure)
     :key apply_contour: boolean, indicates whether to determine the contours and try to plot them.
         (Only used for the advanced procedure)
     :key full_model: boolean, True, indicates whether the full model for extended frequency range is to be used.
         Otherwise, the linear model is used. (Only used for the advanced procedure)
-    :key apply_correction: boolean, False, indicates whether the measured capacitances should be
+    :key apply_correction: boolean, False, indicates whether the measured capacitance should be
         corrected immediately;
-        Will require the presence of further arguments as information about the parasitics needs to be submitted.
-    :key use_corrected: boolean, False, indicates whether to use the corrected capacitances for the depletion
+        Will require the presence of further arguments as information about the parasitic capacitance needs to be submitted.
+    :key use_corrected: boolean, False, indicates whether to use the corrected capacitance for the depletion
         analysis.
-    :key fit_plot_pdf_name:  Name of the pdf file to save fitting figures from the advanced procedures to.
+    :key fit_plot_pdf_name:  Name of the PDF file to save fitting figures from the advanced procedures to.
         (Only used for the advanced procedure)
-    :key bare_file: hdf file containing the measurements and investigation of a bare pixcap sample to obtain
-        information about intrinisc and parasitic capacitances. (Only required for the correction procedure, but in
+    :key bare_file: hdf file containing the measurements and investigation of a bare pix cap sample to obtain
+        information about intrinsic and parasitic capacitance. (Only required for the correction procedure, but in
         this case it must be present)
-    :key bare_hdf_path: hdf files hierarchy path to the group containing the bare pixcap analysis with the information
+    :key bare_hdf_path: hdf files hierarchy path to the group containing the bare pix cap analysis with the information
         about the parasitic after investigating the capacitance distribution. (Only required for
         the correction procedure, but in this case it must be present)
     :key chip_group_name: HDF files hierarchy group with the data/specifications of the pixels on the current sensor.
         (Will only be usd if the depletion behaviour is investigated)
     """
-    # handle the additonal pdf file in case of plotting enabled
+    # handle the additional PDF file in case of plotting enabled
     fit_plot_pdf_name = kwargs.pop('fit_plot_pdf_name', None)
     if "plot" in kwargs and kwargs["plot"] and fit_plot_pdf_name is not None:
         from matplotlib.backends.backend_pdf import PdfPages
         assert "fit_plot_pdf_name" not in kwargs
         with PdfPages(fit_plot_pdf_name) as pdf:
             kwargs['fit_plot_pdf'] = pdf
-            return analyze_data(raw_data, base_path, is_advanced, is_cv, first_boundaries,
-                                second_boundaries, is_inter_pixel, **kwargs)
+            analyze_data(raw_data, base_path, is_advanced, is_cv, first_boundaries,
+                         second_boundaries, is_inter_pixel, **kwargs)
+            return
 
     # handle the real analysis
     with tb.open_file(raw_data, mode='a') as in_file_h5:
@@ -187,8 +192,6 @@ def analyze_data(raw_data, base_path=None, is_advanced=False, is_cv=False,
         base_group = get_base_group(base_path, in_file_h5)
 
         # special handling for C-V characterization.
-        # /biasing/analysis_correction/DepletionWidth
-        # /biasing/analysis_correction/DepletionWidth
         if is_cv:
             # need to perform the analysis for every bias voltage
             cv_data = np.full(shape=(40, 40, base_group.biasing.measurements.BiasVoltageHist.shape[0]),
@@ -208,32 +211,109 @@ def analyze_data(raw_data, base_path=None, is_advanced=False, is_cv=False,
             bare_file_arg = kwargs.pop("bare_file", None)
             bare_path_arg = kwargs.pop("bare_hdf_path", None)
 
+            if kwargs.get("distribution", False):
+                in_file_h5.create_group(base_group.biasing, "analysis")
+                dist_table = in_file_h5.create_table(where=base_group.biasing.analysis, name="CVDistribution",
+                                                     description=CVDistributionData, filters=GLOBAL_FILTERS)
+                dist_entry = dist_table.row
+            else:
+                dist_entry = {}
+
+            if kwargs.get("apply_correction", False):
+                # extract the parasitic capacitances right here!
+                with tb.open_file(kwargs["bare_file"], mode='r') as in_file_h5:
+                    bare_path = kwargs.get("bare_hdf_file", None)
+                    if bare_path is None:
+                        bare_group = in_file_h5.root
+                    else:
+                        bare_group, _ = walk_to_node(in_file_h5.root, bare_path, verify_create=True)
+
+                    assert "parasitic" in get_group_attributes(bare_group.analysis)
+                    assert "parasitic_error" in get_group_attributes(bare_group.analysis)
+                    parasitic = get_group_attribute(bare_group.analysis, "parasitic")
+                    parasitic_error = get_group_attribute(bare_group.analysis, "parasitic_error")
+            else:
+                parasitic = 0
+                parasitic_error = 0
+
             # no progressbar as the overhead for this is much too large in must cases.
             for k, bias_voltage in enumerate(base_group.biasing.measurements.BiasVoltageHist):
                 bias_name = "bias_{volt}_V".format(volt=bias_voltage).replace('-', "M_").replace(".", "__")
                 data_group = base_group.biasing.measurements[bias_name]
-                ana_group = walk_to_node(base_group.biasing,
-                                         str_join("/", ANALYSIS_GROUP_NAME, bias_name), create=True)
+                ana_group, _ = walk_to_node(base_group.biasing,
+                                            str_join("/", ANALYSIS_GROUP_NAME, bias_name), create=True,
+                                            verify_create=True)
                 assert isinstance(ana_group, tb.Group)
                 analysis_data_handle(in_file_h5, data_group, ana_group, is_advanced=is_advanced,
                                      is_inter_pixel=is_inter_pixel, **kwargs)
 
-                # extract the capacitance data for tabular value; will also need coreected data.
+                # extract the capacitance data for tabular value; will also need corrected data.
                 cap_data = ana_group.HistCap[:]
                 cap_error_data = ana_group.HistCapErr[:]
                 cv_data[:, :, k] = cap_data[:, :]
                 cv_err_data[:, :, k] = cap_error_data[:, :]
 
+                if kwargs.get("distribution", False):
+                    # first get a histogram with all the data
+                    n_pix, cap, cap_err, cap_std, cap_std_err = analyze_capacitance_distribution_delegate(None,
+                                                                                                          kwargs.get(
+                                                                                                              "distribution_output_pdf",
+                                                                                                              None),
+                                                                                                          capacitance=cap_data,
+                                                                                                          **kwargs)
+
+                    # try to get to the on-resistance datasets to perform the same distribution handler!
+                    # only issue with this attempt the capacitance will be saved as a parasitic one!
+                    if "HistRes" in ana_group:
+                        resistance_data = ana_group.HistRes[:]
+                        _, res, res_err, res_std, res_std_err = analyze_capacitance_distribution_delegate(None,
+                                                                                                          kwargs.get(
+                                                                                                              "distribution_output_pdf",
+                                                                                                              None),
+                                                                                                          capacitance=resistance_data,
+                                                                                                          **kwargs)
+                    else:
+                        res = 0.0
+                        res_err = 0.0
+                        res_std_err = 0.0
+                        res_std = 0.0
+
+                    dist_entry['bias'] = bias_voltage
+                    dist_entry['n_pixel'] = n_pix
+                    dist_entry['capacitance'] = cap
+                    dist_entry['cap_err'] = cap_err
+                    dist_entry['cap_std'] = cap_std
+                    dist_entry['cap_std_err'] = cap_std_err
+                    dist_entry['r_on'] = res
+                    dist_entry['r_on_err'] = res_err
+                    dist_entry['r_on_std'] = res_std
+                    dist_entry['r_on_std_err'] = res_std_err
+                    if kwargs.get("apply_correction", False):
+                        dist_entry['cap_corrected'] = cap - parasitic
+                        dist_entry['cap_corrected_err'] = cap_std
+                        dist_entry['cap_parasitic'] = parasitic
+                        dist_entry['cap_systematic_error'] = np.sqrt(cap_err ** 2 + parasitic_error ** 2)
+                    else:
+                        dist_entry['cap_corrected'] = cap
+                        dist_entry['cap_corrected_err'] = cap_std
+                        dist_entry['cap_parasitic'] = 0
+                        dist_entry['cap_systematic_error'] = cap_err
+
+                    if isinstance(dist_entry, tb.tableextension.Row):
+                        dist_entry.append()
+                    else:
+                        print("No append of the distribution!")
+
             # in case of active correction, also the summary capacitance tables needs to be corrected, but it should
-            # also a uncorrected table present.
+            # also an uncorrected table present.
             if apply_correction_arg:
                 # perform the transfer
                 apply_correction_simple(bare_file_arg, bare_path_arg, base_group.biasing.analysis, )
 
                 for k, bias_voltage in enumerate(base_group.biasing.measurements.BiasVoltageHist):
-                    ana_group_correction = walk_to_node(base_group.biasing,
-                                                        str_join("/", ANALYSIS_CORRECTED_GROUP_NAME, bias_name),
-                                                        create=True)
+                    ana_group_correction, _ = walk_to_node(base_group.biasing,
+                                                           str_join("/", ANALYSIS_CORRECTED_GROUP_NAME, bias_name),
+                                                           create=True, verify_create=True)
                     cap_data = ana_group_correction.HistCap[:]
                     cap_error_data = ana_group_correction.HistCapErr[:]
                     cv_data_corrected[:, :, k] = cap_data[:, :]
@@ -264,7 +344,7 @@ def analyze_data(raw_data, base_path=None, is_advanced=False, is_cv=False,
                 chip_name = kwargs.pop("chip_group_name", None)
                 # we need to put the plotting arguments back in
                 if chip_name is not None:
-                    chip_spec_group = walk_to_node(in_file_h5.root, chip_name, create=False)
+                    chip_spec_group, _ = walk_to_node(in_file_h5.root, chip_name, create=False, verify_create=True)
                     kwargs['chip_group'] = chip_spec_group
 
                 # Anyway it is necessary to perform this analysis also on a sensor-average basis!
@@ -274,6 +354,39 @@ def analyze_data(raw_data, base_path=None, is_advanced=False, is_cv=False,
                                                first_boundaries, second_boundaries, **kwargs)
                 analyze_depletion_delegate(base_group.biasing.measurements, dep_ana_group,
                                            first_boundaries, second_boundaries, **kwargs)
+
+                if kwargs.get("distribution", False):
+                    dist_table.flush()
+                    dist_table = base_group.biasing.analysis.CVDistribution[:]
+                    first_lower, first_upper = first_boundaries
+                    second_lower, second_upper = second_boundaries
+                    pixel_cap_data = dist_table['capacitance']
+                    pixel_cap_error_data = dist_table['cap_std']
+                    voltage_data = dist_table['bias']
+                    depletion_data_table = in_file_h5.create_table(where=base_group.biasing.analysis,
+                                                                   name="SensorDepletionRaw", description=DepletionData,
+                                                                   filters=GLOBAL_FILTERS)
+                    depletion_distribution_table = in_file_h5.create_table(where=base_group.biasing.analysis,
+                                                                           name="SensorDepletion",
+                                                                           description=CVDepletionCapacitanceData,
+                                                                           filters=GLOBAL_FILTERS)
+                    fit_result_storage = DepletionTableStore(depletion_data_table)
+                    analyze_pixel_depletion(first_lower, first_upper, pixel_cap_data, pixel_cap_error_data,
+                                            second_lower,
+                                            second_upper, voltage_data, fit_result_storage,
+                                            fit_description_text=" Sensor Distribution", **kwargs)
+
+                    depletion_data_table.flush()
+                    # now combine the two tables at last!
+                    for first_row, second_row in zip(base_group.biasing.analysis.CVDistribution.iterrows(),
+                                                     base_group.biasing.analysis.SensorDepletionRaw.iterrows()):
+                        distribution_data = first_row[:]
+                        depletion_data = second_row[:]
+                        new_data = np.concat((distribution_data, depletion_data), )
+                        assert distribution_data != depletion_data
+                        depletion_distribution_table.append(new_data)
+                    depletion_distribution_table.flush()
+
         else:
             if is_inter_pixel:
                 reference_group = base_group.inter_cap
@@ -281,7 +394,7 @@ def analyze_data(raw_data, base_path=None, is_advanced=False, is_cv=False,
                 reference_group = base_group.total_cap
 
             handle_analysis_mix_up(reference_group)
-            ana_group = walk_to_node(reference_group, "analysis", create=True)
+            ana_group, _ = walk_to_node(reference_group, "analysis", create=True, verify_create=True)
             assert isinstance(ana_group, tb.Group)
 
             analysis_data_handle(in_file_h5, reference_group.measurements, ana_group,
@@ -296,10 +409,10 @@ def analysis_data_handle_temporary_replacement(file: tb.File, data_group: GroupT
     advanced_analysis_data_handle
 
     Implementation of the analysis strategy for the capacitance measurement of a pixel sensor.
-    The capacitances of the pixels are measured and investigated individually. For determination of the
+    The capacitance of the pixels are measured and investigated individually. For determination of the
     capacitance values either a linear fit or non-linear least square fit algorithms are used.
     Depending on the choice of the ´is_advanced` parameter non-linear techniques are used.
-    In this case either 'kafe2' or 'iminuit' are used for the least-squares minimiztation depending on the choice
+    In this case either 'kafe2' or 'iminuit' are used for the least-squares minimization depending on the choice
     of parameters.
     When using the advanced least-squares procedure the fit results will be plotted to verify the convergence of the
     fit.
@@ -308,34 +421,34 @@ def analysis_data_handle_temporary_replacement(file: tb.File, data_group: GroupT
     measurement circuit.
 
     In Addition, there is the special case of an inter-pixel capacitance measurement.
-    If the data to be analyzed comes from such a measurement this needs to be specified.
+    If the data to be analysed comes from such a measurement this needs to be specified.
     Thus, in this case it will be checked which of the total current or the two inter-pix current data sets exist.
     The analysis will be done for each existing data set.
     Combinations with a C-V-Characterization might still be an issue.
 
     :param file: h5 file object containing the data to be analysed.
-    :param data_group: hierachy group of the opend hdf file containing the raw data (measurements).
-    :param result_group: hierachy group of the opened hdf file to write the analysis results to.
+    :param data_group: hierarchy group of the opened hdf file containing the raw data (measurements).
+    :param result_group: hierarchy group of the opened hdf file to write the analysis results to.
     :param is_advanced: boolean indicating if the advanced analysis strategy should be used or not (may require additional keyword arguments)
-    :param is_inter_pixel: boolean, False, indicating whether the measurement to be analysed is a inter-pixel
+    :param is_inter_pixel: boolean, False, indicating whether the measurement to be analysed is an inter-pixel
         capacitance measurement. In this case more fits will be applied, adjusted to the specific structure of this
         problem
     :key full_model: boolean, True, indicates whether the full model for extended frequency range is to be used.
         Otherwise, the linear model is used. (Only used for the advanced procedure)
     :key use_kafe2: boolean, indicates whether kafe2 is used for the fit. (Only used for the advanced procedure)
-    :key plot: boolean, indicates whether to plot the data. A output pdf object could be submitted here
+    :key plot: boolean, indicates whether to plot the data. An output PDF object could be submitted here
          instead of an explicitly created one. (Only used for the advanced procedure)
     :key apply_contour: boolean, indicates whether to determine the contours and try to plot them.
         (Only used for the advanced procedure)
     :key fit_plot_pdf: PdfPages object, to save the fit plot figures to (will override the plot object if provided,
         Only used for the advanced procedure)
-    :key apply_correction: boolean, False, indicates whether the measured capacitances should be
+    :key apply_correction: boolean, False, indicates whether the measured capacitance should be
         corrected immediately;
-        Will require the presence of further arguments as information about the parasitics needs to be submitted.
-    :key bare_file: hdf file containing the measurements and investigation of a bare pixcap sample to obtain
-        information about intrinisc and parasitic capacitances. (Only required for the correction procedure, but in
+        Will require the presence of further arguments as information about the parasitic capacitance needs to be submitted.
+    :key bare_file: hdf file containing the measurements and investigation of a bare pix cap sample to obtain
+        information about intrinsic and parasitic capacitance. (Only required for the correction procedure, but in
         this case it must be present)
-    :key bare_path: hdf files hierarchy path to the group containing the bare pixcap analysis with the information
+    :key bare_path: hdf files hierarchy path to the group containing the bare pix cap analysis with the information
         about the parasitic after investigating the capacitance distribution. (Only required for
         the correction procedure, but in this case it must be present)
     """
@@ -348,10 +461,10 @@ def analysis_data_handle(file: tb.File, data_group: GroupType, result_group: Gro
     advanced_analysis_data_handle
 
     Implementation of the analysis strategy for the capacitance measurement of a pixel sensor.
-    The capacitances of the pixels are measured and investigated individually. For determination of the
+    The capacitance of the pixels are measured and investigated individually. For determination of the
     capacitance values either a linear fit or non-linear least square fit algorithms are used.
     Depending on the choice of the ´is_advanced` parameter non-linear techniques are used.
-    In this case either 'kafe2' or 'iminuit' are used for the least-squares minimiztation depending on the choice
+    In this case either 'kafe2' or 'iminuit' are used for the least-squares minimization depending on the choice
     of parameters.
     When using the advanced least-squares procedure the fit results will be plotted to verify the convergence of the
     fit.
@@ -360,43 +473,43 @@ def analysis_data_handle(file: tb.File, data_group: GroupType, result_group: Gro
     measurement circuit.
 
     In Addition, there is the special case of an inter-pixel capacitance measurement.
-    If the data to be analyzed comes from such a measurement this needs to be specified.
+    If the data to be analysed comes from such a measurement this needs to be specified.
     Thus, in this case it will be checked which of the total current or the two inter-pix current data sets exist.
     The analysis will be done for each existing data set.
     Combinations with a C-V-Characterization might still be an issue.
 
     :param file: h5 file object containing the data to be analysed.
-    :param data_group: hierachy group of the opend hdf file containing the raw data (measurements).
-    :param result_group: hierachy group of the opened hdf file to write the analysis results to.
+    :param data_group: hierarchy group of the opened hdf file containing the raw data (measurements).
+    :param result_group: hierarchy group of the opened hdf file to write the analysis results to.
     :param is_advanced: boolean indicating if the advanced analysis strategy should be used or not (may require additional keyword arguments)
-    :param is_inter_pixel: boolean, False, indicating whether the measurement to be analysed is a inter-pixel
+    :param is_inter_pixel: boolean, False, indicating whether the measurement to be analysed is an inter-pixel
         capacitance measurement. In this case more fits will be applied, adjusted to the specific structure of this
         problem
     :key full_model: boolean, True, indicates whether the full model for extended frequency range is to be used.
         Otherwise, the linear model is used. (Only used for the advanced procedure)
     :key use_kafe2: boolean, indicates whether kafe2 is used for the fit. (Only used for the advanced procedure)
-    :key plot: boolean, indicates whether to plot the data. A output pdf object could be submitted here
+    :key plot: boolean, indicates whether to plot the data. An output PDF object could be submitted here
          instead of an explicitly created one. (Only used for the advanced procedure)
     :key apply_contour: boolean, indicates whether to determine the contours and try to plot them.
         (Only used for the advanced procedure)
     :key fit_plot_pdf: PdfPages object, to save the fit plot figures to (will override the plot object if provided,
         Only used for the advanced procedure)
-    :key apply_correction: boolean, False, indicates whether the measured capacitances should be
+    :key apply_correction: boolean, False, indicates whether the measured capacitance should be
         corrected immediately;
-        Will require the presence of further arguments as information about the parasitics needs to be submitted.
-    :key bare_file: hdf file containing the measurements and investigation of a bare pixcap sample to obtain
-        information about intrinisc and parasitic capacitances. (Only required for the correction procedure, but in
+        Will require the presence of further arguments as information about the parasitic capacitance needs to be submitted.
+    :key bare_file: hdf file containing the measurements and investigation of a bare pix cap sample to obtain
+        information about intrinsic and parasitic capacitance. (Only required for the correction procedure, but in
         this case it must be present)
-    :key bare_path: hdf files hierarchy path to the group containing the bare pixcap analysis with the information
+    :key bare_path: hdf files hierarchy path to the group containing the bare pix cap analysis with the information
         about the parasitic after investigating the capacitance distribution. (Only required for
         the correction procedure, but in this case it must be present)
     """
     # get the correct analysis function
     if is_advanced:
-        from advanced_analysis import advanced_analysis_delegate
+        from pixcap65.advanced_analysis import advanced_analysis_delegate
         perform_analysis = advanced_analysis_delegate
     else:
-        from analysis_util import analyze_data_delegate
+        from pixcap65.analysis_util import analyze_data_delegate
         perform_analysis = analyze_data_delegate
 
     # Read pixel map
@@ -514,8 +627,8 @@ class DepletionTableStore(DepletionDataStore):
                 self.entry["a"] = data[0]
                 self.entry["b"] = data[1]
             case "fit_error_first":
-                self.entry["a_error"] = data[1]
-                self.entry["b_error"] = data[2]
+                self.entry["a_error"] = data[0]
+                self.entry["b_error"] = data[1]
             case "fit_result_second":
                 self.entry["c"] = data[0]
                 self.entry["d"] = data[1]
@@ -597,7 +710,7 @@ def analyze_depletion_delegate(data_group: GroupType, analysis_group: GroupType,
                                second_boundaries: Optional[Tuple], chip_group: GroupType = None, apply_doping=False,
                                **kwargs):
     """
-    analyze_depletion_delegate
+    analyse_depletion_delegate
 
     Implementation of the investigation of the depletion behaviour of a pixel sensor.
     So first (this is the only non-optional functionality of this investigation) the C-V curve is used to obtain an
@@ -612,10 +725,10 @@ def analyze_depletion_delegate(data_group: GroupType, analysis_group: GroupType,
     The depletion voltage is then estimated from the intersection of both straight line fits.
     For estimation of the uncertainty of the depletion voltage the full covariance matrix of the fits is used.
 
-    Second, the depletion width and it's consequences are analyzed if requested.
+    Second, the depletion width and it's consequences are analysed if requested.
     This part will only be performed if it is requested by the 'apply_doping' parameter.
     This second analysis also requires the presence of the 'chip_group' parameter and within it the table/array
-    'PhysicalDimensions' with he physical dimensions of the pixels on the module. Otherwise, it is not possible
+    'PhysicalDimensions' with the physical dimensions of the pixels on the module. Otherwise, it is not possible
     to determine the depletion widths from the measured capacitances, which will then be done by assuming a plate
     capacitator geometry.
     After this the effective doping profile is computed from the differential capacitance.
@@ -630,7 +743,7 @@ def analyze_depletion_delegate(data_group: GroupType, analysis_group: GroupType,
     :param chip_group: HDF files hierarchy group with the data/specifications of the pixels on the current sensor.
     :param apply_doping: boolean, False, indicating whether to investigate the (effective) doping of the sensor.
     :key use_kafe2: boolean, False, indicates whether kafe2 is used for the fit.
-    :key plot: boolean, False, indicates whether to plot the data. A output pdf object could be submitted here
+    :key plot: boolean, False, indicates whether to plot the data. AN output PDF object could be submitted here
          instead of an explicitly created one.
     :key apply_contour: boolean, indicates whether to determine the contours and try to plot them.
     :key fit_plot_pdf: PdfPages object, to save the fit plot figures to (will override the plot object if provided,
@@ -676,7 +789,7 @@ def analyze_depletion_delegate(data_group: GroupType, analysis_group: GroupType,
                   title="Histogram of the depletion voltages", obj=fit_result_storage.depletion_voltage,
                   filters=GLOBAL_FILTERS, unit=HIST_BIAS_MEAS_UNIT)
     create_carray(file_h5, where=analysis_group, name="DepletionErrHist",
-                  title="Histogram of the depletion voltage erors", obj=fit_result_storage.depletion_error,
+                  title="Histogram of the depletion voltage errors", obj=fit_result_storage.depletion_error,
                   filters=GLOBAL_FILTERS, unit=HIST_BIAS_MEAS_UNIT)
     create_carray(file_h5, where=analysis_group, name="DepFitParamHist",
                   title="Histogram of the depletion voltages fit parameters",
@@ -697,12 +810,15 @@ def analyze_depletion_delegate(data_group: GroupType, analysis_group: GroupType,
         # some further definitions for the loop
         from findiff import Diff
         import scipy.constants as constants
-        # this values will not be correct as I don't known the doping concentrationor the intrinisc bias voltage;
-        # the intrinisc bias voltage could be estimated from a fit to the forward bias I-V characteristic.
+        # this values will not be correct as I don't know the doping concentration the intrinsic bias voltage;
+        # the intrinsic bias voltage could be estimated from a fit to the forward bias I-V characteristic.
+        # noinspection PyPep8Naming
         NA, ND = 1e16, 1e16
+        # noinspection PyPep8Naming
         V_bi = SILICON_V_BIAS
         assert isinstance(analysis_group, tb.Group)
-        dep_table = file_h5.create_table(where=analysis_group, name="DepletionParamTable", description=DepletionData,
+        dep_table = file_h5.create_table(where=analysis_group, name="DepletionParamTable",
+                                         description=DepletionWidthData,
                                          filters=GLOBAL_FILTERS)
         entry = dep_table.row
         bias_voltages = check_leaf_unit(data_group.BiasVoltageHist, HIST_BIAS_MEAS_UNIT)
@@ -737,10 +853,10 @@ def analyze_depletion_delegate(data_group: GroupType, analysis_group: GroupType,
         # save the computed information about the depletion behaviour
         assert isinstance(analysis_group, tb.Group)
         create_carray(file_h5, where=analysis_group, name="DepletionWidth",
-                      title="Depletion width from the pixel capacitances",
+                      title="Depletion width from the pixel capacitance",
                       filters=GLOBAL_FILTERS, obj=doping_result_storage.depletion_width_plate, unit="um")
         create_carray(file_h5, where=analysis_group, name="DepletionWidthErr",
-                      title="Uncertainty of the depletion width from the pixel capacitances",
+                      title="Uncertainty of the depletion width from the pixel capacitance",
                       filters=GLOBAL_FILTERS, obj=doping_result_storage.depletion_width_plate_error, unit="um")
 
         create_carray(file_h5, where=analysis_group, name="DepletionParameters",
@@ -922,7 +1038,7 @@ def analyze_pixel_depletion(first_lower, first_upper,
     first_cap_error_data = effective_capacitance_error_data[first_section_mask]
     second_cap_error_data = effective_capacitance_error_data[second_section_mask]
 
-    # perform fits to the two boundary regions specified to estimate the two distinc behaviours.
+    # perform fits to the two boundary regions specified to estimate the two distinct behaviours.
     if np.all(np.isfinite(first_cap_error_data)):
         if use_kafe2:
             # perform the fit
@@ -937,6 +1053,7 @@ def analyze_pixel_depletion(first_lower, first_upper,
             first_dep_parameters = np.array([m.parameter_values[0], m.parameter_values[1]])
             first_dep_errors = np.array([m.parameter_errors[0], m.parameter_errors[1]])
             first_dep_cov = m.parameter_cov_mat
+            assert first_dep_cov is not None
             if plot:
                 handle_kafe2_advanced_options(m, apply_contours, "U in V", "\\frac{{1}}{{C^2}}",
                                               "First Fit{}".format(fit_description_text),
@@ -963,6 +1080,20 @@ def analyze_pixel_depletion(first_lower, first_upper,
                                                "First Fit{}".format(fit_description_text),
                                                output_pdf,
                                                "First Contour{}".format(fit_description_text))
+            try:
+                assert first_dep_cov is not None
+            except AssertionError:
+                print(m.valid)
+                print(m.fmin)
+                from matplotlib import pyplot as plt
+                plt.close('all')
+                plt.errorbar(first_voltage_data, first_cap_data, yerr=first_cap_error_data, )
+                plt.show()
+                print(first_voltage_data.shape)
+                print(first_cap_data.shape)
+                print(first_cap_error_data.shape)
+                print(voltage_data)
+                raise
     else:
         first_result = np.polyfit(first_voltage_data, first_cap_data, deg=1, cov=True)
 
@@ -970,6 +1101,7 @@ def analyze_pixel_depletion(first_lower, first_upper,
         first_dep_parameters = np.asarray(first_result[0])
         first_dep_cov = np.asarray(first_result[1])
         first_dep_errors = np.sqrt(np.diag(first_dep_cov))
+        assert first_dep_cov is not None
 
     if np.all(np.isfinite(second_cap_error_data)):
         if use_kafe2:
@@ -985,6 +1117,7 @@ def analyze_pixel_depletion(first_lower, first_upper,
             second_dep_parameters = np.array([m.parameter_values[0], m.parameter_values[1]])
             second_dep_errors = np.array([m.parameter_errors[0], m.parameter_errors[1]])
             second_dep_cov = m.parameter_cov_mat
+            assert second_dep_cov is not None
             if plot:
                 handle_kafe2_advanced_options(m, apply_contours, "U in V", "\\frac{{1}}{{C^2}}",
                                               "Second Fit{}".format(fit_description_text),
@@ -1006,6 +1139,7 @@ def analyze_pixel_depletion(first_lower, first_upper,
             second_dep_parameters = np.array([m.values['a'], m.values['b']])
             second_dep_errors = np.array([m.errors['a'], m.errors['b']])
             second_dep_cov = m.covariance
+            assert second_dep_cov is not None
             if plot:
                 handle_minuit_advanced_options(m, apply_contours, "$U$ in \\unit{{\\volt}}", "$\\frac{{1}}{{C^2}}$",
                                                "Second Fit{}".format(fit_description_text),
@@ -1019,6 +1153,7 @@ def analyze_pixel_depletion(first_lower, first_upper,
         second_dep_parameters = np.asarray(second_result[0])
         second_dep_cov = np.asarray(second_result[1])
         second_dep_errors = np.sqrt(np.diag(second_dep_cov))
+        assert second_dep_cov is not None
 
     # estimate the depletion voltage
     d = first_dep_parameters[1]
@@ -1037,6 +1172,10 @@ def analyze_pixel_depletion(first_lower, first_upper,
     # combine both cov matrices into a single one:
     full_cov = np.full((4, 4), fill_value=0)
     full_cov_2 = np.zeros((4, 4))  # cross correlations between the two fits are not known
+    assert full_cov is not None
+    assert full_cov_2 is not None
+    assert first_dep_cov is not None
+    assert second_dep_cov is not None
     full_cov[:2, :2] = first_dep_cov
     full_cov[2:, 2:] = second_dep_cov
     full_cov_2[:2, :2] = second_dep_cov
@@ -1056,14 +1195,14 @@ def analyze_pixel_depletion(first_lower, first_upper,
     result.flush_data()
 
 
-def effective_doping(capacitances, bias_voltages, diode_area=None) -> np.ndarray:
+def effective_doping(capacitance, bias_voltages, diode_area=None) -> np.ndarray:
     """
     effective doping
 
     Helper function to calculate the effective doping for every bias voltage/depletion depth.
 
-    :param capacitances: measured (and corrected) capacitances of the CV characterization
-    :param bias_voltages: bias voltages corresponding to the provided capacitances
+    :param capacitance: measured (and corrected) capacitance of the CV characterization
+    :param bias_voltages: bias voltages corresponding to the provided capacitance
     :param diode_area: area of the individual pixel.
     :return: effective doping concentration in 10^(12) 1/m (maybe still an issue with the units)
     """
@@ -1071,12 +1210,12 @@ def effective_doping(capacitances, bias_voltages, diode_area=None) -> np.ndarray
     from findiff import Diff
 
     # make sure the data is provided as numpy arrays
-    capacitances = np.asarray(capacitances)
+    capacitance = np.asarray(capacitance)
     bias_voltages = np.asarray(bias_voltages)
 
     if diode_area is None:
         diode_area = 50 * 50  # measured in um^2
-    temp_capacitances = np.reciprocal(capacitances ** 2)
+    temp_capacitances = np.reciprocal(capacitance ** 2)
 
     # noinspection PyTypeChecker
     d_du = Diff(0, bias_voltages)
@@ -1088,7 +1227,7 @@ def effective_doping(capacitances, bias_voltages, diode_area=None) -> np.ndarray
 
 def analyze_capacitance_distribution(raw_data, base_path=None, corrected_distribution=False, **kwargs):
     """
-    analyze_capacitance_distribution
+    analyse_capacitance_distribution
 
     Helper function to describe how the capacitance is distributed over the sensor.
     We are in particular interested in the average capacitance of the pixel and their spread/dispersion.
@@ -1098,14 +1237,14 @@ def analyze_capacitance_distribution(raw_data, base_path=None, corrected_distrib
     :param raw_data: hdf file containing the measurements and investigation of a pixcap sample to obtain
         information about the capacitances.
     :param corrected_distribution: boolean, False, indicates whether the corrected capacitance distribution
-        should be analysed.
+        should be analyzed.
     :param base_path: hdf files group witht the measurement data.
     :key fit_plot_pdf: PdfPages object, to save the fit plot figures to (will override the plot object if provided,
-        Only used for the advanced procedure)
+        Only used for the advanced procedure).
     :key output_pdf: PdfPages object, to save the fit plot figures to (will override the plot object if provided,
-        Only used for the advanced procedure)
-    :key fit_plot_pdf_name:  Name of the pdf file to save fitting figures from the advanced procedures to.
-        (Only used for the advanced procedure)
+        Only used for the advanced procedure).
+    :key fit_plot_pdf_name:  Name of the PDF file to save fitting figures from the advanced procedures to
+        (Only used for the advanced procedure).
     :key mask_pixel: iterable of pixel positions on the grid to ignore for evaluations.
     :key exclude_cap_hist: boolean, whether to exclude the test capacitator row from the histograms.
     :key hist_bins: integer, number of bins to use for the histogram.
@@ -1115,37 +1254,38 @@ def analyze_capacitance_distribution(raw_data, base_path=None, corrected_distrib
         assert "fit_plot_pdf_name" not in kwargs
         from matplotlib.backends.backend_pdf import PdfPages
         with PdfPages(temp_plot_name) as pdf:
-            return analyze_capacitance_distribution(raw_data, base_path, corrected_distribution,
-                                                    fit_plot_pdf=pdf, **kwargs)
+            analyze_capacitance_distribution(raw_data, base_path, corrected_distribution,
+                                             fit_plot_pdf=pdf, **kwargs)
     else:
         output_pdf = kwargs.pop("output_pdf", None)
         if output_pdf is None:
             output_pdf = kwargs.pop("fit_plot_pdf", None)
-    with tb.open_file(raw_data, mode='a') as in_file_h5:
-        base_group = get_base_group(base_path, in_file_h5)
-        if corrected_distribution:
-            analyze_capacitance_distribution_delegate(base_group.total_cap.analysis_correction, output_pdf, **kwargs)
-        else:
-            analyze_capacitance_distribution_delegate(base_group.total_cap.analysis, output_pdf, **kwargs)
+        with tb.open_file(raw_data, mode='a') as in_file_h5:
+            base_group = get_base_group(base_path, in_file_h5)
+            if corrected_distribution:
+                analyze_capacitance_distribution_delegate(base_group.total_cap.analysis_correction, output_pdf,
+                                                          **kwargs)
+            else:
+                analyze_capacitance_distribution_delegate(base_group.total_cap.analysis, output_pdf, **kwargs)
 
 
 def analyze_capacitance_distribution_delegate(analysis_group, output_pdf, **kwargs):
     """
-    analyze_capacitance_distribution_delegate
+    analyse_capacitance_distribution_delegate
 
-    Implementation of the investigation in the distribution of the capacitances on the chip.
-    It should predominantly be used to determine the intrinsic and parasitic capacitances of a bare pixcap chip.
+    Implementation of the investigation in the distribution of the capacitance on the chip.
+    It should predominantly be used to determine the intrinsic and parasitic capacitance of a bare pix cap chip.
     To achieve the distribution the data is first binned and presented into a histogram.
-    Next, a gaussian shape is fitted to the histogram to match it's shape.
+    Next, a gaussian shape is fitted to the histogram to match its shape.
 
     Last the main results are written back to the analysis group as an attribute.
 
-    :param analysis_group: hdf file's group where to find the capacitances to be analyzed.
-    :param output_pdf: pdf object to write the created figures to for long-term saving.
+    :param analysis_group: hdf file's group where to find the capacitance to be analysed.
+    :param output_pdf: PDF object to write the created figures to for long-term saving.
     :key mask_pixel: iterable of pixel positions on the grid to ignore for evaluations.
     :key exclude_cap_hist: boolean, whether to exclude the test capacitator row from the histograms.
     :key hist_bins: integer, number of bins to use for the histogram.
-    :key capacitance: histogram of the capacitances
+    :key capacitance: histogram of the capacitance
     """
     from plotting import CAPACITANCE_CONVERSION_FACTOR
     from plotting import DEFAULT_BIN_NUMBER
@@ -1157,6 +1297,9 @@ def analyze_capacitance_distribution_delegate(analysis_group, output_pdf, **kwar
     use_kafe2 = kwargs.pop("use_kafe2", False)
     if output_pdf is None:
         output_pdf = kwargs.pop("fit_plot_pdf", None)
+    set_parasitic = kwargs.pop("set_parasitic", True)
+    if analysis_group is None:
+        set_parasitic = False
 
     # we want to fit a binned distribution; but some bins might be empty
     cap_hist = kwargs.pop("capacitance", None)
@@ -1228,9 +1371,10 @@ def analyze_capacitance_distribution_delegate(analysis_group, output_pdf, **kwar
                                            "Capacitance distribution", output_pdf,
                                            "Contours for the capacitance distribution")
 
-    set_group_attribute(analysis_group, "parasitic", mean_value)
-    set_group_attribute(analysis_group, "parasitic_error", std_value)
-    set_group_attribute(analysis_group, UNITS_ATTRIBUTE_KEY, "fF")
+    if set_parasitic and analysis_group is not None:
+        set_group_attribute(analysis_group, "parasitic", mean_value)
+        set_group_attribute(analysis_group, "parasitic_error", std_value)
+        set_group_attribute(analysis_group, UNITS_ATTRIBUTE_KEY, "fF")
     binning_span = np.linspace(bin_positions[0], bin_positions[-1], 1000)
     normalisation = norm * np.mean(np.diff(bin_positions))
     model_data = gauss_model(binning_span, mean_value, std_value, normalisation)
@@ -1239,18 +1383,16 @@ def analyze_capacitance_distribution_delegate(analysis_group, output_pdf, **kwar
                                                                                             error=std_value))
     try:
         from jacobi import propagate
-        y, ycov = propagate(lambda p: gauss_model(binning_span, p[0], p[1], normalisation), fit_results,
-                            fit_cov)
-        yerr_prop = np.diag(ycov) ** 0.5
-        ax.fill_between(binning_span, y - yerr_prop, y + yerr_prop, facecolor="C1", alpha=0.5)
+        y, y_cov = propagate(lambda p: gauss_model(binning_span, p[0], p[1], normalisation), fit_results,
+                             fit_cov)
+        y_err_prop = np.diag(y_cov) ** 0.5
+        ax.fill_between(binning_span, y - y_err_prop, y + y_err_prop, facecolor="C1", alpha=0.5)
 
     except ImportError:
-        pass
+        # noinspection PyUnusedLocal
+        propagate = lambda: None
     # add some information about the model
     hypo_test = investigate_fit_convergence(fitter)
-    #     ax.text(0.5, 0.5, f"""GoF = {hypo_test['x']:.2f}
-    # ndf = {hypo_test['ndf']:.2f}
-    # p = {hypo_test['p']:.2f}""", transform=ax.transAxes)
     ax.set_ylabel(COUNTS_HIST_LABEL)
     ax.set_xlabel(HIST_PIX_CAP_LABEL)
     ax.grid()
@@ -1261,6 +1403,8 @@ def analyze_capacitance_distribution_delegate(analysis_group, output_pdf, **kwar
         output_pdf.savefig(fig, bbox_inches='tight')
         plt.close(fig)
 
+    return temp_hist_back_data.reshape(-1).shape[0], mean_value, 0, std_value, 0
+
 
 def apply_correction(raw_data, base_path=None, bare_data_path=None, bare_group=None):
     """
@@ -1268,9 +1412,9 @@ def apply_correction(raw_data, base_path=None, bare_data_path=None, bare_group=N
 
     Wrapper function to handle the file access, when correcting the capacitance data tables.
 
-    :param raw_data: hdf file containing the measurements and investigation of a pixcap sample which needs correction
+    :param raw_data: hdf file containing the measurements and investigation of a pix cap sample which needs correction
     :param base_path: hdf files group with the analysis data/capacitance data to be corrected.
-    :param bare_data_path: file containing the analysis of the bare pixcap sample to be used for capacitance correction.
+    :param bare_data_path: file containing the analysis of the bare pix cap sample to be used for capacitance correction.
     :param bare_group: hdf files group for the bare analysis (holding the parasitic capacitance information)
     """
     # first extract the parasitic capacitances
@@ -1286,26 +1430,26 @@ def apply_correction_simple(bare_data_path: str, bare_path: str, analysis_group:
 
     Minimal wrapper for the correction of the measured capacitance for the capacitance of the bump-bond and the
     switching circuit itself.
-    It will open the data file and analysis group of the bare pixcap measurement, extract the parasitic capacitances
+    It will open the data file and analysis group of the bare pix cap measurement, extract the parasitic capacitance
     (including their uncertainties which will be applied as systematic uncertainties to the measurement), correct for
     these effect and write all the results of the current analysis with the correction applied back.
-    As the bump-bond capacitance and the intrinsic capacitance of the switching circuit can be considered as beeing
-    parallel no further effects needs to be accounted for. Also these capacitances could be considered beeing parallel
-    to the pixel sensors capacitances. So the correction could be done by a simple subtraction.
+    As the bump-bond capacitance and the intrinsic capacitance of the switching circuit can be considered as being
+    parallel no further effects needs to be accounted for. Also, these capacitance could be considered being parallel
+    to the pixel sensors capacitance. So the correction could be done by a simple subtraction.
 
 
-    :param bare_data_path: path to the hdf file of the bare pixcap measurement to obtain information about parasitic
-        capacitances
-    :param bare_path: hdf files hierarchy path to the group containing the bare pixcap analysis with the information
+    :param bare_data_path: path to the hdf file of the bare pix cap measurement to obtain information about parasitic
+        capacitance.
+    :param bare_path: hdf files hierarchy path to the group containing the bare pix cap analysis with the information
         about the parasitic after investigating the capacitance distribution.
     :param analysis_group: hdf files hierarchy group with the analysis results which needs to be corrected for the
-        intrinsic and parasitic effectcs.
+        intrinsic and parasitic effects.
     """
     with tb.open_file(bare_data_path, mode='r') as in_file_h5:
         if bare_path is None:
             bare_group = in_file_h5.root
         else:
-            bare_group = walk_to_node(in_file_h5.root, bare_path)
+            bare_group, _ = walk_to_node(in_file_h5.root, bare_path, verify_create=True)
 
         assert "parasitic" in get_group_attributes(bare_group.analysis)
         assert "parasitic_error" in get_group_attributes(bare_group.analysis)
@@ -1326,9 +1470,9 @@ def apply_correction_delegate(parasitic, parasitic_error, group: GroupType):
 
     Implementation of the capacitance correction for the parasitic capacitance of the bump-bond and the intrinsic
     capacitance of the switching circuit.
-    As the bump-bond capacitance and the intrinsic capacitance of the switching circuit can be considered as beeing
-    parallel no further effects needs to be accounted for. Also these capacitances could be considered beeing parallel
-    to the pixel sensors capacitances. So the correction could be done by a simple subtraction.
+    As the bump-bond capacitance and the intrinsic capacitance of the switching circuit can be considered as being
+    parallel no further effects needs to be accounted for. Also, these capacitance could be considered being parallel
+    to the pixel sensors capacitance. So the correction could be done by a simple subtraction.
 
     To make it possible to still plot all the data later on, the new tables get also the parasitic capacitance
     subtracted as an attribute.
@@ -1352,22 +1496,23 @@ def apply_correction_delegate(parasitic, parasitic_error, group: GroupType):
     # for key, value in group._v_leaves.items():
     for key, value in get_leaves(group):
         if "Cap" in key:
-            logger.debug("Found the key %s for transfering capacitance data.", key)
+            logger.debug("Found the key %s for transferring capacitance data.", key)
             if "Err" in key:
                 copy_node(value, newparent=correction_group)
                 # value._f_copy(newparent=correction_group)
             else:
+                assert isinstance(value, TABLES_PART_LEAF_TYPE)
                 cap_data_hist = value[:]
                 assert isinstance(cap_data_hist, np.ndarray)
                 corrected_cap_data = np.where(np.isfinite(cap_data_hist), cap_data_hist - parasitic * 1.e-15, np.nan)
-                corrected_cap_systemtatics = np.full_like(corrected_cap_data, fill_value=parasitic_error)
+                corrected_cap_systematics = np.full_like(corrected_cap_data, fill_value=parasitic_error)
                 temp_data_array = file_h5.create_carray(where=correction_group, name=key, title=value.title,
                                                         filters=value.filters, obj=corrected_cap_data)
-                # careful the parasitics are provided in fF were all other capacitacnes are saved in F
+                # careful the parasitic capacitance are provided in fF were all other capacitance are saved in F
                 temp_data_array.attrs[PARASITIC_SUBTRACTION] = parasitic
                 temp_error_array = file_h5.create_carray(where=correction_group, name="{}Systematics".format(key),
                                                          title=value.title,
-                                                         filters=value.filters, obj=corrected_cap_systemtatics)
+                                                         filters=value.filters, obj=corrected_cap_systematics)
                 # for name in value.attrs._f_list():
                 for name in list_attributes(value):
                     temp_data_array.attrs[name] = value.attrs[name]
@@ -1380,23 +1525,23 @@ def apply_correction_delegate(parasitic, parasitic_error, group: GroupType):
     for group_key, next_group in get_groups(group):
         next_correction_group = file_h5.create_group(where=correction_group, name=group_key)
         for key, value in get_leaves(next_group):
-            # And waht about tables here?
-            assert isinstance(value, tb.Node)
+            # And what about tables here?
+            assert isinstance(value, tb.Leaf)
             if "Cap" in key:
                 if "Err" in key:
                     copy_node(value, newparent=next_correction_group)
-                    # value._f_copy(newparent=next_correction_group)
                 else:
+                    assert isinstance(value, tb.Array) or isinstance(value, tb.Table)
                     cap_data_hist = value[:]
                     corrected_cap_data = cap_data_hist - parasitic
-                    corrected_cap_systemtatics = np.full_like(corrected_cap_data, fill_value=parasitic_error)
+                    corrected_cap_systematics = np.full_like(corrected_cap_data, fill_value=parasitic_error)
                     temp_data_array = file_h5.create_carray(where=next_correction_group, name=key,
                                                             title=value.title,
                                                             filters=value.filters, obj=corrected_cap_data)
                     temp_error_array = file_h5.create_carray(where=next_correction_group,
                                                              name="{}Systematics".format(key), title=value.title,
                                                              filters=value.filters,
-                                                             obj=corrected_cap_systemtatics)
+                                                             obj=corrected_cap_systematics)
                     # for name in value.attrs._f_list():
                     assert isinstance(value, tb.Leaf)
                     for name in list_attributes(value):
@@ -1408,14 +1553,11 @@ def apply_correction_delegate(parasitic, parasitic_error, group: GroupType):
 
 
 if __name__ == '__main__':
-    # analyze_data(raw_data='/home/silab/git/pixcap65/pixcap_full_data_image1.h5')
-    # advanced_analysis(raw_data='New_2_Scan.h5', base_path="ATLAS_Itk/X2/unbiased_1")
-    # advanced_analysis(raw_data='Data/r13-measurement/R13_Initial_3_Scan.h5',base_path="ATLAS ITk/unbiased_1")
-    # analyze_data(raw_data='Data/r13-measurement/R13_BIAS_CV_COMBI_6.h5', is_cv=True, first_boundaries=(-100,-40), second_boundaries=(-10, 0),)
+    # analyse_data(raw_data='/home/silab/git/pixcap65/pixcap_full_data_image1.h5')
     from pixcap65.utility.homogenize_plots import set_params
 
     set_params(latex=True,
-               latex_extra=r"\sisetup{separate-uncertainty}\sisetup{locale = DE}\sisetup{uncertainty-descriptors={stat,sys}}\sisetup{uncertainty-descriptor-mode=subscript}\sisetup{retain-zero-uncertainty}")
+               latex_extra=r"\setup{separate-uncertainty}\setup{locale = DE}\setup{uncertainty-descriptors={stat,sys}}\setup{uncertainty-descriptor-mode=subscript}\setup{retain-zero-uncertainty}")
 
     bare_correction_args = {
         "apply_correction": True,
@@ -1431,7 +1573,7 @@ if __name__ == '__main__':
     # analyze_data(raw_data='Data/r13-measurement/R13_Full_Scan_80V.h5', is_advanced=False, **bare_correction_args)
 
     # plot_data(interpreted_data='Data/r13-measurement/R13_Full_Scan_80V.h5', suffix="general_data_run_corrected", use_group=False, use_corrected=True)
-    # analyze_data(raw_data='Data/r13-measurement/R13_BIAS_CV_COMBI_6.h5', is_advanced=False, is_cv=True,
+    # analyse_data(raw_data='Data/r13-measurement/R13_BIAS_CV_COMBI_6.h5', is_advanced=False, is_cv=True,
     #              first_boundaries=(-100, -40),
     #              second_boundaries=(-10, 0), apply_doping=True, chip_group_name="sensor", use_corrected=True, plot=True, apply_contours=False,
     #              fit_plot_pdf_name="r13-CV_COMBI_6_C_V_Fits.pdf",
