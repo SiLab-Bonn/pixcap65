@@ -1,10 +1,10 @@
-from collections.abc import dict_items
 from typing import Any
+from typing import ItemsView
 
 import tables as tb
 
 
-def get_groups(parent: tb.Group) -> dict_items:
+def get_groups(parent: tb.Group) -> ItemsView[str, tb.Group]:
     """
     get_groups
 
@@ -16,7 +16,7 @@ def get_groups(parent: tb.Group) -> dict_items:
     return parent._v_groups.items()
 
 
-def get_leaves(parent: tb.Group) -> dict_items:
+def get_leaves(parent: tb.Group) -> ItemsView[str, tb.Leaf]:
     """
     get_leaves
 
@@ -28,7 +28,7 @@ def get_leaves(parent: tb.Group) -> dict_items:
     return parent._v_leaves.items()
 
 
-def get_children(parent: tb.Group) -> dict_items:
+def get_children(parent: tb.Group) -> ItemsView[str, tb.Node]:
     # noinspection PyProtectedMember
     return parent._v_children.items()
 
@@ -43,7 +43,7 @@ def copy_node(node: tb.Node, **kwargs) -> tb.Node:
     return node._f_copy(**kwargs)
 
 
-def list_attributes(leave: tb.Leaf) -> list:
+def list_attributes(leave: tb.Leaf) -> list[str]:
     # noinspection PyProtectedMember
     return leave.attrs._f_list()
 
@@ -81,3 +81,11 @@ def get_node_pathname(node: tb.Node) -> str:
 def hdf_get_or_create_path(file: tb.File, *args, **kwargs):
     # noinspection PyProtectedMember
     return file._get_or_create_path(*args, **kwargs)
+
+
+def rename_node(node: tb.Node, new_name: str):
+    if isinstance(node, tb.Leaf):
+        node.rename(new_name)
+    else:
+        # noinspection PyProtectedMember
+        node._f_rename(new_name)

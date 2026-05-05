@@ -15,21 +15,26 @@ from pixcap65.utility.tables_util import group_get_file, set_group_attribute, ge
 GroupType = Union[tb.Group, tb.Node, tb.Leaf]
 
 
-def walk_to_node(parent: GroupType, path: str, create=False, verify_create=False) -> GroupType | Tuple[GroupType, bool]:
+def walk_to_node(parent: GroupType, path: str, create=False, verify_create=False) -> tb.Group | Tuple[tb.Group, bool]:
+    assert verify_create
     result = parent
+    assert isinstance(parent, tb.Group)
     file_h5 = group_get_file(parent)
     already_exits = True
     for element in path.split('/'):
+        assert isinstance(result, tb.Group)
         if element in result:
             result = result[element]
         elif create:
             already_exits = False
+            assert isinstance(result, tb.Group)
             result = file_h5.create_group(where=result, name=element)
         else:
             print(file_h5)
             raise AssertionError(f"The requested path '{path}' does not exist and creating the path is disabled.")
+    assert isinstance(result, tb.Group)
     if verify_create:
-        return result, not already_exits
+        return result, not already_exits,
     return result
 
 
@@ -51,11 +56,11 @@ def create_carray(h5: tb.File, where: tb.Group | str, name: str, *args, **kwargs
     input_dut = kwargs.pop('input', None)
     unit = kwargs.pop('unit', None)
     if isinstance(where, str):
-        where = hdf_get_or_create_path(where)
+        where = hdf_get_or_create_path(h5, where)
         assert isinstance(where, tb.Group)
-    result = create_update_array(h5, where, name, *args, **kwargs)
+    result = create_update_array(h5, where, name, **kwargs)
     if result is None:
-        logger.error("Failed to create or update the array. Could not adjust the attriubutes.")
+        logger.error("Failed to create or update the array. Could not adjust the attributes.")
     elif isinstance(result, tb.Leaf):
         if input_dut is not None:
             result.attrs["Input"] = input_dut
@@ -69,7 +74,7 @@ def create_carray(h5: tb.File, where: tb.Group | str, name: str, *args, **kwargs
     return result
 
 
-def create_update_array(h5, where: tb.Group, name: str, *args, **kwargs):
+def create_update_array(h5, where: tb.Group, name: str, **kwargs):
     max_iter = kwargs.get("max_iter", 10)
     if name in get_children_bare(where):
         current_array = get_children_bare(where)[name]
@@ -98,6 +103,7 @@ def create_update_array(h5, where: tb.Group, name: str, *args, **kwargs):
             if "already has a child node named" in str(e):
                 logger.warning("Unexpectedly found that the child node already exists.")
                 assert hasattr(where[name], "rename")
+                # noinspection PyUnresolvedReferences
                 where[name].rename("{old}_backing".format(old=name))
                 sleep(1)
             else:
@@ -111,8 +117,8 @@ def create_update_array(h5, where: tb.Group, name: str, *args, **kwargs):
             logger.exception(e.args, e.__traceback__)
             sleep(create_iteration // 2)
 
-        logger.warning(f"Failed to create or update the array {name}")
-        return None
+    logger.warning(f"Failed to create or update the array {name}")
+    return None
 
 
 def prevent_group_mix_up(parent: tb.Group, node: str):

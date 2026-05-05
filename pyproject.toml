@@ -1,3 +1,4 @@
+# commented configuration options are the result when using hatch instead of setuptool
 [project]
 name = "pixcap65_DOMI1279"
 dynamic = ["version"]
@@ -6,28 +7,37 @@ authors = [
     { name = "Hans Krüger", email = "krueger@physik.uni-bonn.de" },
 ]
 maintainers = [
-    { name = "Yannick Dieter", email = "dieter@physik.uni-bonn.de"},
+    { name = "Yannick Dieter", email = "dieter@physik.uni-bonn.de" },
     { name = "Dominik Fischer", email = "s6dkfisc@uni-bonn.de" },
 ]
 
 license = "MIT AND BSD-3-Clause"
-readme = {file = "README.md", content-type = "text/markdown"}
-requires-python = ">=3.9"
+readme = { file = "README.md", content-type = "text/markdown" }
+requires-python = ">=2.7"
 dependencies = [
     "numpy>=2.3",
     "matplotlib",
     "tables>=3.0",
     "pyyaml",
-    "bitarray>=3.4.0",
+    "bitarray<=1.9.0; python_version < '3'",
+    "bitarray>=3.4.0; python_version >= '3.5'",
+    "bitarray; python_version < '3.5' and python_version >= '3'",
     "coloredlogs",
-    "basil-daq==3.1.0",
+    "basil-daq @ git+https:////github.com/SiLab-Bonn/basil.git@502a999eb5075e04850f7a481d2668726583c290 ; python_version >= '3.9'",
+    "basil-daq==3.1.0; platform_system == 'Windows' or python_version < '3.9'",
     "tqdm",
 ]
 
 [project.urls]
 Homepage = "https://github.com/SiLab-Bonn/pixcap65/"
 Issues = "https://github.com/SiLab-Bonn/pixcap65/issues/"
+"Source code" = "https://github.com/SiLab-Bonn/pixcap65/"
 # no documentation present.
+
+[project.scripts]
+pixcap_inter_cap = "pixcap65.pixcap_65_test_inter_cap"
+pixcap_total_cap = "pixcap65.pixcap_65_test_total_cap"
+pixcap_line = "pixcap65.pixcap.pixcap_65_test_load_line"
 
 [project.optional-dependencies]
 advanced = [
@@ -36,30 +46,60 @@ advanced = [
     "scipy>=1.15.0",
     "numpy>=2.3",
     "jacobi",
-    "findiff"
+    "findiff",
+    "dut"
 ]
 visualization = [
     "pyqt5",
     "vitables",
-    "matplotlib"
+    "matplotlib",
+    "dut"
 ]
 dut = [
     "pyserial",
-    "pyvisa",
+    "pyvisa ; python_version > '3.5'",
     "pyusb",
     "pysilibusb"
+]
+dev = [
+    "dut",
+    "advanced",
+    "visualization"
 ]
 
 [build-system]
 requires = ["setuptools >= 77.0.3"]
 build-backend = "setuptools.build_meta"
 
-[tool.setuptools]
-include-package-data = true
-packages = ["pixcap65", "pixcap", "configs", "analysis_util"]
+#requires = ["hatchling >= 1.26"]
+#build-backend = ["hatchling.build"]
+
+
+
+# [tool.setuptools]
+# include-package-data = true
+# packages = ["pixcap65", "pixcap", "configs", "analysis_util"]
+# packages = ["pixcap65"]
+[tool.setuptools.packages.find]
+# where = ["pixcap65"]
+include = ["pixcap65*"]
+exclude = ["tests", "data_local", "Data", "doc", "**full_analysis", "**.h5", "**.pdf"]
 
 [tool.setuptools.dynamic]
-version = { attr = "pixcap.__version__" }
+version = { attr = "pixcap65.pixcap.__version__" }
+
+[tool.hatch.version]
+path = "..."
+
+[tool.hatch.metadata]
+allow-direct-references = true
+
+[tool.hatch.build.targets.sdist]
+exclude = [
+    "*.h5",
+    "*.pdf",
+    "**/full_analysis.py"
+]
 
 
 #[tool.setuptools.exclude-package-data]

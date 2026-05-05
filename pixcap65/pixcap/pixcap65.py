@@ -60,7 +60,7 @@ class Pixcap65(Dut):
         }
         self.binary_active = False
 
-        # MARK: perhaps this guard should be generalised for every smu!
+        # MARK: perhaps this guard should be generalized for every smu!
         if "active" in self[self.__bias_smu_key]._init and self[self.__bias_smu_key]._init["active"]:
             self.__has_bias_suppy = True
         else:
@@ -76,7 +76,7 @@ class Pixcap65(Dut):
 
     @property
     def frequency_settling(self):
-        """Get the settling time for the clocks frequency."""
+        """Get the settling time for the clock's frequency."""
         return self.__frequency_settling
 
     @frequency_settling.setter
@@ -107,7 +107,7 @@ class Pixcap65(Dut):
     def cvm_frequency(self):
         """
         Get the frequency set at the MIO PLL clock.
-        It retrieves the frequency set for capacitance measureement not the higher one for the MIO PLL which accounts for
+        It retrieves the frequency set for capacitance measurement not the higher one for the MIO PLL which accounts for
         the size of the pattern and applies the pattern switching frequency.
         :return: current MIO frequency in MHz.
         """
@@ -124,7 +124,7 @@ class Pixcap65(Dut):
             if not res:
                 logger.warning("Could not set the MIO PLL frequency to %d Hz.", freq)
         except:
-            # error occured => revert the whole thing!
+            # error occurred => revert the whole thing!
             self.__current_cvm_frequency = prev_freq
             raise
         else:
@@ -141,7 +141,7 @@ class Pixcap65(Dut):
 
     @property
     def has_smu(self):
-        """Get the mapping of the smus to the state whether they are active and connected by the configuration file."""
+        """Get the mapping of the sums to the state whether they are active and connected by the configuration file."""
         return self.__has_smu
 
     # general properties!
@@ -153,27 +153,27 @@ class Pixcap65(Dut):
     # Handle the implementation of the SMU config
     @property
     def smu_kwargs(self):
-        """Gets the primary SMUs additonal keyword arguments."""
+        """Gets the primary SMUs additional keyword arguments."""
         return self.__smu_kwargs
 
     @property
     def smu_bias_kwargs(self):
-        """Gets the HV SMUs additonal keyword arguments."""
+        """Gets the HV SMUs additional keyword arguments."""
         return self.__bias_kwargs
 
     @property
     def smu_vm1_kwargs(self):
-        """Get the additonal keyword arguments for the SMU connected to the PCBs VM1 port."""
+        """Get the additional keyword arguments for the SMU connected to the PCBs VM1 port."""
         return {}
 
     @property
     def smu_vm2_kwargs(self):
-        """Get the additonal keyword arguments for the SMU connected to the PCBs VM2 port."""
+        """Get the additional keyword arguments for the SMU connected to the PCBs VM2 port."""
         return {}
 
     @property
     def smu_vm3_kwargs(self):
-        """Get the additonal keyword arguments for the SMU connected to the PCBs VM3 port."""
+        """Get the additional keyword arguments for the SMU connected to the PCBs VM3 port."""
         return {}
 
     @property
@@ -216,7 +216,6 @@ class Pixcap65(Dut):
         else:
             self[self.bias_smu_key].set_number_measurements(value, **self.__bias_kwargs)
         self.__n_measurements[self.bias_smu_key] = value
-
 
     # endregion
 
@@ -264,7 +263,7 @@ class Pixcap65(Dut):
             else:
                 raise
 
-        # setup the chip
+        # set up the chip
         self.switch_on_power_supply_voltages(1)
         self.init_config()
 
@@ -284,7 +283,6 @@ class Pixcap65(Dut):
 
         print(self.smu_setup_devices)
         assert self.has_bias_suppy == self.__has_smu[self.bias_smu_key]
-
 
     # region Control and setup handling of the Pixcap Chip.
     def close(self):
@@ -328,6 +326,7 @@ class Pixcap65(Dut):
         Fetch the current state of the pixcap chips power supply
         :return: current time and information about the power supply of the pixcap chips logic.
         """
+        # noinspection PyDictCreation
         status = {}
         status['Time'] = time.strftime("%d %M %Y %H:%M:%S")
         status['VDD'] = {'voltage(V)': format(self['VDD'].get_voltage(unit='V'), '.3f'),
@@ -338,8 +337,8 @@ class Pixcap65(Dut):
         """
         enable_pixel_clk
 
-        Enable a specific pixel clk (multiple of these) for a specifc pixel.
-        Note: this wont have any effect if the clock is not active for column containing the pixel.
+        Enable a specific pixel clk (multiple of these) for a specific pixel.
+        Note: this won't have any effect if the clock is not active for column containing the pixel.
 
         :param i_col: number of the column in which a pixel should be activated
         :param i_pix: row number of the pixel to be activated
@@ -371,7 +370,7 @@ class Pixcap65(Dut):
 
         :param i_col: column for which to activate a 'feature'/function !!no bit mask for specifying
             multiple columns at once.!!
-        :param EOC_MASK: Bit mask (multiple by bitwise OR) of the functions to be activated.
+        :param EOC_MASK: Bit mask (multiply by bitwise OR) of the functions to be activated.
         """
         self['SPI']['COL'][c.COL_NMAX - i_col]['EOC'] = EOC_MASK
         self.update_spi()
@@ -413,7 +412,7 @@ class Pixcap65(Dut):
         reset_chip
 
         Resets the whole pixcap chip back to default by 'pushing' the reset button which will also erase all the
-        SPI registers such that no previous data will be present anymore.
+        SPI registers such that no previous data will be present any more.
         """
         # reset shift register
         self['GPIO']['RST_B'] = 0
@@ -427,7 +426,7 @@ class Pixcap65(Dut):
         init_config
 
         (re-)init the pixcap chip. This will first configure the spi (more precisely it's size) and afterwards perform a
-        reset if the pixcap chip to get a well defined state of the hardware.
+        reset if the pixcap chip to get a well-defined state of the hardware.
         """
         self['SPI'].set_size(9960)
         self.reset_chip()
@@ -437,7 +436,7 @@ class Pixcap65(Dut):
         set_frequency
 
         Sets the frequency of the clock nets at the MIO.
-        This will take into account the size of the sequence generators patterns as these will require an higher
+        This will take into account the size of the sequence generators patterns as these will require a higher
         frequency to be set at the MIO.
         The effectively set frequency at the MIO will be the switching frequency within the pattern.
         :param freq: frequency in MHz to be set for the clocks.
@@ -452,10 +451,10 @@ class Pixcap65(Dut):
         It may be necessary to set the patterns for all the clocks.
         At last the sequence generators patter creation is started.
 
-        :param clk_0: bitarray or string, None, bit pattern for the first clock net (CLK 0)
-        :param clk_1: bitarray or string, None, bit pattern for the second clock net (CLK 1)
-        :param clk_2: bitarray or string, None, bit pattern for the third clock net (CLK 2)
-        :param clk_3: bitarray or string, None, bit pattern for the third clock net (CLK 3)
+        :param clk_0: bitarray or string, None, bit pattern for the first clock net (CLK 0).
+        :param clk_1: bitarray or string, None, bit pattern for the second clock net (CLK 1).
+        :param clk_2: bitarray or string, None, bit pattern for the third clock net (CLK 2).
+        :param clk_3: bitarray or string, None, bit pattern for the third clock net (CLK 3).
         """
         assert self.seq_size >= 4
 
@@ -492,7 +491,7 @@ class Pixcap65(Dut):
         if configuration is not None and isinstance(configuration, str):
             self['SEQ'][clock_id][0:self.seq_size - 1] = bitarray(configuration)
         elif configuration is not None and isinstance(configuration, bitarray):
-            self['SEQ'][clock_id][0:self.seq_size] = configuration
+            self['SEQ'][clock_id][0:self.seq_size - 1] = configuration
 
     def has_configured_smu(self, smu: str):
         """
@@ -504,10 +503,11 @@ class Pixcap65(Dut):
         """
         assert smu in self.__smu_keys
         return self.has_smu[smu]
+
     # endregion
 
     # Handle the SMU!
-    # region Accesor methods for a general SMU
+    # region Accessor methods for a general SMU
     # MARK: perhaps this functions should be shifted direct to a SMU type in the basil framework?
     def smu_init(self, smu: str, current_limit: float, current_range, plc: int, src_u, voltage_range: float,
                  kwargs=None):
@@ -521,11 +521,11 @@ class Pixcap65(Dut):
         arguments.
         On some SMUs it will also configure the measurement buffers for acquiring multiple readings at once.
 
-        :param smu: SMU dut key of the SMU to be initially set up
-        :param current_limit: current compliance limit to be set in A
-        :param current_range: current measurement range/maximum current intended to be measured in A
-        :param plc: number of power supply cycles to be averaged over when measureing
-        :param src_u: sourcing voltage for the SMU
+        :param smu: SMU dut key of the SMU to be initially set up.
+        :param current_limit: current compliance limit to be set in A.
+        :param current_range: current measurement range/maximum current intended to be measured in A.
+        :param plc: number of power supply cycles to be averaged over when measuring.
+        :param src_u: sourcing voltage for the SMU.
         :param voltage_range:
         :param kwargs: further keyword arguments to be forwarded to the call of the lab device by basil
         """
@@ -607,7 +607,7 @@ class Pixcap65(Dut):
 
         Sets the voltage to be sourced by the SMU (constant voltage mode of the SMU).
         The call to the SMU is only performed when the SMU is connected and active.
-        After changing the configuration, the settling of the smu will taken into account to make sure that no
+        After changing the configuration, the settling of the smu will be taken into account to make sure that no
         measurement is performed within the settling interval of the voltage source.
 
         :param smu: smu dut key of the SMU to configure
@@ -629,7 +629,7 @@ class Pixcap65(Dut):
 
             Sets the current to be sourced by the SMU (constant current mode of the SMU).
             The call to the SMU is only performed when the SMU is connected and active.
-            After changing the configuration, the settling of the smu will taken into account to make sure that no
+            After changing the configuration, the settling of the smu will be taken into account to make sure that no
             measurement is performed within the settling interval of the current source.
 
             :param smu: smu dut key of the SMU to configure
@@ -694,9 +694,9 @@ class Pixcap65(Dut):
         Read the current through the SMU. (Performs a current measurement in constant voltage mode.)
         The call to the SMU is only performed when the SMU is connected and active.
 
-        :param smu: smu dut key of the SMU to configure
-        :param kwargs: further keyword arguments to be forwarded to the call to the lab device by basil
-        :return: measured current in A or nan if the measurement fails or the SMU is not connected/active
+        :param smu: smu dut key of the SMU to configure.
+        :param kwargs: further keyword arguments to be forwarded to the call to the lab device by basil.
+        :return: measured current in A or nan if the measurement fails or the SMU is not connected/active.
         """
         if not self.has_configured_smu(smu):
             logger.debug("The current could only be measured for an active smu but '%s' is inactive.", smu)
@@ -727,9 +727,9 @@ class Pixcap65(Dut):
         Read the voltage over the SMU contacts. (Performs a voltage measurement in constant current mode.)
         The call to the SMU is only performed when the SMU is connected and active.
 
-        :param smu: smu dut key of the SMU to configure
-        :param kwargs: further keyword arguments to be forwarded to the call to the lab device by basil
-        :return: measured voltage in V or nan if the measurement fails or the SMU is not connected/active
+        :param smu: smu dut key of the SMU to configure.
+        :param kwargs: further keyword arguments to be forwarded to the call to the lab device by basil.
+        :return: measured voltage in V or nan if the measurement fails or the SMU is not connected/active.
         """
         if not self.has_configured_smu(smu):
             logger.debug("The voltage could only be measured for an active smu but '%s' is inactive.", smu)
@@ -758,15 +758,15 @@ class Pixcap65(Dut):
         smu_averaged_current
 
         Will perform a current measurement by measuring multiple times and read only the averaged value.
-        If no number of measurements is explicitly specified the number of measurements properties for the specifed
+        If no number of measurements is explicitly specified the number of measurements properties for the specified
         smu is used.
         The call to the SMU is only performed when the SMU is connected and active.
 
         :param n: number of measurements to be performed or None when the property should be used to determine the
-            number of measurements to perform
-        :param smu: smu dut key of the SMU to configure
-        :param kwargs: further keyword arguments to be forwarded to the call to the lab device by basil
-        :return: (average current reading, uncertainty of the current reading) in A
+            number of measurements to perform.
+        :param smu: smu dut key of the SMU to configure.
+        :param kwargs: further keyword arguments to be forwarded to the call to the lab device by basil.
+        :return: (average current reading, uncertainty of the current reading) in A.
         """
         if not self.has_configured_smu(smu):
             logger.debug("The current could only be measured for an active smu but '%s' is inactive.", smu)
@@ -791,15 +791,15 @@ class Pixcap65(Dut):
         smu_averaged_voltage
 
         Will perform a voltage measurement by measuring multiple times and read only the averaged value.
-        If no number of measurements is explicitly specified the number of measurements properties for the specifed
+        If no number of measurements is explicitly specified the number of measurements properties for the specified
         smu is used.
         The call to the SMU is only performed when the SMU is connected and active.
 
         :param n: number of measurements to be performed or None when the property should be used to determine the
-            number of measurements to perform
-        :param smu: smu dut key of the SMU to configure
-        :param kwargs: further keyword arguments to be forwarded to the call to the lab device by basil
-        :return: (average voltage reading, uncertainty of the voltage reading) in V
+            number of measurements to perform.
+        :param smu: smu dut key of the SMU to configure.
+        :param kwargs: further keyword arguments to be forwarded to the call to the lab device by basil.
+        :return: (average voltage reading, uncertainty of the voltage reading) in V.
         """
         if not self.has_configured_smu(smu):
             logger.debug("The voltage could only be measured for an active smu but '%s' is inactive.", smu)
@@ -826,15 +826,15 @@ class Pixcap65(Dut):
         Performs a current measurement by reading multiple current values from the SMU. The full dataset of
         measurements will be returned.
         The call to the SMU is only performed when the SMU is connected and active.
-        If no number of measurements is explicitly specified the number of measurements properties for the specifed
+        If no number of measurements is explicitly specified the number of measurements properties for the specified
         smu is used.
 
 
         This is the fast implementation for this purpose using directly dedicated functions of the SMU.
 
         :param n: number of measurements to be performed or None when the property should be used to determine the
-            number of measurements to perform
-        :param smu: smu dut key of the SMU to configure
+            number of measurements to perform.
+        :param smu: smu dut key of the SMU to configure.
         :param kwargs: further keyword arguments to be forwarded to the call to the lab device by basil or additionally
             'binary_enabled' in the case that the special binary readout mode should be used.
         :return: array of the measured currents in A; If the SMU is not active only NaN will be returned within the
@@ -858,6 +858,7 @@ class Pixcap65(Dut):
         result = self[smu].get_advanced_current(**kwargs)
         if "binary_enabled" in kwargs and kwargs["binary_enabled"]:
             n = self.__n_measurements[smu]
+            assert isinstance(n, int)
             if result.shape[0] > n:
                 offset = int(result.shape[0] % n)
                 shift = int(result.shape[0] // n)
@@ -872,15 +873,15 @@ class Pixcap65(Dut):
         Performs a voltage measurement by reading multiple voltage values from the SMU. The full dataset of
         measurements will be returned.
         The call to the SMU is only performed when the SMU is connected and active.
-        If no number of measurements is explicitly specified the number of measurements properties for the specifed
+        If no number of measurements is explicitly specified the number of measurements properties for the specified
         smu is used.
 
 
         This is the fast implementation for this purpose using directly dedicated functions of the SMU.
 
         :param n: number of measurements to be performed or None when the property should be used to determine the
-            number of measurements to perform
-        :param smu: smu dut key of the SMU to configure
+            number of measurements to perform.
+        :param smu: smu dut key of the SMU to configure.
         :param kwargs: further keyword arguments to be forwarded to the call to the lab device by basil or additionally
             'binary_enabled' in the case that the special binary readout mode should be used.
         :return: array of the measured voltages in V; If the SMU is not active only NaN will be returned within the
@@ -918,15 +919,15 @@ class Pixcap65(Dut):
         Performs a current measurement by reading multiple current values from the SMU. The full dataset of
         measurements will be returned.
         The call to the SMU is only performed when the SMU is connected and active.
-        If no number of measurements is explicitly specified the number of measurements properties for the specifed
+        If no number of measurements is explicitly specified the number of measurements properties for the specified
         smu is used.
 
 
         This is the slow implementation for this purpose consisting on single measurement calls to the SMU.
 
         :param n: number of measurements to be performed or None when the property should be used to determine the
-            number of measurements to perform
-        :param smu: smu dut key of the SMU to configure
+            number of measurements to perform.
+        :param smu: smu dut key of the SMU to configure.
         :param kwargs: further keyword arguments to be forwarded to the call to the lab device by basil or additionally
             'binary_enabled' in the case that the special binary readout mode should be used.
         :return: array of the measured currents in A; If the SMU is not active only NaN will be returned within the
@@ -959,15 +960,15 @@ class Pixcap65(Dut):
         Performs a voltage measurement by reading multiple voltage values from the SMU. The full dataset of
         measurements will be returned.
         The call to the SMU is only performed when the SMU is connected and active.
-        If no number of measurements is explicitly specified the number of measurements properties for the specifed
+        If no number of measurements is explicitly specified the number of measurements properties for the specified
         smu is used.
 
 
         This is the slow implementation for this purpose consisting of single measurement calls to the SMU.
 
-        :param n: number of measurements to be performed or None when the property should be used to determinte the
-            number of measurements to perform
-        :param smu: smu dut key of the SMU to configure
+        :param n: number of measurements to be performed or None when the property should be used to determine the
+            number of measurements to perform.
+        :param smu: smu dut key of the SMU to configure.
         :param kwargs: further keyword arguments to be forwarded to the call to the lab device by basil or additionally
             'binary_enabled' in the case that the special binary readout mode should be used.
         :return: array of the measured voltages in V; If the SMU is not active only NaN will be returned within the
@@ -1032,7 +1033,7 @@ class Pixcap65(Dut):
         """
         set_smu_measurements
 
-        Configures the number of measurements to be performed on reading (using reading buffer) for the specief SMU.
+        Configures the number of measurements to be performed on reading (using reading buffer) for the specific SMU.
         The call to the SMU is only performed when the SMU is connected and active.
         If the requested number of measurements is negative, it will be replaced by 1 before transmission.
         Additionally, the number of measurements property for the SMU is updated with the new value.
@@ -1042,7 +1043,8 @@ class Pixcap65(Dut):
         :param kwargs: further keyword arguments to be forwarded to the call to the lab device by basil.
         """
         if not self.has_configured_smu(smu):
-            logger.debug("The number of measurements to be done could only be set for an active smu but '%s' is inactive.", smu)
+            logger.debug(
+                "The number of measurements to be done could only be set for an active smu but '%s' is inactive.", smu)
             return
         if kwargs is None:
             kwargs = {}
@@ -1059,6 +1061,7 @@ class Pixcap65(Dut):
             except ValueError:
                 pass
         self.__n_measurements[smu] = value
+
     # endregion
 
     # implementations for the different SMU's in use with pixcap
@@ -1077,7 +1080,7 @@ class Pixcap65(Dut):
 
         :param current_limit: current compliance limit to be set in A
         :param current_range: current measurement range/maximum current intended to be measured in A
-        :param plc: number of power supply cycles to be averaged over when measureing
+        :param plc: number of power supply cycles to be averaged over when measuring
         :param src_u: sourcing voltage for the SMU
         :param voltage_range:
         :param kwargs: further keyword arguments to be forwarded to the call of the lab device by basil
@@ -1127,7 +1130,7 @@ class Pixcap65(Dut):
         """
         Gets the voltage to be sourced by the primary SMU (constant voltage mode of the SMU).
         The call to the SMU is only performed when the SMU is connected and active.
-        After changing the configuration, the settling of the smu will taken into account to make sure that no
+        After changing the configuration, the settling of the smu will be taken into account to make sure that no
         measurement is performed within the settling interval of the voltage source.
         """
         return self.get_smu_source_voltage(self.__primary_smu_key, kwargs=self.smu_kwargs)
@@ -1141,7 +1144,7 @@ class Pixcap65(Dut):
         """
         Gets the current to be sourced by the primary SMU (constant current mode of the SMU).
         The call to the SMU is only performed when the SMU is connected and active.
-        After changing the configuration, the settling of the smu will taken into account to make sure that no
+        After changing the configuration, the settling of the smu will be taken into account to make sure that no
         measurement is performed within the settling interval of the current source.
         """
         return self.get_smu_source_current(self.__primary_smu_key, kwargs=self.smu_kwargs)
@@ -1162,7 +1165,7 @@ class Pixcap65(Dut):
         """
         smu_measure_volts
 
-        Read the voltage over the prinmary SMU contacts. (Performs a voltage measurement in constant current mode.)
+        Read the voltage over the primary SMU contacts. (Performs a voltage measurement in constant current mode.)
         The call to the primary SMU is only performed when the SMU is connected and active.
         """
         return self.smu_measure_voltage(self.__primary_smu_key, kwargs=self.smu_kwargs)
@@ -1298,10 +1301,10 @@ class Pixcap65(Dut):
         arguments.
         On some SMUs it will also configure the measurement buffers for acquiring multiple readings at once.
 
-        :param current_limit: current compliance limit to be set in A
-        :param current_range: current measurement range/maximum current intended to be measured in A
-        :param plc: number of power supply cycles to be averaged over when measureing
-        :param voltage: sourcing voltage for the SMU
+        :param current_limit: current compliance limit to be set in A.
+        :param current_range: current measurement range/maximum current intended to be measured in A.
+        :param plc: number of power supply cycles to be averaged over when measuring.
+        :param voltage: sourcing voltage for the SMU.
         :param voltage_range: voltage range of the SMUs source.
         """
         if self.has_bias_suppy:
@@ -1353,7 +1356,7 @@ class Pixcap65(Dut):
         """
         Gets the voltage to be sourced by the HV SMU (constant voltage mode of the SMU).
         The call to the SMU is only performed when the SMU is connected and active.
-        After changing the configuration, the settling of the smu will taken into account to make sure that no
+        After changing the configuration, the settling of the smu will be taken into account to make sure that no
         measurement is performed within the settling interval of the voltage source.
         """
         if self.has_bias_suppy:
@@ -1373,7 +1376,7 @@ class Pixcap65(Dut):
         """
         Gets the current to be sourced by the HV SMU (constant current mode of the SMU).
         The call to the SMU is only performed when the SMU is connected and active.
-        After changing the configuration, the settling of the smu will taken into account to make sure that no
+        After changing the configuration, the settling of the smu will be taken into account to make sure that no
         measurement is performed within the settling interval of the current source.
         """
         if self.has_bias_suppy:
@@ -1555,10 +1558,10 @@ class Pixcap65(Dut):
         arguments.
         On some SMUs it will also configure the measurement buffers for acquiring multiple readings at once.
 
-        :param current_limit: current compliance limit to be set in A
-        :param current_range: current measurement range/maximum current intended to be measured in A
-        :param plc: number of power supply cycles to be averaged over when measureing
-        :param src_u: sourcing voltage for the SMU
+        :param current_limit: current compliance limit to be set in A.
+        :param current_range: current measurement range/maximum current intended to be measured in A.
+        :param plc: number of power supply cycles to be averaged over when measuring.
+        :param src_u: sourcing voltage for the SMU.
         :param voltage_range: voltage range of the SMUs source.
         """
         self.smu_init(self.__vm1_smu_key, current_limit, current_range, plc, src_u, voltage_range,
@@ -1605,7 +1608,7 @@ class Pixcap65(Dut):
         """
         Gets the voltage to be sourced by the SMU connected to the PCBs VM1 port (constant voltage mode of the SMU).
         The call to the SMU is only performed when the SMU is connected and active.
-        After changing the configuration, the settling of the smu will taken into account to make sure that no
+        After changing the configuration, the settling of the smu will be taken into account to make sure that no
         measurement is performed within the settling interval of the voltage source.
         """
         return self.get_smu_source_voltage(self.__vm1_smu_key, kwargs=self.smu_vm1_kwargs)
@@ -1619,7 +1622,7 @@ class Pixcap65(Dut):
         """
         Gets the current to be sourced by the SMU connected to the PCBs VM1 port (constant current mode of the SMU).
         The call to the SMU is only performed when the SMU is connected and active.
-        After changing the configuration, the settling of the smu will taken into account to make sure that no
+        After changing the configuration, the settling of the smu will be taken into account to make sure that no
         measurement is performed within the settling interval of the current source.
         """
         return self.get_smu_source_current(self.__vm1_smu_key, kwargs=self.smu_vm1_kwargs)
@@ -1641,7 +1644,7 @@ class Pixcap65(Dut):
         """
         vm1_measure_volts
 
-        Read the voltage over the SMU contacts conncted to the PCBs VM1 port. (Performs a voltage measurement in constant current mode.)
+        Read the voltage over the SMU contacts connected to the PCBs VM1 port. (Performs a voltage measurement in constant current mode.)
         The call to the SMU is only performed when the SMU is connected and active.
         """
         return self.smu_measure_voltage(self.__vm1_smu_key, kwargs=self.smu_vm1_kwargs)
@@ -1772,7 +1775,7 @@ class Pixcap65(Dut):
 
         :param current_limit: current compliance limit to be set in A.
         :param current_range: current measurement range/maximum current intended to be measured in A.
-        :param plc: number of power supply cycles to be averaged over when measureing.
+        :param plc: number of power supply cycles to be averaged over when measuring.
         :param src_u: sourcing voltage for the SMU.
         :param voltage_range: voltage range of the SMUs source.
         """
@@ -1820,7 +1823,7 @@ class Pixcap65(Dut):
         """
         Gets the voltage to be sourced by the SMU connected to the PCBs VM2 port (constant voltage mode of the SMU).
         The call to the SMU is only performed when the SMU is connected and active.
-        After changing the configuration, the settling of the smu will taken into account to make sure that no
+        After changing the configuration, the settling of the smu will be taken into account to make sure that no
         measurement is performed within the settling interval of the voltage source.
         """
         return self.get_smu_source_voltage(self.__vm2_smu_key, kwargs=self.smu_vm2_kwargs)
@@ -1834,7 +1837,7 @@ class Pixcap65(Dut):
         """
         Gets the current to be sourced by the SMU connected to the PCBs VM2 port (constant current mode of the SMU).
         The call to the SMU is only performed when the SMU is connected and active.
-        After changing the configuration, the settling of the smu will taken into account to make sure that no
+        After changing the configuration, the settling of the smu will be taken into account to make sure that no
         measurement is performed within the settling interval of the current source.
         """
         return self.get_smu_source_current(self.__vm2_smu_key, kwargs=self.smu_vm2_kwargs)
@@ -1856,7 +1859,7 @@ class Pixcap65(Dut):
         """
         vm2_measure_volts
 
-        Read the voltage over the SMU contacts conncted to the PCBs VM2 port. (Performs a voltage measurement in constant current mode.)
+        Read the voltage over the SMU contacts connected to the PCBs VM2 port. (Performs a voltage measurement in constant current mode.)
         The call to the SMU is only performed when the SMU is connected and active.
         """
         return self.smu_measure_voltage(self.__vm2_smu_key, kwargs=self.smu_vm2_kwargs)
@@ -1985,10 +1988,10 @@ class Pixcap65(Dut):
         arguments.
         On some SMUs it will also configure the measurement buffers for acquiring multiple readings at once.
 
-        :param current_limit: current compliance limit to be set in A
-        :param current_range: current measurement range/maximum current intended to be measured in A
-        :param plc: number of power supply cycles to be averaged over when measureing
-        :param src_u: sourcing voltage for the SMU
+        :param current_limit: current compliance limit to be set in A.
+        :param current_range: current measurement range/maximum current intended to be measured in A.
+        :param plc: number of power supply cycles to be averaged over when measuring.
+        :param src_u: sourcing voltage for the SMU.
         :param voltage_range: voltage range of the SMUs source.
         """
         self.smu_init(self.__vm3_smu_key, current_limit, current_range, plc, src_u, voltage_range,
@@ -2035,7 +2038,7 @@ class Pixcap65(Dut):
         """
         Gets the voltage to be sourced by the SMU connected to the PCBs VM3 port (constant voltage mode of the SMU).
         The call to the SMU is only performed when the SMU is connected and active.
-        After changing the configuration, the settling of the smu will taken into account to make sure that no
+        After changing the configuration, the settling of the smu will be taken into account to make sure that no
         measurement is performed within the settling interval of the voltage source.
         """
         return self.get_smu_source_voltage(self.__vm3_smu_key, kwargs=self.smu_vm3_kwargs)
@@ -2049,7 +2052,7 @@ class Pixcap65(Dut):
         """
         Gets the current to be sourced by the SMU connected to the PCBs VM3 port (constant current mode of the SMU).
         The call to the SMU is only performed when the SMU is connected and active.
-        After changing the configuration, the settling of the smu will taken into account to make sure that no
+        After changing the configuration, the settling of the smu will be taken into account to make sure that no
         measurement is performed within the settling interval of the current source.
         """
         return self.get_smu_source_current(self.__vm3_smu_key, kwargs=self.smu_vm3_kwargs)
@@ -2071,7 +2074,7 @@ class Pixcap65(Dut):
         """
         vm3_measure_volts
 
-        Read the voltage over the SMU contacts conncted to the PCBs VM3 port. (Performs a voltage measurement in constant current mode.)
+        Read the voltage over the SMU contacts connected to the PCBs VM3 port. (Performs a voltage measurement in constant current mode.)
         The call to the SMU is only performed when the SMU is connected and active.
         """
         return self.smu_measure_voltage(self.__vm3_smu_key, kwargs=self.smu_vm3_kwargs)

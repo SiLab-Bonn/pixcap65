@@ -3,7 +3,7 @@ from typing import Iterable
 import numpy as np
 import time
 
-from pixcap_65_test_total_cap import scan_configuration, NUMBER_AVERAGE_MEASUREMENTS_KEY, PixCap65TotalCap
+from pixcap65.pixcap_65_test_total_cap import scan_configuration, NUMBER_AVERAGE_MEASUREMENTS_KEY, PixCap65TotalCap
 
 
 def test_frequency_settling(settling_range: Iterable, file_name: str):
@@ -78,7 +78,7 @@ def test_source_settling(settling_range: Iterable, file_name: str):
             pix.pixcap.bias_voltage = -20
             start = time.time()
             result = pix.pixcap.bias_advanced_current_multiple(10)[1::2]
-            print(f"It take {time.time() - start} seconds.")
+            print(f"It takes {time.time() - start} seconds.")
             print(result)
             pix.pixcap.bias_voltage = -0.1
             time.sleep(1)

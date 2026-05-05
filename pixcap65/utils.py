@@ -35,8 +35,9 @@ class PixCapSetup(Dut):
         str, type, None] = None, hl_keys=None, tl_keys=None, rl_keys=None):
         if measurement is None:
             measurement = PixcapMeasurements.TOTAL_CAPACITANCE
-        assert isinstance(measurement, PixcapMeasurements) or isinstance(measurement, str) or issubclass(measurement,
-                                                                                                         PixCap65Measurement)
+        assert isinstance(measurement, PixcapMeasurements) or isinstance(measurement, str) or (
+                isinstance(measurement, type) and issubclass(measurement,
+                                                             PixCap65Measurement))
         if isinstance(config, str) and config.endswith(".yaml"):
             # verify the path and modify the configuration if necessary!
             import os
@@ -46,7 +47,7 @@ class PixCapSetup(Dut):
                     assert os.path.exists(new_path)
                     config = new_path
                 elif os.path.dirname(config) == "pixcap":
-                    new_path = os.path.join("..", config)
+                    new_path = os.path.join("../..", config)
                     new_path = os.path.normpath(new_path)
                     assert os.path.exists(new_path)
                     config = new_path
@@ -159,7 +160,7 @@ class PixCapSetup(Dut):
                 environ_tl.append(driver)
                 processed_tl_keys.append(connection)
 
-        # check for conflicts betweent the setup delegation and the dut.
+        # check for conflicts between the setup delegation and the dut.
         for hardware, hw_idx in hl_mapping.items():
             if hardware not in hl_keys:
                 if "interface" in adjusted_config["hw_drivers"][hw_idx] and adjusted_config["hw_drivers"][hw_idx][
@@ -211,10 +212,10 @@ class PixCapSetup(Dut):
             self.measurement_arguments = pix_args
             match measurement:
                 case PixcapMeasurements.TOTAL_CAPACITANCE:
-                    from pixcap_65_test_total_cap import PixCap65TotalCap
+                    from pixcap65.pixcap_65_test_total_cap import PixCap65TotalCap
                     self.measurement_class = PixCap65TotalCap
                 case PixcapMeasurements.INTER_CAPACITANCE:
-                    from pixcap_65_test_inter_cap import Pixcap65TestInterCap
+                    from pixcap65.pixcap_65_test_inter_cap import Pixcap65TestInterCap
                     self.measurement_class = Pixcap65TestInterCap
                 case _:
                     raise ValueError(f"provided measurement class does not exist.")
@@ -231,6 +232,9 @@ class PixCapSetup(Dut):
             self["power"].set_enable(0, channel=1)
             self["power"].set_enable(0, channel=2)
             self["power"].set_enable(0, channel=3)
+            import serial
+            
+
         except:
             logger.error("Failed to clean up the setup handling.")
         super(PixCapSetup, self).close()
@@ -259,6 +263,7 @@ class PixCapSetup(Dut):
 
             # init the pixcap system
             self.pixcap = self.measurement_class(**self.measurement_arguments)
+            assert self.pixcap is not None
             self.pixcap.configure()
             return self.pixcap
         except:
@@ -272,6 +277,7 @@ class PixCapSetup(Dut):
             raise
 
     def __exit__(self, exc_type, exc_val, exc_tb):
+        assert self.pixcap is not None
         self.pixcap.close()
         self.pixcap = None
         self.close()

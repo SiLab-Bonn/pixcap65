@@ -120,7 +120,8 @@ registers:
     type        : FunctionalRegister
     hw_driver   : GPAC
     arg_names   : [ value ]
-    arg_add     : { 'channel': 'PWR0'}
+    arg_add     : { # noinspection YAMLIncompatibleTypes
+      'channel': 'PWR0' }
 
   - name        : GPIO
     type        : StdRegister

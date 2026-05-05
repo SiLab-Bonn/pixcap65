@@ -2,14 +2,10 @@
 This file contains some utilities needed for the analysis and the plotting.
 """
 
-from typing import Union, Mapping, AnyStr, LiteralString
+from typing import Union, Mapping
 
 import numpy as np
 import tables as tb
-# FIXME: optional dependence should not be imported anyway!
-# from iminuit import Minuit
-# noinspection PyProtectedMember
-# from iminuit.minuit import _cl_to_errordef
 from tables import File
 from tables.group import RootGroup
 
@@ -24,6 +20,7 @@ ANALYSIS_CORRECTED_GROUP_NAME = "analysis_correction"
 TABLES_ARRAY_TYPE = Union[np.ndarray, tb.CArray]
 TABLES_TABLE_TYPE = Union[tb.Table, Mapping[str, TABLES_ARRAY_TYPE]]
 TABLES_LEAF_TYPE = Union[tb.Leaf, tb.Table, tb.Array]
+TABLES_PART_LEAF_TYPE = Union[tb.Table, tb.Array, tb.CArray]
 TABLES_LEAF_COMPAT_TYPE = Union[tb.Leaf, tb.Table, tb.Array, np.ndarray, tb.CArray]
 GENERAL_PIXCAP_SHAPE = (40, 40)
 COVARIANCE_PIXCAP_SHAPE = (40, 40, 4, 4)
@@ -89,15 +86,15 @@ def transform_covariance(cov):
                 "parameters.")
 
 
-def str_join(delimiter: AnyStr, *args: AnyStr) -> LiteralString | bytes:
+def str_join(delimiter: str | bytes, *args) -> str | bytes:
     """
     str_join
 
     Modified function to join multiple strings separated by the specified delimiter.
     This function was necessary as the builtin implementation does not support variable args.
     :param delimiter: delimiter to use between the different strings when combining them.
-    :param args: strings to be combined
-    :return: combined string
+    :param args: strings to be combined.
+    :return: combined string.
     """
     # But what 'to do' if one of the var args is a list or in general an iterable of strings?
     return delimiter.join(args)
@@ -115,7 +112,7 @@ def check_leaf_unit(leaf: TABLES_LEAF_TYPE, unit: str) -> TABLES_LEAF_COMPAT_TYP
     :param unit: Expected unit for the data structure.
     :return: array_like of the data structures contents.
     """
-    assert isinstance(leaf, TABLES_LEAF_TYPE)
+    assert isinstance(leaf, TABLES_PART_LEAF_TYPE)
     if UNITS_ATTRIBUTE_KEY not in leaf.attrs or leaf.attrs[UNITS_ATTRIBUTE_KEY] != unit:
         raise AssertionError
     result = leaf[:]
@@ -133,8 +130,8 @@ def handle_kafe2_advanced_options(fit_object, apply_contour, x_label, y_label, t
 
     :param fit_object: object of the already performed fit.
     :param apply_contour: boolean, whether to apply contour profiling around the found optimum.
-    :param x_label: label of the x axis.
-    :param y_label: label of the y axis.
+    :param x_label: label of the x-axis.
+    :param y_label: label of the y-axis.
     :param title: title of the plot.
     :param pdf: PdfPages object to save the fit plots to.
     :param contours_title: title of the contour plot.
@@ -152,7 +149,8 @@ def handle_kafe2_advanced_options(fit_object, apply_contour, x_label, y_label, t
             if ax_k >= 1:
                 print("We are now at iteration ", ax_k)
             ax.set_title(title)
-            ax.text(0, 0.9, f"Fit with cost={conv_invest['x']:.4f} and \np={conv_invest['p']:.4f}", transform=ax.transAxes)
+            ax.text(0, 0.9, f"Fit with cost={conv_invest['x']:.4f} and \np={conv_invest['p']:.4f}",
+                    transform=ax.transAxes)
             break
         pdf.savefig(fig, bbox_inches='tight')
     for fig in fit_plot.figures:
@@ -187,8 +185,8 @@ def handle_minuit_advanced_options(fit_object, apply_contour, x_label, y_label, 
 
     :param fit_object: object of the already performed fit.
     :param apply_contour: boolean, whether to apply contour profiling around the found optimum.
-    :param x_label: label of the x axis.
-    :param y_label: label of the y axis.
+    :param x_label: label of the x-axis.
+    :param y_label: label of the y-axis.
     :param title: title of the plot.
     :param pdf: PdfPages object to save the fit plots to.
     :param contours_title: title of the contour plot.
@@ -207,8 +205,9 @@ def handle_minuit_advanced_options(fit_object, apply_contour, x_label, y_label, 
     model_parameters = ""
     for key, value in fit_object.values.to_dict().items():
         model_parameters += f"{key} = {value:.4f}\n"
-    ax.legend(["data", f"model",],
-              title=f"{model_parameters}\nGoF={conv_result['x']:.4f}\nndf={conv_result['ndf']}\np={conv_result['p']:.4f}", frameon=False)
+    ax.legend(["data", f"model", ],
+              title=f"{model_parameters}\nGoF={conv_result['x']:.4f}\nndf={conv_result['ndf']}\np={conv_result['p']:.4f}",
+              frameon=False)
 
     # for error bands we must perform something similar
     if hasattr(extract_iminuit_cost_object(fit_object), "model"):
@@ -216,10 +215,10 @@ def handle_minuit_advanced_options(fit_object, apply_contour, x_label, y_label, 
             from jacobi import propagate
             # noinspection PyProtectedMember
             x, _, _ = extract_iminuit_cost_object(fit_object)._masked.T
-            y, ycov = propagate(lambda p: extract_iminuit_cost_object(fit_object).model(x, p), fit_object.values,
-                                fit_object.covariance)
-            yerr_prop = np.diag(ycov) ** 0.5
-            plt.fill_between(x, y - yerr_prop, y + yerr_prop, facecolor="C1", alpha=0.5)
+            y, y_cov = propagate(lambda p: extract_iminuit_cost_object(fit_object).model(x, p), fit_object.values,
+                                 fit_object.covariance)
+            y_err_prop = np.diag(y_cov) ** 0.5
+            plt.fill_between(x, y - y_err_prop, y + y_err_prop, facecolor="C1", alpha=0.5)
         except:
             pass
 
@@ -230,22 +229,22 @@ def handle_minuit_advanced_options(fit_object, apply_contour, x_label, y_label, 
     if apply_contour and fit_object.valid:
         # will need 'to do' it on our selves
         pars = [p for p in fit_object.parameters if not fit_object.fixed[p]]
-        npar = len(pars)
-        figsize = None
+        n_par = len(pars)
+        fig_size = None
         fig, ax = plt.subplots(
-            npar,
-            npar,
-            figsize=figsize,
+            n_par,
+            n_par,
+            figsize=fig_size,
             constrained_layout=True,
             squeeze=False,
         )
 
         for i, par1 in enumerate(pars):
             plt.sca(ax[i, i])
-            fmax = 0
+            f_max = 0
             for k, cl in enumerate(cls):
                 f = _cl_to_errordef(cl, 1, 0.68)
-                fmax = max(fmax, f)
+                f_max = max(f_max, f)
                 plt.axhline(f, color=f"C{k}")
             fit_object.draw_mnprofile(par1, subtract_min=True, bound=3)
             ax[i, i].set_ylabel("$\\Delta - 2\\log \\mathcal{{L}}$")
@@ -281,7 +280,7 @@ def investigate_fit_convergence(fitter):
     else:
         raise TypeError("Fitter must be either a Minuit or XYFit object.")
     from scipy.stats.distributions import chi2
-    regular_cost = cost_value / ndf
+    regular_cost = cost_value / ndf if cost_value is not None else -1
     p_value = 1 - chi2.cdf(regular_cost, df=ndf)
     convergence = dict(x=cost_value, xn=regular_cost, ndf=ndf, p=p_value)
     print(convergence)
@@ -303,7 +302,7 @@ def get_base_group(base_path, in_file_h5: File) -> Union[tb.Group, RootGroup]:
         base_group = in_file_h5.root
     else:
         try:
-            base_group = walk_to_node(in_file_h5.root, base_path)
+            base_group, _ = walk_to_node(in_file_h5.root, base_path, verify_create=True)
             assert isinstance(base_group, tb.Group)
         except:
             print(in_file_h5)
@@ -341,11 +340,11 @@ def get_analysis_group(base_group, **kwargs):
     """
     get_analysis_grouo
 
-    Get the correct analysis group for the given occaison.
-    Distinghuish between analysis and corrected analysis groups and provides the correct one.
+    Get the correct analysis group for the given occasion.
+    Distinguish between analysis and corrected analysis groups and provides the correct one.
 
     :param base_group: hdf files group where to look for the analysis groups.
-    :key use_corrected: boolean, whether to use the corrected capacitances for plotting.
+    :key use_corrected: boolean, whether to use the corrected capacitance's for plotting.
     :return: analysis group from the hdf file.
     """
     if kwargs.get('use_corrected', False):
@@ -375,11 +374,68 @@ default_analysis_keyword_arguments = {
 }
 
 
-class DepletionData(tb.IsDescription):
+class DepletionWidthData(tb.IsDescription):
     col = tb.Int64Col(pos=0)
     row = tb.Int64Col(pos=1)
     V = tb.Float32Col(pos=2)
     NAD = tb.Float32Col(pos=3)
     dep = tb.Float32Col(pos=4)
     sat = tb.Float32Col(pos=5)
+
+
+class CVDistributionData(tb.IsDescription):
+    bias = tb.Float64Col(pos=0)
+    n_pixel = tb.Int64Col(pos=1)
+    capacitance = tb.Float64Col(pos=2)
+    cap_err = tb.Float64Col(pos=3)
+    cap_std = tb.Float64Col(pos=4)
+    cap_std_err = tb.Float64Col(pos=5)
+    r_on = tb.Float64Col(pos=6)
+    r_on_err = tb.Float64Col(pos=7)
+    r_on_std = tb.Float64Col(pos=8)
+    r_on_std_err = tb.Float64Col(pos=9)
+    cap_corrected = tb.Float64Col(pos=10)
+    cap_corrected_err = tb.Float64Col(pos=11)
+    cap_parasitic = tb.Float64Col(pos=12)
+    cap_systematic_error = tb.Float64Col(pos=13)
+
+
+class DepletionData(tb.IsDescription):
+    Ubi = tb.Float64Col(pos=0)
+    Ubi_error = tb.Float64Col(pos=1)
+    a = tb.Float64Col(pos=2)
+    a_error = tb.Float64Col(pos=3)
+    b = tb.Float64Col(pos=4)
+    b_error = tb.Float64Col(pos=5)
+    c = tb.Float64Col(pos=6)
+    c_error = tb.Float64Col(pos=7)
+    d = tb.Float64Col(pos=8)
+    d_error = tb.Float64Col(pos=9)
+
+
+class CVDepletionCapacitanceData(tb.IsDescription):
+    bias = tb.Float64Col(pos=0)
+    n_pixel = tb.Int64Col(pos=1)
+    capacitance = tb.Float64Col(pos=2)
+    cap_err = tb.Float64Col(pos=3)
+    cap_std = tb.Float64Col(pos=4)
+    cap_std_err = tb.Float64Col(pos=5)
+    r_on = tb.Float64Col(pos=6)
+    r_on_err = tb.Float64Col(pos=7)
+    r_on_std = tb.Float64Col(pos=8)
+    r_on_std_err = tb.Float64Col(pos=9)
+    cap_corrected = tb.Float64Col(pos=10)
+    cap_corrected_err = tb.Float64Col(pos=11)
+    cap_parasitic = tb.Float64Col(pos=12)
+    cap_systematic_error = tb.Float64Col(pos=13)
+    Ubi = tb.Float64Col(pos=14)
+    Ubi_error = tb.Float64Col(pos=15)
+    a = tb.Float64Col(pos=16)
+    a_error = tb.Float64Col(pos=17)
+    b = tb.Float64Col(pos=18)
+    b_error = tb.Float64Col(pos=19)
+    c = tb.Float64Col(pos=20)
+    c_error = tb.Float64Col(pos=21)
+    d = tb.Float64Col(pos=22)
+    d_error = tb.Float64Col(pos=23)
 # endregion

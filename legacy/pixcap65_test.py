@@ -12,7 +12,7 @@ import pylab as pl
 import time
 from bitarray import bitarray
 
-from pixcap.pixcap65 import Pixcap65
+from pixcap65.pixcap.pixcap65 import Pixcap65
 from pixcap65.utility import pixcap65_constants as c
 
 logging.getLogger().setLevel(logging.DEBUG)

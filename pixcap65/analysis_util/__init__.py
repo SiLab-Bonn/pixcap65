@@ -1,8 +1,9 @@
 import numpy as np
 import tables as tb
 
-from analysis_util.utility import GENERAL_PIXCAP_SHAPE
-from analysis_util.utility import TABLES_ARRAY_TYPE, TABLES_TABLE_TYPE, GENERAL_PIXCAP_SHAPE, transform_covariance
+from pixcap65.analysis_util.utility import GENERAL_PIXCAP_SHAPE
+from pixcap65.analysis_util.utility import TABLES_ARRAY_TYPE, TABLES_TABLE_TYPE, GENERAL_PIXCAP_SHAPE, \
+    transform_covariance
 
 
 def analyze_data_delegate(file: tb.File, group: tb.Group, current_hist: TABLES_ARRAY_TYPE,
@@ -38,7 +39,7 @@ def analyze_data_delegate(file: tb.File, group: tb.Group, current_hist: TABLES_A
             leak_error_hist[col, row] = leak_error
             fit_cov[col, row] = cov
 
-        # #apply linear fit to measured current values; also returns covariance matrix
+        # #apply linear fit to measured current values; also returns covariance matrix.
         # matrix = np.polyfit(freq_sweep_array, current_array, 1, cov=True)
 
         # a, b = matrix[0][0], matrix[0][1]

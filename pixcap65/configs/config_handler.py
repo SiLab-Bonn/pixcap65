@@ -9,7 +9,7 @@ try:
     from collections.abc import Iterable
 except ImportError:
     # python 2.7 and < python 3.3
-    # noinspection PyProtectedMember
+    # noinspection PyProtectedMember,PyUnresolvedReferences
     from collections import Iterable
 
 from typing import Callable
@@ -47,7 +47,7 @@ def update_smu_range_configuration(config_file):
     """
     update_smu_range_configuration
 
-    This will take a prepared configuration file and add or update the values for the normalised range values,
+    This will take a prepared configuration file and add or update the values for the normalized range values,
     which are the ones used for the communication with the Lab device. The changed config will replace the old one.
     The configuration file will be overwritten in the end.
     :param config_file: path of the file containing the range
@@ -71,13 +71,13 @@ def handle_range_configuration(key_spec: str, range_config, config_precision=2):
 
     Helper function to handle the range configuration for a particular kind of measurement. It will verify the
     existence of the range prefixes and range quantifiers convert all string representations to float values.
-    Afterwards the normalised range value will be calculated and stored in the configuration (as a scientific
+    Afterwards the normalized range value will be calculated and stored in the configuration (as a scientific
     notation string).
 
 
     :param key_spec: kind of measurement (current or voltage)
     :param range_config: range configuration mapping
-    :param config_precision: precision of the normalised range value in scientific notation.
+    :param config_precision: precision of the normalized range value in scientific notation.
     """
     if key_spec in range_config:
         for idx in range(len(range_config[key_spec])):
@@ -151,7 +151,7 @@ def extract_smu_range_error(smu_config: dict, data, range_spec: float, kind: str
     To get the correct error for the given range a comparison to values in the SMU configuration is performed.
     This comparison may suffer from (numerical) rounding errors in the process.
 
-    The error is assumed to composed from a relative part of the measurement (reading error) and an absolute part
+    The error is assumed to composed of a relative part of the measurement (reading error) and an absolute part
     defined by the selected measurement range. It is also possible to perform the calculation directly for an
     Iterable of measurements. In this case the errors are returned as a numpy array.
 
@@ -225,7 +225,7 @@ if __name__ == '__main__':
         if file.endswith('_Range.yaml'):
             update_smu_range_configuration(file)
 
-    with open("../pixcap_logging.yml", 'r') as f:
+    with open("../../pixcap_logging.yml", 'r') as f:
         logging.config.dictConfig(yaml.safe_load(f))
 
     for logger in logging.getLogger().getChildren():
