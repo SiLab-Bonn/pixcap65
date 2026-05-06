@@ -28,3 +28,6 @@ Tests are only performed with
 The package itself is located in [Pixcap65](pixcap65), but there are still some legacy scripts from previous
 implementations.
 The latter ones were moved to [legacy](legacy).
+
+The utility code file [homogenize_plots.py](pixcap65/utility/homogenize_plots.py) is taken from code sources provided for the module `physik131: EDV für Physiker`.
+

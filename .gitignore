@@ -6,3 +6,17 @@
 gpgkey
 /data/bare-measurement/
 /data/advanced-bare-measurement/
+
+PresentationNotes.MD
+*.pdf
+/data_local
+/data_local/**
+/build
+/out
+/dist
+/pixcap65/Data
+/pixcap65/Data/**
+/pixcap65/Data.backup-2026-04-26
+!pixcap65/device
+!doc
+!doc/*.pdf

@@ -10,12 +10,17 @@ maintainers = [
     { name = "Yannick Dieter", email = "dieter@physik.uni-bonn.de" },
     { name = "Dominik Fischer", email = "s6dkfisc@uni-bonn.de" },
 ]
-
 license = "MIT AND BSD-3-Clause"
 readme = { file = "README.md", content-type = "text/markdown" }
 requires-python = ">=2.7"
+classifiers = [
+    "Programming Language :: Python :: 3",
+    "Operating System :: OS Independent",
+]
 dependencies = [
-    "numpy>=2.3",
+    "numpy < 2; python_version < '3'",
+    "numpy < 2.3; python_version > '3' and python_version < '3.11'",
+    "numpy>=2.3; python_version >= '3.11'",
     "matplotlib",
     "tables>=3.0",
     "pyyaml",
@@ -23,8 +28,11 @@ dependencies = [
     "bitarray>=3.4.0; python_version >= '3.5'",
     "bitarray; python_version < '3.5' and python_version >= '3'",
     "coloredlogs",
-    "basil-daq @ git+https:////github.com/SiLab-Bonn/basil.git@502a999eb5075e04850f7a481d2668726583c290 ; python_version >= '3.9'",
-    "basil-daq==3.1.0; platform_system == 'Windows' or python_version < '3.9'",
+    # these declaration is only for the package index!
+    "basil-daq < 3.2",
+    # only to be used for the installs and not for defining the dependency for the package index!
+    # "basil-daq @ git+https:////github.com/SiLab-Bonn/basil.git@502a999eb5075e04850f7a481d2668726583c290 ; python_version >= '3.9'",
+    # "basil-daq==3.1.0; platform_system == 'Windows' or python_version < '3.9'",
     "tqdm",
 ]
 
@@ -35,64 +43,69 @@ Issues = "https://github.com/SiLab-Bonn/pixcap65/issues/"
 # no documentation present.
 
 [project.scripts]
-pixcap_inter_cap = "pixcap65.pixcap_65_test_inter_cap"
-pixcap_total_cap = "pixcap65.pixcap_65_test_total_cap"
-pixcap_line = "pixcap65.pixcap.pixcap_65_test_load_line"
+# pixcap_inter_cap = "pixcap65.pixcap_65_test_inter_cap"
+# pixcap_total_cap = "pixcap65.pixcap_65_test_total_cap"
+# pixcap_line = "pixcap65.pixcap.pixcap_65_test_load_line"
 
 [project.optional-dependencies]
-advanced = [
-    "iminuit>2.30.0",
-    "kafe2>2.10.0",
-    "scipy>=1.15.0",
-    "numpy>=2.3",
-    "jacobi",
-    "findiff",
-    "dut"
-]
-visualization = [
-    "pyqt5",
-    "vitables",
-    "matplotlib",
-    "dut"
-]
 dut = [
     "pyserial",
     "pyvisa ; python_version > '3.5'",
     "pyusb",
     "pysilibusb"
 ]
-dev = [
-    "dut",
-    "advanced",
-    "visualization"
+advanced = [
+    "iminuit>2.30.0; python_version >= '3.9'",
+    "iminuit ; python_version < '3.9'",
+    "kafe2>2.10.0; python_version >= '3.7'",
+    "kafe2 ; python_version < '3.7'",
+    "scipy>=1.15.0; python_version >= '3.10'",
+    "scipy ; python_version < '3.10'",
+    "jacobi ; python_version >= '3.6'",
+    "findiff",
+]
+visualization = [
+    "pyqt5",
+    "vitables",
+    "matplotlib",
 ]
 
+
+
+
+# configuration of different build systems which could be used interchangebly!
 [build-system]
-requires = ["setuptools >= 77.0.3"]
+requires = ["setuptools >= 77.0.3", "hatchling >= 1.26", "uv_build >= 0.11.7, <0.12.0"]
 build-backend = "setuptools.build_meta"
+# build-backend = "hatchling.build"
+#build-backend = "uv_build"
 
-#requires = ["hatchling >= 1.26"]
-#build-backend = ["hatchling.build"]
-
-
-
+# setuptools configuration
 # [tool.setuptools]
 # include-package-data = true
-# packages = ["pixcap65", "pixcap", "configs", "analysis_util"]
-# packages = ["pixcap65"]
-[tool.setuptools.packages.find]
-# where = ["pixcap65"]
-include = ["pixcap65*"]
-exclude = ["tests", "data_local", "Data", "doc", "**full_analysis", "**.h5", "**.pdf"]
 
 [tool.setuptools.dynamic]
 version = { attr = "pixcap65.pixcap.__version__" }
 
+[tool.setuptools.exclude-package-data]
+pixcap65 = [".gitattributes", ".gitignore", "**.h5"]
+
+[tool.setuptools.packages.find]
+include = ["pixcap65*"]
+exclude = ["tests", "data_local", "Data", "doc", "**full_analysis", "**.h5", "**.pdf"]
+
+# hatch configuration
 [tool.hatch.version]
-path = "..."
+path = "pixcap65/pixcap/__init__.py"
 
 [tool.hatch.metadata]
 allow-direct-references = true
+
+[tool.hatch.build]
+directory = "out"
+
+[tool.hatch.build.targets.wheel]
+packages = ["pixcap65"]
 
 [tool.hatch.build.targets.sdist]
 exclude = [
@@ -101,6 +114,13 @@ exclude = [
     "**/full_analysis.py"
 ]
 
+[tool.hatch.envs.hatch-build]
+# installer = "pip"
 
-#[tool.setuptools.exclude-package-data]
-#mypkg = [".gitattributes", ".gitignore", "**.h5"]
+[tool.uv.build-backend]
+module-name = "pixcap65"
+module-root = ""
+# namespace = true
+data = ["pixcap65/device"]
+source-exclude = ["doc", "Data", "data_local"]
+

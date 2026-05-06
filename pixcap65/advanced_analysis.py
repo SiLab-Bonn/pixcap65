@@ -1,10 +1,9 @@
-from warnings import deprecated
-
 import numpy as np
 import tables as tb
 from matplotlib.backends.backend_pdf import PdfPages
+from warnings import deprecated
 
-from analysis import analyze_depletion_delegate, apply_correction_simple
+from pixcap65.analysis import analyze_depletion_delegate, apply_correction_simple
 from pixcap65.analysis_util.physics_modelling import full_capacitance_model, simple_capacitance_model
 from pixcap65.analysis_util.utility import str_join, check_leaf_unit, \
     transform_covariance, TABLES_ARRAY_TYPE, GENERAL_PIXCAP_SHAPE, COVARIANCE_PIXCAP_SHAPE, FULL_MODEL_LABEL, \
