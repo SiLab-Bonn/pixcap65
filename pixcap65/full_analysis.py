@@ -1,11 +1,15 @@
 """
 Analysis and plotting script evaluate all the data taking from the beginning!
 """
+import numpy as np
+import tables as tb
 from matplotlib.backends.backend_pdf import PdfPages
 
+from analysis_util.utility import get_base_group
 from pixcap65.analysis import analyze_data, analyze_capacitance_distribution
 from pixcap65.utility.homogenize_plots import set_params
 from plotting import plot_data, plot_combined_data, plot_bias_data
+from utility.tables_util import get_group_attribute
 
 if __name__ == '__main__':
     # additional setup
@@ -13,7 +17,7 @@ if __name__ == '__main__':
     set_params(latex=True,
                latex_extra=r"\sisetup{separate-uncertainty}\sisetup{locale = DE}\sisetup{uncertainty-descriptors={"
                            r"stat,sys}}\sisetup{uncertainty-descriptor-mode=subscript}\sisetup{"
-                           r"retain-zero-uncertainty}")
+                           r"retain-zero-uncertainty}", fig_width=8.26772, fig_height=11.69291, )
     bare_correction_args = {
         "apply_correction": True,
         "bare_file": "Bare_Repeat_2_Scan.h5",
@@ -28,7 +32,8 @@ if __name__ == '__main__':
     print("Analyze the Bare samples for calibration of the pixcap chips")
     analyze_data(raw_data='pixcap65/Data/bare-measurement/TEST.h5', is_advanced=False)
     analyze_data(raw_data='pixcap65/Data/advanced-bare-measurement/TEST.h5', is_advanced=True, is_cv=False)
-    analyze_data(raw_data='Bare_Repeat_2_Scan.h5', base_path="Reference/bare/unbiased_8", is_advanced=True, is_cv=False)
+    analyze_data(raw_data='Bare_Repeat_2_Scan.h5', base_path="Reference/bare/unbiased_8", is_advanced=True, is_cv=False,
+                 full_model=False)
     analyze_capacitance_distribution(raw_data='Bare_Repeat_2_Scan.h5', base_path="Reference/bare/unbiased_8",
                                      corrected_distribution=False,
                                      exclude_test_cap=True, use_kafe2=True,
@@ -37,6 +42,17 @@ if __name__ == '__main__':
                                      corrected_distribution=False,
                                      exclude_test_cap=True, use_kafe2=False,
                                      fit_plot_pdf_name="Bare_analysis_parasitic.pdf")
+    # investigate the bump capacitance
+    with tb.open_file("Bare_Repeat_2_Scan.h5", 'r') as f:
+        base_group = get_base_group("Reference/bare/unbiased_8", f)
+        bump_caps = np.concat(base_group.analysis.HistCap[:5, 0], base_group.analysis.HistCap[35:, 0])
+        bump_errors = np.concat(base_group.analysis.HistCapErr[:5, 0], base_group.analysis.HistCapErr[35:, 0])
+        weights = np.reciprocal(bump_errors ** 2)
+        average_bump_cap = np.average(bump_caps, weights=weights)
+        statistical_bump_error = np.shape(bump_errors)[0] / np.sum(weights)
+        parasitic = get_group_attribute(base_group.analysis, "parasitic")
+        parasitic_error = get_group_attribute(base_group.analysis, "parasitic_error")
+        print(f"bump capacitance: ({parasitic - average_bump_cap}+-{statistical_bump_error}+-{parasitic_error})")
 
     # analysis section/calibration
     print("Analyze the R13 reference sample.")

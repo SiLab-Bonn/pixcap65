@@ -2,12 +2,11 @@
 This file contains some utilities needed for the analysis and the plotting.
 """
 
-from typing import Union, Mapping
-
 import numpy as np
 import tables as tb
 from tables import File
 from tables.group import RootGroup
+from typing import Union, Mapping
 
 from pixcap65.utility.utils_2 import walk_to_node, UNITS_ATTRIBUTE_KEY, prevent_group_mix_up
 
@@ -195,6 +194,7 @@ def handle_minuit_advanced_options(fit_object, apply_contour, x_label, y_label, 
     from iminuit import Minuit
     # noinspection PyProtectedMember
     from iminuit.minuit import _cl_to_errordef
+    from iminuit.cost import BinnedNLL
     assert isinstance(fit_object, Minuit)
     fig, ax = plt.subplots()
     ax.set_title(title)
@@ -205,7 +205,8 @@ def handle_minuit_advanced_options(fit_object, apply_contour, x_label, y_label, 
     model_parameters = ""
     for key, value in fit_object.values.to_dict().items():
         model_parameters += f"{key} = {value:.4f}\n"
-    ax.legend(["data", f"model", ],
+    # TODO: the legend might be wrong presented
+    ax.legend(["model", "data"],
               title=f"{model_parameters}\nGoF={conv_result['x']:.4f}\nndf={conv_result['ndf']}\np={conv_result['p']:.4f}",
               frameon=False)
 

@@ -3,11 +3,10 @@ Analysis of Pixcap65 data. Fits freq vs current to extract the capacitance. A 2D
 for each pixel is stored.
 """
 import logging
-from typing import Optional, Tuple
-from warnings import deprecated
-
 import numpy as np
 import tables as tb
+from typing import Optional, Tuple
+from warnings import deprecated
 
 from pixcap65.analysis_util.physics_modelling import SILICON_V_BIAS, depletion_model, model_depletion, EPS_SILICON, \
     gauss_model, \
@@ -19,10 +18,10 @@ from pixcap65.analysis_util.utility import check_leaf_unit, str_join, ANALYSIS_C
     PARASITIC_SUBTRACTION, get_base_group, handle_analysis_mix_up, HIST_CAP_UNIT, HIST_CURRENT_MEAS_UNIT, \
     HIST_BIAS_MEAS_UNIT, get_analysis_group, investigate_fit_convergence, TABLES_LEAF_COMPAT_TYPE, \
     TABLES_PART_LEAF_TYPE, CVDistributionData, CVDepletionCapacitanceData
+from pixcap65.plotting import CAPACITANCE_CONVERSION_FACTOR, evaluate_pixel_mask
 from pixcap65.utility.tables_util import get_groups, get_leaves, copy_node, list_attributes, group_get_file, \
     set_group_attribute, get_group_attribute, get_group_attributes, get_parent_group
 from pixcap65.utility.utils_2 import walk_to_node, GroupType, create_carray, prevent_group_mix_up
-from plotting import CAPACITANCE_CONVERSION_FACTOR, evaluate_pixel_mask
 
 UNITS_ATTRIBUTE_KEY = "Units"
 
@@ -1287,10 +1286,10 @@ def analyze_capacitance_distribution_delegate(analysis_group, output_pdf, **kwar
     :key hist_bins: integer, number of bins to use for the histogram.
     :key capacitance: histogram of the capacitance
     """
-    from plotting import CAPACITANCE_CONVERSION_FACTOR
-    from plotting import DEFAULT_BIN_NUMBER
-    from plotting import COUNTS_HIST_LABEL
-    from plotting import HIST_PIX_CAP_LABEL
+    from pixcap65.plotting import CAPACITANCE_CONVERSION_FACTOR
+    from pixcap65.plotting import DEFAULT_BIN_NUMBER
+    from pixcap65.plotting import COUNTS_HIST_LABEL
+    from pixcap65.plotting import HIST_PIX_CAP_LABEL
     from matplotlib import pyplot as plt
 
     # extract further arguments for the performance of the fitting
@@ -1347,9 +1346,9 @@ def analyze_capacitance_distribution_delegate(analysis_group, output_pdf, **kwar
         fitter.migrad()
         fitter.hesse()
         print("There are results for the extended fit")
-        print(fitter.fmin)
-        print(fitter.values)
-        print(fitter.errors)
+        # print(fitter.fmin)
+        # print(fitter.values)
+        # print(fitter.errors)
         if output_pdf is not None:
             handle_minuit_advanced_options(fitter, False, "$C$ in \\unit{{\\femto\\farad}}", COUNTS_HIST_LABEL,
                                            "Capacitance distribution (EXTENDED)", output_pdf,
@@ -1357,15 +1356,17 @@ def analyze_capacitance_distribution_delegate(analysis_group, output_pdf, **kwar
         fitter = Minuit(cost, **initial_estimator)
         fitter.migrad()
         fitter.hesse()
-        print("There are results for the standard fit")
-        print(fitter.fmin)
-        print(fitter.values)
-        print(fitter.errors)
+        # print("There are results for the standard fit")
+        # print(fitter.fmin)
+        # print(fitter.values)
+        # print(fitter.errors)
         fit_results = fitter.values
         fit_cov = fitter.covariance
         norm = np.sum(hist_data)
         mean_value = fitter.values["u"]
+        mean_error = fitter.errors["u"]
         std_value = fitter.values["s"]
+        std_error = fitter.errors["s"]
         if output_pdf is not None:
             handle_minuit_advanced_options(fitter, True, "$C$ in \\unit{{\\femto\\farad}}", COUNTS_HIST_LABEL,
                                            "Capacitance distribution", output_pdf,
@@ -1391,19 +1392,22 @@ def analyze_capacitance_distribution_delegate(analysis_group, output_pdf, **kwar
     except ImportError:
         # noinspection PyUnusedLocal
         propagate = lambda: None
+    except np.linalg.LinAlgError:
+        pass
     # add some information about the model
     hypo_test = investigate_fit_convergence(fitter)
     ax.set_ylabel(COUNTS_HIST_LABEL)
     ax.set_xlabel(HIST_PIX_CAP_LABEL)
     ax.grid()
-    ax.legend(title=f"GoF = {hypo_test['x']:.4f}\nndf = {hypo_test['ndf']: .4f}\np = {hypo_test['p']: .4f}")
+    ax.legend(
+        title=f"GoF = {hypo_test['x']:.4f}\nndf = {hypo_test['ndf']: .4f}\np = {hypo_test['p']: .4f}\nu = {mean_value:.3f}+-{mean_error:.3f}\ns = {std_value:.3f}+-{std_error:.3f}")
     if output_pdf is None:
         plt.show()
     else:
         output_pdf.savefig(fig, bbox_inches='tight')
         plt.close(fig)
 
-    return temp_hist_back_data.reshape(-1).shape[0], mean_value, 0, std_value, 0
+    return temp_hist_back_data.reshape(-1).shape[0], mean_value, mean_error, std_value, std_error
 
 
 def apply_correction(raw_data, base_path=None, bare_data_path=None, bare_group=None):
@@ -1557,7 +1561,7 @@ if __name__ == '__main__':
     from pixcap65.utility.homogenize_plots import set_params
 
     set_params(latex=True,
-               latex_extra=r"\setup{separate-uncertainty}\setup{locale = DE}\setup{uncertainty-descriptors={stat,sys}}\setup{uncertainty-descriptor-mode=subscript}\setup{retain-zero-uncertainty}")
+               latex_extra=r"\sisetup{separate-uncertainty}\sisetup{locale = DE}\sisetup{uncertainty-descriptors={stat,sys}}\sisetup{uncertainty-descriptor-mode=subscript}\sisetup{retain-zero-uncertainty}")
 
     bare_correction_args = {
         "apply_correction": True,
@@ -1565,13 +1569,15 @@ if __name__ == '__main__':
         "bare_hdf_path": "Reference/bare/unbiased_8/total_cap",
     }
 
-    # analyze_capacitance_distribution(raw_data='Bare_Repeat_2_Scan.h5', base_path="Reference/bare/unbiased_8",
-    #                                  corrected_distribution=False,
-    #                                  exclude_test_cap=True, use_kafe2=False, fit_plot_pdf_name="Bare_analysis_parasitic.pdf")
-    analyze_data(raw_data='R13-Interpixel_Scan.h5', base_path="Reference/R13/demo_measurement_52_biased_80_V_1_charge",
+    analyze_capacitance_distribution(raw_data='Bare_Repeat_2_Scan.h5', base_path="Reference/bare/unbiased_8",
+                                     corrected_distribution=False,
+                                     exclude_test_cap=True, use_kafe2=False,
+                                     fit_plot_pdf_name="Bare_analysis_parasitic.pdf")
+    analyze_data(raw_data='Reference_R13_Scan.h5', base_path="Reference/R13/unbiased_12_full", **bare_correction_args,
+                 is_advanced=True)
+    analyze_data(raw_data='R13-Interpixel_Scan.h5', base_path="Reference/R13/demo_measurement_65_unbiased_1_discharge",
                  is_inter_pixel=True, is_advanced=True)
     # analyze_data(raw_data='Data/r13-measurement/R13_Full_Scan_80V.h5', is_advanced=False, **bare_correction_args)
-
     # plot_data(interpreted_data='Data/r13-measurement/R13_Full_Scan_80V.h5', suffix="general_data_run_corrected", use_group=False, use_corrected=True)
     # analyse_data(raw_data='Data/r13-measurement/R13_BIAS_CV_COMBI_6.h5', is_advanced=False, is_cv=True,
     #              first_boundaries=(-100, -40),
@@ -1580,4 +1586,5 @@ if __name__ == '__main__':
     #              **bare_correction_args)
     # plot_combined_data(interpreted_data='Data/r13-measurement/R13_BIAS_CV_COMBI_6.h5', first_lower=-100,
     #                    first_upper=-40, second_lower=-8, second_upper=0, use_corrected=True, apply_doping=True)
-    analyze_data(raw_data="Reference_Evelyn_Scan.h5", base_path="Reference/E1/unbiased_1_test", is_advanced=True)
+    # analyze_data(raw_data="Reference_Evelyn_Scan.h5", base_path="Reference/E1/unbiased_1_test", is_advanced=True)
+    # analyze_data(raw_data='Bare_Repeat_2_Scan.h5', base_path="Reference/bare/unbiased_8", is_advanced=True, is_cv=False, full_model=False)

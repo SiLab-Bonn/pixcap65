@@ -1,12 +1,12 @@
 """
 Plotting of Pixcap65 data.
 """
-import logging
 import os.path
-from typing import Any, Optional
 
+import logging
 from matplotlib.axes import Axes
 from tables import Group
+from typing import Any, Optional
 
 from pixcap65.analysis_util.physics_modelling import model_depletion
 
@@ -541,6 +541,7 @@ def plot_data_delegate(data_group: tb.Group, analysis_group: tb.Group, output_pd
             # res = np.polyfit(scan_parameters['frequency'], current_hist[col, row] * 1e9, deg=1, cov=True)
             f = np.arange(0, scan_parameters['frequency'].max() * 1.1, 0.1)
             actual_cap = cap_hist[col, row] * CAPACITANCE_CONVERSION_FACTOR
+
             plot_current_model(ax, col, row, analysis_group, actual_cap, leak_hist, f,
                                parasitic_correction=extract_parasitic_capacitance(analysis_group.HistCap))
             plot_current_data(ax, col, row, scan_parameters, current_hist, current_err_hist, marker='o', ls='')
@@ -844,7 +845,7 @@ def plot_current_model(ax: Axes, col, row, analysis_group: Group, actual_cap: An
     plot_args.setdefault('marker', '')
     plot_args.setdefault('ls', '--')
     assert 'prefix' not in plot_args
-    if resistor_name in analysis_group and np.isfinite(analysis_group.HistRes[col, row]):
+    if resistor_name in analysis_group and np.isfinite(analysis_group[resistor_name][col, row]):
         hist_resistance = analysis_group[resistor_name]
         from pixcap65.analysis_util.physics_modelling import full_capacitance_model
         assert isinstance(hist_resistance, tb.Array) or isinstance(hist_resistance, np.ndarray)
@@ -855,10 +856,41 @@ def plot_current_model(ax: Axes, col, row, analysis_group: Group, actual_cap: An
                                        i=total_leak_hist[col, row] * 1.e-9, u0=1) * 1e9,
                 color=cmap(color),
                 label=SIMPLE_CAP_LABEL_PERCENT_FORMAT % (prefix, actual_cap), **plot_args)
+        try:
+            from jacobi import propagate
+            parameters = [
+                (actual_cap + parasitic_correction) * ADVANCED_CAPACITANCE_CONVERSION_FACTOR, hist_resistance[col, row],
+                total_leak_hist[col, row] * 1.e-9]
+            y, y_cov = propagate(lambda p: full_capacitance_model(f, p[0], p[1], p[2]), parameters, analysis_group.HistFitCov[col, row, :3, :3])
+            y_err_prop = np.diag(y_cov) ** 0.5
+            ax.fill_between(f, y - y_err_prop, y + y_err_prop, facecolor="C1", alpha=0.5)
+        except ImportError:
+            pass
+        except np.linalg.LinAlgError:
+            pass
+        except ValueError:
+            print(parameters)
+            print(analysis_group.HistFitCov[col, row, :3, :3].shape)
+            print(analysis_group.HistFitCov[col, row, :3, :3])
+            raise
+
+
     else:
         ax.plot(f, (actual_cap + parasitic_correction) * f + total_leak_hist[col, row],
                 color=cmap(color),
                 label=SIMPLE_CAP_LABEL_PERCENT_FORMAT % (prefix, actual_cap), **plot_args)
+        try:
+            from jacobi import propagate
+            from pixcap65.analysis_util.physics_modelling import simple_capacitance_model
+            y, y_cov = propagate(lambda p: full_capacitance_model(f, p[0], p[1]), [
+                (actual_cap + parasitic_correction) * ADVANCED_CAPACITANCE_CONVERSION_FACTOR,
+                total_leak_hist[col, row] * 1.e-9], analysis_group.HistFitCov[col, row, :])
+            y_err_prop = np.diag(y_cov) ** 0.5
+            ax.fill_between(f, y - y_err_prop, y + y_err_prop, facecolor="C1", alpha=0.5, **plot_args)
+        except ImportError:
+            pass
+        except np.linalg.LinAlgError:
+            pass
 
 
 def plot_compare_delegate(first_group: GroupType, second_group: GroupType, output_pdf: PdfPages):
@@ -969,10 +1001,14 @@ def plot_depletion_pixel_delegate(bias_voltages: TABLES_LEAF_COMPAT_TYPE, i_col,
 if __name__ == '__main__':
     # plot_data(interpreted_data=os.path.expanduser('~/git/pixcap65/pixcap_LF_50x50_DC_R3_80V_HV.h5'))
     # plot_data(interpreted_data='Data/r13-measurement/R13_Initial_3_Scan.h5', base_path="ATLAS ITk/unbiased_1", suffix="unbiased_full_measurement", use_group=True)
-    # plot_inter_pix_data(interpreted_data='R13-Interpixel_Scan.h5',
-    #                     base_path="Reference/R13/demo_measurement_65_unbiased_1_discharge",
-    #                     use_group=True, suffix="inter_pix_65", total_data="Data/r13-measurement/TEST.h5",
-    #                     distribution=True, set_parasitic=False)
+    plot_data(interpreted_data='Reference_R13_Scan.h5', suffix="test-general_run", use_group=False,
+              base_path="Reference/R13/unbiased_12_full")
+    plot_data(interpreted_data='Reference_R13_Scan.h5', suffix="test-general_run", use_group=False,
+              use_corrected=True, base_path="Reference/R13/unbiased_12_full")
+    plot_inter_pix_data(interpreted_data='R13-Interpixel_Scan.h5',
+                        base_path="Reference/R13/demo_measurement_65_unbiased_1_discharge",
+                        use_group=True, suffix="inter_pix_65", total_data='Reference_R13_Scan.h5',
+                        distribution=True, set_parasitic=False, total_path="Reference/R13/unbiased_12_full")
     # plot_inter_pix_data(interpreted_data='R13-Interpixel_Scan.h5', base_path="Reference/R13/demo_measurement_64_unbiased_1_discharge",
     #                     use_group=True, suffix="inter_pix_64")
     # plot_data(interpreted_data="Reference_Evelyn_Scan.h5", base_path="Reference/E1/unbiased_3_test", use_group=True)
@@ -984,11 +1020,15 @@ if __name__ == '__main__':
     #                     base_path="Reference/R13/demo_measurement_52_biased_80_V_1_charge",
     #                     use_group=True, suffix="inter_pix_52")
     # plot_data(interpreted_data="Reference_Evelyn_Scan.h5", base_path="Reference/E1/unbiased_1_test", use_group=True)
-    plot_data(interpreted_data='Data/New_1_Initial_6_Scan.h5', base_path="ATLAS ITk/unbiased_3",
-              suffix="general_data", use_group=True, exclude_test_cap=True, mask_pixel=[[39, 39], [38, 39]],
-              distribution=True)
-    plot_data(interpreted_data='Data/New_1_Initial_6_Scan.h5', base_path="ATLAS ITk/unbiased_3",
-              suffix="general_data", use_group=True, use_corrected=True, mask_pixel=[[39, 39], [38, 39]],
-              exclude_test_cap=True, distribution=True)
+    # plot_data(interpreted_data='Data/New_1_Initial_6_Scan.h5', base_path="ATLAS ITk/unbiased_3",
+    #           suffix="general_data", use_group=True, exclude_test_cap=True, mask_pixel=[[39, 39], [38, 39]],
+    #           distribution=True)
+    # plot_data(interpreted_data='Data/New_1_Initial_6_Scan.h5', base_path="ATLAS ITk/unbiased_3",
+    #           suffix="general_data", use_group=True, use_corrected=True, mask_pixel=[[39, 39], [38, 39]],
+    #           exclude_test_cap=True, distribution=True)
     # plot_bias_data(interpreted_data='Data/r13-measurement/R13_BIAS_2.h5')
     # plot_combined_data(interpreted_data='Data/r13-measurement/R13_BIAS_CV_COMBI_6.h5', first_lower=-100,first_upper=-40, second_lower=-10, second_upper=0)
+
+    # plot_data(interpreted_data='Bare_Repeat_2_Scan.h5', base_path="Reference/bare/unbiased_8",
+    #           suffix="general_bare_data_3", use_group=True,
+    #           exclude_test_cap=True)
