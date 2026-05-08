@@ -5,12 +5,14 @@ import tables as tb
 import time
 from matplotlib import pyplot as plt
 from matplotlib.backends.backend_pdf import PdfPages
+from tqdm import tqdm
 
-from analysis import analyze_data
-from analysis_util.utility import get_base_group
+from pixcap65.analysis import analyze_data
+from pixcap65.analysis_util.utility import get_base_group
 from pixcap65.pixcap_65_test_total_cap import scan_configuration, NUMBER_AVERAGE_MEASUREMENTS_KEY, PixCap65TotalCap
-from utility.utils_2 import create_carray
-from utils import PixCapSetup
+from pixcap65.utility.tqdm_logging_utils import logging_redirect_tqdm
+from pixcap65.utility.utils_2 import create_carray
+from pixcap65.utils import PixCapSetup
 
 
 def test_frequency_settling_2(settling_range: Iterable, file_name: str):
@@ -19,25 +21,27 @@ def test_frequency_settling_2(settling_range: Iterable, file_name: str):
         'stop_column': 24,
         'start_row': 20,
         'stop_row': 24,
-        "average_measurements": 5,
+        "average_measurements": 30,
 
         'Vin': 1.0,  # input voltage in V
-        'frequency_range': np.arange(1, 4.1, 0.5),  # frequency sweep in MHz
+        'frequency_range': np.arange(1, 4.1, 0.75),  # frequency sweep in MHz
 
         'data_path': "Equipment/Test/frequency",
         "out_file_mode": "append",
     }
     settling_range = np.asarray(settling_range)
     settling_path = {}
-    with PixCapSetup.PixCapSetup(configuration) as pix:
-        for settling_time in settling_range:
+    # for settling_time in settling_range:
+    #     settling_path[settling_time] = "settling-time-{}".format(settling_time).replace('.', '_')
+    with PixCapSetup(configuration, file_name) as pix, logging_redirect_tqdm():
+        for settling_time in tqdm(settling_range, desc="Settling time"):
             pix.pixcap.frequency_settling = settling_time
             settling_path[settling_time] = "settling-time-{}".format(settling_time).replace('.', '_')
             try:
                 pix.pixcap.binary_active = True
                 pix._smu_setup(pix.pixcap.primary_smu_key).binary_format()
-                pix.pixcap[pix.pixcap.primary_smu_key].set_current_nlpc(10)
-                pix.pixcap.scan(data_group_spec=settling_path[settling_time])
+                pix.pixcap[pix.pixcap.primary_smu_key].set_current_nlpc(1)
+                pix.scan(data_group_spec=settling_path[settling_time])
             finally:
                 pix.pixcap[pix.pixcap.primary_smu_key].set_current_nlpc(10)
                 pix._smu_setup(pix.pixcap.primary_smu_key).text_format()
@@ -46,6 +50,8 @@ def test_frequency_settling_2(settling_range: Iterable, file_name: str):
     # perform the analysis of these different paths.
     with PdfPages(file_name[:-3] + '.pdf') as output_pdf:
         for settling_time in settling_range:
+            print(f"processing the settling time {settling_time} s")
+            analyze_data(raw_data=file_name, base_path=configuration['data_path'] + "/" + settling_path[settling_time], is_advanced=True, full_model=False, plot=True, apply_contour=False, fit_plot_pdf=output_pdf)
             analyze_data(raw_data=file_name, base_path=configuration['data_path'] + settling_path[settling_time],
                          is_advanced=True, full_model=True, plot=True, apply_contour=True, fit_plot_pdf=output_pdf)
 
@@ -54,7 +60,7 @@ def test_frequency_settling_2(settling_range: Iterable, file_name: str):
     with tb.open_file(file_name, 'a') as h5_file, PdfPages(file_name[:-3] + "comparison" + '.pdf') as output_pdf:
         create_carray(h5_file, h5_file.root, "HistSettlingTime", obj=settling_range)
         for k, settling_time in enumerate(settling_range):
-            group = get_base_group(configuration['data_path'] + settling_path[settling_time], h5_file)
+            group = get_base_group(configuration['data_path'] + "/" + settling_path[settling_time], h5_file)
             sensor_error_data = group.total_cap.analysis.HistCapErr[:]
             error_data[:, :, k] = sensor_error_data
 
@@ -62,6 +68,8 @@ def test_frequency_settling_2(settling_range: Iterable, file_name: str):
 
         # last plot the dependency for every pixel
         for ii, jj in np.ndindex((40, 40)):
+            if np.all(~np.isfinite(error_data[ii, jj])):
+                continue
             fig, ax = plt.subplots()
             ax.plot(settling_range, error_data[ii, jj, :])
             ax.set_title(f"Frequency settling results for pixel ({ii}, {jj}).")

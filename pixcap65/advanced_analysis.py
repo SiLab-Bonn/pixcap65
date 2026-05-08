@@ -363,8 +363,8 @@ def _perform_advanced_fit(file: tb.File, group: tb.Group, current_hist: np.ndarr
         # https://matplotlib.org/3.10.9/api/_as_gen/matplotlib.pyplot.get_fignums.html
 
         plot_fit(fitter, apply_contour, ANALYSIS_FIT_X_LABEL, ANALYSIS_FIT_Y_LABEL,
-                 ANALYSIS_FIT_PLOT_LEGEND.format(col=ii, row=ii), output_pdf,
-                 ANALYSIS_FIT_CONTOUR_LEGEND.format(col=jj, row=jj))
+                 ANALYSIS_FIT_PLOT_LEGEND.format(col=ii, row=jj), output_pdf,
+                 ANALYSIS_FIT_CONTOUR_LEGEND.format(col=ii, row=jj))
 
         fit_cov[ii, jj, :cov_array_limit, :cov_array_limit] = transform_covariance(fit_cov_temp, )
 

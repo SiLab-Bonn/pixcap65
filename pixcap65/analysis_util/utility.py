@@ -6,6 +6,7 @@ from typing import Union, Mapping
 
 import numpy as np
 import tables as tb
+from conda import exception_handler
 from tables import File
 from tables.group import RootGroup
 
@@ -218,6 +219,7 @@ def handle_minuit_advanced_options(fit_object, apply_contour, x_label, y_label, 
     """
     from matplotlib import pyplot as plt
     from iminuit import Minuit
+    from iminuit.cost import LeastSquares
     # noinspection PyProtectedMember
     from iminuit.minuit import _cl_to_errordef
     assert isinstance(fit_object, Minuit)
@@ -229,7 +231,7 @@ def handle_minuit_advanced_options(fit_object, apply_contour, x_label, y_label, 
     conv_result = investigate_fit_convergence(fit_object)
     model_parameters = ""
     for key, value in fit_object.values.to_dict().items():
-        model_parameters += f"{key} = {value:.4f}\n"
+        model_parameters += f"{key} = {value:.4g}\n"
     # TODO: the legend might be wrong presented
     ax.legend(["model", "data"],
               title=f"{model_parameters}\nGoF={conv_result['x']:.4f}\nndf={conv_result['ndf']}\np={conv_result['p']:.4f}",
@@ -282,7 +284,12 @@ def handle_minuit_advanced_options(fit_object, apply_contour, x_label, y_label, 
                 par2 = pars[j]
                 plt.sca(ax[i, j])
                 plt.plot(fit_object.values[par2], fit_object.values[par1], "+", color="k")
-                fit_object.draw_mncontour(par2, par1, cl=cls)
+                try:
+                    fit_object.draw_mncontour(par2, par1, cl=cls)
+                except:
+                    print(par1)
+                    print(par2)
+                    raise
                 ax[j, i].set_visible(False)
 
         fig.suptitle(contours_title)
