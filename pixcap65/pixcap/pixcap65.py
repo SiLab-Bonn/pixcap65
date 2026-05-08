@@ -1515,7 +1515,11 @@ class Pixcap65(Dut):
             array.
         """
         if self.has_bias_suppy:
-            return self.smu_advanced_current_multiple(n, self.__bias_smu_key, kwargs=self.smu_bias_kwargs)
+            results = self.smu_advanced_current_multiple(n, self.__bias_smu_key, kwargs=self.smu_bias_kwargs)
+            if self[self.bias_smu_key].get_buffer2_mode().startswith("NEXT"):
+                logger.info("Still in data taking mode. 2")
+                self[self.bias_smu_key].disable_buffer()
+            return results
         elif n is None:
             return np.full(10, fill_value=np.nan)
         return np.full(n, fill_value=np.nan)
