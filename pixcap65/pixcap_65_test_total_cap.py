@@ -552,6 +552,19 @@ class PixCap65Measurement(object, metaclass=ABCMeta):
             logger.debug(
                 "Sequence call encountered when writing the configuration options as attribute. Skip this.")
 
+    @contextmanager
+    def binary_readout_mode(self):
+        try:
+            self.pixcap.binary_active = True
+            self._smu_setup(self.pixcap.primary_smu_key).binary_format()
+            if self.n_measurements > 5:
+                self.pixcap[self.pixcap.primary_smu_key].set_current_nlpc(2)
+            yield self
+        finally:
+            self.pixcap[self.pixcap.primary_smu_key].set_current_nlpc(10)
+            self._smu_setup(self.pixcap.primary_smu_key).text_format()
+            self.pixcap.binary_active = False
+
     # region Pixcap measurement properties
     @property
     def pixcap(self) -> Pixcap65:
@@ -907,7 +920,6 @@ class PixCap65TotalCap(PixCap65Measurement):
                 yield self.pixcap
             finally:
                 pass
-
 
     def bias_scan(self, data_group_spec=None):
         """

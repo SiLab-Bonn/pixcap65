@@ -953,15 +953,42 @@ if __name__ == '__main__':
                            r"retain-zero-uncertainty}", fig_height=8.26772, fig_width=11.69291, )
     # plot_data(interpreted_data=os.path.expanduser('~/git/pixcap65/pixcap_LF_50x50_DC_R3_80V_HV.h5'))
     # plot_data(interpreted_data='Data/r13-measurement/R13_Initial_3_Scan.h5', base_path="ATLAS ITk/unbiased_1", suffix="unbiased_full_measurement", use_group=True)
-    plot_data(interpreted_data='pixcap65/Data/r13-measurement/R13_Full_Scan_80V.h5', suffix="general_data",
-              use_group=False)
-    plot_data(interpreted_data='pixcap65/Data/r13-measurement/R13_Full_Scan_80V.h5', suffix="general_data",
-              use_group=False,
-              use_corrected=True, exclude_test_cap=True, distribution=True)
-    # plot_inter_pix_data(interpreted_data='R13-Interpixel_Scan.h5',
-    #                     base_path="Reference/R13/demo_measurement_65_unbiased_1_discharge",
-    #                     use_group=True, suffix="inter_pix_65", total_data='Reference_R13_Scan.h5',
-    #                     distribution=True, set_parasitic=False, total_path="Reference/R13/unbiased_12_full")
+    # plot_data(interpreted_data='pixcap65/Data/r13-measurement/R13_Full_Scan_80V.h5', suffix="general_data",
+    #           use_group=False)
+    # plot_data(interpreted_data='pixcap65/Data/r13-measurement/R13_Full_Scan_80V.h5', suffix="general_data",
+    #           use_group=False,
+    #           use_corrected=True, exclude_test_cap=True, distribution=True)
+    plot_inter_pix_data(interpreted_data='R13-Interpixel_Scan.h5',
+                        base_path="Reference/R13/demo_measurement_65_unbiased_1_discharge",
+                        use_group=True, suffix="inter_pix_65", total_data='Reference_R13_Scan.h5',
+                        distribution=True, set_parasitic=False, total_path="Reference/R13/unbiased_12_full")
+    plot_inter_pix_data(interpreted_data='packaged/R13-Interpixel_Scan.h5',
+                        base_path="Reference/R13/demo_measurement_66_biased_80_V_1_discharge",
+                        use_group=True, suffix="inter_pix_66", total_data='pixcap65/Data/r13-measurement/R13_Full_Scan_80V.h5',
+                        distribution=True, set_parasitic=False)
+    plot_inter_pix_data(interpreted_data='packaged/R13-Interpixel_Scan.h5',
+                        base_path="Reference/R13/demo_measurement_67_biased_80_V_1_discharge",
+                        use_group=True, suffix="inter_pix_67", total_data='pixcap65/Data/r13-measurement/R13_Full_Scan_80V.h5',
+                        distribution=True, set_parasitic=False)
+    plot_inter_pix_data(interpreted_data='packaged/R13-Interpixel_Scan.h5',
+                        base_path="Reference/R13/demo_measurement_68_biased_40_V_1_discharge",
+                        use_group=True, suffix="inter_pix_68")
+    plot_inter_pix_data(interpreted_data='packaged/R13-Interpixel_Scan.h5',
+                        base_path="Reference/R13/demo_measurement_69_biased_05_V_1_discharge",
+                        use_group=True, suffix="inter_pix_69")
+    plot_inter_pix_data(interpreted_data='packaged/R13-Interpixel_Scan.h5',
+                        base_path="Reference/R13/demo_measurement_70_unbiased_1_discharge",
+                        use_group=True, suffix="inter_pix_70", total_data='Reference_R13_Scan.h5',
+                        distribution=True, set_parasitic=False, total_path="Reference/R13/unbiased_12_full")
+    plot_inter_pix_data(interpreted_data='packaged/RX-Interpixel_Scan.h5',
+                        base_path="Reference/R1/demo_measurement_1_unbiased_1_discharge",
+                        use_group=True, suffix="inter_pix_1")
+    plot_inter_pix_data(interpreted_data='packaged/RX-Interpixel_Scan.h5',
+                        base_path="Reference/R1/demo_measurement_2_biased_80_V_1_discharge",
+                        use_group=True, suffix="inter_pix_1")
+    plot_inter_pix_data(interpreted_data='packaged/RX-Interpixel_Scan.h5',
+                        base_path="Reference/R1/demo_measurement_3_biased_40_V_1_discharge",
+                        use_group=True, suffix="inter_pix_1")
     # plot_inter_pix_data(interpreted_data='R13-Interpixel_Scan.h5', base_path="Reference/R13/demo_measurement_64_unbiased_1_discharge",
     #                     use_group=True, suffix="inter_pix_64")
     # plot_data(interpreted_data="Reference_Evelyn_Scan.h5", base_path="Reference/E1/unbiased_3_test", use_group=True)
@@ -986,12 +1013,12 @@ if __name__ == '__main__':
     #           suffix="general_bare_data_3", use_group=True,
     #           exclude_test_cap=True)
 
-    plot_combined_data(interpreted_data='pixcap65/Data/New_1_Initial_6_Scan.h5',
-                       base_path="ATLAS ITk/C_V_Characteristic",
-                       use_group=True, first_lower=-60, first_upper=-40, second_lower=-60, second_upper=0,
-                       use_corrected=True,
-                       apply_doping=True)
-
-    plot_combined_data(interpreted_data='New_2_Scan.h5', base_path="ATLAS_Itk/X2/C_V_Characteristic",
-                       use_group=True, first_lower=-60, first_upper=-40, second_lower=-60, second_upper=0,
-                       use_corrected=True)
+    # plot_combined_data(interpreted_data='pixcap65/Data/New_1_Initial_6_Scan.h5',
+    #                    base_path="ATLAS ITk/C_V_Characteristic",
+    #                    use_group=True, first_lower=-60, first_upper=-40, second_lower=-60, second_upper=0,
+    #                    use_corrected=True,
+    #                    apply_doping=True)
+    #
+    # plot_combined_data(interpreted_data='New_2_Scan.h5', base_path="ATLAS_Itk/X2/C_V_Characteristic",
+    #                    use_group=True, first_lower=-60, first_upper=-40, second_lower=-60, second_upper=0,
+    #                    use_corrected=True)
