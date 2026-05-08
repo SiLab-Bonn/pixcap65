@@ -4,17 +4,29 @@ from pixcap65.utils import PixCapSetup, PixcapMeasurements
 from pixcap_65_test_total_cap import ScanConfigurationKeys
 
 scan_configuration = {
+    'start_column': 0,
+    'stop_column': 40,
+    'start_row': 0,
+    'stop_row': 40,
 
+    'Vin': 1.0,  # input voltage in V
+    'frequency_range': np.arange(1, 8.1, 0.5),  # frequency sweep in MHz
+    # 'bias_range': -1 * np.arange(1, 100.1, 0.5),
+    # 'bias': -80.0,   # bias voltage to apply in V
+
+    'data_path': "ATLAS_ITk/X2",
+    "out_file_mode": "append",
 }
 
 if __name__ == "__main__":
     # one setup trial per measurement
-    output_file = "../Reference_Evelyn_Scan.h5"
+    output_file = "X2_2_Scan.h5"
 
     # initial measurement sample
     scan_configuration[ScanConfigurationKeys.AVERAGE_MEASUREMENTS] = 30
     scan_configuration[ScanConfigurationKeys.FREQUENCY_RANGE] = np.arange(1, 12.1, 1)
     with PixCapSetup(scan_configuration, output_file, measurement=PixcapMeasurements.TOTAL_CAPACITANCE) as pix:
+        pix.pixcap.frequency_settling = 0.3
         print(type(pix))
         with pix.binary_readout_mode() as binary_pix:
             binary_pix.scan(data_group_spec="unbiased_1_full")
@@ -56,9 +68,9 @@ if __name__ == "__main__":
     scan_configuration[ScanConfigurationKeys.FREQUENCY_RANGE] = np.arange(1, 4.1, 0.5)
     assert np.all(scan_configuration[ScanConfigurationKeys.BIAS_VOLTAGE_RANGE] < 0)
     with PixCapSetup(scan_configuration, output_file, measurement=PixcapMeasurements.TOTAL_CAPACITANCE) as pix:
+        pix.pixcap.frequency_settling = 0.3
         print(type(pix))
         from pixcap65.pixcap_65_test_total_cap import PixCap65Measurement
-
         print(issubclass(type(pix), PixCap65Measurement))
         print(isinstance(pix, PixCap65Measurement))
         pix.combined_bias_cv_scan(data_group_spec="C_V_Characteristic_refined")
@@ -71,6 +83,7 @@ if __name__ == "__main__":
     scan_configuration[ScanConfigurationKeys.FREQUENCY_RANGE] = np.arange(1, 12.1, 1)
     scan_configuration[ScanConfigurationKeys.AVERAGE_MEASUREMENTS] = 30
     with PixCapSetup(scan_configuration, output_file, measurement=PixcapMeasurements.TOTAL_CAPACITANCE) as pix:
+        pix.pixcap.frequency_settling = 0.3
         print(type(pix))
         print(issubclass(type(pix), PixCap65Measurement))
         print(isinstance(pix, PixCap65Measurement))
