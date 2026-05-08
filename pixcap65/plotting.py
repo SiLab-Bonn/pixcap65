@@ -1,14 +1,16 @@
 """
 Plotting of Pixcap65 data.
 """
-import os.path
-
 import logging
-from matplotlib.axes import Axes
-from tables import Group
+import os.path
 from typing import Any, Optional
+from warnings import warn
+
+from matplotlib.axes import Axes
 
 from pixcap65.analysis_util.physics_modelling import model_depletion
+
+NUMBER_DEPLETION_PLOT_POINTS = 1000
 
 try:
     # noinspection PyCompatibility
@@ -220,7 +222,7 @@ def plot_cv_data(interpreted_data, base_path=None, first_upper=None, first_lower
     """
     pdf_name = get_pdf_name(base_path, interpreted_data, suffix, use_group)
     with PdfPages(pdf_name) as output_pdf:
-        with tb.open_file(interpreted_data, mode='r') as in_file_h5:
+        with tb.open_file(interpreted_data, mode='a') as in_file_h5:
             base_group = get_base_group(base_path, in_file_h5)
             plot_cv_data_delegate(base_group.biasing.measurements,
                                   get_analysis_group(base_group.biasing, **kwargs), output_pdf,
@@ -315,7 +317,17 @@ Optional[float] = None, second_upper: Optional[float] = None,
     """
     # extract the bias data
     voltage_data = check_leaf_unit(data_group.BiasVoltageHist, HIST_BIAS_MEAS_UNIT)
-    verbose_output = kwargs.pop("verbose", False)
+
+    approx_depletion = True
+    if first_upper is None or first_lower is None or second_upper is None or second_lower is None:
+        approx_depletion = False
+    if approx_depletion and "DepletionHist" not in analysis_group:
+        warn("The renew computation is now deperecated and will be removed in future version.")
+        if 'chip_group' in kwargs:
+            kwargs['apply_doping'] = apply_doping
+        from pixcap65.analysis import analyze_depletion_delegate
+        analyze_depletion_delegate(data_group, analysis_group, (first_lower, first_upper),
+                                   (second_lower, second_upper), **kwargs)
 
     # investigate all the pixel for plotting
     for ii, jj in np.ndindex(GENERAL_PIXCAP_SHAPE):
@@ -327,94 +339,51 @@ Optional[float] = None, second_upper: Optional[float] = None,
         if np.any(np.isnan(cap_data[ii, jj, :])):
             continue
 
-        # extract the information about the depletion voltage
-        approx_depletion = True
-        if first_upper is None:
-            approx_depletion = False
-        if first_lower is None:
-            approx_depletion = False
-        if second_upper is None:
-            approx_depletion = False
-        if second_lower is None:
-            approx_depletion = False
-        if approx_depletion and "DepletionHist" not in analysis_group:
-            assert first_upper is not None
-            assert first_lower is not None
-            assert second_upper is not None
-            assert second_lower is not None
-            first_section_upper_mask = voltage_data <= first_upper
-            first_section_lower_mask = voltage_data >= first_lower
-            first_section_mask = np.logical_and(first_section_upper_mask, first_section_lower_mask)
+        # cv_height, cv_width = rcParams['figure.figsize']
+        # fig, ax = plt.subplots(ncols=2, figsize=(cv_width, cv_height))
+        fig, ax = plt.subplots(ncols=2)
 
-            second_section_upper_mask = voltage_data <= second_upper
-            second_section_lower_mask = voltage_data >= second_lower
-            second_section_mask = np.logical_and(second_section_upper_mask, second_section_lower_mask)
+        title_str = ""
+        # extract the information about the depletion voltage+
+        if "DepletionHist" in analysis_group:
+            depletion_fit_data = analysis_group.DepFitParamHist[:]
+            depletion_hist = analysis_group.DepletionHist[:]
+            assert isinstance(depletion_fit_data, np.ndarray)
+            assert isinstance(depletion_hist, np.ndarray)
+            if len(depletion_fit_data.shape) == 3:
+                depletion_fit_data_temp = depletion_fit_data.reshape((40, 40, 1, 4))
+                try:
+                    assert np.allclose(depletion_fit_data_temp[:, :, 0, :], depletion_fit_data, equal_nan=True)
+                except AssertionError:
+                    finite_mask = np.isfinite(depletion_fit_data)
+                    temp_data_reshape = np.full((40, 40, 1, 4), np.nan)
+                    temp_data_reshape[:, :, 0, :] = depletion_fit_data
+                    print(np.allclose(temp_data_reshape[:, :, 0, :][finite_mask], depletion_fit_data[finite_mask]))
+                    print(np.abs(temp_data_reshape[:, :, 0, :][finite_mask] - depletion_fit_data[finite_mask]))
+                    print(np.isclose(depletion_fit_data_temp[:, :, 0, :][finite_mask], depletion_fit_data[finite_mask]))
+                    raise
+                depletion_fit_data = depletion_fit_data_temp
+                depletion_hist = depletion_hist.reshape((40, 40, 1))
 
-            effective_capacitance_data = np.reciprocal(cap_data[ii, jj, :] * CAPACITANCE_CONVERSION_FACTOR) ** 2
-            first_voltage_data = voltage_data[first_section_mask]
-            second_voltage_data = voltage_data[second_section_mask]
-            first_cap_data = effective_capacitance_data[first_section_mask]
-            second_cap_data = effective_capacitance_data[second_section_mask]
-            first_result = np.polyfit(first_voltage_data, first_cap_data, deg=1, cov=True)
-            first_dep_parameters = np.asarray(first_result[0])
-            first_dep_cov = np.asarray(first_result[1])
-            if verbose_output:
-                logger.debug("The result of the first fit is:")
-                logger.debug(str(first_result))
-            second_result = np.polyfit(second_voltage_data, second_cap_data, deg=1, cov=True)
-            second_dep_parameters = np.asarray(second_result[0])
-            second_dep_cov = np.asarray(second_result[1])
-            if verbose_output:
-                logger.debug("The result of the second fit is:")
-                logger.debug(str(second_result))
-
-            # estimate the depletion voltage
-            d = first_dep_parameters[1]
-            b = second_dep_parameters[1]
-            c = first_dep_parameters[0]
-            a = second_dep_parameters[0]
-            dep_voltage_2 = (d - b) / (a - c)
-
-            dep_voltage_jacobian = np.array([
-                (b - d) / ((a - c) ** 2),
-                1 / (c - a),
-                (d - b) / ((a - c) ** 2),
-                1 / (a - c)
-            ])
-
-            # combine both cov matrices into a single one:
-            full_cov = np.full((4, 4), fill_value=0)
-            full_cov_2 = np.zeros((4, 4))  # cross correlations between the two fits are not known
-            full_cov[:2, :2] = first_dep_cov
-            full_cov[2:, 2:] = second_dep_cov
-            full_cov_2[:2, :2] = second_dep_cov
-            full_cov_2[2:, 2:] = second_dep_cov
-
-            # perform the full error calculation with matrix methods:
-            dep_voltage_error_2 = np.sqrt(dep_voltage_jacobian @ full_cov_2 @ dep_voltage_jacobian)
-            if verbose_output:
-                logger.info("The depletion voltage is {voltage}+-{error}".format(voltage=dep_voltage_2,
-                                                                                 error=dep_voltage_error_2))
-        elif "DepletionHist" in analysis_group:
-            approx_depletion = True
-            first_dep_parameters = analysis_group.DepFitParamHist[ii, jj, :2]
-            second_dep_parameters = analysis_group.DepFitParamHist[ii, jj, 2:]
-            dep_voltage_2 = analysis_group.DepletionHist[ii, jj]
-        else:
-            approx_depletion = False
-            first_dep_parameters = None
-            second_dep_parameters = None
-            dep_voltage_2 = 0
-
-        fig, ax = plt.subplots(ncols=2, figsize=(20, 10))
-        if approx_depletion:
-            first_voltage_x = np.linspace(first_lower, - dep_voltage_2 / 1.1, 1000)
-            second_voltage_x = np.linspace(np.where(-dep_voltage_2 < second_lower, -dep_voltage_2, second_lower) * 1.1,
-                                           second_upper, 100)
-            first_cap_calc = first_dep_parameters[0] * first_voltage_x + first_dep_parameters[1]
-            second_cap_calc = second_dep_parameters[0] * second_voltage_x + second_dep_parameters[1]
-            ax[1].plot(first_voltage_x, first_cap_calc, '-', label="First section fit")
-            ax[1].plot(second_voltage_x, second_cap_calc, '-', label="Second section fit")
+            for dep_idx in range(depletion_fit_data.shape[2]):
+                first_dep_parameters = depletion_fit_data[ii, jj, dep_idx, :2]
+                second_dep_parameters = depletion_fit_data[ii, jj, dep_idx, 2:]
+                dep_voltage_2 = depletion_hist[ii, jj, dep_idx]
+                # directly plot these
+                # first_voltage_x = np.linspace(-100, - dep_voltage_2 / 1.1, NUMBER_DEPLETION_PLOT_POINTS)
+                # second_voltage_x = np.linspace(
+                #     np.where(-dep_voltage_2 < second_lower, -dep_voltage_2, second_lower) * 1.1,
+                #     second_upper, NUMBER_DEPLETION_PLOT_POINTS)
+                first_voltage_x = np.linspace(np.min(voltage_data) - 10, dep_voltage_2 / 1.1,
+                                              NUMBER_DEPLETION_PLOT_POINTS)
+                second_voltage_x = np.linspace(dep_voltage_2 * 1.1, np.max(voltage_data) + 10,
+                                               NUMBER_DEPLETION_PLOT_POINTS)
+                first_cap_calc = first_dep_parameters[0] * first_voltage_x + first_dep_parameters[1]
+                second_cap_calc = second_dep_parameters[0] * second_voltage_x + second_dep_parameters[1]
+                ax[1].plot(first_voltage_x, first_cap_calc, '-', label="First section fit")
+                ax[1].plot(second_voltage_x, second_cap_calc, '-', label="Second section fit")
+                # TODO: What about the covariance matrix here!
+                title_str += "U = {} V\n".format(dep_voltage_2)
 
         effective_capacitance_error_data = np.reciprocal(cap_data[ii, jj, :] * CAPACITANCE_CONVERSION_FACTOR) ** 3 * \
                                            cap_errors[
@@ -428,8 +397,13 @@ Optional[float] = None, second_upper: Optional[float] = None,
                   xlabel=BIAS_CURVE_X_LABEL, ylabel="$1/ C^2$ in $1/(fF)^2$")
         ax[1].errorbar(voltage_data, 1 / (cap_data[ii, jj, :] * CAPACITANCE_CONVERSION_FACTOR) ** 2,
                        yerr=effective_capacitance_error_data, fmt='o', label="Bias data", alpha=0.5)
+        ax[1].set_xlim(np.min(voltage_data) - 10, 5 + np.max(voltage_data))
+        ax[1].set_ylim(np.min(1 / (cap_data[ii, jj, :] * CAPACITANCE_CONVERSION_FACTOR) ** 2),
+                       np.max(1 / (cap_data[ii, jj, :] * CAPACITANCE_CONVERSION_FACTOR) ** 2))
         ax[0].legend()
-        ax[1].legend()
+        ax[1].legend(title=title_str)
+        ax[1].grid(True)
+        fig.suptitle("C-V Characterization")
         output_pdf.savefig(fig, bbox_inches='tight')
         plt.close(fig)
 
@@ -849,48 +823,20 @@ def plot_current_model(ax: Axes, col, row, analysis_group: Group, actual_cap: An
         hist_resistance = analysis_group[resistor_name]
         from pixcap65.analysis_util.physics_modelling import full_capacitance_model
         assert isinstance(hist_resistance, tb.Array) or isinstance(hist_resistance, np.ndarray)
+        y = full_capacitance_model(f,
+                                   c=(actual_cap + parasitic_correction) * ADVANCED_CAPACITANCE_CONVERSION_FACTOR,
+                                   r=hist_resistance[col, row],
+                                   i=total_leak_hist[col, row] * 1.e-9, u0=1) * 1e9
         ax.plot(f,
-                full_capacitance_model(f,
-                                       c=(actual_cap + parasitic_correction) * ADVANCED_CAPACITANCE_CONVERSION_FACTOR,
-                                       r=hist_resistance[col, row],
-                                       i=total_leak_hist[col, row] * 1.e-9, u0=1) * 1e9,
+                y,
                 color=cmap(color),
                 label=SIMPLE_CAP_LABEL_PERCENT_FORMAT % (prefix, actual_cap), **plot_args)
-        try:
-            from jacobi import propagate
-            parameters = [
-                (actual_cap + parasitic_correction) * ADVANCED_CAPACITANCE_CONVERSION_FACTOR, hist_resistance[col, row],
-                total_leak_hist[col, row] * 1.e-9]
-            y, y_cov = propagate(lambda p: full_capacitance_model(f, p[0], p[1], p[2]), parameters, analysis_group.HistFitCov[col, row, :3, :3])
-            y_err_prop = np.diag(y_cov) ** 0.5
-            ax.fill_between(f, y - y_err_prop, y + y_err_prop, facecolor="C1", alpha=0.5)
-        except ImportError:
-            pass
-        except np.linalg.LinAlgError:
-            pass
-        except ValueError:
-            print(parameters)
-            print(analysis_group.HistFitCov[col, row, :3, :3].shape)
-            print(analysis_group.HistFitCov[col, row, :3, :3])
-            raise
 
 
     else:
         ax.plot(f, (actual_cap + parasitic_correction) * f + total_leak_hist[col, row],
                 color=cmap(color),
                 label=SIMPLE_CAP_LABEL_PERCENT_FORMAT % (prefix, actual_cap), **plot_args)
-        try:
-            from jacobi import propagate
-            from pixcap65.analysis_util.physics_modelling import simple_capacitance_model
-            y, y_cov = propagate(lambda p: full_capacitance_model(f, p[0], p[1]), [
-                (actual_cap + parasitic_correction) * ADVANCED_CAPACITANCE_CONVERSION_FACTOR,
-                total_leak_hist[col, row] * 1.e-9], analysis_group.HistFitCov[col, row, :])
-            y_err_prop = np.diag(y_cov) ** 0.5
-            ax.fill_between(f, y - y_err_prop, y + y_err_prop, facecolor="C1", alpha=0.5, **plot_args)
-        except ImportError:
-            pass
-        except np.linalg.LinAlgError:
-            pass
 
 
 def plot_compare_delegate(first_group: GroupType, second_group: GroupType, output_pdf: PdfPages):
@@ -999,16 +945,23 @@ def plot_depletion_pixel_delegate(bias_voltages: TABLES_LEAF_COMPAT_TYPE, i_col,
 
 
 if __name__ == '__main__':
+    from pixcap65.utility.homogenize_plots import set_params
+
+    set_params(latex=True,
+               latex_extra=r"\sisetup{separate-uncertainty}\sisetup{locale = DE}\sisetup{uncertainty-descriptors={"
+                           r"stat,sys}}\sisetup{uncertainty-descriptor-mode=subscript}\sisetup{"
+                           r"retain-zero-uncertainty}", fig_height=8.26772, fig_width=11.69291, )
     # plot_data(interpreted_data=os.path.expanduser('~/git/pixcap65/pixcap_LF_50x50_DC_R3_80V_HV.h5'))
     # plot_data(interpreted_data='Data/r13-measurement/R13_Initial_3_Scan.h5', base_path="ATLAS ITk/unbiased_1", suffix="unbiased_full_measurement", use_group=True)
-    plot_data(interpreted_data='Reference_R13_Scan.h5', suffix="test-general_run", use_group=False,
-              base_path="Reference/R13/unbiased_12_full")
-    plot_data(interpreted_data='Reference_R13_Scan.h5', suffix="test-general_run", use_group=False,
-              use_corrected=True, base_path="Reference/R13/unbiased_12_full")
-    plot_inter_pix_data(interpreted_data='R13-Interpixel_Scan.h5',
-                        base_path="Reference/R13/demo_measurement_65_unbiased_1_discharge",
-                        use_group=True, suffix="inter_pix_65", total_data='Reference_R13_Scan.h5',
-                        distribution=True, set_parasitic=False, total_path="Reference/R13/unbiased_12_full")
+    plot_data(interpreted_data='pixcap65/Data/r13-measurement/R13_Full_Scan_80V.h5', suffix="general_data",
+              use_group=False)
+    plot_data(interpreted_data='pixcap65/Data/r13-measurement/R13_Full_Scan_80V.h5', suffix="general_data",
+              use_group=False,
+              use_corrected=True, exclude_test_cap=True, distribution=True)
+    # plot_inter_pix_data(interpreted_data='R13-Interpixel_Scan.h5',
+    #                     base_path="Reference/R13/demo_measurement_65_unbiased_1_discharge",
+    #                     use_group=True, suffix="inter_pix_65", total_data='Reference_R13_Scan.h5',
+    #                     distribution=True, set_parasitic=False, total_path="Reference/R13/unbiased_12_full")
     # plot_inter_pix_data(interpreted_data='R13-Interpixel_Scan.h5', base_path="Reference/R13/demo_measurement_64_unbiased_1_discharge",
     #                     use_group=True, suffix="inter_pix_64")
     # plot_data(interpreted_data="Reference_Evelyn_Scan.h5", base_path="Reference/E1/unbiased_3_test", use_group=True)
@@ -1032,3 +985,13 @@ if __name__ == '__main__':
     # plot_data(interpreted_data='Bare_Repeat_2_Scan.h5', base_path="Reference/bare/unbiased_8",
     #           suffix="general_bare_data_3", use_group=True,
     #           exclude_test_cap=True)
+
+    plot_combined_data(interpreted_data='pixcap65/Data/New_1_Initial_6_Scan.h5',
+                       base_path="ATLAS ITk/C_V_Characteristic",
+                       use_group=True, first_lower=-60, first_upper=-40, second_lower=-60, second_upper=0,
+                       use_corrected=True,
+                       apply_doping=True)
+
+    plot_combined_data(interpreted_data='New_2_Scan.h5', base_path="ATLAS_Itk/X2/C_V_Characteristic",
+                       use_group=True, first_lower=-60, first_upper=-40, second_lower=-60, second_upper=0,
+                       use_corrected=True)

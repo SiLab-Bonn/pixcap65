@@ -5,10 +5,10 @@ import numpy as np
 import tables as tb
 from matplotlib.backends.backend_pdf import PdfPages
 
-from analysis_util.utility import get_base_group
 from pixcap65.analysis import analyze_data, analyze_capacitance_distribution
+from pixcap65.analysis_util.utility import get_base_group
 from pixcap65.utility.homogenize_plots import set_params
-from plotting import plot_data, plot_combined_data, plot_bias_data
+from plotting import plot_data, plot_combined_data, plot_bias_data, plot_inter_pix_data
 from utility.tables_util import get_group_attribute
 
 if __name__ == '__main__':
@@ -17,7 +17,7 @@ if __name__ == '__main__':
     set_params(latex=True,
                latex_extra=r"\sisetup{separate-uncertainty}\sisetup{locale = DE}\sisetup{uncertainty-descriptors={"
                            r"stat,sys}}\sisetup{uncertainty-descriptor-mode=subscript}\sisetup{"
-                           r"retain-zero-uncertainty}", fig_width=8.26772, fig_height=11.69291, )
+                           r"retain-zero-uncertainty}", fig_height=8.26772, fig_width=11.69291, )
     bare_correction_args = {
         "apply_correction": True,
         "bare_file": "Bare_Repeat_2_Scan.h5",
@@ -76,6 +76,8 @@ if __name__ == '__main__':
     analyze_data(raw_data='pixcap65/Data/TEST_2.h5', is_advanced=False)
     analyze_data(raw_data='pixcap65/Data/r13-measurement/data.h5', is_advanced=False, **bare_correction_args)
     analyze_data(raw_data='pixcap65/Data/r13-measurement/TEST.h5', is_advanced=False, **bare_correction_args)
+    analyze_data(raw_data='Reference_R13_Scan.h5', base_path="Reference/R13/unbiased_12_full", **bare_correction_args,
+                 is_advanced=True)
     # r13-measurements/R13_BIAS_CV_2.h5 could not be directly investigated as it is incomplete.
     analyze_data(raw_data='pixcap65/Data/r13-measurement/R13_BIAS_CV_COMBI_2.h5', is_advanced=False, is_cv=True,
                  use_corrected=True, apply_doping=True, chip_group_name="sensor",
@@ -93,6 +95,9 @@ if __name__ == '__main__':
                  **bare_correction_args)
     analyze_data(raw_data='pixcap65/Data/r13-measurement/R13_Initial_3_Scan.h5', base_path="ATLAS ITk/unbiased_1",
                  is_advanced=True, **bare_correction_args)
+    analyze_data(raw_data='R13-Interpixel_Scan.h5', base_path="Reference/R13/demo_measurement_65_unbiased_1_discharge",
+                 is_inter_pixel=True, is_advanced=True)
+
     print("Analyze Evelyn reference sample.")
     from matplotlib import pyplot as plt
 
@@ -172,6 +177,10 @@ if __name__ == '__main__':
     plot_data(interpreted_data='pixcap65/Data/r13-measurement/Test.h5', suffix="test-general_run", use_group=False)
     plot_data(interpreted_data='pixcap65/Data/r13-measurement/Test.h5', suffix="test-general_run", use_group=False,
               use_corrected=True)
+    plot_data(interpreted_data='Reference_R13_Scan.h5', suffix="test-general_run", use_group=False,
+              base_path="Reference/R13/unbiased_12_full", exclude_test_cap=True, distribution=True)
+    plot_data(interpreted_data='Reference_R13_Scan.h5', suffix="test-general_run", use_group=False,
+              use_corrected=True, base_path="Reference/R13/unbiased_12_full", exclude_test_cap=True, distribution=True)
     plot_bias_data(interpreted_data='pixcap65/Data/r13-measurement/R13_BIAS_2.h5')
     # Data/r13-measurement/R13_BIAS_CV_COMBI_2.h5 no further investigation possible as data set is incomplete!
     # Data/r13-measurement/R13_BIAS_CV_COMBI_3.h5 no further investigation possible as data set is incomplete!
@@ -192,6 +201,10 @@ if __name__ == '__main__':
               suffix="unbiased_full_measurement", use_group=True)
     plot_data(interpreted_data='pixcap65/Data/r13-measurement/R13_Initial_3_Scan.h5', base_path="ATLAS ITk/unbiased_1",
               suffix="unbiased_full_measurement", use_group=True, use_corrected=True)
+    plot_inter_pix_data(interpreted_data='R13-Interpixel_Scan.h5',
+                        base_path="Reference/R13/demo_measurement_65_unbiased_1_discharge",
+                        use_group=True, suffix="inter_pix_65", total_data="Data/r13-measurement/TEST.h5",
+                        distribution=True, set_parasitic=False)
 
     print("Plots for the reference sample E1")
     # plot_data(interpreted_data="Reference_Evelyn_Scan.h5", base_path="Reference/E1/unbiased_1_test", use_group=True)
