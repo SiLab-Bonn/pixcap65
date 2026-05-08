@@ -1,17 +1,21 @@
+from typing import Any, Callable, Union
+from warnings import deprecated
+
 import numpy as np
 import tables as tb
 from matplotlib.backends.backend_pdf import PdfPages
-from warnings import deprecated
 
+from analysis_util.utility import HandleFitterStubClass, HandleFitterGeneral, HIST_CAP_UNIT, \
+    HIST_LEAK_CURRENT_UNIT
 from pixcap65.analysis import analyze_depletion_delegate, apply_correction_simple
 from pixcap65.analysis_util.physics_modelling import full_capacitance_model, simple_capacitance_model
 from pixcap65.analysis_util.utility import str_join, check_leaf_unit, \
-    transform_covariance, TABLES_ARRAY_TYPE, GENERAL_PIXCAP_SHAPE, COVARIANCE_PIXCAP_SHAPE, FULL_MODEL_LABEL, \
+    transform_covariance, TABLES_ARRAY_TYPE, GENERAL_PIXCAP_SHAPE, FULL_MODEL_LABEL, \
     SIMPLE_MODEL_LABEL, FULL_MODEL_EXPRESSION, SIMPLE_MODEL_EXPRESSION, FULL_MODEL_PARAMETER_DICT, \
-    SIMPLE_MODEL_PARAMETER_DICT, GLOBAL_FILTERS, handle_kafe2_advanced_options, handle_minuit_advanced_options, \
-    FARAD_CONVERSION_FACTOR, CURRENT_CONVERSION_FACTOR, TABLES_TABLE_TYPE, get_analysis_group
+    SIMPLE_MODEL_PARAMETER_DICT, GLOBAL_FILTERS, FARAD_CONVERSION_FACTOR, CURRENT_CONVERSION_FACTOR, TABLES_TABLE_TYPE, \
+    get_analysis_group
 from pixcap65.utility.tables_util import get_node_pathname
-from pixcap65.utility.utils_2 import walk_to_node, GroupType, prevent_group_mix_up
+from pixcap65.utility.utils_2 import walk_to_node, GroupType, prevent_group_mix_up, create_carray
 
 ANALYSIS_FIT_Y_LABEL = "$I$ in A"
 ANALYSIS_FIT_X_LABEL = "$\\nu$ in MHz"
@@ -77,7 +81,8 @@ def advanced_analysis(raw_data, base_path=None, is_cv=False, first_boundaries=No
             for k, bias_voltage in enumerate(base_group.biasing.measurements.BiasVoltageHist):
                 bias_name = f"bias_{bias_voltage}_V".replace('-', "M_").replace(".", "__")
                 data_group = base_group.biasing.measurements[bias_name]
-                ana_group, _ = walk_to_node(base_group.biasing, str_join("/", ANALYSIS_GROUP_NAME, bias_name), create=True, verify_create=True)
+                ana_group, _ = walk_to_node(base_group.biasing, str_join("/", ANALYSIS_GROUP_NAME, bias_name),
+                                            create=True, verify_create=True)
                 assert isinstance(ana_group, tb.Group)
                 advanced_analysis_data_handle(in_file_h5, data_group, ana_group,
                                               is_inter_pixel=is_inter_pixel, **kwargs)
@@ -89,13 +94,12 @@ def advanced_analysis(raw_data, base_path=None, is_cv=False, first_boundaries=No
                 cv_err_data[:, :, k] = cap_error_data[:, :]
                 if kwargs.get("apply_correction", False):
                     ana_group_correction, _ = walk_to_node(base_group.biasing,
-                                                        str_join("/", ANALYSIS_CORRECTED_GROUP_NAME, bias_name),
-                                                        create=True, verify_create=True)
+                                                           str_join("/", ANALYSIS_CORRECTED_GROUP_NAME, bias_name),
+                                                           create=True, verify_create=True)
                     cap_data = ana_group_correction.HistCap[:]
                     cap_error_data = ana_group_correction.HistCapErr[:]
                     cv_data_corrected[:, :, k] = cap_data[:, :]
                     cv_err_data_corrected[:, :, k] = cap_error_data[:, :]
-
 
             temp_array = in_file_h5.create_carray(base_group.biasing.analysis, name="UCHist",
                                                   title="Histogram of the U-C-curve",
@@ -292,15 +296,43 @@ def advanced_analysis_delegate(file: tb.File, group: tb.Group, current_hist: TAB
         :key apply_contour: boolean, indicates whether to determine the contours and try to plot them.
         :key fit_plot_pdf: PdfPages object, to save the fit plot figures to (will override the plot object if provided)
         """
+    plot = kwargs.pop("plot", False)
+    plot_fit = HandleFitterStubClass()
+    if plot:
+        plot_fit = HandleFitterGeneral()
+        output_pdf_name = f"{file.filename[:-3]}_{get_node_pathname(group).replace('/', '----')}_fit_results.pdf"
+        fit_plot_pdf = kwargs.pop("fit_plot_pdf", None)
+        if "output_pdf" in kwargs:
+            pass
+        elif fit_plot_pdf is not None and isinstance(fit_plot_pdf, PdfPages):
+            kwargs['output_pdf'] = fit_plot_pdf
+        elif isinstance(plot, PdfPages):
+            kwargs['output_pdf'] = plot
+        else:
+            with PdfPages(output_pdf_name) as pdf:
+                assert isinstance(current_hist, np.ndarray)
+                assert isinstance(scan_parameters, np.ndarray)
+                _perform_advanced_fit(file, group, current_hist, plot_fit, scan_parameters, output_pdf=pdf, **kwargs)
+                return
 
+    # need 'to do' it this way for compatibility with python 2.7
+    assert isinstance(plot_fit, HandleFitterStubClass)
+    assert isinstance(current_hist, np.ndarray)
+    assert isinstance(scan_parameters, np.ndarray)
+    _perform_advanced_fit(file, group, current_hist, plot_fit, scan_parameters, **kwargs)
+
+
+def _perform_advanced_fit(file: tb.File, group: tb.Group, current_hist: np.ndarray,
+                          plot_fit: HandleFitterStubClass, scan_parameters: Union[tb.Table, np.ndarray],
+                          **kwargs):
     # extract the additional keyword arguments
-    full_model = kwargs.get("full_model", True)
+    full_model = kwargs.pop("full_model", True)
     assert "current_error_hist" in kwargs
     current_error_hist = kwargs['current_error_hist']
     assert isinstance(current_error_hist, TABLES_ARRAY_TYPE)
-    use_kafe2 = kwargs.get("use_kafe2", False)
-    apply_contour = kwargs.get("apply_contour", False)
-    plot = kwargs.get("plot", False)
+    use_kafe2 = kwargs.pop("use_kafe2", False)
+    apply_contour = kwargs.pop("apply_contour", False)
+    output_pdf = kwargs.pop("output_pdf", None)
 
     # create array_like objects to save the analysis results temporarily.
     cap_hist = np.full(shape=GENERAL_PIXCAP_SHAPE, fill_value=np.nan)
@@ -309,144 +341,32 @@ def advanced_analysis_delegate(file: tb.File, group: tb.Group, current_hist: TAB
     leak_error_hist = np.full(shape=GENERAL_PIXCAP_SHAPE, fill_value=np.nan)
     resistor_hist = np.full(shape=GENERAL_PIXCAP_SHAPE, fill_value=np.nan)
     resistor_error_hist = np.full(shape=GENERAL_PIXCAP_SHAPE, fill_value=np.nan)
-    if full_model:
-        fit_cov = np.full(shape=COVARIANCE_PIXCAP_SHAPE, fill_value=np.nan)
-    else:
-        fit_cov = np.full(shape=(40, 40, 3, 3), fill_value=np.nan)
 
     # prepare the fit model
-    if full_model:
-        effective_model = full_capacitance_model
-        effective_label = FULL_MODEL_LABEL
-        effective_expression = FULL_MODEL_EXPRESSION
-        effective_parameter_dict = FULL_MODEL_PARAMETER_DICT
-    else:
-        effective_model = simple_capacitance_model
-        effective_label = SIMPLE_MODEL_LABEL
-        effective_expression = SIMPLE_MODEL_EXPRESSION
-        effective_parameter_dict = SIMPLE_MODEL_PARAMETER_DICT
+    (cov_array_limit, effective_model, effective_expression, effective_label,
+     effective_parameter_dict, initial_guess) = __declare_fit_model(full_model)
 
-    if plot:
-        output_pdf_name = f"{file.filename[:-3]}_{get_node_pathname(group).replace('/', '----')}_fit_results.pdf"
-        fit_plot_pdf = kwargs.get("fit_plot_pdf", None)
-        if fit_plot_pdf is not None and isinstance(fit_plot_pdf, PdfPages):
-            output_pdf = fit_plot_pdf
-        elif isinstance(plot, PdfPages):
-            output_pdf = plot
-        else:
-            output_pdf = PdfPages(output_pdf_name)
-    else:
-        output_pdf = None
+    fit_cov = np.full(shape=tuple([*GENERAL_PIXCAP_SHAPE, cov_array_limit + 1, cov_array_limit + 1]), fill_value=np.nan)
 
     # Fit pixel data in order to extract capacitance for each pixel
     for ii, jj in np.ndindex(current_hist.shape[:2]):
-        if np.all(np.isfinite(current_hist[ii, jj, :])):
-            if use_kafe2:
-                from kafe2 import XYContainer, XYFit
-                xy_data = XYContainer(scan_parameters['frequency'], current_hist[ii, jj])
-                # errors?
-                if np.all(np.isfinite(current_error_hist[ii, jj, :])):
-                    xy_data.add_error('y', err_val=current_error_hist[ii, jj, :])
-                fitter = XYFit(xy_data, model_function=effective_model)
-                fitter.assign_model_function_latex_name(effective_label)
-                fitter.assign_model_function_latex_expression(effective_expression)
-                fitter.assign_parameter_latex_names(**effective_parameter_dict)
-                fitter.fix_parameter('u0', 1)
-                fitter.do_fit()
-            else:
-                from iminuit import Minuit
-                from iminuit.cost import LeastSquares
-                if np.all(np.isfinite(current_error_hist[ii, jj, :])):
-                    errors = current_error_hist[ii, jj, :]
-                else:
-                    errors = np.full_like(current_error_hist, fill_value=1)
-                # noinspection PyTypeChecker
-                cost = LeastSquares(x=scan_parameters['frequency'], y=current_hist[ii, jj],
-                                    yerror=errors, model=effective_model)
-                if full_model:
-                    fitter = Minuit(cost, c=1e-6, r=1e6, i=0, u0=1)
-                else:
-                    fitter = Minuit(cost, c=1e-6, i=0, u0=1)
-                fitter.fixto('u0', 1)
-                fitter.migrad()
-                fitter.hesse()
+        if not np.all(np.isfinite(current_hist[ii, jj, :])):
+            continue
+        frequencies = scan_parameters['frequency']
+        currents = current_hist[ii, jj]
+        current_errors = current_error_hist[ii, jj]
+        cap, cap_error, fit_cov_temp, fitter, leakage, leakage_error, resistor, resistor_error = __perform_pixel_fit(
+            currents, current_errors, frequencies, effective_expression, effective_label, effective_model,
+            effective_parameter_dict, full_model, initial_guess, use_kafe2)
 
-            # extract the fit parameters
-            if use_kafe2:
-                from kafe2 import XYFit
-                assert isinstance(fitter, XYFit)
-                assert fitter.did_fit
-                try:
-                    cap = fitter.parameter_values[0] * FARAD_CONVERSION_FACTOR  # convert to F
-                    cap_error = fitter.parameter_errors[0] * FARAD_CONVERSION_FACTOR
-                    leakage = fitter.parameter_values[2] * CURRENT_CONVERSION_FACTOR  # convert to nA
-                    leakage_error = fitter.parameter_errors[2] * CURRENT_CONVERSION_FACTOR  # convert to nA
-                except:
-                    print(fitter.parameter_values)
-                    print(fitter.get_result_dict()["parameter_values"])
-                    raise
-                if full_model:
-                    # otherwise the requested information may not be present
-                    resistor = fitter.parameter_values[1]
-                    resistor_error = fitter.parameter_errors[1]
-                else:
-                    resistor = np.nan
-                    resistor_error = np.nan
-                fit_cov[ii, jj] = fitter.parameter_cov_mat
+        # https://matplotlib.org/3.10.9/api/pyplot_api.html#matplotlib.pyplot.get_fignums
+        # https://matplotlib.org/3.10.9/api/_as_gen/matplotlib.pyplot.get_fignums.html
 
-                if plot:
-                    handle_kafe2_advanced_options(fitter, apply_contour, ANALYSIS_FIT_X_LABEL, ANALYSIS_FIT_Y_LABEL,
-                                                  ANALYSIS_FIT_PLOT_LEGEND.format(col=ii, row=jj),
-                                                  output_pdf,
-                                                  ANALYSIS_FIT_CONTOUR_LEGEND.format(col=ii, row=jj))
+        plot_fit(fitter, apply_contour, ANALYSIS_FIT_X_LABEL, ANALYSIS_FIT_Y_LABEL,
+                 ANALYSIS_FIT_PLOT_LEGEND.format(col=ii, row=ii), output_pdf,
+                 ANALYSIS_FIT_CONTOUR_LEGEND.format(col=jj, row=jj))
 
-            else:
-                from iminuit import Minuit
-                assert isinstance(fitter, Minuit)
-                cap = fitter.values['c'] * FARAD_CONVERSION_FACTOR  # convert to F
-                cap_error = fitter.errors['c'] * FARAD_CONVERSION_FACTOR
-                leakage = fitter.values['i'] * CURRENT_CONVERSION_FACTOR  # convert to nA
-                leakage_error = fitter.errors['i'] * CURRENT_CONVERSION_FACTOR  # convert to nA
-                if full_model:
-                    # otherwise the requested information may not be present.
-                    resistor = fitter.values['r']
-                    resistor_error = fitter.errors['r']
-                else:
-                    resistor = np.nan
-                    resistor_error = np.nan
-                fit_cov[ii, jj] = fitter.covariance
-
-                if plot:
-                    handle_minuit_advanced_options(fitter, apply_contour, ANALYSIS_FIT_X_LABEL,
-                                                   ANALYSIS_FIT_Y_LABEL,
-                                                   ANALYSIS_FIT_PLOT_LEGEND.format(col=ii, row=jj), output_pdf,
-                                                   ANALYSIS_FIT_CONTOUR_LEGEND.format(col=ii, row=jj))
-
-                # if apply_contour and plot:
-                #     assert isinstance(fitter, Minuit)
-                #     print(fitter.draw_mnmatrix())
-                #     from matplotlib import pyplot as plt
-                #     print(plt.get_fignums())
-                #     current_fig = plt.figure(plt.get_fignums()[0])
-                #     current_fig.axes[0, 0].set_title(f"Fit of the frequency dependence for pixel ({ii}, {jj})")
-                #     output_pdf.savefig(current_fig, bbox_inches='tight')
-
-            if full_model:
-                fit_cov[ii, jj, :3, :3] = transform_covariance(fit_cov[ii, jj])
-            else:
-                fit_cov[ii, jj, :2, :2] = transform_covariance(fit_cov[ii, jj])
-
-        else:
-            cap = np.nan
-            cap_error = np.nan
-            leakage = np.nan
-            leakage_error = np.nan
-            resistor = np.nan
-            resistor_error = np.nan
-            if full_model:
-                fit_cov[ii, jj, :3, :3] = np.full(shape=(3, 3), fill_value=np.nan)
-            else:
-                fit_cov[ii, jj, :2, :2] = np.full(shape=(2, 2), fill_value=np.nan)
+        fit_cov[ii, jj, :cov_array_limit, :cov_array_limit] = transform_covariance(fit_cov_temp, )
 
         # temporarily save the results to memory
         cap_hist[ii, jj] = cap
@@ -456,79 +376,118 @@ def advanced_analysis_delegate(file: tb.File, group: tb.Group, current_hist: TAB
         resistor_hist[ii, jj] = resistor
         resistor_error_hist[ii, jj] = resistor_error
 
-        # make sure that no plots/figures are opened any more.
-        from matplotlib import pyplot as plt
-        plt.close('all')
-
-    if plot and not (isinstance(plot, PdfPages) or isinstance(kwargs.get("fit_plot_pdf", None), PdfPages)):
-        assert output_pdf is not None
-        output_pdf.close()
-
     # Store capacitance values and specify the used units as an attribute.
-    temp_array = file.create_carray(group,
-                                    name=kwargs.get("cap_name", "HistCap"),
-                                    title=kwargs.get("cap_title", "Capacitance Histogram"),
-                                    obj=cap_hist,
-                                    filters=tb.Filters(complib='blosc',
-                                                       complevel=5,
-                                                       fletcher32=False))
-    temp_array.attrs["Units"] = "F"
-    temp_array.flush()
-    temp_array = file.create_carray(group,
-                                    name=kwargs.get("cap_err_name", "HistCapErr"),
-                                    title=kwargs.get("cap_err_title", "Capacitance Error Histogram"),
-                                    obj=cap_error_hist,
-                                    filters=tb.Filters(complib='blosc',
-                                                       complevel=5,
-                                                       fletcher32=False))
-    temp_array.attrs["Units"] = "F"
-    temp_array.flush()
+    create_carray(file, group, name=kwargs.get("cap_name", "HistCap"),
+                  title=kwargs.get("cap_title", "Capacitance Histogram"), obj=cap_hist, filters=GLOBAL_FILTERS,
+                  unit=HIST_CAP_UNIT)
+    create_carray(file, group, name=kwargs.get("cap_err_name", "HistCapErr"),
+                  title=kwargs.get("cap_err_title", "Capacitance Error Histogram"), obj=cap_error_hist,
+                  filters=GLOBAL_FILTERS, unit=HIST_CAP_UNIT)
 
-    temp_array = file.create_carray(group,
-                                    name=kwargs.get("leak_name", "HistLeak"),
-                                    title=kwargs.get("leak_title", "Leakage Current Histogram"),
-                                    obj=leak_hist,
-                                    filters=tb.Filters(complib='blosc',
-                                                       complevel=5,
-                                                       fletcher32=False))
-    temp_array.attrs["Units"] = "nA"
-    temp_array.flush()
-    temp_array = file.create_carray(group,
-                                    name=kwargs.get("leak_error_name", "HistLeakErr"),
-                                    title=kwargs.get("leak_error_title", "Leakage Current Error Histogram"),
-                                    obj=leak_error_hist,
-                                    filters=tb.Filters(complib='blosc',
-                                                       complevel=5,
-                                                       fletcher32=False))
-    temp_array.attrs["Units"] = "nA"
-    temp_array.flush()
+    create_carray(file, group, name=kwargs.get("leak_name", "HistLeak"),
+                  title=kwargs.get("leak_title", "Leakage Current Histogram"), obj=leak_hist, filters=GLOBAL_FILTERS,
+                  unit=HIST_LEAK_CURRENT_UNIT)
+    create_carray(file, group, name=kwargs.get("leak_error_name", "HistLeakErr"),
+                  title=kwargs.get("leak_error_title", "Leakage Current Error Histogram"), obj=leak_error_hist,
+                  filters=GLOBAL_FILTERS, unit=HIST_LEAK_CURRENT_UNIT)
+    create_carray(file, group, name=kwargs.get("resistor_name", "HistRes"),
+                  title=kwargs.get("resistor_title", "On-Resistance Histogram"), obj=resistor_hist,
+                  filters=GLOBAL_FILTERS, unit="O")
+    create_carray(file, group, name=kwargs.get("resistor_error_name", "HistResErr"),
+                  title=kwargs.get("resistor_error_title", "On-Resistance Error Histogram"), obj=resistor_error_hist,
+                  filters=GLOBAL_FILTERS, unit="O")
+    create_carray(file, group, name=kwargs.get("cov_name", "HistFitCov"),
+                  title=kwargs.get("cov_title", 'Fit Covariance Matrix'), obj=fit_cov, filters=GLOBAL_FILTERS,
+                  unit="{{F^2, F O, F nA, F V},{O F, O^2, O nA, O V},{nA F, nA O, nA^2, nA V}, {V F, V O, V nA, V^2}")
 
-    temp_array = file.create_carray(group,
-                                    name=kwargs.get("resistor_name", "HistRes"),
-                                    title=kwargs.get("resistor_title", "On-Resistance Histogram"),
-                                    obj=resistor_hist,
-                                    filters=tb.Filters(complib='blosc',
-                                                       complevel=5,
-                                                       fletcher32=False))
-    temp_array.attrs["Units"] = "O"
-    temp_array.flush()
-    temp_array = file.create_carray(group,
-                                    name=kwargs.get("resistor_error_name", "HistResErr"),
-                                    title=kwargs.get("resistor_error_title", "On-Resistance Error Histogram"),
-                                    obj=resistor_error_hist,
-                                    filters=tb.Filters(complib='blosc',
-                                                       complevel=5,
-                                                       fletcher32=False))
-    temp_array.attrs["Units"] = "O"
-    temp_array.flush()
+def __perform_pixel_fit(currents: np.ndarray, current_errors: np.ndarray, frequencies: np.ndarray,
+                        effective_expression: str,
+                        effective_label: str, effective_model: Callable[..., Any],
+                        effective_parameter_dict: dict[str, str], full_model: bool, initial_guess: dict[str, float],
+                        use_kafe2) -> tuple[float, float, np.ndarray, Any, float, float, float, float]:
+    resistor = np.nan
+    resistor_error = np.nan
+    if use_kafe2:
+        from kafe2 import XYContainer, XYFit
+        xy_data = XYContainer(frequencies, currents)
+        # errors?
+        if np.all(np.isfinite(current_errors)):
+            xy_data.add_error('y', err_val=current_errors)
+        fitter = XYFit(xy_data, model_function=effective_model)
+        fitter.assign_model_function_latex_name(effective_label)
+        fitter.assign_model_function_latex_expression(effective_expression)
+        fitter.assign_parameter_latex_names(**effective_parameter_dict)
+        fitter.set_parameter_values(**initial_guess)
+        fitter.fix_parameter('u0', 1)
+        fitter.do_fit()
 
-    temp_array = file.create_carray(group,
-                                    name=kwargs.get("cov_name", "HistFitCov"),
-                                    title=kwargs.get("cov_title", 'Fit Covariance Matrix'),
-                                    obj=fit_cov, filters=tb.Filters(complib='blosc',
-                                                                    complevel=5,
-                                                                    fletcher32=False)
-                                    )
-    temp_array.attrs[
-        "Units"] = "{{F^2, F O, F nA, F V},{O F, O^2, O nA, O V},{nA F, nA O, nA^2, nA V}, {V F, V O, V nA, V^2}"
-    temp_array.flush()
+        # extract the fit parameters
+        assert fitter.did_fit
+        cap = fitter.parameter_values[0] * FARAD_CONVERSION_FACTOR  # convert to F
+        cap_error = fitter.parameter_errors[0] * FARAD_CONVERSION_FACTOR
+        leakage = fitter.parameter_values[2] * CURRENT_CONVERSION_FACTOR  # convert to nA
+        leakage_error = fitter.parameter_errors[2] * CURRENT_CONVERSION_FACTOR  # convert to nA
+        if full_model:
+            # otherwise the requested information may not be present
+            resistor = fitter.parameter_values[1]
+            resistor_error = fitter.parameter_errors[1]
+        fit_cov_temp = fitter.parameter_cov_mat
+    else:
+        from iminuit import Minuit
+        from iminuit.cost import LeastSquares
+        if np.all(np.isfinite(current_errors)):
+            errors = current_errors
+        else:
+            errors = np.full_like(current_errors, fill_value=1)
+        # noinspection PyTypeChecker
+        cost = LeastSquares(x=frequencies, y=currents,
+                            yerror=errors, model=effective_model)
+        fitter = Minuit(cost, **initial_guess)
+        fitter.fixto('u0', 1)
+        fitter.migrad()
+        fitter.hesse()
+
+        # extract the fit parameters
+        cap = fitter.values['c'] * FARAD_CONVERSION_FACTOR  # convert to F
+        cap_error = fitter.errors['c'] * FARAD_CONVERSION_FACTOR
+        leakage = fitter.values['i'] * CURRENT_CONVERSION_FACTOR  # convert to nA
+        leakage_error = fitter.errors['i'] * CURRENT_CONVERSION_FACTOR  # convert to nA
+        if full_model:
+            # otherwise the requested information may not be present.
+            resistor = fitter.values['r']
+            resistor_error = fitter.errors['r']
+        fit_cov_temp = fitter.covariance
+
+    assert isinstance(fit_cov_temp, np.ndarray)
+    PERFORM_PIXEL_TYPE = np.dtype([('C', np.float64), ('Cerr', np.float64),
+              ('I', np.float64), ('Ierr', np.float64),
+              ('R', np.float64), ('Rerr', np.float64),
+              ('fit', Any), ('cov', np.ndarray)])
+    np.array([
+        ('C', cap),
+        ('Cerr', cap_error),
+        ('I', leakage),
+        ('Ierr', leakage_error),
+        ('R', resistor),
+        ('Rerr', resistor_error),
+        ('fit', fitter)
+    ])
+    return cap, cap_error, fit_cov_temp, fitter, leakage, leakage_error, resistor, resistor_error
+
+
+def __declare_fit_model(full_model) -> tuple[int, Callable[..., Any], str, str, dict[str, str], dict[str, float]]:
+    if full_model:
+        effective_model = full_capacitance_model
+        effective_label = FULL_MODEL_LABEL
+        effective_expression = FULL_MODEL_EXPRESSION
+        effective_parameter_dict = FULL_MODEL_PARAMETER_DICT
+        param_defaults = {'c': 1e-6, 'r': 1e6, 'i': 0, 'u0': 1}
+        cov_array_limit = 3
+    else:
+        effective_model = simple_capacitance_model
+        effective_label = SIMPLE_MODEL_LABEL
+        effective_expression = SIMPLE_MODEL_EXPRESSION
+        effective_parameter_dict = SIMPLE_MODEL_PARAMETER_DICT
+        param_defaults = {'c': 1e-6, 'i': 0, 'u0': 1}
+        cov_array_limit = 2
+    return cov_array_limit, effective_model, effective_expression, effective_label, effective_parameter_dict, param_defaults
