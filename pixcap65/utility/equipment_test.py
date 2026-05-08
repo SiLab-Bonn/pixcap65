@@ -46,7 +46,8 @@ def test_frequency_settling_2(settling_range: Iterable, file_name: str):
     # perform the analysis of these different paths.
     with PdfPages(file_name[:-3] + '.pdf') as output_pdf:
         for settling_time in settling_range:
-            analyze_data(raw_data=file_name, base_path=configuration['data_path'] + settling_path[settling_time], is_advanced=True, full_model=True, plot=True, apply_contour=True, fit_plot_pdf=output_pdf)
+            analyze_data(raw_data=file_name, base_path=configuration['data_path'] + settling_path[settling_time],
+                         is_advanced=True, full_model=True, plot=True, apply_contour=True, fit_plot_pdf=output_pdf)
 
     # extract the dependecies for the chip from the measured error
     error_data = np.full((40, 40, settling_range.shape[0]), fill_value=np.nan)
@@ -68,9 +69,6 @@ def test_frequency_settling_2(settling_range: Iterable, file_name: str):
             ax.set_ylabel("Error of C")
             output_pdf.savefig(fig, bbox_inches='tight')
             plt.close(fig)
-
-
-
 
 
 def test_frequency_settling(settling_range: Iterable, file_name: str):

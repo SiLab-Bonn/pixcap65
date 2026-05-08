@@ -5,10 +5,10 @@ import numpy as np
 import tables as tb
 from matplotlib.backends.backend_pdf import PdfPages
 
-from analysis_util.utility import HandleFitterStubClass, HandleFitterGeneral, HIST_CAP_UNIT, \
-    HIST_LEAK_CURRENT_UNIT
 from pixcap65.analysis import analyze_depletion_delegate, apply_correction_simple
 from pixcap65.analysis_util.physics_modelling import full_capacitance_model, simple_capacitance_model
+from pixcap65.analysis_util.utility import HandleFitterStubClass, HandleFitterGeneral, HIST_CAP_UNIT, \
+    HIST_LEAK_CURRENT_UNIT
 from pixcap65.analysis_util.utility import str_join, check_leaf_unit, \
     transform_covariance, TABLES_ARRAY_TYPE, GENERAL_PIXCAP_SHAPE, FULL_MODEL_LABEL, \
     SIMPLE_MODEL_LABEL, FULL_MODEL_EXPRESSION, SIMPLE_MODEL_EXPRESSION, FULL_MODEL_PARAMETER_DICT, \
@@ -400,6 +400,7 @@ def _perform_advanced_fit(file: tb.File, group: tb.Group, current_hist: np.ndarr
                   title=kwargs.get("cov_title", 'Fit Covariance Matrix'), obj=fit_cov, filters=GLOBAL_FILTERS,
                   unit="{{F^2, F O, F nA, F V},{O F, O^2, O nA, O V},{nA F, nA O, nA^2, nA V}, {V F, V O, V nA, V^2}")
 
+
 def __perform_pixel_fit(currents: np.ndarray, current_errors: np.ndarray, frequencies: np.ndarray,
                         effective_expression: str,
                         effective_label: str, effective_model: Callable[..., Any],
@@ -460,9 +461,9 @@ def __perform_pixel_fit(currents: np.ndarray, current_errors: np.ndarray, freque
 
     assert isinstance(fit_cov_temp, np.ndarray)
     PERFORM_PIXEL_TYPE = np.dtype([('C', np.float64), ('Cerr', np.float64),
-              ('I', np.float64), ('Ierr', np.float64),
-              ('R', np.float64), ('Rerr', np.float64),
-              ('fit', Any), ('cov', np.ndarray)])
+                                   ('I', np.float64), ('Ierr', np.float64),
+                                   ('R', np.float64), ('Rerr', np.float64),
+                                   ('fit', Any), ('cov', np.ndarray)])
     np.array([
         ('C', cap),
         ('Cerr', cap_error),

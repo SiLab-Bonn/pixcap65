@@ -19,7 +19,6 @@ except ImportError:
 
 import numpy as np
 import tables as tb
-from matplotlib.backends.backend_pdf import PdfPages
 from typing import Optional, Tuple, Union, Callable, Any
 from warnings import deprecated
 
@@ -1538,27 +1537,51 @@ if __name__ == '__main__':
         "bare_hdf_path": "Reference/bare/unbiased_8/total_cap",
     }
 
-    analyze_capacitance_distribution(raw_data='Bare_Repeat_2_Scan.h5', base_path="Reference/bare/unbiased_8",
-                                     corrected_distribution=False,
-                                     exclude_test_cap=True, use_kafe2=False,
-                                     fit_plot_pdf_name="Bare_analysis_parasitic.pdf")
-    analyze_data(raw_data='pixcap65/Data/r13-measurement/R13_Full_Scan_80V.h5', is_advanced=True,
-                 **bare_correction_args)
-    # analyze_data(raw_data='R13-Interpixel_Scan.h5',
-    #              base_path="Reference/R13/demo_measurement_65_unbiased_1_discharge",
-    #              is_inter_pixel=True, is_advanced=True)
-    with PdfPages("New_2_Scan_CV_refined_distribution.pdf") as pdf:
-        analyze_data(raw_data='New_2_Scan.h5', base_path="ATLAS_Itk/X2/C_V_Characteristic_refined", is_advanced=True,
-                     is_cv=True,
-                     first_boundaries=(-60, -20), second_boundaries=(-5, 0), use_corrected=True, apply_doping=True,
-                     chip_group_name="ATLAS_Itk/X2/sensor", distribution=True, set_parasitic=False,
-                     distribution_output_pdf=pdf, **bare_correction_args)
-
-    analyze_data(raw_data='pixcap65/Data/New_1_Initial_6_Scan.h5', base_path="ATLAS ITk/C_V_Characteristic",
-                 is_advanced=False, is_cv=True, use_corrected=True, apply_doping=True,
-                 chip_group_name="ATLAS ITk/sensor",
-                 first_boundaries=[(-60, -40), (-80, -75)], second_boundaries=[(-5, 0), (-70, -65)],
-                 **bare_correction_args)
-    analyze_data(raw_data='New_2_Scan.h5', base_path="ATLAS_Itk/X2/C_V_Characteristic", is_advanced=True, is_cv=True,
-                 first_boundaries=[(-60, -40), (-80, -75)], second_boundaries=[(-5, 0), (-70, -65)], use_corrected=True,
-                 **bare_correction_args)
+    # analyze_capacitance_distribution(raw_data='Bare_Repeat_2_Scan.h5', base_path="Reference/bare/unbiased_8",
+    #                                  corrected_distribution=False,
+    #                                  exclude_test_cap=True, use_kafe2=False,
+    #                                  fit_plot_pdf_name="Bare_analysis_parasitic.pdf")
+    # analyze_data(raw_data='pixcap65/Data/r13-measurement/R13_Full_Scan_80V.h5', is_advanced=True,
+    #              **bare_correction_args)
+    analyze_data(raw_data='R13-Interpixel_Scan.h5',
+                 base_path="Reference/R13/demo_measurement_65_unbiased_1_discharge",
+                 is_inter_pixel=True, is_advanced=True)
+    analyze_data(raw_data='packaged/R13-Interpixel_Scan.h5',
+                 base_path="Reference/R13/demo_measurement_66_biased_80_V_1_discharge",
+                 is_inter_pixel=True, is_advanced=True)
+    analyze_data(raw_data='packaged/R13-Interpixel_Scan.h5',
+                 base_path="Reference/R13/demo_measurement_67_biased_80_V_1_discharge",
+                 is_inter_pixel=True, is_advanced=True)
+    analyze_data(raw_data='packaged/R13-Interpixel_Scan.h5',
+                 base_path="Reference/R13/demo_measurement_68_biased_40_V_1_discharge",
+                 is_inter_pixel=True, is_advanced=True)
+    analyze_data(raw_data='packaged/R13-Interpixel_Scan.h5',
+                 base_path="Reference/R13/demo_measurement_69_biased_05_V_1_discharge",
+                 is_inter_pixel=True, is_advanced=True)
+    analyze_data(raw_data='packaged/R13-Interpixel_Scan.h5',
+                 base_path="Reference/R13/demo_measurement_70_unbiased_1_discharge",
+                 is_inter_pixel=True, is_advanced=True)
+    analyze_data(raw_data='packaged/RX-Interpixel_Scan.h5',
+                 base_path="Reference/R1/demo_measurement_1_unbiased_1_discharge",
+                 is_inter_pixel=True, is_advanced=True)
+    analyze_data(raw_data='packaged/RX-Interpixel_Scan.h5',
+                 base_path="Reference/R1/demo_measurement_2_biased_80_V_1_discharge",
+                 is_inter_pixel=True, is_advanced=True)
+    analyze_data(raw_data='packaged/RX-Interpixel_Scan.h5',
+                 base_path="Reference/R1/demo_measurement_3_biased_40_V_1_discharge",
+                 is_inter_pixel=True, is_advanced=True)
+    # with PdfPages("New_2_Scan_CV_refined_distribution.pdf") as pdf:
+    #     analyze_data(raw_data='New_2_Scan.h5', base_path="ATLAS_Itk/X2/C_V_Characteristic_refined", is_advanced=True,
+    #                  is_cv=True,
+    #                  first_boundaries=(-60, -20), second_boundaries=(-5, 0), use_corrected=True, apply_doping=True,
+    #                  chip_group_name="ATLAS_Itk/X2/sensor", distribution=True, set_parasitic=False,
+    #                  distribution_output_pdf=pdf, **bare_correction_args)
+    #
+    # analyze_data(raw_data='pixcap65/Data/New_1_Initial_6_Scan.h5', base_path="ATLAS ITk/C_V_Characteristic",
+    #              is_advanced=False, is_cv=True, use_corrected=True, apply_doping=True,
+    #              chip_group_name="ATLAS ITk/sensor",
+    #              first_boundaries=[(-60, -40), (-80, -75)], second_boundaries=[(-5, 0), (-70, -65)],
+    #              **bare_correction_args)
+    # analyze_data(raw_data='New_2_Scan.h5', base_path="ATLAS_Itk/X2/C_V_Characteristic", is_advanced=True, is_cv=True,
+    #              first_boundaries=[(-60, -40), (-80, -75)], second_boundaries=[(-5, 0), (-70, -65)], use_corrected=True,
+    #              **bare_correction_args)
