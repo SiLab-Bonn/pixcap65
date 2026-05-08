@@ -60,7 +60,7 @@ def test_frequency_settling_2(settling_range: Iterable, file_name: str):
         create_carray(h5_file, h5_file.root, "HistErrSettling", obj=error_data)
 
         # last plot the dependency for every pixel
-        for ii, jj in np.ndindex((40,40)):
+        for ii, jj in np.ndindex((40, 40)):
             fig, ax = plt.subplots()
             ax.plot(settling_range, error_data[ii, jj, :])
             ax.set_title(f"Frequency settling results for pixel ({ii}, {jj}).")

@@ -22,6 +22,7 @@ from __future__ import annotations
 import logging
 import os
 from collections import OrderedDict
+from contextlib import contextmanager
 from typing import Iterable, Mapping, Any
 from warnings import warn, deprecated
 
@@ -32,6 +33,12 @@ from pixcap65.analysis import analysis_data_handle
 from pixcap65.analysis_util.utility import HIST_CURRENT_MEAS_UNIT, HIST_BIAS_MEAS_UNIT
 from pixcap65.utility.tables_util import get_group_attributes, set_group_attribute, \
     get_group_attribute, get_children, group_get_file, rename_node
+
+HV_WAIT = 0.01
+
+HV_VOLTAGE_TOL = 1e-2
+
+HV_CURRENT_LIMIT = 1e-7
 
 try:
     from abc import abstractmethod, ABCMeta
@@ -863,6 +870,17 @@ class PixCap65TotalCap(PixCap65Measurement):
                         scan_group = group_get_file(data_group).create_group(where=data_group, name=bias_group_name)
                     logger.info("Perform sweep for bias voltage %f.", bias_voltage)
                     self.scan_parameters = OrderedDict()
+                    # check for the smu's settling here
+                    with self.bias_without_averaging() as hv_less:
+                        previous_measurement = hv_less.bias_measure_volts()
+                        current_measurement = hv_less.bias_measure_volts()
+                        while np.abs(current_measurement - previous_measurement) > HV_VOLTAGE_TOL:
+                            time.sleep(HV_WAIT)
+                            previous_measurement = current_measurement
+                            current_measurement = hv_less.bias_measure_volts()
+
+                        if hv_less.bias_measure_current() > HV_CURRENT_LIMIT:
+                            break
                     self.scan(data_group_spec=scan_group, sequence_call=True)
         finally:
             logger.info("Collect all the current information and package it together.")
@@ -873,6 +891,23 @@ class PixCap65TotalCap(PixCap65Measurement):
             set_group_attribute(data_group, "bias_voltage_unit", HIST_BIAS_MEAS_UNIT)
             self.store_configuration(data_group)
             logger.info("Done bias measurements.")
+
+    @contextmanager
+    def bias_without_averaging(self):
+        if self.bias_averaging:
+            # we must deactivate the averaging for the measurement
+            back_n_bias_measurements = self.bias_measurements
+            self.bias_measurements = 1
+            try:
+                yield self.pixcap
+            finally:
+                self.bias_measurements = back_n_bias_measurements
+        else:
+            try:
+                yield self.pixcap
+            finally:
+                pass
+
 
     def bias_scan(self, data_group_spec=None):
         """
@@ -910,16 +945,29 @@ class PixCap65TotalCap(PixCap65Measurement):
         try:
             for k, bias_voltage in enumerate(bias_voltages):
                 self.pixcap.bias_voltage = bias_voltage
+                # check for the smu's settling here
+                with self.bias_without_averaging() as hv_less:
+                    previous_measurement = hv_less.bias_measure_volts()
+                    current_measurement = hv_less.bias_measure_volts()
+                    while np.abs(current_measurement - previous_measurement) > HV_VOLTAGE_TOL:
+                        time.sleep(HV_WAIT)
+                        previous_measurement = current_measurement
+                        current_measurement = hv_less.bias_measure_volts()
+
+                    if hv_less.bias_measure_current() > HV_CURRENT_LIMIT:
+                        break
                 self.handle_bias_measurement(k)
-                if self.bias_averaging:
-                    # we must deactivate the averaging for the measurement
-                    back_n_bias_measurements = self.bias_measurements
-                    self.bias_measurements = 1
-                    actual_bias_voltage = self.pixcap.bias_measure_volts()
-                    self.bias_measurements = back_n_bias_measurements
-                else:
-                    # could directly measure
-                    actual_bias_voltage = self.pixcap.bias_measure_volts()
+                with self.bias_without_averaging() as hv_less:
+                    actual_bias_voltage = hv_less.bias_measure_volts()
+                # if self.bias_averaging:
+                #     # we must deactivate the averaging for the measurement
+                #     back_n_bias_measurements = self.bias_measurements
+                #     self.bias_measurements = 1
+                #     actual_bias_voltage = self.pixcap.bias_measure_volts()
+                #     self.bias_measurements = back_n_bias_measurements
+                # else:
+                #     # could directly measure
+                #     actual_bias_voltage = self.pixcap.bias_measure_volts()
                 store_scan_par_values(scan_parameters=self.bias_scan_parameters, scan_param_id=k,
                                       bias_voltage=bias_voltage, hv_voltage=actual_bias_voltage)
         finally:
@@ -968,16 +1016,19 @@ class PixCap65TotalCap(PixCap65Measurement):
             for k, bias_voltage in tenumerate(bias_voltages, desc="Bias Voltage Scan."):
                 self.pixcap.bias_voltage = bias_voltage
                 self.scan_parameters = OrderedDict()
+                with self.bias_without_averaging() as hv_less:
+                    previous_measurement = hv_less.bias_measure_volts()
+                    current_measurement = hv_less.bias_measure_volts()
+                    while np.abs(current_measurement - previous_measurement) > HV_VOLTAGE_TOL:
+                        time.sleep(HV_WAIT)
+                        previous_measurement = current_measurement
+                        current_measurement = hv_less.bias_measure_volts()
+
+                    if hv_less.bias_measure_current() > HV_CURRENT_LIMIT:
+                        break
                 self.handle_bias_measurement(k)
-                if self.bias_averaging:
-                    # we must deactivate the averaging for the measurement
-                    back_n_bias_measurements = self.bias_measurements
-                    self.bias_measurements = 1
-                    actual_bias_voltage = self.pixcap.bias_measure_volts()
-                    self.bias_measurements = back_n_bias_measurements
-                else:
-                    # could directly measure
-                    actual_bias_voltage = self.pixcap.bias_measure_volts()
+                with self.bias_without_averaging() as hv_less:
+                    actual_bias_voltage = hv_less.bias_measure_volts()
                 store_scan_par_values(scan_parameters=self.bias_scan_parameters, scan_param_id=k,
                                       bias_voltage=bias_voltage, hv_voltage=actual_bias_voltage)
                 bias_group_name = "bias_{bias_voltage}_V".format(bias_voltage=bias_voltage).replace('-', "M_").replace(

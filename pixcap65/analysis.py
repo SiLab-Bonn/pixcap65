@@ -3,9 +3,24 @@ Analysis of Pixcap65 data. Fits freq vs current to extract the capacitance. A 2D
 for each pixel is stored.
 """
 import logging
+
+from tables import File, Group
+
+from pixcap65.analysis_util.data_store import DepletionDataStore, DepletionTableStore, DepletionArrayStore, \
+    DopingArrayStore
+
+try:
+    # noinspection PyCompatibility
+    from collections.abc import Sized, Iterable
+except ImportError:
+    # python 2.7
+    import collections.Sized as Sized
+    import collections.Iterable as Iterable
+
 import numpy as np
 import tables as tb
-from typing import Optional, Tuple
+from matplotlib.backends.backend_pdf import PdfPages
+from typing import Optional, Tuple, Union, Callable, Any
 from warnings import deprecated
 
 from pixcap65.analysis_util.physics_modelling import SILICON_V_BIAS, depletion_model, model_depletion, EPS_SILICON, \
@@ -24,14 +39,16 @@ from pixcap65.utility.tables_util import get_groups, get_leaves, copy_node, list
 from pixcap65.utility.utils_2 import walk_to_node, GroupType, create_carray, prevent_group_mix_up
 
 UNITS_ATTRIBUTE_KEY = "Units"
+BOUNDARY_TYPE = Union[Tuple, Iterable[Tuple]]
+ADVANCED_PARAMETER_TYPE = Union[bool, Iterable[bool]]
 
 logger = logging.getLogger(__name__)
 
 
 @deprecated("Please use analyze_data instead.")
 def analyze_data_temporary_replacement(raw_data, base_path=None, is_advanced=False, is_cv=False,
-                                       first_boundaries: Optional[Tuple] = None,
-                                       second_boundaries: Optional[Tuple] = None,
+                                       first_boundaries: Optional[BOUNDARY_TYPE] = None,
+                                       second_boundaries: Optional[BOUNDARY_TYPE] = None,
                                        is_inter_pixel=False, **kwargs):
     """
     analyze_data
@@ -104,8 +121,8 @@ def analyze_data_temporary_replacement(raw_data, base_path=None, is_advanced=Fal
 
 
 def analyze_data(raw_data, base_path=None, is_advanced=False, is_cv=False,
-                 first_boundaries: Optional[Tuple] = None,
-                 second_boundaries: Optional[Tuple] = None,
+                 first_boundaries: Optional[BOUNDARY_TYPE] = None,
+                 second_boundaries: Optional[BOUNDARY_TYPE] = None,
                  is_inter_pixel=False, **kwargs):
     """
     analyze_data
@@ -184,6 +201,12 @@ def analyze_data(raw_data, base_path=None, is_advanced=False, is_cv=False,
             analyze_data(raw_data, base_path, is_advanced, is_cv, first_boundaries,
                          second_boundaries, is_inter_pixel, **kwargs)
             return
+    kargs = kwargs.copy()
+    kargs.pop("plot", None)
+    kargs.pop("fit_plot_pdf", None)
+    kargs.pop("use_kafe2", None)
+    kargs.pop("output_pdf", None)
+    kargs['no_plot'] = True
 
     # handle the real analysis
     with tb.open_file(raw_data, mode='a') as in_file_h5:
@@ -247,12 +270,11 @@ def analyze_data(raw_data, base_path=None, is_advanced=False, is_cv=False,
 
                 if kwargs.get("distribution", False):
                     # first get a histogram with all the data
-                    n_pix, cap, cap_err, cap_std, cap_std_err = analyze_capacitance_distribution_delegate(None,
-                                                                                                          kwargs.get(
-                                                                                                              "distribution_output_pdf",
-                                                                                                              None),
-                                                                                                          capacitance=cap_data,
-                                                                                                          **kwargs)
+                    temp_tuple = analyze_capacitance_distribution_delegate(None,
+                                                                           None,
+                                                                           capacitance=cap_data,
+                                                                           **kargs)
+                    n_pix, cap, cap_err, cap_std, cap_std_err = temp_tuple
 
                     # try to get to the on-resistance datasets to perform the same distribution handler!
                     # only issue with this attempt the capacitance will be saved as a parasitic one!
@@ -513,83 +535,13 @@ def analysis_data_handle(file: tb.File, data_group: GroupType, result_group: Gro
         the correction procedure, but in this case it must be present)
     """
     # get the correct analysis function
-    if is_advanced:
-        from pixcap65.advanced_analysis import advanced_analysis_delegate
-        perform_analysis = advanced_analysis_delegate
-    else:
-        from pixcap65.analysis_util import analyze_data_delegate
-        perform_analysis = analyze_data_delegate
+    perform_analysis = _get_analyze(is_advanced)
 
     # Read pixel map
     assert isinstance(data_group, tb.Group)
     assert isinstance(result_group, tb.Group)
     if is_inter_pixel:
-        current_hist = check_leaf_unit(data_group.TotalHistCurr, HIST_CURRENT_MEAS_UNIT)
-        if is_advanced and "TotalHistCurr" in data_group:
-            current_error_hist = check_leaf_unit(data_group.TotalHistCurr, HIST_CURRENT_MEAS_UNIT)
-        else:
-            current_error_hist = np.full_like(current_hist, fill_value=np.nan)
-        kwargs["current_error_hist"] = current_error_hist
-
-        # Read scan parameters
-        scan_parameters = data_group.scan_params[:]
-        assert isinstance(scan_parameters, tb.Table) or isinstance(scan_parameters, np.ndarray)
-        assert isinstance(current_hist, tb.CArray) or isinstance(current_hist, np.ndarray)
-        perform_analysis(file, result_group, current_hist, scan_parameters, **kwargs)
-
-        # handle the first inter-pixel measurement.
-        inter_a_output_dict = {
-            "cap_name": "HistCapInterA",
-            "cap_title": "Capacitance Histogram of inter pixel A",
-            "cap_err_name": "HistCapErrInterA",
-            "cap_err_title": "Capacitance Error Histogram of inter pixel A",
-            "leak_name": "HistLeakInterA",
-            "leak_title": "Leakage Current Histogram of inter pixel A",
-            "leak_error_name": "HistLeakErrInterA",
-            "leak_error_title": "Leakage Current Error Histogram of inter pixel A",
-            "resistor_name": "HistResInterA",
-            "resistor_title": "On-Resistance Histogram of inter pixel A",
-            "resistor_error_name": "HistResErrInterA",
-            "resistor_error_title": "On-Resistance Error Histogram of inter pixel A",
-            "cov_name": "HistFitCovInterA",
-            "cov_title": 'Fit Covariance Matrix of inter pixel A'
-        }
-        kwargs.update(inter_a_output_dict)
-        current_hist = check_leaf_unit(data_group.InterHistCurrA, HIST_CURRENT_MEAS_UNIT)
-        if is_advanced and "InterHistCurrErrA" in data_group:
-            current_error_hist = check_leaf_unit(data_group.InterHistCurrErrA, HIST_CURRENT_MEAS_UNIT)
-        else:
-            current_error_hist = np.full_like(current_hist, fill_value=np.nan)
-
-        kwargs["current_error_hist"] = current_error_hist
-        assert isinstance(current_hist, tb.CArray) or isinstance(current_hist, np.ndarray)
-        perform_analysis(file, result_group, current_hist, scan_parameters, **kwargs)
-
-        inter_b_output_dict = {
-            "cap_name": "HistCapInterB",
-            "cap_title": "Capacitance Histogram of inter pixel B",
-            "cap_err_name": "HistCapErrInterB",
-            "cap_err_title": "Capacitance Error Histogram of inter pixel B",
-            "leak_name": "HistLeakInterB",
-            "leak_title": "Leakage Current Histogram of inter pixel B",
-            "leak_error_name": "HistLeakErrInterB",
-            "leak_error_title": "Leakage Current Error Histogram of inter pixel B",
-            "resistor_name": "HistResInterB",
-            "resistor_title": "On-Resistance Histogram of inter pixel B",
-            "resistor_error_name": "HistResErrInterB",
-            "resistor_error_title": "On-Resistance Error Histogram of inter pixel B",
-            "cov_name": "HistFitCovInterB",
-            "cov_title": 'Fit Covariance Matrix of inter pixel B'
-        }
-        kwargs.update(inter_b_output_dict)
-        current_hist = check_leaf_unit(data_group.InterHistCurrB, HIST_CURRENT_MEAS_UNIT)
-        if "InterHistCurrErrB" in data_group:
-            current_error_hist = check_leaf_unit(data_group.InterHistCurrErrB, HIST_CURRENT_MEAS_UNIT)
-        else:
-            current_error_hist = np.full_like(current_hist, fill_value=np.nan)
-        kwargs["current_error_hist"] = current_error_hist
-        assert isinstance(current_hist, tb.CArray) or isinstance(current_hist, np.ndarray)
-        perform_analysis(file, result_group, current_hist, scan_parameters, **kwargs)
+        _handle_inter_pix_capacitance(file, data_group, is_advanced, perform_analysis, result_group, **kwargs)
 
     else:
         current_hist = check_leaf_unit(data_group.HistCurr, HIST_CURRENT_MEAS_UNIT)
@@ -606,116 +558,100 @@ def analysis_data_handle(file: tb.File, data_group: GroupType, result_group: Gro
         perform_analysis(file, result_group, current_hist, scan_parameters, **kwargs)
 
     # if necessary: directly apply the correction of the capacitance values
+    _handle_cap_correction(result_group, **kwargs)
+
+
+def _handle_inter_pix_capacitance(file: File, data_group: tb.Group, is_advanced: ADVANCED_PARAMETER_TYPE,
+                                  perform_analysis: Callable[..., None], result_group: tb.Group, **kwargs):
+    current_hist = check_leaf_unit(data_group.TotalHistCurr, HIST_CURRENT_MEAS_UNIT)
+    if is_advanced and "TotalHistCurr" in data_group:
+        current_error_hist = check_leaf_unit(data_group.TotalHistCurr, HIST_CURRENT_MEAS_UNIT)
+    else:
+        current_error_hist = np.full_like(current_hist, fill_value=np.nan)
+    kwargs["current_error_hist"] = current_error_hist
+
+    # Read scan parameters
+    scan_parameters = data_group.scan_params[:]
+    assert isinstance(scan_parameters, tb.Table) or isinstance(scan_parameters, np.ndarray)
+    assert isinstance(current_hist, tb.CArray) or isinstance(current_hist, np.ndarray)
+    perform_analysis(file, result_group, current_hist, scan_parameters, **kwargs)
+
+    # handle the first inter-pixel measurement.
+    inter_a_output_dict = {
+        "cap_name": "HistCapInterA",
+        "cap_title": "Capacitance Histogram of inter pixel A",
+        "cap_err_name": "HistCapErrInterA",
+        "cap_err_title": "Capacitance Error Histogram of inter pixel A",
+        "leak_name": "HistLeakInterA",
+        "leak_title": "Leakage Current Histogram of inter pixel A",
+        "leak_error_name": "HistLeakErrInterA",
+        "leak_error_title": "Leakage Current Error Histogram of inter pixel A",
+        "resistor_name": "HistResInterA",
+        "resistor_title": "On-Resistance Histogram of inter pixel A",
+        "resistor_error_name": "HistResErrInterA",
+        "resistor_error_title": "On-Resistance Error Histogram of inter pixel A",
+        "cov_name": "HistFitCovInterA",
+        "cov_title": 'Fit Covariance Matrix of inter pixel A'
+    }
+    kwargs.update(inter_a_output_dict)
+    current_hist = check_leaf_unit(data_group.InterHistCurrA, HIST_CURRENT_MEAS_UNIT)
+    if is_advanced and "InterHistCurrErrA" in data_group:
+        current_error_hist = check_leaf_unit(data_group.InterHistCurrErrA, HIST_CURRENT_MEAS_UNIT)
+    else:
+        current_error_hist = np.full_like(current_hist, fill_value=np.nan)
+
+    kwargs["current_error_hist"] = current_error_hist
+    assert isinstance(current_hist, tb.CArray) or isinstance(current_hist, np.ndarray)
+    perform_analysis(file, result_group, current_hist, scan_parameters, **kwargs)
+
+    inter_b_output_dict = {
+        "cap_name": "HistCapInterB",
+        "cap_title": "Capacitance Histogram of inter pixel B",
+        "cap_err_name": "HistCapErrInterB",
+        "cap_err_title": "Capacitance Error Histogram of inter pixel B",
+        "leak_name": "HistLeakInterB",
+        "leak_title": "Leakage Current Histogram of inter pixel B",
+        "leak_error_name": "HistLeakErrInterB",
+        "leak_error_title": "Leakage Current Error Histogram of inter pixel B",
+        "resistor_name": "HistResInterB",
+        "resistor_title": "On-Resistance Histogram of inter pixel B",
+        "resistor_error_name": "HistResErrInterB",
+        "resistor_error_title": "On-Resistance Error Histogram of inter pixel B",
+        "cov_name": "HistFitCovInterB",
+        "cov_title": 'Fit Covariance Matrix of inter pixel B'
+    }
+    kwargs.update(inter_b_output_dict)
+    current_hist = check_leaf_unit(data_group.InterHistCurrB, HIST_CURRENT_MEAS_UNIT)
+    if "InterHistCurrErrB" in data_group:
+        current_error_hist = check_leaf_unit(data_group.InterHistCurrErrB, HIST_CURRENT_MEAS_UNIT)
+    else:
+        current_error_hist = np.full_like(current_hist, fill_value=np.nan)
+    kwargs["current_error_hist"] = current_error_hist
+    assert isinstance(current_hist, tb.CArray) or isinstance(current_hist, np.ndarray)
+    perform_analysis(file, result_group, current_hist, scan_parameters, **kwargs)
+
+
+def _handle_cap_correction(result_group: Group, **kwargs):
     if "apply_correction" in kwargs and kwargs["apply_correction"]:
         assert 'bare_file' in kwargs
         assert 'bare_hdf_path' in kwargs
         apply_correction_simple(kwargs['bare_file'], kwargs['bare_hdf_path'], result_group)
 
 
-class DepletionDataStore:
-    def store_data(self, key, data):
-        pass
-
-    def flush_data(self):
-        pass
-
-
-class DepletionTableStore(DepletionDataStore):
-    def __init__(self, table: tb.Table):
-        self.table = table
-        self.entry = self.table.row
-
-    def store_data(self, key, data):
-        match key:
-            case "depletion":
-                self.entry["Ubi"] = data
-            case "depletion_error":
-                self.entry["Ubi_error"] = data
-            case "fit_result_first":
-                self.entry["a"] = data[0]
-                self.entry["b"] = data[1]
-            case "fit_error_first":
-                self.entry["a_error"] = data[0]
-                self.entry["b_error"] = data[1]
-            case "fit_result_second":
-                self.entry["c"] = data[0]
-                self.entry["d"] = data[1]
-            case "fit_error_second":
-                self.entry["c_error"] = data[0]
-                self.entry["d_error"] = data[1]
-            case _:
-                raise ValueError(f"The provided storage key is unknown: {key}")
-
-    def flush_data(self):
-        self.entry.append()
+def _get_analyze(is_advanced: bool) -> Callable[..., None]:
+    if is_advanced:
+        from pixcap65.advanced_analysis import advanced_analysis_delegate
+        perform_analysis = advanced_analysis_delegate
+    else:
+        from pixcap65.analysis_util import analyze_data_delegate
+        perform_analysis = analyze_data_delegate
+    return perform_analysis
 
 
-class DepletionArrayStore(DepletionDataStore):
-    def __init__(self):
-        self.depletion_voltage = np.full(shape=GENERAL_PIXCAP_SHAPE, fill_value=np.nan)
-        self.depletion_error = np.full(shape=GENERAL_PIXCAP_SHAPE, fill_value=np.nan)
-        self.fit_parameter_estimators = np.full(shape=(40, 40, 4), fill_value=np.nan)
-        self.fit_parameter_errors = np.full(shape=(40, 40, 4), fill_value=np.nan)
-        self.pixel_row = 1
-        self.pixel_col = 1
-
-    def set_pixel(self, i_row, i_col):
-        self.pixel_row = i_row
-        self.pixel_col = i_col
-
-    def store_data(self, key, data):
-        match key:
-            case "depletion":
-                self.depletion_voltage[self.pixel_col, self.pixel_row] = data
-            case "depletion_error":
-                self.depletion_error[self.pixel_col, self.pixel_row] = data
-            case "fit_result_first":
-                self.fit_parameter_estimators[self.pixel_col, self.pixel_row, :2] = data
-            case "fit_error_first":
-                self.fit_parameter_errors[self.pixel_col, self.pixel_row, :2] = data
-            case "fit_result_second":
-                self.fit_parameter_estimators[self.pixel_col, self.pixel_row, 2:] = data
-            case "fit_error_second":
-                self.fit_parameter_errors[self.pixel_col, self.pixel_row, 2:] = data
-            case _:
-                raise ValueError(f"The provided storage key is unknown: {key}")
-
-
-class DopingArrayStore(DepletionDataStore):
-    def __init__(self, doping_shape):
-        self.pixel_row = 1
-        self.pixel_col = 1
-        self.depletion_width_plate = np.full(shape=doping_shape, fill_value=np.nan)
-        self.depletion_width_plate_error = np.full(shape=doping_shape, fill_value=np.nan)
-        self.depletion_fit_parameter_table = np.full((40, 40, 4), fill_value=np.nan)
-        self.depletion_fit_parameter_error_table = np.full((40, 40, 4), fill_value=np.nan)
-        self.depletion_fit_covariance_table = np.full((40, 40, 4, 4), fill_value=np.nan)
-        self.effective_doping_table = np.full(shape=doping_shape, fill_value=np.nan)
-
-    def set_pixel(self, i_row, i_col):
-        self.pixel_row = i_row
-        self.pixel_col = i_col
-
-    def store_data(self, key, data):
-        match key:
-            case "width":
-                self.depletion_width_plate[self.pixel_col, self.pixel_row] = data
-            case "width_error":
-                self.depletion_width_plate_error[self.pixel_col, self.pixel_row] = data
-            case "fit_parameters":
-                self.depletion_fit_parameter_table[self.pixel_col, self.pixel_row] = data
-            case "fit_parameters_error":
-                self.depletion_fit_parameter_error_table[self.pixel_col, self.pixel_row] = data
-            case "fit_covariance":
-                self.depletion_fit_covariance_table[self.pixel_col, self.pixel_row] = data
-            case "doping":
-                self.effective_doping_table[self.pixel_col, self.pixel_row] = data
-            case _:
-                raise ValueError(f"Unknown data storage key {key}")
-
-
-def analyze_depletion_delegate(data_group: GroupType, analysis_group: GroupType, first_boundaries: Optional[Tuple],
-                               second_boundaries: Optional[Tuple], chip_group: GroupType = None, apply_doping=False,
+def analyze_depletion_delegate(data_group: tb.Group, analysis_group: tb.Group,
+                               first_boundaries: Optional[BOUNDARY_TYPE],
+                               second_boundaries: Optional[BOUNDARY_TYPE], chip_group: Optional[tb.Group] = None,
+                               apply_doping=False,
                                **kwargs):
     """
     analyse_depletion_delegate
@@ -753,46 +689,43 @@ def analyze_depletion_delegate(data_group: GroupType, analysis_group: GroupType,
     :key use_kafe2: boolean, False, indicates whether kafe2 is used for the fit.
     :key plot: boolean, False, indicates whether to plot the data. AN output PDF object could be submitted here
          instead of an explicitly created one.
-    :key apply_contour: boolean, indicates whether to determine the contours and try to plot them.
+    :key apply_contours: boolean, indicates whether to determine the contours and try to plot them.
     :key fit_plot_pdf: PdfPages object, to save the fit plot figures to (will override the plot object if provided,
         Only used for the advanced procedure)
     :key verbose: boolean, indicating whether to use verbose output of the depletion voltages.
     """
     # extract the additional parameters for advanced fitting procedures
-    use_kafe2 = kwargs.pop("use_kafe2", False)
-    apply_contours = kwargs.pop("apply_contours", False)
-    plot = kwargs.pop("plot", False)
-    output_pdf = kwargs.pop("fit_plot_pdf", None)
-
-    # extract the required data and create arrays for temporary storage.
-    voltage_data = check_leaf_unit(data_group.BiasVoltageHist, HIST_BIAS_MEAS_UNIT)
-    first_lower, first_upper = first_boundaries
-    second_lower, second_upper = second_boundaries
-    fit_result_storage = DepletionArrayStore()
+    propagate_kwargs = kwargs.copy()
+    propagate_kargs = kwargs.copy()
+    propagate_kargs.setdefault('output_pdf', kwargs.get('fit_plot_pdf', None))
 
     # verify and extract the raw data for further analysis
-    check_leaf_unit(analysis_group.UCHist, HIST_CAP_UNIT)
-    check_leaf_unit(analysis_group.UCErrHist, HIST_CAP_UNIT)
-    cap_data = analysis_group.UCHist[:, :, :]
-    cap_error_data = analysis_group.UCErrHist[:, :, :]
-    for ii, jj in np.ndindex(GENERAL_PIXCAP_SHAPE):
-        pixel_cap_data = cap_data[ii, jj, :]
-        pixel_cap_error_data = cap_error_data[ii, jj, :]
-        # could only perform the analysis for pixels with trustable measurements.
-        if np.any(~np.isfinite(pixel_cap_data)):
-            continue
-        fit_result_storage.set_pixel(jj, ii)
-        analyze_pixel_depletion(first_lower, first_upper, pixel_cap_data, pixel_cap_error_data, second_lower,
-                                second_upper, voltage_data, fit_result_storage, use_kafe2=use_kafe2,
-                                apply_contours=apply_contours, plot=plot, fit_plot_pdf=output_pdf,
-                                fit_description_text=" for Pixel ({col},{row})".format(col=ii, row=jj),
-                                verbose=kwargs.get("verbose", False))
+    cap_data = check_leaf_unit(analysis_group.UCHist, HIST_CAP_UNIT)
+    cap_error_data = check_leaf_unit(analysis_group.UCErrHist, HIST_CAP_UNIT)
+    voltage_data = check_leaf_unit(data_group.BiasVoltageHist, HIST_BIAS_MEAS_UNIT)
+
+    if isinstance(first_boundaries, Iterable) and not isinstance(first_boundaries, Tuple):
+        assert first_boundaries is not None
+        assert second_boundaries is not None
+        assert isinstance(first_boundaries, Sized)
+        fit_result_storage = DepletionArrayStore(n_depletions=len(first_boundaries))
+        for k, (first_bound, second_bound) in enumerate(zip(first_boundaries, second_boundaries)):
+            first_lower, first_upper = first_bound
+            second_lower, second_upper = second_bound
+            fit_result_storage.set_depletion_region(k)
+            depletion_delegation_impl(cap_data, cap_error_data, first_lower, first_upper, second_lower, second_upper,
+                                      fit_result_storage, voltage_data, **propagate_kargs)
+
+    else:
+        # extract the required data and create arrays for temporary storage.
+        first_lower, first_upper = first_boundaries
+        second_lower, second_upper = second_boundaries
+        fit_result_storage = DepletionArrayStore()
+        depletion_delegation_impl(cap_data, cap_error_data, first_lower, first_upper, second_lower, second_upper,
+                                  fit_result_storage, voltage_data, **propagate_kargs)
 
     # save the depletion voltage data.
-    assert isinstance(analysis_group, tb.Group)
     file_h5 = group_get_file(analysis_group)
-    assert isinstance(file_h5, tb.File)
-    assert isinstance(analysis_group, tb.Group)  # necessary as only groups could contain subelements.
     create_carray(file_h5, where=analysis_group, name="DepletionHist",
                   title="Histogram of the depletion voltages", obj=fit_result_storage.depletion_voltage,
                   filters=GLOBAL_FILTERS, unit=HIST_BIAS_MEAS_UNIT)
@@ -808,82 +741,121 @@ def analyze_depletion_delegate(data_group: GroupType, analysis_group: GroupType,
                   obj=fit_result_storage.fit_parameter_errors,
                   filters=GLOBAL_FILTERS, unit="NONE")
 
-    if apply_doping and chip_group is not None and "PhysicalDimensions" in chip_group and chip_group.PhysicalDimensions.shape == (
-            40, 40, 2) and np.all(np.isfinite(chip_group.PhysicalDimensions[:])):
-        physical_dimensions_data = chip_group.PhysicalDimensions[:]
-        pixel_areas = np.prod(physical_dimensions_data, axis=2)
-        doping_shape = (40, 40, voltage_data.shape[0])
-        doping_result_storage = DopingArrayStore(doping_shape)
+    if (not apply_doping or chip_group is None or "PhysicalDimensions" not in chip_group or
+            chip_group.PhysicalDimensions.shape != (40, 40, 2) or
+            np.any(~np.isfinite(chip_group.PhysicalDimensions[:]))):
+        return
+    physical_dimensions_data = chip_group.PhysicalDimensions[:]
+    pixel_areas = np.prod(physical_dimensions_data, axis=2)
+    doping_shape = (40, 40, voltage_data.shape[0])
+    doping_result_storage = DopingArrayStore(doping_shape)
 
-        # some further definitions for the loop
-        from findiff import Diff
-        import scipy.constants as constants
-        # this values will not be correct as I don't know the doping concentration the intrinsic bias voltage;
-        # the intrinsic bias voltage could be estimated from a fit to the forward bias I-V characteristic.
-        # noinspection PyPep8Naming
-        NA, ND = 1e16, 1e16
-        # noinspection PyPep8Naming
-        V_bi = SILICON_V_BIAS
-        assert isinstance(analysis_group, tb.Group)
-        dep_table = file_h5.create_table(where=analysis_group, name="DepletionParamTable",
-                                         description=DepletionWidthData,
-                                         filters=GLOBAL_FILTERS)
-        entry = dep_table.row
-        bias_voltages = check_leaf_unit(data_group.BiasVoltageHist, HIST_BIAS_MEAS_UNIT)
-        bias_voltage_errors = np.full_like(bias_voltages, fill_value=np.nan)
+    # some further definitions for the loop
+    # this values will not be correct as I don't know the doping concentration the intrinsic bias voltage;
+    # the intrinsic bias voltage could be estimated from a fit to the forward bias I-V characteristic.
+    # noinspection PyPep8Naming
+    NA = 1e16
+    v_bi = SILICON_V_BIAS
+    dep_table = file_h5.create_table(where=analysis_group, name="DepletionParamTable",
+                                     description=DepletionWidthData,
+                                     filters=GLOBAL_FILTERS)
+    entry = dep_table.row
+    bias_voltages = check_leaf_unit(data_group.BiasVoltageHist, HIST_BIAS_MEAS_UNIT)
+    bias_voltage_errors = np.full_like(bias_voltages, fill_value=np.nan)
 
-        for col, row in np.ndindex(GENERAL_PIXCAP_SHAPE):
-            kwargs['fit_description_text'] = ' for Pixel ({col},{row})'.format(col=col, row=row)
-            # make sure the provided data is useful for further investigation.
-            if not np.all(np.isfinite(physical_dimensions_data[col, row])):
-                continue
-            pixel_cap_data = cap_data[col, row]
-            pixel_cap_error_data = cap_error_data[col, row]
-            pixel_area = pixel_areas[col, row]
-            if not np.all(np.isfinite(pixel_cap_data)):
-                continue
-            doping_result_storage.set_pixel(row, col)
-            entry["row"] = row
-            entry["col"] = col
+    for col, row in np.ndindex(GENERAL_PIXCAP_SHAPE):
+        propagate_kwargs['fit_description_text'] = ' for Pixel ({col},{row})'.format(col=col, row=row)
+        # make sure the provided data is useful for further investigation.
+        if not np.all(np.isfinite(physical_dimensions_data[col, row])):
+            continue
+        pixel_cap_data = cap_data[col, row]
+        pixel_cap_error_data = cap_error_data[col, row]
+        pixel_area = pixel_areas[col, row]
+        if not np.all(np.isfinite(pixel_cap_data)):
+            continue
+        doping_result_storage.set_pixel(row, col)
+        entry["row"] = row
+        entry["col"] = col
 
-            Neff, depletion_width_data, pos_min = analyze_doping_profile(bias_voltages, bias_voltage_errors,
-                                                                         doping_result_storage, entry, NA / 2, V_bi,
-                                                                         pixel_area, pixel_cap_data,
-                                                                         pixel_cap_error_data,
-                                                                         use_kafe2=use_kafe2,
-                                                                         plot=plot, apply_contours=apply_contours,
-                                                                         fit_plot_pdf=output_pdf, **kwargs)
+        n_eff, depletion_width_data, pos_min = analyze_doping_profile(bias_voltages, bias_voltage_errors,
+                                                                      doping_result_storage, entry, NA / 2, v_bi,
+                                                                      pixel_area, pixel_cap_data,
+                                                                      pixel_cap_error_data, **propagate_kwargs)
 
-            if kwargs.get("verbose", False):
-                print(
-                    f"The minimum concentration is {Neff[pos_min]} and depth {depletion_width_data[pos_min]} for pixel ({col}, {row})")
+        if kwargs.get("verbose", False):
+            msg = "The minimum concentration is {nm} and depth {dep_min} for pixel ({col}, {row})"
+            print(msg.format(nm=n_eff[pos_min], dep_min=depletion_width_data[pos_min], col=col, row=row))
 
-        # save the computed information about the depletion behaviour
-        assert isinstance(analysis_group, tb.Group)
-        create_carray(file_h5, where=analysis_group, name="DepletionWidth",
-                      title="Depletion width from the pixel capacitance",
-                      filters=GLOBAL_FILTERS, obj=doping_result_storage.depletion_width_plate, unit="um")
-        create_carray(file_h5, where=analysis_group, name="DepletionWidthErr",
-                      title="Uncertainty of the depletion width from the pixel capacitance",
-                      filters=GLOBAL_FILTERS, obj=doping_result_storage.depletion_width_plate_error, unit="um")
+    # save the computed information about the depletion behaviour
+    create_carray(file_h5, where=analysis_group, name="DepletionWidth",
+                  title="Depletion width from the pixel capacitance",
+                  filters=GLOBAL_FILTERS, obj=doping_result_storage.depletion_width_plate, unit="um")
+    create_carray(file_h5, where=analysis_group, name="DepletionWidthErr",
+                  title="Uncertainty of the depletion width from the pixel capacitance",
+                  filters=GLOBAL_FILTERS, obj=doping_result_storage.depletion_width_plate_error, unit="um")
 
-        create_carray(file_h5, where=analysis_group, name="DepletionParameters",
-                      title="Depletion Parameters from fitting the depletion width",
-                      filters=GLOBAL_FILTERS, obj=doping_result_storage.depletion_fit_parameter_table,
-                      unit="cm^-3; cm^-3; V")
-        create_carray(file_h5, where=analysis_group, name="DepletionErrors",
-                      title="Depletion Parameters from fitting the depletion width",
-                      filters=GLOBAL_FILTERS, obj=doping_result_storage.depletion_fit_parameter_error_table,
-                      unit="cm^-3; cm^-3; V")
-        create_carray(file_h5, where=analysis_group, name="DepletionCovariance",
-                      title="Covariance matrices for Depletion Parameters from fitting the depletion width",
-                      filters=GLOBAL_FILTERS, obj=doping_result_storage.depletion_fit_covariance_table,
-                      unit="{{cm^-6, cm^-6, cm^-3 V},{cm^-6, cm^-6, cm^-3 V},{V cm^-3, V cm^-3, V^2}}")
-        create_carray(file_h5, where=analysis_group, name="DepletionEffDoping",
-                      title="Data for the effective doping from the cv-analysis",
-                      filters=GLOBAL_FILTERS, obj=doping_result_storage.effective_doping_table, unit="cm^-3")
-        file_h5.flush()
-        # TODO: is the unit correct?
+    create_carray(file_h5, where=analysis_group, name="DepletionParameters",
+                  title="Depletion Parameters from fitting the depletion width",
+                  filters=GLOBAL_FILTERS, obj=doping_result_storage.depletion_fit_parameter_table,
+                  unit="cm^-3; cm^-3; V")
+    create_carray(file_h5, where=analysis_group, name="DepletionErrors",
+                  title="Depletion Parameters from fitting the depletion width",
+                  filters=GLOBAL_FILTERS, obj=doping_result_storage.depletion_fit_parameter_error_table,
+                  unit="cm^-3; cm^-3; V")
+    create_carray(file_h5, where=analysis_group, name="DepletionCovariance",
+                  title="Covariance matrices for Depletion Parameters from fitting the depletion width",
+                  filters=GLOBAL_FILTERS, obj=doping_result_storage.depletion_fit_covariance_table,
+                  unit="{{cm^-6, cm^-6, cm^-3 V},{cm^-6, cm^-6, cm^-3 V},{V cm^-3, V cm^-3, V^2}}")
+    create_carray(file_h5, where=analysis_group, name="DepletionEffDoping",
+                  title="Data for the effective doping from the cv-analysis",
+                  filters=GLOBAL_FILTERS, obj=doping_result_storage.effective_doping_table, unit="cm^-3")
+    file_h5.flush()
+    # TODO: is the unit correct?
+
+
+def depletion_delegation_impl(cap_data, cap_error_data, first_lower, first_upper, second_lower, second_upper,
+                              fit_result_storage: DepletionArrayStore, voltage_data: Union[np.ndarray, tb.CArray],
+                              **kwargs):
+    """
+    depletion_delegate_impl
+
+    @author Dominik Fischer
+    @date 2026-05-07
+
+    Implementation of the pixel-whise depletion voltage estimation from a provided C-V characterization.
+
+    :param cap_data: capacitance data from the characterization.
+    :param cap_error_data: uncertainties of the capacitance data from the characterization.
+    :param first_lower: lower bound of the first fit section (high voltage limit) to estimate the depletion voltage of
+        the pixel.
+    :param first_upper: upper bound of the first fit section (high voltage limit) to estimate the depletion voltage of
+        the pixel.
+    :param second_lower: lower bound of the second fit section (low voltage limit) to estimate the depletion voltage of
+        the pixel.
+    :param second_upper: upper bound of the second fit section (low voltage limit) to estimate the depletion voltage of
+        the pixel.
+    :param fit_result_storage: DataStorage object for intermediate storage of fit results and depletion parameters
+    :param voltage_data: data of the applied HV voltages
+    :param kwargs: further keyword arguments to be propagated to functions/implementations.
+    :key use_kafe2: boolean, False, indicates whether kafe2 is used for the fit.
+    :key apply_contours: boolean, indicates whether to determine the contours and try to plot them.
+    :key plot: boolean, False, indicates whether to plot the data. AN output PDF object could be submitted here
+         instead of an explicitly created one.
+    :key fit_plot_pdf: PDF object to save the fit figures to.
+    :key verbose: boolean, indicating whether to use verbose output of the depletion voltages.
+    """
+    kwargs.setdefault("verbose", False)
+    for ii, jj in np.ndindex(GENERAL_PIXCAP_SHAPE):
+        pixel_cap_data = cap_data[ii, jj, :]
+        pixel_cap_error_data = cap_error_data[ii, jj, :]
+        # could only perform the analysis for pixels with trustable measurements.
+        if np.any(~np.isfinite(pixel_cap_data)):
+            continue
+        fit_result_storage.set_pixel(jj, ii)
+        analyze_pixel_depletion(first_lower, first_upper, pixel_cap_data, pixel_cap_error_data, second_lower,
+                                second_upper, voltage_data, fit_result_storage,
+                                fit_description_text=" for Pixel ({col},{row})".format(col=ii, row=jj),
+                                **kwargs)
 
 
 DOPING_RESULT_TYPE = Tuple[np.ndarray, np.ndarray, int]
@@ -951,7 +923,7 @@ def analyze_doping_profile(bias_voltages: np.ndarray,
     # this model fits may fail due to two indistinguishable parameters.
     if use_kafe2:
         from kafe2 import XYFit, XYContainer
-        assert isinstance(bias_voltages, np.ndarray) or isinstance(bias_voltages, tb.CArray)
+        assert isinstance(bias_voltages, np.ndarray)
         xy_data = XYContainer(x_data=bias_voltages, y_data=depletion_width_data)
         xy_data.add_error(axis='y', err_val=depletion_width_error_data)
         if np.all(bias_voltage_errors[np.isfinite(bias_voltages)]):
@@ -1030,6 +1002,14 @@ def analyze_pixel_depletion(first_lower, first_upper,
                             voltage_data: TABLES_LEAF_COMPAT_TYPE,
                             result: DepletionDataStore, **kwargs):
     """
+    analyze_pixel_depletion
+
+    @author Dominik Fischer
+    @date 2026-05-07
+
+    Helper function to perform the investigation of the depletion voltage for a single pixel.
+    The function does not need to known which pixel is currently investigated which enables the usage of
+    for distributions of the capacitance over the whole sensor.
 
     :param first_upper: upper limit of the first fit range for the high voltage limit of the capacitance behaviour
         to estimate the depletion voltage of the pixel.
@@ -1044,14 +1024,15 @@ def analyze_pixel_depletion(first_lower, first_upper,
     :param voltage_data: array of the biasing HV voltages (with the correct sign)
     :param result: data store container to write the results back
     :param kwargs: further keyword arguments for fitting and output.
+    :key fit_description_text: text describing the fit performed for usage within the plot handler of the fits.
+    :key use_kafe2: boolean, False, indicates whether kafe2 is used for the fit.
+    :key apply_contours: boolean, indicates whether to determine the contours and try to plot them.
+    :key plot: boolean, False, indicates whether to plot the data. AN output PDF object could be submitted here
+         instead of an explicitly created one.
+    :key fit_plot_pdf: PDF object to save the fit figures to.
     :key verbose: boolean, indicating whether to use verbose output of the depletion voltages.
     """
     # extract the additional parameters for advanced fitting procedures
-    use_kafe2 = kwargs.pop("use_kafe2", False)
-    apply_contours = kwargs.pop("apply_contours", False)
-    plot = kwargs.pop("plot", False)
-    output_pdf = kwargs.pop("fit_plot_pdf", None)
-    fit_description_text = kwargs.pop("fit_description_text", "")
     verbose_output = kwargs.pop("verbose", False)
     # extract the information about the depletion voltage
     assert not isinstance(voltage_data, tb.Leaf)
@@ -1076,121 +1057,13 @@ def analyze_pixel_depletion(first_lower, first_upper,
     second_cap_error_data = effective_capacitance_error_data[second_section_mask]
 
     # perform fits to the two boundary regions specified to estimate the two distinct behaviours.
-    if np.all(np.isfinite(first_cap_error_data)):
-        if use_kafe2:
-            # perform the fit
-            from kafe2 import XYContainer, XYFit
-            data_container = XYContainer(first_voltage_data, first_cap_data)
-            data_container.add_error(axis='y', err_val=first_cap_error_data)
-            m = XYFit(data_container, model_function=depletion_model)
-            m.do_fit()
+    first_dep_cov, first_dep_errors, first_dep_parameters = get_depletion_fit(first_cap_data, first_cap_error_data,
+                                                                              first_voltage_data, "First",
+                                                                              **kwargs)
 
-            # extract the fit parameters
-            assert m.did_fit
-            first_dep_parameters = np.array([m.parameter_values[0], m.parameter_values[1]])
-            first_dep_errors = np.array([m.parameter_errors[0], m.parameter_errors[1]])
-            first_dep_cov = m.parameter_cov_mat
-            assert first_dep_cov is not None
-            if plot:
-                handle_kafe2_advanced_options(m, apply_contours, "U in V", "\\frac{{1}}{{C^2}}",
-                                              "First Fit{}".format(fit_description_text),
-                                              output_pdf,
-                                              "First Contour{}".format(fit_description_text))
-
-        else:
-            # perform the fit
-            from iminuit import Minuit
-            # noinspection PyProtectedMember
-            from iminuit.cost import LeastSquares, Model
-            assert isinstance(depletion_model, Model)
-            cost = LeastSquares(first_voltage_data, first_cap_data, first_cap_error_data, depletion_model)
-            m = Minuit(cost, a=1, b=0)
-            m.migrad()
-            m.hesse()
-
-            # extract the parameters
-            first_dep_parameters = np.array([m.values['a'], m.values['b']])
-            first_dep_errors = np.array([m.errors['a'], m.errors['b']])
-            first_dep_cov = m.covariance
-            if plot:
-                handle_minuit_advanced_options(m, apply_contours, "$U$ in \\unit{{\\volt}}", "$\\frac{{1}}{{C^2}}$",
-                                               "First Fit{}".format(fit_description_text),
-                                               output_pdf,
-                                               "First Contour{}".format(fit_description_text))
-            try:
-                assert first_dep_cov is not None
-            except AssertionError:
-                print(m.valid)
-                print(m.fmin)
-                from matplotlib import pyplot as plt
-                plt.close('all')
-                plt.errorbar(first_voltage_data, first_cap_data, yerr=first_cap_error_data, )
-                plt.show()
-                print(first_voltage_data.shape)
-                print(first_cap_data.shape)
-                print(first_cap_error_data.shape)
-                print(voltage_data)
-                raise
-    else:
-        first_result = np.polyfit(first_voltage_data, first_cap_data, deg=1, cov=True)
-
-        # extract the parameters and fit results.
-        first_dep_parameters = np.asarray(first_result[0])
-        first_dep_cov = np.asarray(first_result[1])
-        first_dep_errors = np.sqrt(np.diag(first_dep_cov))
-        assert first_dep_cov is not None
-
-    if np.all(np.isfinite(second_cap_error_data)):
-        if use_kafe2:
-            # perform the fit
-            from kafe2 import XYContainer, XYFit
-            data_container = XYContainer(second_voltage_data, second_cap_data)
-            data_container.add_error(axis='y', err_val=second_cap_error_data)
-            m = XYFit(data_container, model_function=depletion_model)
-            m.do_fit()
-
-            # extract the fit parameters
-            assert m.did_fit
-            second_dep_parameters = np.array([m.parameter_values[0], m.parameter_values[1]])
-            second_dep_errors = np.array([m.parameter_errors[0], m.parameter_errors[1]])
-            second_dep_cov = m.parameter_cov_mat
-            assert second_dep_cov is not None
-            if plot:
-                handle_kafe2_advanced_options(m, apply_contours, "U in V", "\\frac{{1}}{{C^2}}",
-                                              "Second Fit{}".format(fit_description_text),
-                                              output_pdf,
-                                              "Second Contour{}".format(fit_description_text))
-
-        else:
-            # perform the fit
-            from iminuit import Minuit
-            # noinspection PyProtectedMember
-            from iminuit.cost import LeastSquares, Model
-            assert isinstance(depletion_model, Model)
-            cost = LeastSquares(second_voltage_data, second_cap_data, second_cap_error_data, depletion_model)
-            m = Minuit(cost, a=1, b=0)
-            m.migrad()
-            m.hesse()
-
-            # extract the parameters
-            second_dep_parameters = np.array([m.values['a'], m.values['b']])
-            second_dep_errors = np.array([m.errors['a'], m.errors['b']])
-            second_dep_cov = m.covariance
-            assert second_dep_cov is not None
-            if plot:
-                handle_minuit_advanced_options(m, apply_contours, "$U$ in \\unit{{\\volt}}", "$\\frac{{1}}{{C^2}}$",
-                                               "Second Fit{}".format(fit_description_text),
-                                               output_pdf,
-                                               "Second Contour{}".format(fit_description_text))
-        # MARK: What about an analysis of the fits convergence properties.
-    else:
-        second_result = np.polyfit(second_voltage_data, second_cap_data, deg=1, cov=True)
-
-        # extract the parameters and fit results.
-        second_dep_parameters = np.asarray(second_result[0])
-        second_dep_cov = np.asarray(second_result[1])
-        second_dep_errors = np.sqrt(np.diag(second_dep_cov))
-        assert second_dep_cov is not None
+    second_dep_cov, second_dep_errors, second_dep_parameters = get_depletion_fit(second_cap_data, second_cap_error_data,
+                                                                                 second_voltage_data, "Second",
+                                                                                 **kwargs)
 
     # estimate the depletion voltage
     d = first_dep_parameters[1]
@@ -1207,14 +1080,10 @@ def analyze_pixel_depletion(first_lower, first_upper,
     ])
 
     # combine both cov matrices into a single one:
-    full_cov = np.full((4, 4), fill_value=0)
     full_cov_2 = np.zeros((4, 4))  # cross correlations between the two fits are not known
-    assert full_cov is not None
     assert full_cov_2 is not None
     assert first_dep_cov is not None
     assert second_dep_cov is not None
-    full_cov[:2, :2] = first_dep_cov
-    full_cov[2:, 2:] = second_dep_cov
     full_cov_2[:2, :2] = second_dep_cov
     full_cov_2[2:, 2:] = second_dep_cov
 
@@ -1230,6 +1099,104 @@ def analyze_pixel_depletion(first_lower, first_upper,
     result.store_data("fit_error_first", first_dep_errors)
     result.store_data("fit_error_second", second_dep_errors)
     result.flush_data()
+
+
+def get_depletion_fit(cap_data: np.ndarray, cap_error_data: np.ndarray, voltage_data: np.ndarray,
+                      fit_reference, **kwargs) -> tuple[np.ndarray, np.ndarray, np.ndarray]:
+    """
+    get_depletion_fit
+
+    @author Dominik Fischer
+    @date 2026-05-07
+
+    performs the necessary fits to estimate the depletion voltage from to linear fits to the capacitance
+    characterization.
+
+
+    :param cap_data: capacitance data from the characterization for this fit section.
+    :param cap_error_data: uncertainties of the capacitance data from the characterization for this fit section.
+    :param voltage_data: data of the applied HV voltages for this fit section.
+    :param fit_reference: identifieng the fit section for which the fit is performed.
+    :key fit_description_text: text describing the fit performed for usage within the plot handler of the fits.
+    :key use_kafe2: boolean, False, indicates whether kafe2 is used for the fit.
+    :key apply_contours: boolean, indicates whether to determine the contours and try to plot them.
+    :key plot: boolean, False, indicates whether to plot the data. AN output PDF object could be submitted here
+         instead of an explicitly created one.
+    :key fit_plot_pdf: PDF object to save the fit figures to.
+    :return: covariance_matrix, fit parameter errors, fit parameter values
+    """
+    # extract the additional parameters for advanced fitting procedures
+    use_kafe2 = kwargs.pop("use_kafe2", False)
+    apply_contours = kwargs.pop("apply_contours", False)
+    plot = kwargs.pop("plot", False)
+    output_pdf = kwargs.pop("fit_plot_pdf", None)
+    fit_description_text = kwargs.pop("fit_description_text", "")
+    if np.all(np.isfinite(cap_error_data)):
+        if use_kafe2:
+            # perform the fit
+            from kafe2 import XYContainer, XYFit
+            data_container = XYContainer(voltage_data, cap_data)
+            data_container.add_error(axis='y', err_val=cap_error_data)
+            m = XYFit(data_container, model_function=depletion_model)
+            m.do_fit()
+
+            # extract the fit parameters
+            assert m.did_fit
+            first_dep_parameters = np.array([m.parameter_values[0], m.parameter_values[1]])
+            first_dep_errors = np.array([m.parameter_errors[0], m.parameter_errors[1]])
+            first_dep_cov = m.parameter_cov_mat
+            assert first_dep_cov is not None
+            if plot:
+                handle_kafe2_advanced_options(m, apply_contours, "U in V", "\\frac{{1}}{{C^2}}",
+                                              "{} Fit{}".format(fit_reference, fit_description_text),
+                                              output_pdf,
+                                              "{} Contour{}".format(fit_reference, fit_description_text))
+
+        else:
+            # perform the fit
+            from iminuit import Minuit
+            # noinspection PyProtectedMember
+            from iminuit.cost import LeastSquares, Model
+            assert isinstance(depletion_model, Model)
+            cost = LeastSquares(voltage_data, cap_data, cap_error_data, depletion_model)
+            m = Minuit(cost, a=1, b=0)
+            m.migrad()
+            m.hesse()
+
+            # extract the parameters
+            first_dep_parameters = np.array([m.values['a'], m.values['b']])
+            first_dep_errors = np.array([m.errors['a'], m.errors['b']])
+            first_dep_cov = m.covariance
+            if plot:
+                handle_minuit_advanced_options(m, apply_contours, "$U$ in \\unit{{\\volt}}", "$\\frac{{1}}{{C^2}}$",
+                                               "{} Fit{}".format(fit_reference, fit_description_text),
+                                               output_pdf,
+                                               "{} Contour{}".format(fit_reference, fit_description_text))
+            try:
+                assert first_dep_cov is not None
+            except AssertionError:
+                print(m.valid)
+                print(m.fmin)
+                from matplotlib import pyplot as plt
+                plt.close('all')
+                plt.errorbar(voltage_data, cap_data, yerr=cap_error_data, )
+                plt.show()
+                print(voltage_data.shape)
+                print(cap_data.shape)
+                print(cap_error_data.shape)
+                raise
+    else:
+        first_result = np.polyfit(voltage_data, cap_data, deg=1, cov=True)
+
+        # extract the parameters and fit results.
+        first_dep_parameters = np.asarray(first_result[0])
+        first_dep_cov = np.asarray(first_result[1])
+        first_dep_errors = np.sqrt(np.diag(first_dep_cov))
+        assert first_dep_cov is not None
+    assert isinstance(first_dep_parameters, np.ndarray)
+    assert isinstance(first_dep_errors, np.ndarray)
+    assert isinstance(first_dep_cov, np.ndarray)
+    return first_dep_cov, first_dep_errors, first_dep_parameters
 
 
 def effective_doping(capacitance, bias_voltages, diode_area=None) -> np.ndarray:
@@ -1342,7 +1309,9 @@ def analyze_capacitance_distribution_delegate(analysis_group: Optional[tb.Group]
     if cap_hist is None or not isinstance(cap_hist, np.ndarray):
         assert analysis_group is not None
         cap_hist = check_leaf_unit(analysis_group.HistCap, HIST_CAP_UNIT)
-    fig, ax = plt.subplots()
+    from matplotlib import rcParams
+    cv_height, cv_width = rcParams['figure.figsize']
+    fig, ax = plt.subplots(figsize=(cv_width, cv_height))
     hist_cap_hist = evaluate_pixel_mask(cap_hist, **kwargs)
     temp_hist_back_data = hist_cap_hist[~np.isnan(hist_cap_hist)].reshape(-1) * CAPACITANCE_CONVERSION_FACTOR
     hist_data, bins, _ = ax.hist(temp_hist_back_data,
@@ -1434,8 +1403,11 @@ def analyze_capacitance_distribution_delegate(analysis_group: Optional[tb.Group]
     ax.set_xlabel(HIST_PIX_CAP_LABEL)
     ax.grid()
     ax.legend(
-        title=f"GoF = {hypo_test['x']:.4f}\nndf = {hypo_test['ndf']: .4f}\np = {hypo_test['p']: .4f}\nu = {mean_value:.3f}+-{mean_error:.3f}\ns = {std_value:.3f}+-{std_error:.3f}")
-    if output_pdf is None:
+        title=f"GoF = {hypo_test['x']:.4f}\nndf = {hypo_test['ndf']: .4f}\np = {hypo_test['p']: .4f}\nu = "
+              f"{mean_value:.3f}+-{mean_error:.3f}\ns = {std_value:.3f}+-{std_error:.3f}")
+    if kwargs.get('no_plot', False):
+        plt.close(fig)
+    elif output_pdf is None:
         plt.show()
     else:
         output_pdf.savefig(fig, bbox_inches='tight')
@@ -1570,18 +1542,23 @@ if __name__ == '__main__':
                                      corrected_distribution=False,
                                      exclude_test_cap=True, use_kafe2=False,
                                      fit_plot_pdf_name="Bare_analysis_parasitic.pdf")
-    analyze_data(raw_data='Reference_R13_Scan.h5', base_path="Reference/R13/unbiased_12_full", **bare_correction_args,
-                 is_advanced=True)
-    analyze_data(raw_data='R13-Interpixel_Scan.h5', base_path="Reference/R13/demo_measurement_65_unbiased_1_discharge",
-                 is_inter_pixel=True, is_advanced=True)
-    # analyze_data(raw_data='Data/r13-measurement/R13_Full_Scan_80V.h5', is_advanced=False, **bare_correction_args)
-    # plot_data(interpreted_data='Data/r13-measurement/R13_Full_Scan_80V.h5', suffix="general_data_run_corrected", use_group=False, use_corrected=True)
-    # analyse_data(raw_data='Data/r13-measurement/R13_BIAS_CV_COMBI_6.h5', is_advanced=False, is_cv=True,
-    #              first_boundaries=(-100, -40),
-    #              second_boundaries=(-10, 0), apply_doping=True, chip_group_name="sensor", use_corrected=True, plot=True, apply_contours=False,
-    #              fit_plot_pdf_name="r13-CV_COMBI_6_C_V_Fits.pdf",
-    #              **bare_correction_args)
-    # plot_combined_data(interpreted_data='Data/r13-measurement/R13_BIAS_CV_COMBI_6.h5', first_lower=-100,
-    #                    first_upper=-40, second_lower=-8, second_upper=0, use_corrected=True, apply_doping=True)
-    # analyze_data(raw_data="Reference_Evelyn_Scan.h5", base_path="Reference/E1/unbiased_1_test", is_advanced=True)
-    # analyze_data(raw_data='Bare_Repeat_2_Scan.h5', base_path="Reference/bare/unbiased_8", is_advanced=True, is_cv=False, full_model=False)
+    analyze_data(raw_data='pixcap65/Data/r13-measurement/R13_Full_Scan_80V.h5', is_advanced=True,
+                 **bare_correction_args)
+    # analyze_data(raw_data='R13-Interpixel_Scan.h5',
+    #              base_path="Reference/R13/demo_measurement_65_unbiased_1_discharge",
+    #              is_inter_pixel=True, is_advanced=True)
+    with PdfPages("New_2_Scan_CV_refined_distribution.pdf") as pdf:
+        analyze_data(raw_data='New_2_Scan.h5', base_path="ATLAS_Itk/X2/C_V_Characteristic_refined", is_advanced=True,
+                     is_cv=True,
+                     first_boundaries=(-60, -20), second_boundaries=(-5, 0), use_corrected=True, apply_doping=True,
+                     chip_group_name="ATLAS_Itk/X2/sensor", distribution=True, set_parasitic=False,
+                     distribution_output_pdf=pdf, **bare_correction_args)
+
+    analyze_data(raw_data='pixcap65/Data/New_1_Initial_6_Scan.h5', base_path="ATLAS ITk/C_V_Characteristic",
+                 is_advanced=False, is_cv=True, use_corrected=True, apply_doping=True,
+                 chip_group_name="ATLAS ITk/sensor",
+                 first_boundaries=[(-60, -40), (-80, -75)], second_boundaries=[(-5, 0), (-70, -65)],
+                 **bare_correction_args)
+    analyze_data(raw_data='New_2_Scan.h5', base_path="ATLAS_Itk/X2/C_V_Characteristic", is_advanced=True, is_cv=True,
+                 first_boundaries=[(-60, -40), (-80, -75)], second_boundaries=[(-5, 0), (-70, -65)], use_corrected=True,
+                 **bare_correction_args)

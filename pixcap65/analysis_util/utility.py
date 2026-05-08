@@ -2,11 +2,12 @@
 This file contains some utilities needed for the analysis and the plotting.
 """
 
+from typing import Union, Mapping
+
 import numpy as np
 import tables as tb
 from tables import File
 from tables.group import RootGroup
-from typing import Union, Mapping
 
 from pixcap65.utility.utils_2 import walk_to_node, UNITS_ATTRIBUTE_KEY, prevent_group_mix_up
 
@@ -85,7 +86,7 @@ def transform_covariance(cov):
                 "parameters.")
 
 
-def str_join(delimiter: str | bytes, *args) -> str | bytes:
+def str_join(delimiter: str, *args) -> str:
     """
     str_join
 
@@ -99,7 +100,7 @@ def str_join(delimiter: str | bytes, *args) -> str | bytes:
     return delimiter.join(args)
 
 
-def check_leaf_unit(leaf: TABLES_LEAF_TYPE, unit: str) -> TABLES_LEAF_COMPAT_TYPE:
+def check_leaf_unit(leaf: TABLES_LEAF_TYPE, unit: str) -> np.ndarray:
     """
     check_leaf_unit(leaf, unit)
 
@@ -115,11 +116,31 @@ def check_leaf_unit(leaf: TABLES_LEAF_TYPE, unit: str) -> TABLES_LEAF_COMPAT_TYP
     if UNITS_ATTRIBUTE_KEY not in leaf.attrs or leaf.attrs[UNITS_ATTRIBUTE_KEY] != unit:
         raise AssertionError
     result = leaf[:]
-    assert isinstance(result, TABLES_LEAF_COMPAT_TYPE)
+    assert isinstance(result, np.ndarray)
     return result
 
 
-def handle_kafe2_advanced_options(fit_object, apply_contour, x_label, y_label, title, pdf, contours_title=None):
+def handle_fitter_stub(fit_object, apply_contour, x_label, y_label, title, pdf, contours_title=None, fig_title=None):
+    # This is just a stub method for simplifing the fit plotting
+    pass
+
+
+def handle_fitter_advanced_options(fit_object, apply_contour, x_label, y_label, title, pdf, contours_title=None,
+                                   fig_title=None):
+    from kafe2 import FitBase
+    from iminuit import Minuit
+    if isinstance(fit_object, FitBase):
+        handle_kafe2_advanced_options(fit_object, apply_contour, x_label, y_label, title, pdf, contours_title,
+                                      fig_title)
+    elif isinstance(fit_object, Minuit):
+        handle_minuit_advanced_options(fit_object, apply_contour, x_label, y_label, title, pdf, contours_title,
+                                       fig_title)
+    else:
+        raise TypeError("Fitting object is from an unexpected type '{}'.".format(type(fit_object)))
+
+
+def handle_kafe2_advanced_options(fit_object, apply_contour, x_label, y_label, title, pdf, contours_title=None,
+                                  fit_title=None):
     """
     handle_kafe2_advanced_options
 
@@ -174,7 +195,7 @@ def extract_iminuit_cost_object(fit):
 
 
 def handle_minuit_advanced_options(fit_object, apply_contour, x_label, y_label, title, pdf,
-                                   contours_title=None):
+                                   contours_title=None, fig_title=None):
     """
     handle_iminuit_advanced_options
 
@@ -194,7 +215,6 @@ def handle_minuit_advanced_options(fit_object, apply_contour, x_label, y_label, 
     from iminuit import Minuit
     # noinspection PyProtectedMember
     from iminuit.minuit import _cl_to_errordef
-    from iminuit.cost import BinnedNLL
     assert isinstance(fit_object, Minuit)
     fig, ax = plt.subplots()
     ax.set_title(title)
@@ -223,6 +243,8 @@ def handle_minuit_advanced_options(fit_object, apply_contour, x_label, y_label, 
         except:
             pass
 
+    if fig_title is not None:
+        fig.suptitle(fig_title)
     pdf.savefig(fig, bbox_inches='tight')
     plt.close(fig)
     cls = [0.68, 0.9, 0.99]
@@ -259,6 +281,7 @@ def handle_minuit_advanced_options(fit_object, apply_contour, x_label, y_label, 
 
         fig.suptitle(contours_title)
         pdf.savefig(fig, bbox_inches='tight')
+        plt.close(fig)
         fig, ax = fit_object.draw_mnmatrix(cl=cls)
 
         # fit_object.draw_mncontour()
@@ -284,7 +307,7 @@ def investigate_fit_convergence(fitter):
     regular_cost = cost_value / ndf if cost_value is not None else -1
     p_value = 1 - chi2.cdf(regular_cost, df=ndf)
     convergence = dict(x=cost_value, xn=regular_cost, ndf=ndf, p=p_value)
-    print(convergence)
+    # print(convergence)
     return convergence
 
 
@@ -352,6 +375,29 @@ def get_analysis_group(base_group, **kwargs):
         return base_group.analysis_correction
 
     return base_group.analysis
+
+
+class HandleFitterStubClass:
+    def __call__(self, fit_object, apply_contour, x_label, y_label, title, pdf, contours_title=None, fig_title=None):
+        return handle_fitter_stub(fit_object, apply_contour, x_label, y_label, title, pdf, contours_title, fig_title)
+
+
+class HandleFitterGeneral(HandleFitterStubClass):
+    def __call__(self, fit_object, apply_contour, x_label, y_label, title, pdf, contours_title=None, fig_title=None):
+        return handle_fitter_advanced_options(fit_object, apply_contour, x_label, y_label, title, pdf, contours_title,
+                                              fig_title)
+
+
+class HandleFitterKafe2(HandleFitterStubClass):
+    def __call__(self, fit_object, apply_contour, x_label, y_label, title, pdf, contours_title=None, fig_title=None):
+        return handle_kafe2_advanced_options(fit_object, apply_contour, x_label, y_label, title, pdf, contours_title,
+                                             fig_title)
+
+
+class HandleFitterMinuit(HandleFitterStubClass):
+    def __call__(self, fit_object, apply_contour, x_label, y_label, title, pdf, contours_title=None, fig_title=None):
+        return handle_minuit_advanced_options(fit_object, apply_contour, x_label, y_label, title, pdf, contours_title,
+                                              fig_title)
 
 
 # endregion: Utility functions

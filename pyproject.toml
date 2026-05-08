@@ -29,7 +29,7 @@ dependencies = [
     "bitarray; python_version < '3.5' and python_version >= '3'",
     "coloredlogs",
     # these declaration is only for the package index!
-    "basil-daq < 3.2",
+    "basil-daq <= 3.2.0.dev0",
     # only to be used for the installs and not for defining the dependency for the package index!
     # "basil-daq @ git+https:////github.com/SiLab-Bonn/basil.git@502a999eb5075e04850f7a481d2668726583c290 ; python_version >= '3.9'",
     # "basil-daq==3.1.0; platform_system == 'Windows' or python_version < '3.9'",
@@ -43,9 +43,9 @@ Issues = "https://github.com/SiLab-Bonn/pixcap65/issues/"
 # no documentation present.
 
 [project.scripts]
-# pixcap_inter_cap = "pixcap65.pixcap_65_test_inter_cap"
-# pixcap_total_cap = "pixcap65.pixcap_65_test_total_cap"
-# pixcap_line = "pixcap65.pixcap.pixcap_65_test_load_line"
+pixcap_inter_cap = "pixcap65.pixcap_65_test_inter_cap"
+pixcap_total_cap = "pixcap65.pixcap_65_test_total_cap"
+pixcap_line = "pixcap65.pixcap.pixcap_65_test_load_line"
 
 [project.optional-dependencies]
 dut = [
@@ -78,11 +78,11 @@ visualization = [
 requires = ["setuptools >= 77.0.3", "hatchling >= 1.26", "uv_build >= 0.11.7, <0.12.0"]
 build-backend = "setuptools.build_meta"
 # build-backend = "hatchling.build"
-#build-backend = "uv_build"
+# build-backend = "uv_build"
 
 # setuptools configuration
-# [tool.setuptools]
-# include-package-data = true
+[tool.setuptools]
+include-package-data = true
 
 [tool.setuptools.dynamic]
 version = { attr = "pixcap65.pixcap.__version__" }
@@ -92,7 +92,7 @@ pixcap65 = [".gitattributes", ".gitignore", "**.h5"]
 
 [tool.setuptools.packages.find]
 include = ["pixcap65*"]
-exclude = ["tests", "data_local", "Data", "doc", "**full_analysis", "**.h5", "**.pdf"]
+exclude = ["tests", "data_local", "Data", "doc", "**full_analysis", "**.h5", "**.pdf", "legacy"]
 
 # hatch configuration
 [tool.hatch.version]
@@ -115,12 +115,12 @@ exclude = [
 ]
 
 [tool.hatch.envs.hatch-build]
-# installer = "pip"
+installer = "pip"
 
 [tool.uv.build-backend]
 module-name = "pixcap65"
 module-root = ""
-# namespace = true
+namespace = true
 data = ["pixcap65/device"]
 source-exclude = ["doc", "Data", "data_local"]
 
