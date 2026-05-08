@@ -667,7 +667,8 @@ class PixCap65Measurement(object, metaclass=ABCMeta):
     def init_smu(self, voltage_range=1.5, current_limit=0.0001, plc=None, **kwargs):
         if plc is None:
             plc = self.scan_config.get('plc_cycles', 10)
-        self.pixcap.init_smu(self.scan_config[ScanConfigurationKeys.VIN], self.current_sense_range, voltage_range,
+        current_range = kwargs.pop('current_range', self.current_sense_range)
+        self.pixcap.init_smu(self.scan_config[ScanConfigurationKeys.VIN], current_range, voltage_range,
                              current_limit, plc, **kwargs)
 
     def smu_on(self):

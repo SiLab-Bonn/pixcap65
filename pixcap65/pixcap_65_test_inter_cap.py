@@ -11,10 +11,10 @@ from tqdm import tqdm
 
 from pixcap65.analysis_util.utility import HIST_CURRENT_MEAS_UNIT
 from pixcap65.utility.tables_util import set_group_attribute
-from pixcap_65_test_total_cap import PixCap65Measurement, MEASURING_PIXEL_TEXT, \
+from pixcap65.pixcap_65_test_total_cap import PixCap65Measurement, MEASURING_PIXEL_TEXT, \
     _store_scan_par_values
-from utility import pixcap65_constants as c
-from utility.tqdm_logging_utils import logging_redirect_tqdm
+from pixcap65.utility import pixcap65_constants as c
+from pixcap65.utility.tqdm_logging_utils import logging_redirect_tqdm
 
 logging.getLogger().setLevel(logging.INFO)
 logger = logging.getLogger(__name__)
@@ -23,14 +23,14 @@ logger.setLevel(logging.INFO)
 scan_configuration = {
     'start_column': 1,
     'stop_column': 38,
-    'start_row': 5,
+    'start_row': 2,
     'stop_row': 38,
 
     'Vin': 1.0,  # input voltage in V
-    'frequency_range': np.arange(1, 12.1, 0.5),  # .astype(np.float) # [MHz]
+    'frequency_range': np.arange(1.0, 6.1, 0.75),  # .astype(np.float) # [MHz]
     'bias': -80,
 
-    'data_path': "Reference/R13",
+    'data_path': "Reference/R1",
     "out_file_mode": "append",
 }
 
@@ -74,7 +74,7 @@ class Pixcap65InterCap(PixCap65Measurement):
     def configure(self):
         # already done by super-class
         super(Pixcap65InterCap, self).configure()
-        self.init_smu(smu=self.pixcap.vm2_smu_key)
+        self.init_smu(smu=self.pixcap.vm2_smu_key, current_range=0.000001)
         self.init_smu(smu=self.pixcap.vm1_smu_key)
 
         # self.pixcap.seq_init(clk_0='0100', clk_1='0100', clk_2='0001', clk_3='0001')
@@ -226,10 +226,27 @@ class Pixcap65InterCap(PixCap65Measurement):
 
 
 if __name__ == "__main__":
-    output_file = "../R13-Interpixel_Scan.h5"
+    output_file = "../RX-Interpixel_Scan.h5"
     # with Pixcap65InterCap(scan_configuration, output_file) as pix:
     # pix.scan(data_group_spec="demo_measurement_1_80_V")
     from pixcap65.utils import PixCapSetup
 
+    del scan_configuration['bias']
     with PixCapSetup(scan_configuration, output_file, measurement=Pixcap65InterCap) as pix:
-        pix.scan(data_group_spec="demo_measurement_52_biased_80_V_1_charge")
+        pix.pixcap.frequency_settling = 0.4
+        pix.scan(data_group_spec="demo_measurement_1_unbiased_1_discharge")
+
+    scan_configuration['bias'] = -80
+    with PixCapSetup(scan_configuration, output_file, measurement=Pixcap65InterCap) as pix:
+        pix.pixcap.frequency_settling = 0.6
+        pix.scan(data_group_spec="demo_measurement_2_biased_80_V_1_discharge")
+
+    scan_configuration['bias'] = -40
+    with PixCapSetup(scan_configuration, output_file, measurement=Pixcap65InterCap) as pix:
+        pix.pixcap.frequency_settling = 0.4
+        pix.scan(data_group_spec="demo_measurement_3_biased_40_V_1_discharge")
+
+    # scan_configuration['bias'] = -5
+    # with PixCapSetup(scan_configuration, output_file, measurement=Pixcap65InterCap) as pix:
+    #     pix.pixcap.frequency_settling = 0.4
+    #     pix.scan(data_group_spec="demo_measurement_4_biased_05_V_1_discharge")
