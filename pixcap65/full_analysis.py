@@ -31,31 +31,48 @@ if __name__ == '__main__':
     # investigate the bare pixcap ship and it's distribution!
     print("Analyze the Bare samples for calibration of the pixcap chips")
     analyze_data(raw_data='pixcap65/Data/bare-measurement/TEST.h5', is_advanced=False)
+    from matplotlib import pyplot as plt
+    print(plt.get_fignums())
     analyze_data(raw_data='pixcap65/Data/advanced-bare-measurement/TEST.h5', is_advanced=True, is_cv=False)
+    print(plt.get_fignums())
     analyze_data(raw_data='Bare_Repeat_2_Scan.h5', base_path="Reference/bare/unbiased_8", is_advanced=True, is_cv=False,
                  full_model=False)
+    print(plt.get_fignums())
     analyze_capacitance_distribution(raw_data='Bare_Repeat_2_Scan.h5', base_path="Reference/bare/unbiased_8",
                                      corrected_distribution=False,
                                      exclude_test_cap=True, use_kafe2=True,
                                      fit_plot_pdf_name="Bare_analysis_parasitic_kafe2.pdf")
+    print(plt.get_fignums())
     analyze_capacitance_distribution(raw_data='Bare_Repeat_2_Scan.h5', base_path="Reference/bare/unbiased_8",
                                      corrected_distribution=False,
                                      exclude_test_cap=True, use_kafe2=False,
                                      fit_plot_pdf_name="Bare_analysis_parasitic.pdf")
     # investigate the bump capacitance
+    from matplotlib import pyplot as plt
+
+    print(plt.get_fignums())
     with tb.open_file("Bare_Repeat_2_Scan.h5", 'r') as f:
         base_group = get_base_group("Reference/bare/unbiased_8", f)
-        bump_caps = np.concat(base_group.analysis.HistCap[:5, 0], base_group.analysis.HistCap[35:, 0])
-        bump_errors = np.concat(base_group.analysis.HistCapErr[:5, 0], base_group.analysis.HistCapErr[35:, 0])
-        weights = np.reciprocal(bump_errors ** 2)
-        average_bump_cap = np.average(bump_caps, weights=weights)
-        statistical_bump_error = np.shape(bump_errors)[0] / np.sum(weights)
-        parasitic = get_group_attribute(base_group.analysis, "parasitic")
-        parasitic_error = get_group_attribute(base_group.analysis, "parasitic_error")
-        print(f"bump capacitance: ({parasitic - average_bump_cap}+-{statistical_bump_error}+-{parasitic_error})")
+        try:
+            bump_caps = np.concat(
+                (base_group.total_cap.analysis.HistCap[:5, 0], base_group.total_cap.analysis.HistCap[35:, 0],))
+            bump_errors = np.concat(
+                (base_group.total_cap.analysis.HistCapErr[:5, 0], base_group.total_cap.analysis.HistCapErr[35:, 0],))
+            weights = np.reciprocal(bump_errors ** 2)
+            average_bump_cap = np.average(bump_caps, weights=weights)
+            statistical_bump_error = np.shape(bump_errors)[0] / np.sum(weights)
+            parasitic = get_group_attribute(base_group.total_cap.analysis, "parasitic")
+            parasitic_error = get_group_attribute(base_group.total_cap.analysis, "parasitic_error")
+            print(f"bump capacitance: ({parasitic - average_bump_cap}+-{statistical_bump_error}+-{parasitic_error})")
+            print(np.std(bump_caps))
+        except:
+            print(f)
+            raise
 
     # analysis section/calibration
     print("Analyze the R13 reference sample.")
+    from matplotlib import pyplot as plt
+    print(plt.get_fignums())
     analyze_data(raw_data='pixcap65/Data/TEST_2.h5', is_advanced=False)
     analyze_data(raw_data='pixcap65/Data/r13-measurement/data.h5', is_advanced=False, **bare_correction_args)
     analyze_data(raw_data='pixcap65/Data/r13-measurement/TEST.h5', is_advanced=False, **bare_correction_args)
@@ -77,10 +94,16 @@ if __name__ == '__main__':
     analyze_data(raw_data='pixcap65/Data/r13-measurement/R13_Initial_3_Scan.h5', base_path="ATLAS ITk/unbiased_1",
                  is_advanced=True, **bare_correction_args)
     print("Analyze Evelyn reference sample.")
+    from matplotlib import pyplot as plt
+
+    print(plt.get_fignums())
     analyze_data(raw_data="Reference_Evelyn_Scan.h5", base_path="Reference/E1/unbiased_4_full", is_advanced=True,
                  **bare_correction_args)
 
     print("Analyze the ATLAS ITk samples.")
+    from matplotlib import pyplot as plt
+
+    print(plt.get_fignums())
     analyze_data(raw_data='pixcap65/Data/ATLAS ITk/New_1_Initial_2_Scan.h5', base_path="run_1",
                  is_advanced=False, **bare_correction_args)
     analyze_data(raw_data='pixcap65/Data/ATLAS ITk/New_1_Initial_2_Scan.h5', base_path="run_2",
@@ -101,18 +124,29 @@ if __name__ == '__main__':
     analyze_data(raw_data='pixcap65/Data/New_1_Initial_6_Scan.h5', base_path="ATLAS ITk/C_V_Characteristic",
                  is_advanced=False, is_cv=True, use_corrected=True, apply_doping=True,
                  chip_group_name="ATLAS ITk/sensor",
-                 first_boundaries=(-60, -40), second_boundaries=(-5, 0), **bare_correction_args)
+                 first_boundaries=[(-60, -40), (-80, -75)], second_boundaries=[(-5, 0), (-70, -65)],
+                 **bare_correction_args)
     analyze_data(raw_data='pixcap65/Data/New_1_Initial_6_Scan.h5', base_path="ATLAS ITk/full_biased_80_V",
                  is_advanced=True,
                  **bare_correction_args)
 
     print("Analyze the ATLAS sample X2")
+    print("unbiased 1")
+    from matplotlib import pyplot as plt
+    print(plt.get_fignums())
     analyze_data(raw_data='New_2_Scan.h5', base_path="ATLAS_Itk/X2/unbiased_1", is_advanced=True,
                  **bare_correction_args)
+    print("C-V-Characteristic")
+    print(plt.get_fignums())
     analyze_data(raw_data='New_2_Scan.h5', base_path="ATLAS_Itk/X2/C_V_Characteristic", is_advanced=True, is_cv=True,
-                 first_boundaries=(-60, -40), second_boundaries=(-5, 0), use_corrected=True, **bare_correction_args)
+                 first_boundaries=[(-60, -40), (-80, -75)], second_boundaries=[(-5, 0), (-70, -65)], use_corrected=True,
+                 **bare_correction_args)
+    print("biased 80")
+    print(plt.get_fignums())
     analyze_data(raw_data='New_2_Scan.h5', base_path="ATLAS_Itk/X2/biased_80_V", is_advanced=True,
                  **bare_correction_args)
+    print("C-V-Characteristic refined")
+    print(plt.get_fignums())
     with PdfPages("New_2_Scan_CV_refined_distribution.pdf") as pdf:
         analyze_data(raw_data='New_2_Scan.h5', base_path="ATLAS_Itk/X2/C_V_Characteristic_refined", is_advanced=True,
                      is_cv=True,
@@ -218,7 +252,7 @@ if __name__ == '__main__':
                        use_group=True, first_lower=-60, first_upper=-40, second_lower=-5, second_upper=0)
     plot_combined_data(interpreted_data='pixcap65/Data/New_1_Initial_6_Scan.h5',
                        base_path="ATLAS ITk/C_V_Characteristic",
-                       use_group=True, first_lower=-60, first_upper=-40, second_lower=-5, second_upper=0,
+                       use_group=True, first_lower=-60, first_upper=-40, second_lower=-60, second_upper=0,
                        use_corrected=True,
                        apply_doping=True)
     plot_data(interpreted_data='pixcap65/Data/New_1_Initial_6_Scan.h5', base_path="ATLAS ITk/full_biased_80_V",
@@ -236,7 +270,7 @@ if __name__ == '__main__':
     plot_combined_data(interpreted_data='New_2_Scan.h5', base_path="ATLAS_Itk/X2/C_V_Characteristic",
                        use_group=True, first_lower=-60, first_upper=-40, second_lower=-5, second_upper=0)
     plot_combined_data(interpreted_data='New_2_Scan.h5', base_path="ATLAS_Itk/X2/C_V_Characteristic",
-                       use_group=True, first_lower=-60, first_upper=-40, second_lower=-5, second_upper=0,
+                       use_group=True, first_lower=-60, first_upper=-40, second_lower=-60, second_upper=0,
                        use_corrected=True)
     plot_combined_data(interpreted_data='New_2_Scan.h5', base_path="ATLAS_Itk/X2/C_V_Characteristic_refined",
                        use_group=True, first_lower=-60, first_upper=-20, second_lower=-5, second_upper=0)
