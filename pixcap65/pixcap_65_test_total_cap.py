@@ -133,19 +133,19 @@ class ScanConfigurationKeys(StrEnum):
 
 
 scan_configuration = {
-    'start_column': 0,
-    'stop_column': 40,
-    'start_row': 0,
-    'stop_row': 40,
+    'start_column': 20,
+    'stop_column': 22,
+    'start_row': 20,
+    'stop_row': 22,
     # "average_measurements": 30,
     # "bias_average_measurements": 3,
 
     'Vin': 1.0,  # input voltage in V
-    'frequency_range': np.arange(1, 8.1, 0.5),  # frequency sweep in MHz
+    'frequency_range': np.arange(1, 12.1, 0.5),  # frequency sweep in MHz
     # 'bias_range': -1 * np.arange(1, 100.1, 0.5),
     # 'bias': -80.0,   # bias voltage to apply in V
 
-    'data_path': "Reference/E1",
+    'data_path': "Reference/TESTS",
     "out_file_mode": "append",
 }
 
