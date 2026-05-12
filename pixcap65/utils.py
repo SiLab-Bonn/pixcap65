@@ -233,7 +233,7 @@ class PixCapSetup(Dut):
             self["power"].set_enable(0, channel=2)
             self["power"].set_enable(0, channel=3)
             import serial
-            
+
 
         except:
             logger.error("Failed to clean up the setup handling.")
