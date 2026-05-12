@@ -19,5 +19,12 @@ PresentationNotes.MD
 /pixcap65/Data/**
 /pixcap65/Data.backup-2026-04-26
 !pixcap65/device
+
+# environment manager
+uv.lock
+.venv*
+
+# documentation building/docutils/sphinx
+doc/docs/_build
 !doc
 !doc/*.pdf
