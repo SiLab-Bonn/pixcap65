@@ -2,9 +2,12 @@ numpy>=2.3
 matplotlib
 tables
 pyyaml
+
+
 # basil_daq@git+https://github.com/SiLab-Bonn/basil.git
 # this approach is working but it requires it to be present
--e ../basil-pixcap
+# -e ../basil-pixcap
+basil-daq
 bitarray
 coloredlogs
 pyusb

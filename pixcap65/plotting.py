@@ -10,8 +10,6 @@ from matplotlib.axes import Axes
 
 from pixcap65.analysis_util.physics_modelling import model_depletion
 
-NUMBER_DEPLETION_PLOT_POINTS = 1000
-
 try:
     # noinspection PyCompatibility
     from collections.abc import Iterable
@@ -50,9 +48,26 @@ BIAS_CURVE_X_LABEL = "U in V"
 DEFAULT_BIN_NUMBER = 50
 DEFAULT_TEST_CAP_EXCLUSION = True
 logger = logging.getLogger(__name__)
+NUMBER_DEPLETION_PLOT_POINTS = 1000
 
 
 def evaluate_pixel_mask(hist, perform_filter=False, **kwargs):
+    """
+    evaluate_pixel_mask
+
+    @author Dominik Fischer
+    @date 2026-05-11
+
+    :param hist: histogram/data set to be masked for 'defect' pixels
+    :param perform_filter: boolean, indicating whether the generated mask should be applied and only the filtered data
+        returned.
+    :param kwargs: further keyword arguments
+    :key test_cap_exclusion: whether to exclude row 0 completely.
+    :key mask_pixel: array of tuple of pixel positions to be masked.
+    :key mask_lower: float, threshold to mask all pixels below this value.
+    :key mask_upper: float, threshold to mask all pixels above this value.
+    :return: masked histogram/data set (masked pixels values are replaced by np.nan)
+    """
     result_hist = hist.copy()
     kargs = kwargs.copy()
     test_cap_exclusion = kargs.pop("test_cap_exclusion", DEFAULT_TEST_CAP_EXCLUSION)
@@ -156,6 +171,8 @@ def plot_inter_pix_data(interpreted_data, base_path=None, suffix="general_inter_
     :param base_path: path to the base group in the hdf files hierarchy.
     :param suffix: additional suffix to use for naming the PDF containing the plots.
     :param use_group: boolean, whether to append the group name of the measurements to the PDF name.
+    :param total_data: path to the hdf file which holds the analyzed data for the total capacitance scan.
+    :param total_path: hdf group path inside the hdf file containing the total cap analysis results.
     :key exclude_test_cap: boolean, whether to exclude the test capacitator row from the histograms.
     :key hist_bins: integer, number of bins to use for the histogram.
     :key mask_pixel: iterable of pixel positions on the grid to ignore for evaluations.
@@ -205,7 +222,8 @@ def plot_cv_data(interpreted_data, base_path=None, first_upper=None, first_lower
     Plot the results of the C-V characterization of the scanned pixels.
     To achieve this we need the different c-v-data.
     Then the C-V curve is plotted for every pixel.
-    If requested also fits to the boundary regions of the c-v-curve are performed to determine the depletion voltage of the pixel.
+    If requested also fits to the boundary regions of the c-v-curve are performed to determine
+    the depletion voltage of the pixel.
     To do so, two fit ranges for the two boundaries with physically distinct behaviour needs to be supplied.
 
 
@@ -218,7 +236,8 @@ def plot_cv_data(interpreted_data, base_path=None, first_upper=None, first_lower
     :param suffix:  additional suffix to use for naming the PDF containing the plots.
     :param use_group:   boolean, whether to append the group name of the measurements to the PDF name.
     :key verbose: boolean, indicating whether to use verbose output for depletion voltages
-    :key distribution: boolean, indicating whether also the capacitance distribution of the whole sensor should be investigated.
+    :key distribution: boolean, indicating whether also the capacitance distribution of the whole sensor
+        should be investigated.
     """
     pdf_name = get_pdf_name(base_path, interpreted_data, suffix, use_group)
     with PdfPages(pdf_name) as output_pdf:
@@ -239,7 +258,8 @@ def plot_combined_data(interpreted_data, base_path=None, first_upper=None, first
     Plot the results of the C-V characterization of the scanned pixels.
     To achieve this we need the different c-v-data.
     Then the C-V curve is plotted for every pixel.
-    If requested also fits to the boundary regions of the c-v-curve are performed to determine the depletion voltage of the pixel.
+    If requested also fits to the boundary regions of the c-v-curve are performed to determine t
+    he depletion voltage of the pixel.
     To do so, two fit ranges for the two boundaries with physically distinct behaviour needs to be supplied.
 
     :param interpreted_data: path to the hdf file which holds the raw data and the analysis results.
@@ -252,7 +272,8 @@ def plot_combined_data(interpreted_data, base_path=None, first_upper=None, first
     :param use_group: boolean, whether to append the group name of the measurements to the PDF name.
     :key use_corrected: boolean, whether to use corrected data
     :key verbose: boolean, indicating whether to use verbose output for depletion voltages
-    :key distribution: boolean, indicating whether also the capacitance distribution of the whole sensor should be investigated.
+    :key distribution: boolean, indicating whether also the capacitance distribution of the whole sensor
+        should be investigated.
     """
     if kwargs.get("use_corrected", False):
         suffix = "{}_corrected".format(suffix)
@@ -291,8 +312,9 @@ def plot_bias_delegate(data_group, output_pdf: PdfPages):
     plt.close(fig)
 
 
-def plot_cv_data_delegate(data_group, analysis_group, output_pdf, first_upper: Optional[float] = None, first_lower:
-Optional[float] = None, second_upper: Optional[float] = None,
+def plot_cv_data_delegate(data_group, analysis_group, output_pdf,
+                          first_upper: Optional[float] = None, first_lower: Optional[float] = None,
+                          second_upper: Optional[float] = None,
                           second_lower: Optional[float] = None, apply_doping=False, **kwargs):
     """
     plot_cv_data_delegate
@@ -313,7 +335,8 @@ Optional[float] = None, second_upper: Optional[float] = None,
     :param second_lower: lower limit of the second fit range.
     :param apply_doping: boolean, False, indicates whether to plot the depletion data.
     :key verbose: boolean, indicating whether to use verbose output for depletion voltages.
-    :key distribution: boolean, indicating whether also the capacitance distribution of the whole sensor should be investigated.
+    :key distribution: boolean, indicating whether also the capacitance distribution of the whole sensor
+        should be investigated.
     """
     # extract the bias data
     voltage_data = check_leaf_unit(data_group.BiasVoltageHist, HIST_BIAS_MEAS_UNIT)
@@ -322,7 +345,7 @@ Optional[float] = None, second_upper: Optional[float] = None,
     if first_upper is None or first_lower is None or second_upper is None or second_lower is None:
         approx_depletion = False
     if approx_depletion and "DepletionHist" not in analysis_group:
-        warn("The renew computation is now deperecated and will be removed in future version.")
+        warn("The depletion computation from plotting is now deprecated and will be removed in future version.")
         if 'chip_group' in kwargs:
             kwargs['apply_doping'] = apply_doping
         from pixcap65.analysis import analyze_depletion_delegate
@@ -339,12 +362,10 @@ Optional[float] = None, second_upper: Optional[float] = None,
         if np.any(np.isnan(cap_data[ii, jj, :])):
             continue
 
-        # cv_height, cv_width = rcParams['figure.figsize']
-        # fig, ax = plt.subplots(ncols=2, figsize=(cv_width, cv_height))
         fig, ax = plt.subplots(ncols=2)
-
         title_str = ""
         # extract the information about the depletion voltage+
+        # TODO: Refactor this to reduce the complexity.
         if "DepletionHist" in analysis_group:
             depletion_fit_data = analysis_group.DepFitParamHist[:]
             depletion_hist = analysis_group.DepletionHist[:]
@@ -386,8 +407,7 @@ Optional[float] = None, second_upper: Optional[float] = None,
                 title_str += "U = {} V\n".format(dep_voltage_2)
 
         effective_capacitance_error_data = np.reciprocal(cap_data[ii, jj, :] * CAPACITANCE_CONVERSION_FACTOR) ** 3 * \
-                                           cap_errors[
-                                               ii, jj, :] if np.all(np.isfinite(cap_errors[ii, jj, :])) else None
+                                           cap_errors[ii, jj, :] if np.all(np.isfinite(cap_errors[ii, jj, :])) else None
         eff_cap_errors = cap_errors[ii, jj, :] if np.all(np.isfinite(cap_errors[ii, jj, :])) else None
         ax[0].set(title="Bias data from the \nmeasurement for pixel ({col},{row})".format(col=ii, row=jj),
                   xlabel=BIAS_CURVE_X_LABEL, ylabel="C in fF")
@@ -528,6 +548,7 @@ def plot_data_delegate(data_group: tb.Group, analysis_group: tb.Group, output_pd
 
             # ax.plot(freq_sweep_array, fit_fn, label = 'a={a:.3E}, b={b:.3E}'.format(a=a, b=b))
 
+        # TODO: move these commented lines from the old script to a new legacy file!
         # #apply linear fit to measured current values; also returns covariance matrix.
         # matrix = np.polyfit(freq_sweep_array, current_array, 1, cov=True)
 
@@ -562,6 +583,7 @@ def plot_inter_pix_data_delegate(data_group: tb.Group, analysis_group: tb.Group,
     :param data_group: hdf files hierarchy group containing the raw measurement data.
     :param analysis_group: hdf files hierarchy group containing the analysis results.
     :param output_pdf: PDF object to write the created figures to for long-term saving.
+    :param total_group: hdf files hierarchy group containing the total cap measurements (results).
     :key exclude_test_cap: boolean, whether to exclude the test capacitator row from the histograms.
     :key hist_bins: integer, number of bins to use for the histogram.
     :key mask_pixel: iterable of pixel positions on the grid to ignore for evaluations.
@@ -792,14 +814,14 @@ def plot_current_data(ax: Axes, col, row, scan_parameters, current_hist, current
                 color=cmap(color), **plot_args)
 
 
-def plot_current_model(ax: Axes, col, row, analysis_group: Group, actual_cap: Any, total_leak_hist, f: np.ndarray,
+def plot_current_model(ax: Axes, col, row, analysis_group: tb.Group, actual_cap: Any, total_leak_hist, f: np.ndarray,
                        resistor_name="HistRes", prefix="", color=0.6, **plot_args):
     """
         plot_current_model
 
         Helper function to plot the current model from the specified parameters.
-        It will decide on execution whether the complete advanced model has to be used depending on whether on-resistance
-        estimators are present.
+        It will decide on execution whether the complete advanced model has to be used depending on
+        whether on-resistance estimators are present.
 
         :param ax: axes object to plot the model to.
         :param col: column coordinate of the pixel for which to plot the model.
@@ -819,6 +841,7 @@ def plot_current_model(ax: Axes, col, row, analysis_group: Group, actual_cap: An
     plot_args.setdefault('marker', '')
     plot_args.setdefault('ls', '--')
     assert 'prefix' not in plot_args
+    # noinspection PyUnresolvedReferences
     if resistor_name in analysis_group and np.isfinite(analysis_group[resistor_name][col, row]):
         hist_resistance = analysis_group[resistor_name]
         from pixcap65.analysis_util.physics_modelling import full_capacitance_model
@@ -832,14 +855,13 @@ def plot_current_model(ax: Axes, col, row, analysis_group: Group, actual_cap: An
                 color=cmap(color),
                 label=SIMPLE_CAP_LABEL_PERCENT_FORMAT % (prefix, actual_cap), **plot_args)
 
-
     else:
         ax.plot(f, (actual_cap + parasitic_correction) * f + total_leak_hist[col, row],
                 color=cmap(color),
                 label=SIMPLE_CAP_LABEL_PERCENT_FORMAT % (prefix, actual_cap), **plot_args)
 
 
-def plot_compare_delegate(first_group: GroupType, second_group: GroupType, output_pdf: PdfPages):
+def plot_compare_delegate(first_group: tb.Group, second_group: tb.Group, output_pdf: PdfPages):
     """
     plot_compare_delegate
 
@@ -873,7 +895,7 @@ def plot_compare_delegate(first_group: GroupType, second_group: GroupType, outpu
     plt.close(fig)
 
 
-def plot_depletion_delegate(data_group: GroupType, analysis_group: GroupType, output_pdf: PdfPages):
+def plot_depletion_delegate(data_group: tb.Group, analysis_group: GroupType, output_pdf: PdfPages):
     """
     plot_depletion_delegate
 
@@ -912,6 +934,7 @@ def plot_depletion_pixel_delegate(bias_voltages: TABLES_LEAF_COMPAT_TYPE, i_col,
         doping_acceptor = depletion_fit_propagate_parameters["NAD"]
         effective_doping = effective_doping_table[i_col, i_row]
         fig, ax = plt.subplots(3)
+        logger.info("The type of bias_voltages is %s", type(bias_voltages))
         bias_mask = bias_voltages < -0.5
         if np.all(np.isfinite(depletion_width_plate_error[i_col, i_row])):
             ax[0].errorbar(bias_voltages[bias_mask], depletion_width_plate[i_col, i_row][bias_mask],
@@ -929,7 +952,7 @@ def plot_depletion_pixel_delegate(bias_voltages: TABLES_LEAF_COMPAT_TYPE, i_col,
                   title=f"Analysis of the depletion width for pixel ({i_col}, {i_row}).")
         ax[0].grid(True)
         ax[0].legend(
-            title=f"Saturating at {depletion_fit_propagate_parameters["dep"]} with {depletion_fit_propagate_parameters['sat']} saturation.")
+            title=f"Saturating at {depletion_fit_propagate_parameters['dep']} with {depletion_fit_propagate_parameters['sat']} saturation.")
         ax[1].plot(-bias_voltages, effective_doping)
         ax[1].set(xlabel='Bias Voltage [V]', ylabel='Effective \ndoping \nconcentration [cm-3]',
                   title="Analysis of the effective doping for pixel ({col}, {row}).")
@@ -945,80 +968,50 @@ def plot_depletion_pixel_delegate(bias_voltages: TABLES_LEAF_COMPAT_TYPE, i_col,
 
 
 if __name__ == '__main__':
+    # plot_data(interpreted_data=os.path.expanduser('~/git/pixcap65/pixcap_LF_50x50_DC_R3_80V_HV.h5'))
+
+    # some usage examples
     from pixcap65.utility.homogenize_plots import set_params
 
     set_params(latex=True,
                latex_extra=r"\sisetup{separate-uncertainty}\sisetup{locale = DE}\sisetup{uncertainty-descriptors={"
                            r"stat,sys}}\sisetup{uncertainty-descriptor-mode=subscript}\sisetup{"
                            r"retain-zero-uncertainty}", fig_height=8.26772, fig_width=11.69291, )
-    # plot_data(interpreted_data=os.path.expanduser('~/git/pixcap65/pixcap_LF_50x50_DC_R3_80V_HV.h5'))
-    # plot_data(interpreted_data='Data/r13-measurement/R13_Initial_3_Scan.h5', base_path="ATLAS ITk/unbiased_1", suffix="unbiased_full_measurement", use_group=True)
+
+    # current measurement
+    plot_data(interpreted_data="packaged/X2_2_Scan.h5", base_path="ATLAS_ITk/X2/unbiased_1_full", use_group=True,
+              exclude_test_cap=True)
+    plot_data(interpreted_data="packaged/X2_2_Scan.h5", base_path="ATLAS_ITk/X2/unbiased_1_full", use_group=True,
+              exclude_test_cap=True, use_corrected=True)
+    plot_data(interpreted_data="packaged/X2_2_Scan.h5", base_path="ATLAS_ITk/X2/biased_80_V_full", use_group=True,
+              exclude_test_cap=True)
+    plot_data(interpreted_data="packaged/X2_2_Scan.h5", base_path="ATLAS_ITk/X2/biased_80_V_full", use_group=True,
+              exclude_test_cap=True, use_corrected=True)
+    plot_combined_data(interpreted_data="packaged/X2_2_Scan.h5", base_path="ATLAS_ITk/X2/C_V_Characteristic_refined",
+                       use_group=True, first_lower=-60, first_upper=-20, second_lower=-5, second_upper=0)
+    plot_combined_data(interpreted_data="packaged/X2_2_Scan.h5", base_path="ATLAS_ITk/X2/C_V_Characteristic_refined",
+                       use_group=True, first_lower=-60, first_upper=-20, second_lower=-5, second_upper=0,
+                       use_corrected=True,
+                       apply_doping=False, distribution=True)
+
+    plot_data(interpreted_data="Reference_Evelyn_Scan.h5", base_path="Reference/E1/unbiased_4_full", use_group=True)
+    plot_data(interpreted_data="Reference_Evelyn_Scan.h5", base_path="Reference/E1/unbiased_4_full", use_group=True,
+              use_corrected=True, distribution=True, exclude_test_cap=True)
+    plot_bias_data(interpreted_data="Reference_Evelyn_Scan.h5", base_path="Reference/E1/I_V_Characteristic",
+                   use_group=True)
+    plot_combined_data(interpreted_data="Reference_Evelyn_Scan.h5", base_path="Reference/E1/C_V_Characteristic",
+                       use_group=True)
+    plot_combined_data(interpreted_data="Reference_Evelyn_Scan.h5", base_path="Reference/E1/C_V_Characteristic",
+                       use_group=True,
+                       use_corrected=True,
+                       apply_doping=False, distribution=False)
+
+    # examples
     # plot_data(interpreted_data='pixcap65/Data/r13-measurement/R13_Full_Scan_80V.h5', suffix="general_data",
     #           use_group=False)
-    # plot_data(interpreted_data='pixcap65/Data/r13-measurement/R13_Full_Scan_80V.h5', suffix="general_data",
-    #           use_group=False,
-    #           use_corrected=True, exclude_test_cap=True, distribution=True)
-    plot_inter_pix_data(interpreted_data='R13-Interpixel_Scan.h5',
-                        base_path="Reference/R13/demo_measurement_65_unbiased_1_discharge",
-                        use_group=True, suffix="inter_pix_65", total_data='Reference_R13_Scan.h5',
-                        distribution=True, set_parasitic=False, total_path="Reference/R13/unbiased_12_full")
-    plot_inter_pix_data(interpreted_data='packaged/R13-Interpixel_Scan.h5',
-                        base_path="Reference/R13/demo_measurement_66_biased_80_V_1_discharge",
-                        use_group=True, suffix="inter_pix_66", total_data='pixcap65/Data/r13-measurement/R13_Full_Scan_80V.h5',
-                        distribution=True, set_parasitic=False)
-    plot_inter_pix_data(interpreted_data='packaged/R13-Interpixel_Scan.h5',
-                        base_path="Reference/R13/demo_measurement_67_biased_80_V_1_discharge",
-                        use_group=True, suffix="inter_pix_67", total_data='pixcap65/Data/r13-measurement/R13_Full_Scan_80V.h5',
-                        distribution=True, set_parasitic=False)
-    plot_inter_pix_data(interpreted_data='packaged/R13-Interpixel_Scan.h5',
-                        base_path="Reference/R13/demo_measurement_68_biased_40_V_1_discharge",
-                        use_group=True, suffix="inter_pix_68")
-    plot_inter_pix_data(interpreted_data='packaged/R13-Interpixel_Scan.h5',
-                        base_path="Reference/R13/demo_measurement_69_biased_05_V_1_discharge",
-                        use_group=True, suffix="inter_pix_69")
-    plot_inter_pix_data(interpreted_data='packaged/R13-Interpixel_Scan.h5',
-                        base_path="Reference/R13/demo_measurement_70_unbiased_1_discharge",
-                        use_group=True, suffix="inter_pix_70", total_data='Reference_R13_Scan.h5',
-                        distribution=True, set_parasitic=False, total_path="Reference/R13/unbiased_12_full")
-    plot_inter_pix_data(interpreted_data='packaged/RX-Interpixel_Scan.h5',
-                        base_path="Reference/R1/demo_measurement_1_unbiased_1_discharge",
-                        use_group=True, suffix="inter_pix_1")
-    plot_inter_pix_data(interpreted_data='packaged/RX-Interpixel_Scan.h5',
-                        base_path="Reference/R1/demo_measurement_2_biased_80_V_1_discharge",
-                        use_group=True, suffix="inter_pix_1")
-    plot_inter_pix_data(interpreted_data='packaged/RX-Interpixel_Scan.h5',
-                        base_path="Reference/R1/demo_measurement_3_biased_40_V_1_discharge",
-                        use_group=True, suffix="inter_pix_1")
-    # plot_inter_pix_data(interpreted_data='R13-Interpixel_Scan.h5', base_path="Reference/R13/demo_measurement_64_unbiased_1_discharge",
-    #                     use_group=True, suffix="inter_pix_64")
-    # plot_data(interpreted_data="Reference_Evelyn_Scan.h5", base_path="Reference/E1/unbiased_3_test", use_group=True)
-    # plot_bias_data(interpreted_data='Data/r13-measurement/R13_BIAS_2.h5')
-    # plot_combined_data(interpreted_data='Data/r13-measurement/R13_BIAS_CV_COMBI_6.h5', first_lower=-100,first_upper=-40, second_lower=-10, second_upper=0)
-    # plot_data(interpreted_data=os.path.expanduser('~/git/pixcap65/pixcap_LF_50x50_DC_R3_80V_HV.h5'))
-    # plot_data(interpreted_data='Data/r13-measurement/R13_Initial_3_Scan.h5', base_path="ATLAS ITk/unbiased_1", suffix="unbiased_full_measurement", use_group=True)
     # plot_inter_pix_data(interpreted_data='R13-Interpixel_Scan.h5',
-    #                     base_path="Reference/R13/demo_measurement_52_biased_80_V_1_charge",
-    #                     use_group=True, suffix="inter_pix_52")
-    # plot_data(interpreted_data="Reference_Evelyn_Scan.h5", base_path="Reference/E1/unbiased_1_test", use_group=True)
-    # plot_data(interpreted_data='Data/New_1_Initial_6_Scan.h5', base_path="ATLAS ITk/unbiased_3",
-    #           suffix="general_data", use_group=True, exclude_test_cap=True, mask_pixel=[[39, 39], [38, 39]],
-    #           distribution=True)
-    # plot_data(interpreted_data='Data/New_1_Initial_6_Scan.h5', base_path="ATLAS ITk/unbiased_3",
-    #           suffix="general_data", use_group=True, use_corrected=True, mask_pixel=[[39, 39], [38, 39]],
-    #           exclude_test_cap=True, distribution=True)
+    #                     base_path="Reference/R13/demo_measurement_65_unbiased_1_discharge",
+    #                     use_group=True, suffix="inter_pix_65", total_data='Reference_R13_Scan.h5',
+    #                     distribution=True, set_parasitic=False, total_path="Reference/R13/unbiased_12_full")
     # plot_bias_data(interpreted_data='Data/r13-measurement/R13_BIAS_2.h5')
     # plot_combined_data(interpreted_data='Data/r13-measurement/R13_BIAS_CV_COMBI_6.h5', first_lower=-100,first_upper=-40, second_lower=-10, second_upper=0)
-
-    # plot_data(interpreted_data='Bare_Repeat_2_Scan.h5', base_path="Reference/bare/unbiased_8",
-    #           suffix="general_bare_data_3", use_group=True,
-    #           exclude_test_cap=True)
-
-    # plot_combined_data(interpreted_data='pixcap65/Data/New_1_Initial_6_Scan.h5',
-    #                    base_path="ATLAS ITk/C_V_Characteristic",
-    #                    use_group=True, first_lower=-60, first_upper=-40, second_lower=-60, second_upper=0,
-    #                    use_corrected=True,
-    #                    apply_doping=True)
-    #
-    # plot_combined_data(interpreted_data='New_2_Scan.h5', base_path="ATLAS_Itk/X2/C_V_Characteristic",
-    #                    use_group=True, first_lower=-60, first_upper=-40, second_lower=-60, second_upper=0,
-    #                    use_corrected=True)

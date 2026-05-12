@@ -42,9 +42,9 @@ if __name__ == "__main__":
     # C-V characterization sample
     # coarse_bias_range = -1 * np.arange(1, 100.1, 0.75)
     fine_bias_range = -1 * np.concat((
-        np.geomspace(0.1,20,30),
+        np.geomspace(0.1, 20, 30),
         np.arange(20, 60.1, 5),
-        np.geomspace(60,85,20)
+        np.geomspace(60, 85, 20)
     ))
     # scan_configuration[ScanConfigurationKeys.BIAS_VOLTAGE_RANGE] = coarse_bias_range
     scan_configuration.update(start_row=20, stop_row=25, start_column=20, stop_column=25)
@@ -71,6 +71,7 @@ if __name__ == "__main__":
         pix.pixcap.frequency_settling = 0.3
         print(type(pix))
         from pixcap65.pixcap_65_test_total_cap import PixCap65Measurement
+
         print(issubclass(type(pix), PixCap65Measurement))
         print(isinstance(pix, PixCap65Measurement))
         pix.combined_bias_cv_scan(data_group_spec="C_V_Characteristic_refined")

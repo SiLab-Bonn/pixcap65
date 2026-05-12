@@ -4,8 +4,8 @@ from typing import Optional, OrderedDict, Union
 
 import numpy as np
 import time
-
 from basil.dut import Dut, Base
+
 from pixcap_65_test_total_cap import PixCap65Measurement
 
 logger = logging.getLogger(__name__)
@@ -215,8 +215,8 @@ class PixCapSetup(Dut):
                     from pixcap65.pixcap_65_test_total_cap import PixCap65TotalCap
                     self.measurement_class = PixCap65TotalCap
                 case PixcapMeasurements.INTER_CAPACITANCE:
-                    from pixcap65.pixcap_65_test_inter_cap import Pixcap65TestInterCap
-                    self.measurement_class = Pixcap65TestInterCap
+                    from pixcap65.pixcap_65_test_inter_cap import Pixcap65InterCap
+                    self.measurement_class = Pixcap65InterCap
                 case _:
                     raise ValueError(f"provided measurement class does not exist.")
             self.pixcap = None
@@ -233,7 +233,7 @@ class PixCapSetup(Dut):
             self["power"].set_enable(0, channel=2)
             self["power"].set_enable(0, channel=3)
             import serial
-            
+
 
         except:
             logger.error("Failed to clean up the setup handling.")

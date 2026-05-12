@@ -8,24 +8,30 @@ def full_capacitance_model(freq, c=1e-6, r=1e6, i=0, u0=1):
     # ignores the reference voltage for now
     return (u0 * c * freq + i) / (1 + r * c * freq)
 
+
 def grad_full_capacitance_model(freq, c=1e-6, r=1e6, i=0, u0=1):
     return np.array([
-        (u0*freq*(1 + r * c * freq) - (u0 * c * freq + i) * r * freq)/(1 + r * c * freq)**2,
-        ((u0*c*freq+i) * c * freq)/(1 + r * c * freq)**2,
-        1/(1 + r * c * freq),
+        (u0 * freq * (1 + r * c * freq) - (u0 * c * freq + i) * r * freq) / (1 + r * c * freq) ** 2,
+        ((u0 * c * freq + i) * c * freq) / (1 + r * c * freq) ** 2,
+        1 / (1 + r * c * freq),
         c * freq / (1 + r * c * freq)
     ])
+
 
 def simple_capacitance_model(freq, c=1e-6, i=0, u0=1):
     return u0 * c * freq + i
 
+
+# noinspection PyUnusedLocal
 def grad_simple_capacitance_model(freq, c=1e-6, i=0, u0=1):
-    return np.array([u0*freq, 1, c*freq])
+    return np.array([u0 * freq, 1, c * freq])
 
 
 def depletion_model(x, a=1, b=0):
     return a * x + b
 
+
+# noinspection PyUnusedLocal
 def grad_depletion_model(x, a=1, b=0):
     return np.array([x, 1])
 

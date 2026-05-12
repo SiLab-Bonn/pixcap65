@@ -1,7 +1,9 @@
+from typing import Any
+
 import numpy as np
-import pylab as pl
 import time
 from bitarray import bitarray
+from matplotlib import pyplot as plt
 
 from pixcap65.pixcap.pixcap65 import Pixcap65
 from pixcap65.utility import pixcap65_constants as c
@@ -75,7 +77,8 @@ if __name__ == "__main__":
     col_range = range(col_start, col_stop + 1)
 
     freq_sweep_array = np.arange(1, 4.1, 1)  # .astype(np.float) # [MHz]
-    table_first_row = ["row\col"]
+    table_first_row = list[Any]()
+    table_first_row.append("row\\col")
     table_first_row.extend(col_range)
     table_row = []
     table_storage = []  # some additional list to store results during measurement
@@ -145,14 +148,14 @@ if __name__ == "__main__":
             freq_sweep_array_plot = np.arange(0, 5.1, 1)
 
             fit_fn = a * freq_sweep_array_plot + b
-            pl.plot(freq_sweep_array, current_array1, 'o',
+            plt.plot(freq_sweep_array, current_array1, 'o',
                     label='COL({i_col})PIX({i_row}), I3'.format(i_col=i_col, i_row=i_row))
-            pl.plot(freq_sweep_array_plot, fit_fn, label='a={a:.3E}, b={b:.3E}'.format(a=a, b=b))
+            plt.plot(freq_sweep_array_plot, fit_fn, label='a={a:.3E}, b={b:.3E}'.format(a=a, b=b))
 
             fit_fn = e * freq_sweep_array_plot + d
-            pl.plot(freq_sweep_array, current_array2, 'o',
+            plt.plot(freq_sweep_array, current_array2, 'o',
                     label='COL({i_col})PIX({i_row}), I2'.format(i_col=i_col, i_row=i_row))
-            pl.plot(freq_sweep_array_plot, fit_fn, label='c={a:.3E}, d={b:.3E}'.format(a=e, b=d))
+            plt.plot(freq_sweep_array_plot, fit_fn, label='c={a:.3E}, d={b:.3E}'.format(a=e, b=d))
 
         # print(','.join(map(str, table_row)))
         # data_file.write(','.join(map(str, table_row)) + '\n')
@@ -166,8 +169,8 @@ if __name__ == "__main__":
     dut['SMU2'].off()
     dut['SMU3'].off()
 
-    pl.legend(loc='best')
-    pl.xlabel('Freq [MHz]')
-    pl.ylabel('I [A]')
-    pl.show()
+    plt.legend(loc='best')
+    plt.xlabel('Freq [MHz]')
+    plt.ylabel('I [A]')
+    plt.show()
     dut.close()

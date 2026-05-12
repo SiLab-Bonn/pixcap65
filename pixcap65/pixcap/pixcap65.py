@@ -13,10 +13,10 @@ from typing import Any
 
 import numpy as np
 import time
-from numpy import ndarray
-
 from basil.RL.FunctionalRegister import FunctionalRegister
 from basil.dut import Dut
+from numpy import ndarray
+
 from pixcap65.utility import pixcap65_constants as c
 
 # perhaps add the channel information to the pixcap config file and extract it from here!
@@ -226,7 +226,7 @@ class Pixcap65(Dut):
             Dut.init(self, init_conf=init_conf, **kwargs)
         except USBTimeoutError:
             # perform a power cycle if possible
-            logger.error("An USB error occured try to solve the issue by a power cycle.")
+            logger.error("A USB error occured try to solve the issue by a power cycle.")
             if "power" in list(self._hardware_layer.keys()):
                 # FIXME: type error (very static for the used psu)
                 power_driver = self._hardware_layer["power"]
@@ -533,7 +533,7 @@ class Pixcap65(Dut):
         if kwargs is None:
             kwargs = {}
         if not self.has_configured_smu(smu):
-            logger.debug("SMU initialisation is only possible for active smu but '%s' is inactive.", smu)
+            logger.debug("SMU initialization is only possible for active smu but '%s' is inactive.", smu)
             return
         self[smu].off(**kwargs)
         try:
@@ -710,14 +710,14 @@ class Pixcap65(Dut):
                 or isinstance(result, np.float64)
                 or isinstance(result, str)):
             print(type(result), result)
-            raise TypeError("The current returned {result} which was not recognised as a format.".format(result=result))
+            raise TypeError("The current returned {result} which was not recognized as a format.".format(result=result))
         if isinstance(result, str) and ',' in result:
             current = float_initialiser(result.split(',')[1])
         else:
             current = float_initialiser(result)
         if np.isnan(current):
             logging.warning("It was a NaN value measured by the SMU.")
-            raise ValueError("The current returned {current} was not recognised as a number.".format(current=current))
+            raise ValueError("The current returned {current} was not recognized as a number.".format(current=current))
         return current
 
     def smu_measure_voltage(self, smu: str, kwargs=None) -> float:
@@ -743,14 +743,14 @@ class Pixcap65(Dut):
                 or isinstance(result, np.float64)
                 or isinstance(result, str)):
             print(type(result), result)
-            raise TypeError("The current returned {result} which was not recognised as a format.".format(result=result))
+            raise TypeError("The current returned {result} which was not recognized as a format.".format(result=result))
         if isinstance(result, str) and ',' in result:
             voltage = float_initialiser(result.split(',')[0])
         else:
             voltage = float_initialiser(result)
         if np.isnan(voltage):
             logging.warning("It was a NaN value measured by the SMU.")
-            raise ValueError("The current returned {current} was not recognised as a number.".format(current=voltage))
+            raise ValueError("The current returned {current} was not recognized as a number.".format(current=voltage))
         return voltage
 
     def smu_averaged_current(self, n: int, smu: str, kwargs=None) -> tuple[float, ...]:
@@ -1258,10 +1258,10 @@ class Pixcap65(Dut):
         :return: array of the measured currents in A; If the SMU is not active only NaN will be returned within the
             array.
         """
-        kargs = self.smu_kwargs.copy()
-        kargs['binary_enabled'] = self.binary_active
-        kargs['data_points'] = self.n_measurements
-        return self.smu_advanced_current_multiple(n, self.__primary_smu_key, kwargs=kargs)
+        keyword_arguments = self.smu_kwargs.copy()
+        keyword_arguments['binary_enabled'] = self.binary_active
+        keyword_arguments['data_points'] = self.n_measurements
+        return self.smu_advanced_current_multiple(n, self.__primary_smu_key, kwargs=keyword_arguments)
 
     def get_advanced_voltage_multiple(self, n: int):
         """

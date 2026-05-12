@@ -6,6 +6,7 @@ import os
 import sys
 
 try:
+    # noinspection PyCompatibility
     from collections.abc import Iterable
 except ImportError:
     # python 2.7 and < python 3.3
@@ -43,25 +44,25 @@ class ResolutionElements(enum.StrEnum):
 
 
 # we could use the range configurations to estimate the measurement error of the SMU in use.
-def update_smu_range_configuration(config_file):
+def update_smu_range_configuration(configuration_file):
     """
     update_smu_range_configuration
 
     This will take a prepared configuration file and add or update the values for the normalized range values,
     which are the ones used for the communication with the Lab device. The changed config will replace the old one.
     The configuration file will be overwritten in the end.
-    :param config_file: path of the file containing the range
+    :param configuration_file: path of the file containing the range
         and resolution configuration of a Lab Device.
     """
     range_config = {}
-    with open(config_file, 'r') as f:
+    with open(configuration_file, 'r') as f:
         range_config = yaml.safe_load(f)
         print(range_config)
         handle_range_configuration(CONFIG_KIND_VOLTAGE, range_config)
 
         handle_range_configuration(CONFIG_KIND_CURRENT, range_config)
 
-    with open(config_file, 'w') as f:
+    with open(configuration_file, 'w') as f:
         yaml.safe_dump(range_config, f, encoding='utf-8', allow_unicode=True, sort_keys=False)
 
 
@@ -83,16 +84,16 @@ def handle_range_configuration(key_spec: str, range_config, config_precision=2):
         for idx in range(len(range_config[key_spec])):
             if ConfigElements.NORMALISED_RANGE in range_config[key_spec][idx]:
                 print(
-                    "The current normalisation type is "
+                    "The current normalization type is "
                     f"{type(range_config[key_spec][idx][ConfigElements.NORMALISED_RANGE])}")
             unit_prefix = verify_range_prefix(idx, key_spec, range_config)
 
-            if isinstance(range_config[key_spec][idx][ConfigElements.RANGE], float):
+            if check_config_float(idx, key_spec, range_config, ConfigElements.RANGE):
                 range_spec = range_config[key_spec][idx][ConfigElements.RANGE]
             else:
                 range_spec = float(range_config[key_spec][idx][ConfigElements.RANGE])
                 range_config[key_spec][idx][ConfigElements.RANGE] = range_spec
-                assert isinstance(range_config[key_spec][idx][ConfigElements.RANGE], float)
+                assert check_config_float(idx, key_spec, range_config, ConfigElements.RANGE)
 
             normalised_range = range_spec * unit_prefix
             assert isinstance(normalised_range, float)
@@ -101,6 +102,10 @@ def handle_range_configuration(key_spec: str, range_config, config_precision=2):
             print(type(range_config[key_spec][idx][ConfigElements.RANGE]))
             print(type(range_config[key_spec][idx][ConfigElements.UNIT_PREFIX_VALUE]))
             print(range_config[key_spec][idx][ConfigElements.UNIT_PREFIX_VALUE])
+
+
+def check_config_float(idx: int, key_spec: str, range_config, element) -> bool:
+    return isinstance(range_config[key_spec][idx][element], float)
 
 
 def verify_range_prefix(idx: int, key_spec: str, range_config) -> float:
@@ -114,12 +119,12 @@ def verify_range_prefix(idx: int, key_spec: str, range_config) -> float:
     :param range_config: range configuration mapping
     :return: floating point value of the range prefix
     """
-    if isinstance(range_config[key_spec][idx][ConfigElements.UNIT_PREFIX_VALUE], float):
+    if check_config_float(idx, key_spec, range_config, ConfigElements.UNIT_PREFIX_VALUE):
         unit_prefix = range_config[key_spec][idx][ConfigElements.UNIT_PREFIX_VALUE]
     else:
         unit_prefix = float(range_config[key_spec][idx][ConfigElements.UNIT_PREFIX_VALUE])
         range_config[key_spec][idx][ConfigElements.UNIT_PREFIX_VALUE] = unit_prefix
-        assert isinstance(range_config[key_spec][idx][ConfigElements.UNIT_PREFIX_VALUE], float)
+        assert check_config_float(idx, key_spec, range_config, ConfigElements.UNIT_PREFIX_VALUE)
     return unit_prefix
 
 
@@ -225,8 +230,8 @@ if __name__ == '__main__':
         if file.endswith('_Range.yaml'):
             update_smu_range_configuration(file)
 
-    with open("../../pixcap_logging.yml", 'r') as f:
-        logging.config.dictConfig(yaml.safe_load(f))
+    with open("../../pixcap_logging.yml", 'r') as temp_file:
+        logging.config.dictConfig(yaml.safe_load(temp_file))
 
     for logger in logging.getLogger().getChildren():
         print(logger.name)

@@ -1,3 +1,5 @@
+from typing import Any
+
 import time
 from bitarray import bitarray
 
@@ -19,7 +21,7 @@ if __name__ == "__main__":
     dut['SMU3'].set_current_limit(0.001)
     dut['SMU3'].set_current_sense_range(0.00001)
 
-    m = seq_size / 2 - 1  # define index of the last 1 in order to create a non-overlapping clock sequence
+    m = seq_size // 2 - 1  # define index of the last 1 in order to create a non-overlapping clock sequence
     cnt = seq_size / 2 - 1  # counter for numbering in output file
     table_row = []
 
@@ -31,6 +33,8 @@ if __name__ == "__main__":
     bit_array_CLK_0 = bitarray(seq_size)
     bit_array_CLK_0.setall(0)
     bit_array_CLK_0[m + 1:-1] = 1
+
+    data_file = open("./pixcap_full_data_image1.txt", "w")
 
     # vary charging time by looping over the number of bits in bit_array_CLK_3 that are set to 1;
     # number is reduced by one in every step
@@ -62,10 +66,10 @@ if __name__ == "__main__":
         # freq_sweep_array = np.arange(1, 4.1, 1)#.astype(np.float) # [MHz]
         freq_sweep_array = [1.0]  # can also uncomment loop over frequencies
         # Why defining this never used fields?
-        table_first_row = ["row\col"]
+        table_first_row = list[Any]()
+        table_first_row.append("row\\col")
         table_first_row.extend(col_range)
-
-        data_file = open("./pixcap_full_data_image1.txt", "w")
+        current_array = []
 
         # how to distinguish the different rows and columns in the table?
         for i_row in row_range:

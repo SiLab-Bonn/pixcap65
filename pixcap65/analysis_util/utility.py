@@ -21,7 +21,7 @@ TABLES_ARRAY_TYPE = Union[np.ndarray, tb.CArray]
 TABLES_TABLE_TYPE = Union[tb.Table, Mapping[str, TABLES_ARRAY_TYPE]]
 TABLES_LEAF_TYPE = Union[tb.Leaf, tb.Table, tb.Array]
 TABLES_PART_LEAF_TYPE = Union[tb.Table, tb.Array, tb.CArray]
-TABLES_LEAF_COMPAT_TYPE = Union[tb.Leaf, tb.Table, tb.Array, np.ndarray, tb.CArray]
+TABLES_LEAF_COMPAT_TYPE = Union[tb.Table, tb.Array, np.ndarray, tb.CArray]  # no Leaf as it must be an impl.
 GENERAL_PIXCAP_SHAPE = (40, 40)
 COVARIANCE_PIXCAP_SHAPE = (40, 40, 4, 4)
 FULL_MODEL_LABEL = "I_\\text{{full}}"
@@ -120,8 +120,9 @@ def check_leaf_unit(leaf: TABLES_LEAF_TYPE, unit: str) -> np.ndarray:
     return result
 
 
+# noinspection PyUnusedLocal
 def handle_fitter_stub(fit_object, apply_contour, x_label, y_label, title, pdf, contours_title=None, fig_title=None):
-    # This is just a stub method for simplifing the fit plotting
+    # This is just a stub method for simplifying the fit plotting
     pass
 
 
@@ -155,6 +156,7 @@ def handle_kafe2_advanced_options(fit_object, apply_contour, x_label, y_label, t
     :param title: title of the plot.
     :param pdf: PdfPages object to save the fit plots to.
     :param contours_title: title of the contour plot.
+    :param fit_title: If provided, the super-title of the fit plot figures.
     """
     from kafe2 import Plot, FitBase
     from matplotlib import pyplot as plt
@@ -168,6 +170,8 @@ def handle_kafe2_advanced_options(fit_object, apply_contour, x_label, y_label, t
         for ax_k, ax in enumerate(axes.values()):
             if ax_k >= 1:
                 print("We are now at iteration ", ax_k)
+            elif fit_title is not None:
+                fig.suptitle(fit_title, fontsize=20)
             ax.set_title(title)
             ax.text(0, 0.9, f"Fit with cost={conv_invest['x']:.4f} and \np={conv_invest['p']:.4f}",
                     transform=ax.transAxes)
@@ -210,6 +214,7 @@ def handle_minuit_advanced_options(fit_object, apply_contour, x_label, y_label, 
     :param title: title of the plot.
     :param pdf: PdfPages object to save the fit plots to.
     :param contours_title: title of the contour plot.
+    :param fig_title: If provided, the super-title of the fit plot figures.
     """
     from matplotlib import pyplot as plt
     from iminuit import Minuit
@@ -236,6 +241,7 @@ def handle_minuit_advanced_options(fit_object, apply_contour, x_label, y_label, 
             from jacobi import propagate
             # noinspection PyProtectedMember
             x, _, _ = extract_iminuit_cost_object(fit_object)._masked.T
+            # noinspection PyTypeChecker
             y, y_cov = propagate(lambda p: extract_iminuit_cost_object(fit_object).model(x, p), fit_object.values,
                                  fit_object.covariance)
             y_err_prop = np.diag(y_cov) ** 0.5
@@ -379,25 +385,25 @@ def get_analysis_group(base_group, **kwargs):
 
 class HandleFitterStubClass:
     def __call__(self, fit_object, apply_contour, x_label, y_label, title, pdf, contours_title=None, fig_title=None):
-        return handle_fitter_stub(fit_object, apply_contour, x_label, y_label, title, pdf, contours_title, fig_title)
+        handle_fitter_stub(fit_object, apply_contour, x_label, y_label, title, pdf, contours_title, fig_title)
 
 
 class HandleFitterGeneral(HandleFitterStubClass):
     def __call__(self, fit_object, apply_contour, x_label, y_label, title, pdf, contours_title=None, fig_title=None):
-        return handle_fitter_advanced_options(fit_object, apply_contour, x_label, y_label, title, pdf, contours_title,
-                                              fig_title)
+        handle_fitter_advanced_options(fit_object, apply_contour, x_label, y_label, title, pdf, contours_title,
+                                       fig_title)
 
 
 class HandleFitterKafe2(HandleFitterStubClass):
     def __call__(self, fit_object, apply_contour, x_label, y_label, title, pdf, contours_title=None, fig_title=None):
-        return handle_kafe2_advanced_options(fit_object, apply_contour, x_label, y_label, title, pdf, contours_title,
-                                             fig_title)
+        handle_kafe2_advanced_options(fit_object, apply_contour, x_label, y_label, title, pdf, contours_title,
+                                      fig_title)
 
 
 class HandleFitterMinuit(HandleFitterStubClass):
     def __call__(self, fit_object, apply_contour, x_label, y_label, title, pdf, contours_title=None, fig_title=None):
-        return handle_minuit_advanced_options(fit_object, apply_contour, x_label, y_label, title, pdf, contours_title,
-                                              fig_title)
+        handle_minuit_advanced_options(fit_object, apply_contour, x_label, y_label, title, pdf, contours_title,
+                                       fig_title)
 
 
 # endregion: Utility functions
