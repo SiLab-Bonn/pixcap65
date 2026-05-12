@@ -1450,19 +1450,6 @@ class PixCap65TotalCap(PixCap65Measurement):
 if __name__ == '__main__':
     output_file_2 = "../Reference_Demo.h5"
     from pixcap65.utils import PixCapSetup, PixcapMeasurements
-    with PixCapSetup(scan_configuration, output_file_2, measurement=PixcapMeasurements.TOTAL_CAPACITANCE) as pix:
-        print(type(pix))
-        # assert isinstance(pix, PixCap65TotalCap)
-        pix.bias_scan(data_group_spec="simple_bias")
-        pix.bias_scan_parameters = OrderedDict()
-        pix.second_bias_scan(data_group_spec="improved_bias")
-
-    del scan_configuration[BIASING_NUMBER_AVERAGE_MEASUREMENTS_KEY]
-    with PixCapSetup(scan_configuration, output_file_2, measurement=PixcapMeasurements.TOTAL_CAPACITANCE) as pix:
-        pix.bias_cv_scan(data_group_spec="cv_bias")
-
-
-
     # initial measurement sample
     with PixCapSetup(scan_configuration, output_file_2, measurement=PixcapMeasurements.TOTAL_CAPACITANCE) as pix:
         # for larger averages
