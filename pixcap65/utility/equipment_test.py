@@ -49,7 +49,7 @@ def test_frequency_settling_2(settling_range: Iterable, file_name: str):
             analyze_data(raw_data=file_name, base_path=configuration['data_path'] + settling_path[settling_time],
                          is_advanced=True, full_model=True, plot=True, apply_contour=True, fit_plot_pdf=output_pdf)
 
-    # extract the dependecies for the chip from the measured error
+    # extract the dependencies for the chip from the measured error
     error_data = np.full((40, 40, settling_range.shape[0]), fill_value=np.nan)
     with tb.open_file(file_name, 'a') as h5_file, PdfPages(file_name[:-3] + "comparison" + '.pdf') as output_pdf:
         create_carray(h5_file, h5_file.root, "HistSettlingTime", obj=settling_range)
@@ -78,7 +78,6 @@ def test_frequency_settling(settling_range: Iterable, file_name: str):
     with PixCap65TotalCap(special_config, file_name) as pix:
         from matplotlib.backends.backend_pdf import PdfPages
         from matplotlib import cm
-        from matplotlib import pyplot as plt
         cmap = cm.get_cmap('viridis')
         with PdfPages("Settling_Measurement.pdf") as output_pdf:
             for t in settling_range:
@@ -125,7 +124,6 @@ def test_frequency_settling(settling_range: Iterable, file_name: str):
 def test_source_settling(settling_range: Iterable, file_name: str):
     settling_times = np.asarray(settling_range)
     with PixCap65TotalCap(scan_configuration, file_name) as pix:
-        from matplotlib import pyplot as plt
         pix.pixcap.bias_voltage = -0.1
         pix.pixcap.bias_on()
         for _ in range(30):

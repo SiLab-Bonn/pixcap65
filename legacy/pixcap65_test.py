@@ -4,13 +4,12 @@ Script for small tests
 
 import logging
 import os
+from typing import Any
 
 import numpy as np
-# it is a part of matplotlib (or was it is now deprecated)
-# noinspection PyPackageRequirements
-import pylab as pl
 import time
 from bitarray import bitarray
+from matplotlib import pyplot as plt
 
 from pixcap65.pixcap.pixcap65 import Pixcap65
 from pixcap65.utility import pixcap65_constants as c
@@ -55,7 +54,8 @@ row_range = range(row_stop, row_start - 1, -1)
 col_range = range(col_start, col_stop + 1)
 
 freq_sweep_array = np.arange(1, 4.1, 1)  # .astype(np.float) # [MHz]
-table_first_row = ["row\\col"]
+table_first_row = list[Any]()
+table_first_row.append("row\\col")
 table_first_row.extend(col_range)
 table_row = []
 
@@ -78,21 +78,21 @@ for i_row in row_range:
             result = dut['SMU'].get_reading()
             current_array.append(float(result.split(',')[1]))
 
-        pl.plot(freq_sweep_array, current_array, label="COL[" + str(i_col) + ']ROW[' + str(i_row) + ']')
+        plt.plot(freq_sweep_array, current_array, label="COL[" + str(i_col) + ']ROW[' + str(i_row) + ']')
         a, b = np.polyfit(freq_sweep_array, current_array, 1)
         print(i_col, i_row, a)
         table_row.append(a)
         fit_fn = a * freq_sweep_array + b
-        pl.plot(freq_sweep_array, current_array, 'o', label='COL({i_col})PIX(0)'.format(i_col=i_col))
-        pl.plot(freq_sweep_array, fit_fn, label='a={a:.3E}, b={b:.3E}'.format(a=a, b=b))
+        plt.plot(freq_sweep_array, current_array, 'o', label='COL({i_col})PIX(0)'.format(i_col=i_col))
+        plt.plot(freq_sweep_array, fit_fn, label='a={a:.3E}, b={b:.3E}'.format(a=a, b=b))
 
     print(','.join(map(str, table_row)))
     data_file.write(','.join(map(str, table_row)) + '\n')
 
 data_file.close()
 dut['SMU'].off()
-pl.legend(loc='best')
-pl.xlabel('Freq [MHz]')
-pl.ylabel('I [A]')
-pl.show()
+plt.legend(loc='best')
+plt.xlabel('Freq [MHz]')
+plt.ylabel('I [A]')
+plt.show()
 dut.close()

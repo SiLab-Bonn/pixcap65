@@ -47,8 +47,8 @@ class InterCap(tb.IsDescription):
 
 
 class Pixcap65InterCap(PixCap65Measurement):
-    def __init__(self, scan_config, output_file, **kwargs):
-        super(Pixcap65InterCap, self).__init__(scan_config, output_file, **kwargs)
+    def __init__(self, scan_config, out_file, **kwargs):
+        super(Pixcap65InterCap, self).__init__(scan_config, out_file, **kwargs)
 
         # prepare the data fields for the measurement
         self.inter_hist_current_1 = np.full(shape=(40, 40, self.n_frequencies),
@@ -210,12 +210,12 @@ class Pixcap65InterCap(PixCap65Measurement):
     # specialized for the inter capacitance measurement.
     @property
     def col_range(self):
-        """Get the range of columns to scan the pixels for. (specialised for inter-pix)"""
+        """Get the range of columns to scan the pixels for. (specialized for inter-pix)"""
         return range(self.col_start, self.col_stop + 1)
 
     @property
     def row_range(self):
-        """Get the range of rows to scan the pixels for. (specialised for inter-pix)"""
+        """Get the range of rows to scan the pixels for. (specialized for inter-pix)"""
         return range(self.row_stop, self.row_start - 1, -1)
 
     # endregion

@@ -52,7 +52,7 @@ def std_out_err_redirect_tqdm():
 logger = logging.getLogger(__name__)
 
 
-def create_carray(h5: tb.File, where: tb.Group | str, name: str, *args, **kwargs):
+def create_carray(h5: tb.File, where: Union[tb.Group, str], name: str, **kwargs):
     input_dut = kwargs.pop('input', None)
     unit = kwargs.pop('unit', None)
     if isinstance(where, str):
@@ -79,11 +79,13 @@ def create_update_array(h5, where: tb.Group, name: str, **kwargs):
     if name in get_children_bare(where):
         current_array = get_children_bare(where)[name]
         assert isinstance(current_array, tb.CArray)
-        if current_array.shape == kwargs['obj'].shape:
+        current_shape = current_array.shape
+        assert current_shape is not None
+        if current_shape == kwargs['obj'].shape:
             current_array[:] = kwargs['obj']
             current_array.flush()
             return current_array
-        elif np.all(current_array.shape >= kwargs['obj'].shape):
+        elif np.all(current_shape >= kwargs['obj'].shape):
             logger.warning(
                 "The shape of the arrays to be updated are not the same. Only a partial update is performed.")
             for indices in np.ndindex(kwargs['obj'].shape):

@@ -7,9 +7,9 @@ from matplotlib.backends.backend_pdf import PdfPages
 
 from pixcap65.analysis import analyze_data, analyze_capacitance_distribution
 from pixcap65.analysis_util.utility import get_base_group
+from pixcap65.plotting import plot_data, plot_combined_data, plot_bias_data, plot_inter_pix_data
 from pixcap65.utility.homogenize_plots import set_params
-from plotting import plot_data, plot_combined_data, plot_bias_data, plot_inter_pix_data
-from utility.tables_util import get_group_attribute
+from pixcap65.utility.tables_util import get_group_attribute
 
 if __name__ == '__main__':
     # additional setup

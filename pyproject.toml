@@ -21,16 +21,17 @@ dependencies = [
     "numpy < 2; python_version < '3'",
     "numpy < 2.3; python_version > '3' and python_version < '3.11'",
     "numpy>=2.3; python_version >= '3.11'",
-    "matplotlib",
     "tables>=3.0",
     "pyyaml",
+    "ruamel-yaml",
     "bitarray<=1.9.0; python_version < '3'",
     "bitarray>=3.4.0; python_version >= '3.5'",
     "bitarray; python_version < '3.5' and python_version >= '3'",
     "coloredlogs",
     # these declaration is only for the package index!
-    "basil-daq <= 3.2.0.dev0",
-    # only to be used for the installs and not for defining the dependency for the package index!
+    "basil-daq <= 3.2.0.dev0 ; python_version >= '3.7'",
+    # only to be used for the installations and not for defining the dependency for the package index! (Could not use uv then)
+    # "basil-daq @ ../basil-pixcap",
     # "basil-daq @ git+https:////github.com/SiLab-Bonn/basil.git@502a999eb5075e04850f7a481d2668726583c290 ; python_version >= '3.9'",
     # "basil-daq==3.1.0; platform_system == 'Windows' or python_version < '3.9'",
     "tqdm",
@@ -43,9 +44,9 @@ Issues = "https://github.com/SiLab-Bonn/pixcap65/issues/"
 # no documentation present.
 
 [project.scripts]
-pixcap_inter_cap = "pixcap65.pixcap_65_test_inter_cap"
-pixcap_total_cap = "pixcap65.pixcap_65_test_total_cap"
-pixcap_line = "pixcap65.pixcap.pixcap_65_test_load_line"
+# pixcap_inter_cap = "pixcap65.pixcap_65_test_inter_cap"
+# pixcap_total_cap = "pixcap65.pixcap_65_test_total_cap"
+# pixcap_line = "pixcap65.pixcap.pixcap_65_test_load_line"
 
 [project.optional-dependencies]
 dut = [
@@ -68,6 +69,16 @@ visualization = [
     "pyqt5",
     "vitables",
     "matplotlib",
+]
+
+docs = [
+    "sphinxcontrib-blockdiag",
+    "sphinx_rtd_theme",
+    "bitarray",
+    "pyyaml",
+    "setuptools",
+    "pkg-resources-backport ; python_version >= '3.9'",
+    "myst-parser ; python_version >= '3.6'",
 ]
 
 
@@ -116,6 +127,9 @@ exclude = [
 
 [tool.hatch.envs.hatch-build]
 installer = "pip"
+
+[tool.uv.sources]
+basil-daq = { path = "../basil-pixcap", editable = true }
 
 [tool.uv.build-backend]
 module-name = "pixcap65"

@@ -1,9 +1,9 @@
 * Slide with both the full bare capacitance map and the masked one beside it
-* Slide with the listing of the test capacitances and the capacitance distribution of the parasitic effects from the
+* Slide with the listing of the test capacitance and the capacitance distribution of the parasitic effects from the
   bare sensor sample
 * Slide with the setup and the general operation principle
 
-Mapping of the capacitance (design -> measurement) (Measurements are starting with page 4)
+Mapping of the capacitance (design → measurement) (Measurements are starting with page 4)
 
 | Capacitance | Design value | Measurement |
 |-------------|--------------|-------------|
@@ -26,4 +26,4 @@ Mapping of the capacitance (design -> measurement) (Measurements are starting wi
 | 17-26       | 8.53         | 12.6+-1.1   |
 
 Parasitic capacitance from the measurement circuit could be determined to be 14.9
-=> Capacitance from the bumps is 8.9
+⇒ Capacitance from the bumps is 8.9

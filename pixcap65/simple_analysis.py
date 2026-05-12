@@ -60,7 +60,8 @@ def analyze_data(raw_data, base_path=None, is_cv=False, first_boundaries=None, s
             for k, bias_voltage in enumerate(base_group.biasing.measurements.BiasVoltageHist):
                 bias_name = f"bias_{bias_voltage}_V".replace('-', "M_").replace(".", "__")
                 data_group = base_group.biasing.measurements[bias_name]
-                ana_group, _ = walk_to_node(base_group.biasing, str_join("/", ANALYSIS_GROUP_NAME, bias_name), create=True, verify_create=True)
+                ana_group, _ = walk_to_node(base_group.biasing, str_join("/", ANALYSIS_GROUP_NAME, bias_name),
+                                            create=True, verify_create=True)
                 assert isinstance(ana_group, tb.Group)
 
                 analyze_data_handle_data(in_file_h5, data_group, ana_group, is_inter_pixel=is_inter_pixel, **kwargs)
@@ -72,8 +73,8 @@ def analyze_data(raw_data, base_path=None, is_cv=False, first_boundaries=None, s
                 cv_err_data[:, :, k] = cap_error_data[:, :]
                 if kwargs.get("apply_correction", False):
                     ana_group_correction, _ = walk_to_node(base_group.biasing,
-                                                        str_join("/", ANALYSIS_CORRECTED_GROUP_NAME, bias_name),
-                                                        create=True, verify_create=True)
+                                                           str_join("/", ANALYSIS_CORRECTED_GROUP_NAME, bias_name),
+                                                           create=True, verify_create=True)
                     cap_data = ana_group_correction.HistCap[:]
                     cap_error_data = ana_group_correction.HistCapErr[:]
                     cv_data_corrected[:, :, k] = cap_data[:, :]

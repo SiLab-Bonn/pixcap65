@@ -460,10 +460,6 @@ def __perform_pixel_fit(currents: np.ndarray, current_errors: np.ndarray, freque
         fit_cov_temp = fitter.covariance
 
     assert isinstance(fit_cov_temp, np.ndarray)
-    PERFORM_PIXEL_TYPE = np.dtype([('C', np.float64), ('Cerr', np.float64),
-                                   ('I', np.float64), ('Ierr', np.float64),
-                                   ('R', np.float64), ('Rerr', np.float64),
-                                   ('fit', Any), ('cov', np.ndarray)])
     np.array([
         ('C', cap),
         ('Cerr', cap_error),
@@ -474,6 +470,12 @@ def __perform_pixel_fit(currents: np.ndarray, current_errors: np.ndarray, freque
         ('fit', fitter)
     ])
     return cap, cap_error, fit_cov_temp, fitter, leakage, leakage_error, resistor, resistor_error
+
+
+PERFORM_PIXEL_TYPE = np.dtype([('C', np.float64), ('Cerr', np.float64),
+                               ('I', np.float64), ('Ierr', np.float64),
+                               ('R', np.float64), ('Rerr', np.float64),
+                               ('fit', Any), ('cov', np.ndarray)])
 
 
 def __declare_fit_model(full_model) -> tuple[int, Callable[..., Any], str, str, dict[str, str], dict[str, float]]:

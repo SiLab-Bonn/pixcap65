@@ -37,9 +37,20 @@ exclude:
       - ../basil
       - ../basil/*
       - ../basil/**
+      - ../basil-pixcap
+      - ../basil-pixcap/*
+      - ../basil-pixcao/**
       - homogenize_plots.py
       - pixcap65/utility/homogenize_plots.py
       - pixcap65_DOMI1279.egg-info
+      - /pixcap65_DOMI1279.egg-info
+      - /pixcap65_DOMI1279.egg-info/*
+      - /pixcap65_DOMI1279.egg-info/**
+      - /doc/docs/_build
+      - /doc/docs/_build/*
+      - /doc/docs/_build/**
+      - /doc/docs/*.bat
+      - /doc/docs/Makefile
   - name: IncorrectFormatting, YAMLIncompatibleTypes
     paths:
       - pixcap65/**.yaml
@@ -59,12 +70,23 @@ exclude:
       - pixcap65_visa_S.yaml
       - pixcap65/utility/homogenize_plots.py
 
+  - name: DuplicatedCode
+    paths:
+      - legacy
+
 #Execute shell command before Qodana execution (Applied in CI/CD pipeline)
 #bootstrap: sh ./prepare-qodana.sh
+bootstrap: |
+  pip install -r requirements.txt
+  pip install basil-daq
+  python3 -m pip install -r requirements.txt
+  python3 -m pip install basil-daq
 
 #Install IDE plugins before Qodana execution (Applied in CI/CD pipeline)
 #plugins:
 #  - id: <plugin.id> #(plugin id can be found at https://plugins.jetbrains.com)
+plugins:
+  - id: tanvd.grazi
 
 # Quality gate. Will fail the CI/CD pipeline if any condition is not met
 # severityThresholds - configures maximum thresholds for different problem severities

@@ -241,7 +241,7 @@ def analyze_data(raw_data, base_path=None, is_advanced=False, is_cv=False,
                 dist_entry = {}
 
             if kwargs.get("apply_correction", False):
-                # extract the parasitic capacitances right here!
+                # extract the parasitic capacitance right here!
                 with tb.open_file(kwargs["bare_file"], mode='r') as correction_h5:
                     bare_path = kwargs.get("bare_hdf_file", None)
                     assert isinstance(bare_path, (str, None))
@@ -821,7 +821,7 @@ def depletion_delegation_impl(cap_data, cap_error_data, first_lower, first_upper
     @author Dominik Fischer
     @date 2026-05-07
 
-    Implementation of the pixel-whise depletion voltage estimation from a provided C-V characterization.
+    Implementation of the pixel-wise depletion voltage estimation from a provided C-V characterization.
 
     :param cap_data: capacitance data from the characterization.
     :param cap_error_data: uncertainties of the capacitance data from the characterization.
@@ -962,6 +962,7 @@ def analyze_doping_profile(bias_voltages: np.ndarray,
                             yerror=depletion_width_error_data, model=model_depletion)
         fitter = Minuit(cost, NAD=5e15, V=0.7, dep=-10, sat=np.max(depletion_width_data))
         fitter.limits["V"] = (0.0, 10)
+        # noinspection PyTypeChecker
         fitter.limits["NAD", "sat"] = (0.0, None)
         fitter.limits["dep"] = (None, -0.5)
         fitter.migrad()
@@ -1007,7 +1008,7 @@ def analyze_pixel_depletion(first_lower, first_upper,
     @date 2026-05-07
 
     Helper function to perform the investigation of the depletion voltage for a single pixel.
-    The function does not need to known which pixel is currently investigated which enables the usage of
+    The function does not need to know which pixel is currently investigated which enables the usage of
     for distributions of the capacitance over the whole sensor.
 
     :param first_upper: upper limit of the first fit range for the high voltage limit of the capacitance behaviour
@@ -1115,7 +1116,7 @@ def get_depletion_fit(cap_data: np.ndarray, cap_error_data: np.ndarray, voltage_
     :param cap_data: capacitance data from the characterization for this fit section.
     :param cap_error_data: uncertainties of the capacitance data from the characterization for this fit section.
     :param voltage_data: data of the applied HV voltages for this fit section.
-    :param fit_reference: identifieng the fit section for which the fit is performed.
+    :param fit_reference: identifying the fit section for which the fit is performed.
     :key fit_description_text: text describing the fit performed for usage within the plot handler of the fits.
     :key use_kafe2: boolean, False, indicates whether kafe2 is used for the fit.
     :key apply_contours: boolean, indicates whether to determine the contours and try to plot them.
@@ -1230,7 +1231,7 @@ def effective_doping(capacitance, bias_voltages, diode_area=None) -> np.ndarray:
 
 def analyze_capacitance_distribution(raw_data, base_path=None, corrected_distribution=False, **kwargs):
     """
-    analyse_capacitance_distribution
+    analyze_capacitance_distribution
 
     Helper function to describe how the capacitance is distributed over the sensor.
     We are in particular interested in the average capacitance of the pixel and their spread/dispersion.
@@ -1318,7 +1319,7 @@ def analyze_capacitance_distribution_delegate(analysis_group: Optional[tb.Group]
     bin_positions = bins[:-1] + np.diff(bins)
 
     # now fit this to a gauss function
-    initial_estimator = {'u': np.mean(temp_hist_back_data), 's': np.std(temp_hist_back_data)}
+    initial_estimator = {'u': float(np.mean(temp_hist_back_data)), 's': float(np.std(temp_hist_back_data))}
     extended_fitter = None
     if use_kafe2:
         from kafe2 import HistContainer, HistFit
@@ -1380,6 +1381,7 @@ def analyze_capacitance_distribution_delegate(analysis_group: Optional[tb.Group]
                                                                                             error=std_value))
     try:
         from jacobi import propagate
+        # noinspection PyTypeChecker
         y, y_cov = propagate(lambda p: gauss_model(binning_span, p[0], p[1], normalisation), fit_results,
                              fit_cov)
         y_err_prop = np.diag(y_cov) ** 0.5
@@ -1427,7 +1429,7 @@ def apply_correction(raw_data, base_path=None, bare_data_path=None, bare_group=N
         capacitance correction.
     :param bare_group: hdf files group for the bare analysis (holding the parasitic capacitance information)
     """
-    # first extract the parasitic capacitances
+    # first extract the parasitic capacitance
     assert bare_data_path is not None
     with tb.open_file(raw_data, mode='a') as in_file_h5_inner:
         base_group = get_base_group(base_path, in_file_h5_inner)
@@ -1524,6 +1526,8 @@ def _correct_data(correction_group: tb.Group, file_h5: tb.File, group: tb.Group,
 
 if __name__ == '__main__':
     # analyse_data(raw_data='/home/silab/git/pixcap65/pixcap_full_data_image1.h5')
+
+    # some usage examples
     from pixcap65.utility.homogenize_plots import set_params
 
     set_params(latex=True,
@@ -1543,45 +1547,26 @@ if __name__ == '__main__':
     #                                  fit_plot_pdf_name="Bare_analysis_parasitic.pdf")
     # analyze_data(raw_data='pixcap65/Data/r13-measurement/R13_Full_Scan_80V.h5', is_advanced=True,
     #              **bare_correction_args)
-    analyze_data(raw_data='R13-Interpixel_Scan.h5',
-                 base_path="Reference/R13/demo_measurement_65_unbiased_1_discharge",
-                 is_inter_pixel=True, is_advanced=True)
-    analyze_data(raw_data='packaged/R13-Interpixel_Scan.h5',
-                 base_path="Reference/R13/demo_measurement_66_biased_80_V_1_discharge",
-                 is_inter_pixel=True, is_advanced=True)
-    analyze_data(raw_data='packaged/R13-Interpixel_Scan.h5',
-                 base_path="Reference/R13/demo_measurement_67_biased_80_V_1_discharge",
-                 is_inter_pixel=True, is_advanced=True)
-    analyze_data(raw_data='packaged/R13-Interpixel_Scan.h5',
-                 base_path="Reference/R13/demo_measurement_68_biased_40_V_1_discharge",
-                 is_inter_pixel=True, is_advanced=True)
-    analyze_data(raw_data='packaged/R13-Interpixel_Scan.h5',
-                 base_path="Reference/R13/demo_measurement_69_biased_05_V_1_discharge",
-                 is_inter_pixel=True, is_advanced=True)
-    analyze_data(raw_data='packaged/R13-Interpixel_Scan.h5',
-                 base_path="Reference/R13/demo_measurement_70_unbiased_1_discharge",
-                 is_inter_pixel=True, is_advanced=True)
-    analyze_data(raw_data='packaged/RX-Interpixel_Scan.h5',
-                 base_path="Reference/R1/demo_measurement_1_unbiased_1_discharge",
-                 is_inter_pixel=True, is_advanced=True)
-    analyze_data(raw_data='packaged/RX-Interpixel_Scan.h5',
-                 base_path="Reference/R1/demo_measurement_2_biased_80_V_1_discharge",
-                 is_inter_pixel=True, is_advanced=True)
-    analyze_data(raw_data='packaged/RX-Interpixel_Scan.h5',
-                 base_path="Reference/R1/demo_measurement_3_biased_40_V_1_discharge",
-                 is_inter_pixel=True, is_advanced=True)
-    # with PdfPages("New_2_Scan_CV_refined_distribution.pdf") as pdf:
-    #     analyze_data(raw_data='New_2_Scan.h5', base_path="ATLAS_Itk/X2/C_V_Characteristic_refined", is_advanced=True,
-    #                  is_cv=True,
-    #                  first_boundaries=(-60, -20), second_boundaries=(-5, 0), use_corrected=True, apply_doping=True,
-    #                  chip_group_name="ATLAS_Itk/X2/sensor", distribution=True, set_parasitic=False,
-    #                  distribution_output_pdf=pdf, **bare_correction_args)
-    #
+    # analyze_data(raw_data='R13-Interpixel_Scan.h5',
+    #              base_path="Reference/R13/demo_measurement_65_unbiased_1_discharge",
+    #              is_inter_pixel=True, is_advanced=True)
     # analyze_data(raw_data='pixcap65/Data/New_1_Initial_6_Scan.h5', base_path="ATLAS ITk/C_V_Characteristic",
     #              is_advanced=False, is_cv=True, use_corrected=True, apply_doping=True,
     #              chip_group_name="ATLAS ITk/sensor",
     #              first_boundaries=[(-60, -40), (-80, -75)], second_boundaries=[(-5, 0), (-70, -65)],
     #              **bare_correction_args)
-    # analyze_data(raw_data='New_2_Scan.h5', base_path="ATLAS_Itk/X2/C_V_Characteristic", is_advanced=True, is_cv=True,
-    #              first_boundaries=[(-60, -40), (-80, -75)], second_boundaries=[(-5, 0), (-70, -65)], use_corrected=True,
-    #              **bare_correction_args)
+    analyze_data(raw_data="packaged/X2_2_Scan.h5", base_path="ATLAS_ITk/X2/unbiased_1_full", is_advanced=True,
+                 **bare_correction_args)
+    analyze_data(raw_data="packaged/X2_2_Scan.h5", base_path="ATLAS_ITk/X2/biased_80_V_full", is_advanced=True,
+                 **bare_correction_args)
+    analyze_data(raw_data="packaged/X2_2_Scan.h5", base_path="ATLAS_ITk/X2/C_V_Characteristic_refined",
+                 is_advanced=False, full_model=False, is_cv=True, use_corrected=True,
+                 first_boundaries=[(-60, -40), (-80, -75)], second_boundaries=[(-5, 0), (-70, -65)],
+                 **bare_correction_args)
+
+    # remaining analysis of the E1 sample
+    analyze_data(raw_data="Reference_Evelyn_Scan.h5", base_path="Reference/E1/unbiased_4_full", is_advanced=True,
+                 **bare_correction_args)
+    analyze_data(raw_data="Reference_Evelyn_Scan.h5", base_path="Reference/E1/C_V_Characteristic",
+                 is_advanced=True, full_model=False, is_cv=True, use_corrected=True,
+                 **bare_correction_args)

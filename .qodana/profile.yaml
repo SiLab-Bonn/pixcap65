@@ -1,4 +1,4 @@
-version : "1.0"
+version: "1.0"
 
 profile:
   base:
@@ -9,6 +9,7 @@ profile:
       options:
         ignoredErrors:
           - E722
+          - E352
     - inspection: PyBroadException
       enabled: False
     - inspection: PyBroadExceptionInspection

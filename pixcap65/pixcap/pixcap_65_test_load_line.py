@@ -38,9 +38,9 @@ class Pixcap65LoadLine(PixCap65Measurement):
     def store_measurement_data(self, data_group, sequence_call, unit=None):
         raise NotImplementedError("Pixcap65LoadLine.store_measurement_data")
 
-    def __init__(self, scan_config, output_file):
+    def __init__(self, scan_config, out_file):
         self.seq_size = LOAD_LINE_SEQ_SIZE
-        super(Pixcap65LoadLine).__init__(scan_config, output_file)
+        super(Pixcap65LoadLine).__init__(scan_config, out_file)
 
         # prepare the measurement fields
         self.hist_current = np.full(shape=(int(self.seq_size / 2 - 1), 40, 40, self.n_frequencies + 1),
@@ -104,7 +104,7 @@ class Pixcap65LoadLine(PixCap65Measurement):
                         self.hist_current[cnt - 1, i_col, i_row, 0] = cnt
                         if isinstance(result, float):
                             self.hist_current[cnt - 1, i_col, i_row, k + 1] = result
-                        else:
+                        elif isinstance(result, str):
                             self.hist_current[cnt - 1, i_col, i_row, k + 1] = float(result.split(',')[1])
 
                 logger.info(bit_array_clk_3)
