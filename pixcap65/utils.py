@@ -6,7 +6,7 @@ import numpy as np
 import time
 from basil.dut import Dut, Base
 
-from pixcap_65_test_total_cap import PixCap65Measurement
+from pixcap65.pixcap_65_test_total_cap import PixCap65Measurement
 
 logger = logging.getLogger(__name__)
 
