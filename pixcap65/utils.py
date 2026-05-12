@@ -4,12 +4,14 @@ from typing import Optional, OrderedDict, Union
 
 import numpy as np
 import time
+# noinspection PyUnresolvedReferences
 from basil.dut import Dut, Base
-
 from pixcap65.pixcap_65_test_total_cap import PixCap65Measurement
 
 logger = logging.getLogger(__name__)
 
+
+# TODO/FIXME: the location of the device directory for the firmware is difficult to handle when packaging!
 
 # general hierarchy to use:
 
@@ -232,6 +234,7 @@ class PixCapSetup(Dut):
             self["power"].set_enable(0, channel=1)
             self["power"].set_enable(0, channel=2)
             self["power"].set_enable(0, channel=3)
+            import serial
 
 
         except:

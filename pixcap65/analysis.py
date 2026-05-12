@@ -1560,7 +1560,7 @@ if __name__ == '__main__':
     analyze_data(raw_data="packaged/X2_2_Scan.h5", base_path="ATLAS_ITk/X2/biased_80_V_full", is_advanced=True,
                  **bare_correction_args)
     analyze_data(raw_data="packaged/X2_2_Scan.h5", base_path="ATLAS_ITk/X2/C_V_Characteristic_refined",
-                 is_advanced=False, full_model=False, is_cv=True, use_corrected=True,
+                 is_advanced=True, full_model=False, is_cv=True, use_corrected=True,
                  first_boundaries=[(-60, -40), (-80, -75)], second_boundaries=[(-5, 0), (-70, -65)],
                  **bare_correction_args)
 

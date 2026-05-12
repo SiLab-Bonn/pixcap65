@@ -6,7 +6,6 @@ from typing import Union, Mapping
 
 import numpy as np
 import tables as tb
-from conda import exception_handler
 from tables import File
 from tables.group import RootGroup
 
@@ -219,7 +218,6 @@ def handle_minuit_advanced_options(fit_object, apply_contour, x_label, y_label, 
     """
     from matplotlib import pyplot as plt
     from iminuit import Minuit
-    from iminuit.cost import LeastSquares
     # noinspection PyProtectedMember
     from iminuit.minuit import _cl_to_errordef
     assert isinstance(fit_object, Minuit)
