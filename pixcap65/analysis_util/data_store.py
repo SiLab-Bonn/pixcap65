@@ -6,11 +6,20 @@ from pixcap65.analysis_util import GENERAL_PIXCAP_SHAPE
 
 class DepletionDataStore:
     def store_data(self, key, data):
-        # TODO document why this method is empty
+        """
+        temporarily store the data for the given key into the internal data structures.
+        :param key: kind of data to store
+        :param data: data set to store
+        """
+        # Stub function for further implementation
         pass
 
     def flush_data(self):
-        # TODO document why this method is empty
+        """
+        Write the data stored in the internal data structures to a file/disk what ever.
+        This will depend on the actual subclass used.
+        """
+        # stub function for further implemenation by more specialized subclasses.
         pass
 
 

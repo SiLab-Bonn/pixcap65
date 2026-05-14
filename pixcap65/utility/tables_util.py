@@ -1,7 +1,6 @@
+import tables as tb
 from typing import Any
 from typing import ItemsView
-
-import tables as tb
 
 
 def get_groups(parent: tb.Group) -> ItemsView[str, tb.Group]:
@@ -89,3 +88,10 @@ def rename_node(node: tb.Node, new_name: str):
     else:
         # noinspection PyProtectedMember
         node._f_rename(new_name)
+
+def back_node(node: tb.Group, group: tb.Group, rename_target=None):
+    for key, value in get_children(node):
+        new_name = key
+        while new_name in group:
+            new_name = "{old}_backing".format(old=new_name)
+        rename_node(value if rename_target is None else rename_target, new_name)

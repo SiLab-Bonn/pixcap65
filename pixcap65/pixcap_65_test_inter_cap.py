@@ -3,17 +3,16 @@ Script for measuring Inter Pixel Capacitance
 """
 
 import logging
-
 import numpy as np
 import tables as tb
 import time
 from tqdm import tqdm
 
 from pixcap65.analysis_util.utility import HIST_CURRENT_MEAS_UNIT
-from pixcap65.utility.tables_util import set_group_attribute
 from pixcap65.pixcap_65_test_total_cap import PixCap65Measurement, MEASURING_PIXEL_TEXT, \
     _store_scan_par_values
 from pixcap65.utility import pixcap65_constants as c
+from pixcap65.utility.tables_util import set_group_attribute
 from pixcap65.utility.tqdm_logging_utils import logging_redirect_tqdm
 
 logging.getLogger().setLevel(logging.INFO)
@@ -159,31 +158,32 @@ class Pixcap65InterCap(PixCap65Measurement):
             logger.info("Done")
 
     def store_measurement_data(self, data_group: tb.Group, sequence_call: bool, unit=None):
-        assert isinstance(data_group, tb.Group)
-        _store_scan_par_values(h5_file=self.out_file_h5, scan_parameters=self.scan_parameters, group=data_group)
-        self.create_carray(data_group, name='TotalHistCurr',
-                           title='Current Histogram for the total capacitance measurement', obj=self.total_hist_current,
-                           filters=self.filters, unit=HIST_CURRENT_MEAS_UNIT, input="VM2")
-        self.create_carray(data_group, name='TotalHistCurrErr',
-                           title='Error Histogram of the current for the total capacitance measurement',
-                           obj=self.total_hist_current_error, filters=self.filters, unit=HIST_CURRENT_MEAS_UNIT,
-                           input="VM2")
-        self.create_carray(data_group, name='InterHistCurrA',
-                           title='Current Histogram for the inter capacitance measurement',
-                           obj=self.inter_hist_current_1, filters=self.filters, unit=HIST_CURRENT_MEAS_UNIT,
-                           input="VM3")
-        self.create_carray(data_group, name='InterHistCurrErrA',
-                           title='Error Histogram of inter current A for the inter capacitance measurement',
-                           obj=self.inter_hist_current_1_error, filters=self.filters, unit=HIST_CURRENT_MEAS_UNIT,
-                           input="VM3")
-        self.create_carray(data_group, name='InterHistCurrB',
-                           title='Current Histogram for the inter capacitance measurement',
-                           obj=self.inter_hist_current_2, filters=self.filters, unit=HIST_CURRENT_MEAS_UNIT,
-                           input="VM1")
-        self.create_carray(data_group, name='InterHistCurrErrB',
-                           title='Error Histogram of inter current B for the inter capacitance measurement',
-                           obj=self.inter_hist_current_2_error, filters=self.filters, unit=HIST_CURRENT_MEAS_UNIT,
-                           input="VM1")
+        # TODO 2026-05-14 dominikfischer: this make multiple measurements for the inter-pix capacitance measurement impossible
+        if unit == "regular":
+            _store_scan_par_values(h5_file=self.out_file_h5, scan_parameters=self.scan_parameters, group=data_group)
+            self.create_carray(data_group, name='TotalHistCurr',
+                               title='Current Histogram for the total capacitance measurement', obj=self.total_hist_current,
+                               filters=self.filters, unit=HIST_CURRENT_MEAS_UNIT, input="VM2")
+            self.create_carray(data_group, name='TotalHistCurrErr',
+                               title='Error Histogram of the current for the total capacitance measurement',
+                               obj=self.total_hist_current_error, filters=self.filters, unit=HIST_CURRENT_MEAS_UNIT,
+                               input="VM2")
+            self.create_carray(data_group, name='InterHistCurrA',
+                               title='Current Histogram for the inter capacitance measurement',
+                               obj=self.inter_hist_current_1, filters=self.filters, unit=HIST_CURRENT_MEAS_UNIT,
+                               input="VM3")
+            self.create_carray(data_group, name='InterHistCurrErrA',
+                               title='Error Histogram of inter current A for the inter capacitance measurement',
+                               obj=self.inter_hist_current_1_error, filters=self.filters, unit=HIST_CURRENT_MEAS_UNIT,
+                               input="VM3")
+            self.create_carray(data_group, name='InterHistCurrB',
+                               title='Current Histogram for the inter capacitance measurement',
+                               obj=self.inter_hist_current_2, filters=self.filters, unit=HIST_CURRENT_MEAS_UNIT,
+                               input="VM1")
+            self.create_carray(data_group, name='InterHistCurrErrB',
+                               title='Error Histogram of inter current B for the inter capacitance measurement',
+                               obj=self.inter_hist_current_2_error, filters=self.filters, unit=HIST_CURRENT_MEAS_UNIT,
+                               input="VM1")
 
     def handle_measurement_errors(self, unit=None):
         # make sure the measurement points will have uncertainties.

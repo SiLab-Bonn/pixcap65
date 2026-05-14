@@ -3,7 +3,6 @@ Analysis of Pixcap65 data. Fits freq vs current to extract the capacitance. A 2D
 for each pixel is stored.
 """
 import logging
-
 from tables import File, Group
 
 from pixcap65.analysis_util.data_store import DepletionDataStore, DepletionTableStore, DepletionArrayStore, \
@@ -1567,6 +1566,24 @@ if __name__ == '__main__':
     # remaining analysis of the E1 sample
     analyze_data(raw_data="Reference_Evelyn_Scan.h5", base_path="Reference/E1/unbiased_4_full", is_advanced=True,
                  **bare_correction_args)
+    e1_depletion_args = {
+        "first_boundaries": (-100, -80),
+        "second_boundaries": (-10, 0),
+    }
     analyze_data(raw_data="Reference_Evelyn_Scan.h5", base_path="Reference/E1/C_V_Characteristic",
-                 is_advanced=True, full_model=False, is_cv=True, use_corrected=True,
+                 is_advanced=True, full_model=False, is_cv=True, use_corrected=True, **e1_depletion_args,
                  **bare_correction_args)
+
+    analyze_data(raw_data="packaged/Reference_Demo.h5", base_path="Reference/TESTS/cv_only_simple",
+                 is_advanced=True, is_cv=True, use_corrected=True,
+                 **bare_correction_args)
+    analyze_data(raw_data="packaged/Reference_Demo.h5", base_path="Reference/TESTS/cv_only_advanced",
+                 is_advanced=True, is_cv=True, use_corrected=True,
+                 **bare_correction_args)
+    analyze_data(raw_data="packaged/Reference_Demo.h5", base_path="Reference/TESTS/cv_combined_simple",
+                 is_advanced=True, is_cv=True, use_corrected=True,
+                 **bare_correction_args)
+    analyze_data(raw_data="packaged/Reference_Demo.h5", base_path="Reference/TESTS/cv_combined_advanced",
+                 is_advanced=True, is_cv=True, use_corrected=True,
+                 **bare_correction_args)
+

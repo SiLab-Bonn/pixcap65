@@ -165,14 +165,10 @@ if __name__ == '__main__':
     plot_bias_data(interpreted_data='pixcap65/Data/r13-measurement/R13_BIAS_2.h5')
     # Data/r13-measurement/R13_BIAS_CV_COMBI_2.h5 no further investigation possible as data set is incomplete!
     # Data/r13-measurement/R13_BIAS_CV_COMBI_3.h5 no further investigation possible as data set is incomplete!
-    plot_combined_data(interpreted_data='pixcap65/Data/r13-measurement/R13_BIAS_CV_COMBI_5.h5', first_lower=-100,
-                       first_upper=-40, second_lower=-8, second_upper=0)
-    plot_combined_data(interpreted_data='pixcap65/Data/r13-measurement/R13_BIAS_CV_COMBI_5.h5', first_lower=-100,
-                       first_upper=-40, second_lower=-8, second_upper=0, use_corrected=True, apply_doping=True)
-    plot_combined_data(interpreted_data='pixcap65/Data/r13-measurement/R13_BIAS_CV_COMBI_6.h5', first_lower=-100,
-                       first_upper=-40, second_lower=-10, second_upper=0)
-    plot_combined_data(interpreted_data='pixcap65/Data/r13-measurement/R13_BIAS_CV_COMBI_6.h5', first_lower=-100,
-                       first_upper=-40, second_lower=-10, second_upper=0, use_corrected=True, apply_doping=True)
+    plot_combined_data(interpreted_data='pixcap65/Data/r13-measurement/R13_BIAS_CV_COMBI_5.h5')
+    plot_combined_data(interpreted_data='pixcap65/Data/r13-measurement/R13_BIAS_CV_COMBI_5.h5', use_corrected=True, apply_doping=True)
+    plot_combined_data(interpreted_data='pixcap65/Data/r13-measurement/R13_BIAS_CV_COMBI_6.h5')
+    plot_combined_data(interpreted_data='pixcap65/Data/r13-measurement/R13_BIAS_CV_COMBI_6.h5', use_corrected=True, apply_doping=True)
     plot_data(interpreted_data='pixcap65/Data/r13-measurement/R13_Full_Scan_80V.h5', suffix="general_data",
               use_group=False)
     plot_data(interpreted_data='pixcap65/Data/r13-measurement/R13_Full_Scan_80V.h5', suffix="general_data",
@@ -243,11 +239,10 @@ if __name__ == '__main__':
                    use_group=True)
     plot_combined_data(interpreted_data='pixcap65/Data/New_1_Initial_6_Scan.h5',
                        base_path="ATLAS ITk/C_V_Characteristic",
-                       use_group=True, first_lower=-60, first_upper=-40, second_lower=-5, second_upper=0)
+                       use_group=True)
     plot_combined_data(interpreted_data='pixcap65/Data/New_1_Initial_6_Scan.h5',
                        base_path="ATLAS ITk/C_V_Characteristic",
-                       use_group=True, first_lower=-60, first_upper=-40, second_lower=-60, second_upper=0,
-                       use_corrected=True,
+                       use_group=True, use_corrected=True,
                        apply_doping=True)
     plot_data(interpreted_data='pixcap65/Data/New_1_Initial_6_Scan.h5', base_path="ATLAS ITk/full_biased_80_V",
               suffix="general_data", use_group=True, exclude_test_cap=True, mask_pixel=[[39, 39], [38, 39]], )
@@ -262,15 +257,13 @@ if __name__ == '__main__':
               use_group=True, use_corrected=True, exclude_test_cap=True)
     plot_bias_data(interpreted_data='New_2_Scan.h5', base_path="ATLAS_Itk/X2/I_V_Characteristic", use_group=True)
     plot_combined_data(interpreted_data='New_2_Scan.h5', base_path="ATLAS_Itk/X2/C_V_Characteristic",
-                       use_group=True, first_lower=-60, first_upper=-40, second_lower=-5, second_upper=0)
+                       use_group=True)
     plot_combined_data(interpreted_data='New_2_Scan.h5', base_path="ATLAS_Itk/X2/C_V_Characteristic",
-                       use_group=True, first_lower=-60, first_upper=-40, second_lower=-60, second_upper=0,
-                       use_corrected=True)
+                       use_group=True, use_corrected=True)
     plot_combined_data(interpreted_data='New_2_Scan.h5', base_path="ATLAS_Itk/X2/C_V_Characteristic_refined",
-                       use_group=True, first_lower=-60, first_upper=-20, second_lower=-5, second_upper=0)
+                       use_group=True)
     plot_combined_data(interpreted_data='New_2_Scan.h5', base_path="ATLAS_Itk/X2/C_V_Characteristic_refined",
-                       use_group=True, first_lower=-60, first_upper=-20, second_lower=-5, second_upper=0,
-                       use_corrected=True,
+                       use_group=True, use_corrected=True,
                        apply_doping=True, distribution=True)
     plot_data(interpreted_data='New_2_Scan.h5', base_path="ATLAS_Itk/X2/biased_80_V", suffix="general_data_80V",
               use_group=True, exclude_test_cap=True)

@@ -1,18 +1,17 @@
 import logging
-from enum import StrEnum
-from typing import Optional, OrderedDict, Union
-
 import numpy as np
 import time
 # noinspection PyUnresolvedReferences
 from basil.dut import Dut, Base
+from enum import StrEnum
+from typing import Optional, OrderedDict, Union
 
 from pixcap65.pixcap_65_test_total_cap import PixCap65Measurement
 
 logger = logging.getLogger(__name__)
 
 
-# TODO/FIXME: the location of the device directory for the firmware is difficult to handle when packaging!
+# FIXME: the location of the device directory for the firmware is difficult to handle when packaging!
 
 # general hierarchy to use:
 

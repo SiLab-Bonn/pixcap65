@@ -1,7 +1,5 @@
 import contextlib
 import logging
-from typing import Union, Tuple
-
 import numpy as np
 import sys
 import tables as tb
@@ -9,6 +7,8 @@ import time
 from time import sleep
 # noinspection PyProtectedMember
 from tqdm.contrib import DummyTqdmFile
+from typing import Union, Tuple
+from warnings import warn
 
 from pixcap65.utility.tables_util import group_get_file, set_group_attribute, get_children_bare, hdf_get_or_create_path
 
@@ -35,6 +35,10 @@ def walk_to_node(parent: GroupType, path: str, create=False, verify_create=False
     assert isinstance(result, tb.Group)
     if verify_create:
         return result, not already_exits,
+    warn_msg = ("The usage of the parameter `verify_create` is deprecated. The parameter must be specified to be true."
+                "The old behaviour with implicit False will be removed and this warning is mean to identify code where"
+                "still the old behaviour is expected.")
+    warn(warn_msg, category=DeprecationWarning)
     return result
 
 
