@@ -104,7 +104,7 @@ def regenerate_measurement_errors(group):
     if "HistCurrValues" not in group:
         from pixcap65.configs.config_handler import extract_smu_current_error
         import yaml
-        with open("/configs/keithley_2602a_range.yaml") as f:
+        with open("pixcap65/configs/keithley_2602a_range.yaml") as f:
             config = yaml.safe_load(f)
             data = group.HistCurr[:]
             errors = np.where(np.isfinite(data), extract_smu_current_error(config, data, 0.000001), np.nan)
@@ -118,19 +118,20 @@ def regenerate_measurement_errors(group):
 # FIXME: Why are there no error estimations for I-V curves?
 
 if __name__ == "__main__":
-    with tb.open_file('New_2_Scan.h5', "a") as h5_file:
+    with tb.open_file("packaged/Reference_Demo.h5", "a") as h5_file:
         # adjust_cap_measurement(h5_file.root.ATLAS_Itk.X2.unbiased_1.total_cap.measurements, has_values=True)
         # adjust_cap_measurement(h5_file.root.ATLAS_Itk.X2.biased_80_V.total_cap.measurements, has_values=True)
         # adjust_i_v_measurement(h5_file.root.ATLAS_Itk.X2.I_V_Characteristic.biasing.measurements)
         # adjust_c_v_measurement(h5_file.root.ATLAS_Itk.X2.C_V_Characteristic.biasing.measurements)
         # adjust_cap_measurement(h5_file.root.total_cap.measurements, has_values=False)
-        # regenerate_measurement_errors(h5_file.root["ATLAS ITk"].unbiased_4.total_cap.measurements)
+        regenerate_measurement_errors(h5_file.root.Reference.TESTS.unbiased_5_full.total_cap.measurements)
+        regenerate_measurement_errors(h5_file.root.Reference.TESTS.unbiased_4_full.total_cap.measurements)
         # regenerate_measurement_errors(h5_file.root["ATLAS ITk"].unbiased_3.total_cap.measurements)
         # regenerate_measurement_errors(h5_file.root["ATLAS ITk"].run_2.total_cap.measurements)
         # regenerate_measurement_errors(h5_file.root["ATLAS ITk"].run_1.total_cap.measurements)
         # regenerate_i_v_errors(h5_file.root["ATLAS ITk"].I_V_Characteristic.biasing.measurements)
         # regenerate_c_v_errors(h5_file.root["ATLAS ITk"].C_V_Characteristic.biasing.measurements)
-        generate_pixel_dimensions(h5_file.root.ATLAS_Itk.X2)
+        # generate_pixel_dimensions(h5_file.root.ATLAS_Itk.X2)
 
         # group = h5_file.root.ATLAS_Itk.X2.unbiased_1.measurements
         # group.HistCurr.attrs["Units"] = "A"

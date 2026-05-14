@@ -1,12 +1,17 @@
 """
 Plotting of Pixcap65 data.
 """
-import logging
-import os.path
-from typing import Any, Optional
-from warnings import warn
+# ----------------------------------------------------------
+#  Copyright (c) 2018. All rights reserved
+#  SiLab, Institute of Physics, University of Bonn
+# ----------------------------------------------------------
 
+import os.path
+
+import logging
+from contextlib import contextmanager
 from matplotlib.axes import Axes
+from typing import Any, Optional, Union, List, Tuple
 
 from pixcap65.analysis_util.physics_modelling import model_depletion
 
@@ -49,6 +54,7 @@ DEFAULT_BIN_NUMBER = 50
 DEFAULT_TEST_CAP_EXCLUSION = True
 logger = logging.getLogger(__name__)
 NUMBER_DEPLETION_PLOT_POINTS = 1000
+CAPACITANCE_LABEL = "C in fF"
 
 
 def evaluate_pixel_mask(hist, perform_filter=False, **kwargs):
@@ -93,7 +99,6 @@ def evaluate_pixel_mask(hist, perform_filter=False, **kwargs):
     return result_hist
 
 
-# TODO: Implement the extraction of particular figures for certain pixels while performing the plotting for all pixels.
 def get_pdf_name(base_path, interpreted_data, suffix: str, use_group: bool) -> str:
     """
     get_pdf_name
@@ -196,7 +201,63 @@ def plot_inter_pix_data(interpreted_data, base_path=None, suffix="general_inter_
                                                  **kwargs)
 
 
-def plot_bias_data(interpreted_data, base_path=None, suffix="bias_curve", use_group=False):
+@contextmanager
+def multi_sensor_file_handler_simple(interpreted_data, base_path, **kwargs):
+    pdf_name = kwargs.pop("pdf_name", "I-V-Collection.pdf")
+    # to simplify the operation we need a mapping of a file to all the group_mapping it should be used for
+    # and we need a mapping to the opend files
+    group_mapping = {}
+    files = {}
+    groups = []
+    try:
+        for file_path, group_name in zip(interpreted_data, base_path):
+            if file_path not in group_mapping:
+                current_file = tb.open_file(file_path, mode='r')
+                files[file_path] = current_file
+                group = get_base_group(group_name, current_file)
+                group_mapping[file_path] = [group]
+            else:
+                group = get_base_group(group_name, files[file_path])
+                group_mapping[file_path].append(group)
+            groups.append(group.biasing.measurements)
+        with PdfPages(pdf_name) as output_pdf:
+            yield groups, output_pdf
+    finally:
+        for file in files.values():
+            assert isinstance(file, tb.File)
+            file.flush()
+            file.close()
+
+@contextmanager
+def multi_sensor_file_handler_advanced(interpreted_data, base_path, **kwargs):
+    pdf_name = kwargs.pop("pdf_name", "I-V-Collection.pdf")
+    # to simplify the operation we need a mapping of a file to all the group_mapping it should be used for
+    # and we need a mapping to the opend files
+    group_mapping = {}
+    files = {}
+    groups = []
+    analysis_groups = []
+    try:
+        for file_path, group_name in zip(interpreted_data, base_path):
+            if file_path not in group_mapping:
+                current_file = tb.open_file(file_path, mode='r')
+                files[file_path] = current_file
+                group = get_base_group(group_name, current_file)
+                group_mapping[file_path] = [group]
+            else:
+                group = get_base_group(group_name, files[file_path])
+                group_mapping[file_path].append(group)
+            groups.append(group.biasing.measurements)
+            analysis_groups.append(get_analysis_group(group.biasing, **kwargs))
+        with PdfPages(pdf_name) as output_pdf:
+            yield groups, analysis_groups, output_pdf
+    finally:
+        for file in files.values():
+            assert isinstance(file, tb.File)
+            file.flush()
+            file.close()
+
+def plot_bias_data(interpreted_data, base_path=None, suffix="bias_curve", use_group=False, **kwargs):
     """
     plot_bias_data
 
@@ -208,14 +269,17 @@ def plot_bias_data(interpreted_data, base_path=None, suffix="bias_curve", use_gr
     :param use_group: boolean, whether to append the group name of the measurements to the PDF name.
     """
     pdf_name = get_pdf_name(base_path, interpreted_data, suffix, use_group)
-    with PdfPages(pdf_name) as output_pdf:
-        with tb.open_file(interpreted_data, mode='r') as in_file_h5:
-            base_group = get_base_group(base_path, in_file_h5)
-            plot_bias_delegate(base_group.biasing.measurements, output_pdf)
+    if isinstance(interpreted_data, Union[List, Tuple, np.ndarray]):
+        with multi_sensor_file_handler_simple(interpreted_data, base_path, **kwargs) as (groups, output_pdf):
+            plot_bias_delegate(groups, output_pdf, **kwargs)
+    else:
+        with PdfPages(pdf_name) as output_pdf:
+            with tb.open_file(interpreted_data, mode='r') as in_file_h5:
+                base_group = get_base_group(base_path, in_file_h5)
+                plot_bias_delegate(base_group.biasing.measurements, output_pdf)
 
 
-def plot_cv_data(interpreted_data, base_path=None, first_upper=None, first_lower=None, second_upper=None,
-                 second_lower=None, suffix="C_V_characteristic", use_group=False, **kwargs):
+def plot_cv_data(interpreted_data, base_path=None, suffix="C_V_characteristic", use_group=False, **kwargs):
     """
     plot_cv_data
 
@@ -229,10 +293,6 @@ def plot_cv_data(interpreted_data, base_path=None, first_upper=None, first_lower
 
     :param interpreted_data: path to the hdf file which holds the raw data and the analysis results.
     :param base_path: path to the base group in the hdf files hierarchy.
-    :param first_upper: upper limit of the first fit range
-    :param first_lower: lower limit of the first fit range
-    :param second_upper: upper limit of the second fit range
-    :param second_lower: lower limit of the second fit range
     :param suffix:  additional suffix to use for naming the PDF containing the plots.
     :param use_group:   boolean, whether to append the group name of the measurements to the PDF name.
     :key verbose: boolean, indicating whether to use verbose output for depletion voltages
@@ -240,17 +300,19 @@ def plot_cv_data(interpreted_data, base_path=None, first_upper=None, first_lower
         should be investigated.
     """
     pdf_name = get_pdf_name(base_path, interpreted_data, suffix, use_group)
-    with PdfPages(pdf_name) as output_pdf:
-        with tb.open_file(interpreted_data, mode='a') as in_file_h5:
-            base_group = get_base_group(base_path, in_file_h5)
-            plot_cv_data_delegate(base_group.biasing.measurements,
-                                  get_analysis_group(base_group.biasing, **kwargs), output_pdf,
-                                  first_upper, first_lower, second_upper, second_lower,
-                                  apply_doping=kwargs.get('apply_doping', False))
+    if isinstance(interpreted_data, Iterable) and not isinstance(interpreted_data, str):
+        with multi_sensor_file_handler_advanced(interpreted_data, base_path, **kwargs) as (groups, analysis_groups, output_pdf):
+            plot_cv_data_delegate(groups, analysis_groups, output_pdf, **kwargs)
+    else:
+        with PdfPages(pdf_name) as output_pdf:
+            with tb.open_file(interpreted_data, mode='a') as in_file_h5:
+                base_group = get_base_group(base_path, in_file_h5)
+                plot_cv_data_delegate(base_group.biasing.measurements,
+                                      get_analysis_group(base_group.biasing, **kwargs), output_pdf,
+                                      apply_doping=kwargs.get('apply_doping', False))
 
 
-def plot_combined_data(interpreted_data, base_path=None, first_upper=None, first_lower=None, second_upper=None,
-                       second_lower=None, suffix="combined_bias_cv_curve", use_group=False, **kwargs):
+def plot_combined_data(interpreted_data, base_path=None, suffix="combined_bias_cv_curve", use_group=False, **kwargs):
     """
     plot_combined_data
 
@@ -264,10 +326,6 @@ def plot_combined_data(interpreted_data, base_path=None, first_upper=None, first
 
     :param interpreted_data: path to the hdf file which holds the raw data and the analysis results.
     :param base_path: path to the base group in the hdf files hierarchy.
-    :param first_upper: upper limit of the first fit range
-    :param first_lower: lower limit of the first fit range
-    :param second_upper: upper limit of the second fit range
-    :param second_lower: lower limit of the second fit range
     :param suffix: additional suffix to use for naming the PDF containing the plots.
     :param use_group: boolean, whether to append the group name of the measurements to the PDF name.
     :key use_corrected: boolean, whether to use corrected data
@@ -284,10 +342,10 @@ def plot_combined_data(interpreted_data, base_path=None, first_upper=None, first
             base_group = get_base_group(base_path, in_file_h5)
             plot_bias_delegate(base_group.biasing.measurements, output_pdf)
             plot_cv_data_delegate(base_group.biasing.measurements, get_analysis_group(base_group.biasing, **kwargs),
-                                  output_pdf, first_upper, first_lower, second_upper, second_lower, **kwargs)
+                                  output_pdf, **kwargs)
 
 
-def plot_bias_delegate(data_group, output_pdf: PdfPages):
+def plot_bias_delegate(data_group, output_pdf: PdfPages, **kwargs):
     """
     plot_bias_delegate
 
@@ -297,25 +355,44 @@ def plot_bias_delegate(data_group, output_pdf: PdfPages):
     :param data_group: hdf file's hierarchy group containing the raw data.
     :param output_pdf: PDF object to write the plots to.
     """
-    tabular = data_group.BiasTable
-    assert isinstance(tabular, tb.Table)
-    voltage_data = np.abs(tabular.col("U"))
-    current_data = np.abs(tabular.col("I"))
-    current_errors = tabular.col("DI")
-    if not np.all(np.isfinite(voltage_data)):
-        current_errors = None
     fig, ax = plt.subplots()
-    ax.set(title="Bias data from the measurement", xlabel=BIAS_CURVE_X_LABEL, ylabel=BIAS_CURVE_Y_LABEL)
-    ax.errorbar(voltage_data, current_data * CURRENT_CONVERSION_FACTOR,
-                yerr=current_errors, xerr=None, fmt='o', label="Bias data")
+    if isinstance(data_group, Iterable) and not isinstance(data_group, tb.Node):
+        labels = kwargs.pop("labels", ["Bias_data"] * len(data_group))
+        normalization = np.asarray(kwargs.pop("area_normalisation", np.full(len(data_group), 1.0)))
+        print(labels)
+        for group, label, norm in zip(data_group, labels, normalization):
+            _bias_voltage_plotter(ax, group.BiasTable, label, norm=norm)
+    else:
+        tabular = data_group.BiasTable
+        assert isinstance(tabular, tb.Table)
+        _bias_voltage_plotter(ax, tabular, kwargs.pop("labels", "Bias data"))
+    ax.legend()
     output_pdf.savefig(fig, bbox_inches='tight')
     plt.close(fig)
 
 
-def plot_cv_data_delegate(data_group, analysis_group, output_pdf,
-                          first_upper: Optional[float] = None, first_lower: Optional[float] = None,
-                          second_upper: Optional[float] = None,
-                          second_lower: Optional[float] = None, apply_doping=False, **kwargs):
+def _bias_voltage_plotter(ax, tabular: tb.Table, label, norm=1):
+    voltage_data = np.abs(tabular.col("U"))
+    current_data = np.abs(tabular.col("I"))
+    current_errors = tabular.col("DI")
+    try:
+        voltage_error = np.abs(tabular.col("DU"))
+    except (AttributeError, KeyError):
+        voltage_error = voltage_data * 0.0002 + 0.1
+    if not np.all(np.isfinite(voltage_data)):
+        current_errors = None
+    ax.set(title="Bias data from the measurement", xlabel=BIAS_CURVE_X_LABEL, ylabel=BIAS_CURVE_Y_LABEL)
+    # currently we could not use the correct voltage range but we assume the errors to be within
+    ax.errorbar(voltage_data, current_data * CURRENT_CONVERSION_FACTOR / norm, xerr=voltage_error,
+                yerr=current_errors / norm, fmt='o', label=label)
+
+
+SENSOR_ITERABLE = Union[List[tb.Group], Tuple[tb.Group, ...], np.ndarray[tb.Group]]
+
+
+def plot_cv_data_delegate(data_group: Union[tb.Group, SENSOR_ITERABLE],
+                          analysis_group: Union[tb.Group, SENSOR_ITERABLE], output_pdf,
+                          apply_doping=False, **kwargs):
     """
     plot_cv_data_delegate
 
@@ -329,105 +406,41 @@ def plot_cv_data_delegate(data_group, analysis_group, output_pdf,
     :param data_group: hdf files hierarchy group containing the raw measurement data.
     :param analysis_group: HDF files hierarchy group containing the analysis results.
     :param output_pdf: PDF object to write the created figures to for long-term saving.
-    :param first_upper: upper limit of the first fit range.
-    :param first_lower: lower limit of the first fit range.
-    :param second_upper: upper limit of the second fit range.
-    :param second_lower: lower limit of the second fit range.
     :param apply_doping: boolean, False, indicates whether to plot the depletion data.
     :key verbose: boolean, indicating whether to use verbose output for depletion voltages.
     :key distribution: boolean, indicating whether also the capacitance distribution of the whole sensor
         should be investigated.
     """
     # extract the bias data
-    voltage_data = check_leaf_unit(data_group.BiasVoltageHist, HIST_BIAS_MEAS_UNIT)
-
     approx_depletion = True
-    if first_upper is None or first_lower is None or second_upper is None or second_lower is None:
+    if isinstance(data_group, tb.Node):
+        voltage_data_sets = np.array([check_leaf_unit(data_group.BiasVoltageHist, HIST_BIAS_MEAS_UNIT)])
         approx_depletion = False
-    if approx_depletion and "DepletionHist" not in analysis_group:
-        warn("The depletion computation from plotting is now deprecated and will be removed in future version.")
-        if 'chip_group' in kwargs:
-            kwargs['apply_doping'] = apply_doping
-        from pixcap65.analysis import analyze_depletion_delegate
-        analyze_depletion_delegate(data_group, analysis_group, (first_lower, first_upper),
-                                   (second_lower, second_upper), **kwargs)
+    else:
+        voltage_data_sets = [check_leaf_unit(set.BiasVoltageHist, HIST_BIAS_MEAS_UNIT) for set in data_group]
 
+    labels = kwargs.pop('labels', [])
     # investigate all the pixel for plotting
-    for ii, jj in np.ndindex(GENERAL_PIXCAP_SHAPE):
-        check_leaf_unit(analysis_group.UCHist, HIST_CAP_UNIT)
-        check_leaf_unit(analysis_group.UCErrHist, HIST_CAP_UNIT)
 
-        cap_data = analysis_group.UCHist[:, :, :]
-        cap_errors = analysis_group.UCErrHist[:, :, :]
-        if np.any(np.isnan(cap_data[ii, jj, :])):
+
+
+    for ii, jj in np.ndindex(GENERAL_PIXCAP_SHAPE):
+        fig, ax = plt.subplots(ncols=2)
+        title_str = __plot_depletion_estimation(analysis_group, approx_depletion, ax, ii, jj, voltage_data_sets[0])
+
+        if not _cv_plotter(data_group, analysis_group, ii, jj, ax, voltage_data_sets, labels):
+            plt.close(fig)
             continue
 
-        fig, ax = plt.subplots(ncols=2)
-        title_str = ""
-        # extract the information about the depletion voltage+
-        # TODO: Refactor this to reduce the complexity.
-        if "DepletionHist" in analysis_group:
-            depletion_fit_data = analysis_group.DepFitParamHist[:]
-            depletion_hist = analysis_group.DepletionHist[:]
-            assert isinstance(depletion_fit_data, np.ndarray)
-            assert isinstance(depletion_hist, np.ndarray)
-            if len(depletion_fit_data.shape) == 3:
-                depletion_fit_data_temp = depletion_fit_data.reshape((40, 40, 1, 4))
-                try:
-                    assert np.allclose(depletion_fit_data_temp[:, :, 0, :], depletion_fit_data, equal_nan=True)
-                except AssertionError:
-                    finite_mask = np.isfinite(depletion_fit_data)
-                    temp_data_reshape = np.full((40, 40, 1, 4), np.nan)
-                    temp_data_reshape[:, :, 0, :] = depletion_fit_data
-                    print(np.allclose(temp_data_reshape[:, :, 0, :][finite_mask], depletion_fit_data[finite_mask]))
-                    print(np.abs(temp_data_reshape[:, :, 0, :][finite_mask] - depletion_fit_data[finite_mask]))
-                    print(np.isclose(depletion_fit_data_temp[:, :, 0, :][finite_mask], depletion_fit_data[finite_mask]))
-                    raise
-                depletion_fit_data = depletion_fit_data_temp
-                depletion_hist = depletion_hist.reshape((40, 40, 1))
-
-            for dep_idx in range(depletion_fit_data.shape[2]):
-                first_dep_parameters = depletion_fit_data[ii, jj, dep_idx, :2]
-                second_dep_parameters = depletion_fit_data[ii, jj, dep_idx, 2:]
-                dep_voltage_2 = depletion_hist[ii, jj, dep_idx]
-                # directly plot these
-                # first_voltage_x = np.linspace(-100, - dep_voltage_2 / 1.1, NUMBER_DEPLETION_PLOT_POINTS)
-                # second_voltage_x = np.linspace(
-                #     np.where(-dep_voltage_2 < second_lower, -dep_voltage_2, second_lower) * 1.1,
-                #     second_upper, NUMBER_DEPLETION_PLOT_POINTS)
-                first_voltage_x = np.linspace(np.min(voltage_data) - 10, dep_voltage_2 / 1.1,
-                                              NUMBER_DEPLETION_PLOT_POINTS)
-                second_voltage_x = np.linspace(dep_voltage_2 * 1.1, np.max(voltage_data) + 10,
-                                               NUMBER_DEPLETION_PLOT_POINTS)
-                first_cap_calc = first_dep_parameters[0] * first_voltage_x + first_dep_parameters[1]
-                second_cap_calc = second_dep_parameters[0] * second_voltage_x + second_dep_parameters[1]
-                ax[1].plot(first_voltage_x, first_cap_calc, '-', label="First section fit")
-                ax[1].plot(second_voltage_x, second_cap_calc, '-', label="Second section fit")
-                # TODO: What about the covariance matrix here!
-                title_str += "U = {} V\n".format(dep_voltage_2)
-
-        effective_capacitance_error_data = np.reciprocal(cap_data[ii, jj, :] * CAPACITANCE_CONVERSION_FACTOR) ** 3 * \
-                                           cap_errors[ii, jj, :] if np.all(np.isfinite(cap_errors[ii, jj, :])) else None
-        eff_cap_errors = cap_errors[ii, jj, :] if np.all(np.isfinite(cap_errors[ii, jj, :])) else None
-        ax[0].set(title="Bias data from the \nmeasurement for pixel ({col},{row})".format(col=ii, row=jj),
-                  xlabel=BIAS_CURVE_X_LABEL, ylabel="C in fF")
-        ax[0].errorbar(voltage_data, cap_data[ii, jj, :] * CAPACITANCE_CONVERSION_FACTOR, yerr=eff_cap_errors,
-                       fmt='o', label="Bias data")
-        ax[1].set(title="Suited Bias data from the \nmeasurement for pixel ({col},{row})".format(col=ii, row=jj),
-                  xlabel=BIAS_CURVE_X_LABEL, ylabel="$1/ C^2$ in $1/(fF)^2$")
-        ax[1].errorbar(voltage_data, 1 / (cap_data[ii, jj, :] * CAPACITANCE_CONVERSION_FACTOR) ** 2,
-                       yerr=effective_capacitance_error_data, fmt='o', label="Bias data", alpha=0.5)
-        ax[1].set_xlim(np.min(voltage_data) - 10, 5 + np.max(voltage_data))
-        ax[1].set_ylim(np.min(1 / (cap_data[ii, jj, :] * CAPACITANCE_CONVERSION_FACTOR) ** 2),
-                       np.max(1 / (cap_data[ii, jj, :] * CAPACITANCE_CONVERSION_FACTOR) ** 2))
         ax[0].legend()
         ax[1].legend(title=title_str)
         ax[1].grid(True)
-        fig.suptitle("C-V Characterization")
+        fig.suptitle("C-V Characterization for Pixel ({}, {})".format(ii, jj))
         output_pdf.savefig(fig, bbox_inches='tight')
         plt.close(fig)
 
-        if apply_doping:
+        # Plot the doping analysis only for single-sensor samplings.
+        if apply_doping and approx_depletion:
             depletion_width_plate = check_leaf_unit(analysis_group.DepletionWidth, "um")
             depletion_width_plate_error = check_leaf_unit(analysis_group.DepletionWidthErr, "um")
             effective_doping_table = check_leaf_unit(analysis_group.DepletionEffDoping, "cm^-3")
@@ -435,16 +448,144 @@ def plot_cv_data_delegate(data_group, analysis_group, output_pdf,
             table = analysis_group.DepletionParamTable
             plot_depletion_pixel_delegate(bias_voltages, ii, depletion_width_plate, depletion_width_plate_error,
                                           effective_doping_table, output_pdf, jj, table)
+
     if kwargs.pop("distribution", False):
-        assert isinstance(voltage_data, Iterable)
-        for k, bias_voltage in enumerate(voltage_data):
-            if voltage_data.shape[0] > 10 and k % 10 != 0:
+        assert isinstance(voltage_data_sets[0], Iterable)
+        for k, bias_voltage in enumerate(voltage_data_sets[0]):
+            if voltage_data_sets[0].shape[0] > 10 and k % 10 != 0:
                 continue
             fig, ax = plt.subplots()
-            ax.set(title="Capacitance distribution for bias voltage {}".format(bias_voltage), xlabel="C in fF")
+            ax.set(title="Capacitance distribution for bias voltage {}".format(bias_voltage), xlabel=CAPACITANCE_LABEL)
             ax.hist(analysis_group.UCHist[:, :, k].reshape(-1) * 1e15, bins=50)
             output_pdf.savefig(fig, bbox_inches='tight')
             plt.close(fig)
+
+
+def __plot_depletion_estimation(analysis_group: Union[tb.Group, SENSOR_ITERABLE],
+                                approx_depletion: bool, ax, ii, jj, voltage_data: np.ndarray) -> str:
+    if not isinstance(analysis_group, tb.Group):
+        return __plot_depletion_estimation(analysis_group[0], approx_depletion, ax, ii, jj, voltage_data)
+    title_str = ""
+    if approx_depletion and "DepletionHist" in analysis_group:
+        depletion_fit_data = analysis_group.DepFitParamHist[:]
+        depletion_hist = analysis_group.DepletionHist[:]
+        assert isinstance(depletion_fit_data, np.ndarray)
+        assert isinstance(depletion_hist, np.ndarray)
+        if len(depletion_fit_data.shape) == 3:
+            depletion_fit_data_temp = depletion_fit_data.reshape((40, 40, 1, 4))
+            depletion_fit_data = depletion_fit_data_temp
+            depletion_hist = depletion_hist.reshape((40, 40, 1))
+
+        for dep_idx in range(depletion_fit_data.shape[2]):
+            first_dep_parameters = depletion_fit_data[ii, jj, dep_idx, :2]
+            second_dep_parameters = depletion_fit_data[ii, jj, dep_idx, 2:]
+            dep_voltage_2 = depletion_hist[ii, jj, dep_idx]
+            first_voltage_x = np.linspace(np.min(voltage_data) - 10, dep_voltage_2 / 1.1,
+                                          NUMBER_DEPLETION_PLOT_POINTS)
+            second_voltage_x = np.linspace(dep_voltage_2 * 1.1, np.max(voltage_data) + 10,
+                                           NUMBER_DEPLETION_PLOT_POINTS)
+            first_cap_calc = first_dep_parameters[0] * first_voltage_x + first_dep_parameters[1]
+            second_cap_calc = second_dep_parameters[0] * second_voltage_x + second_dep_parameters[1]
+            ax[1].plot(first_voltage_x, first_cap_calc, '-', label="First section fit")
+            ax[1].plot(second_voltage_x, second_cap_calc, '-', label="Second section fit")
+            # TODO: What about the covariance matrix here!
+            title_str += "U = {} V\n".format(dep_voltage_2)
+    return title_str
+
+def _cv_plotter(data, analysis, row, col, ax, voltage_data_sets, labels):
+    if isinstance(data, tb.Group):
+        cap_data = check_leaf_unit(analysis.UCHist, HIST_CAP_UNIT)
+        cap_errors = check_leaf_unit(analysis.UCErrHist, HIST_CAP_UNIT)
+        voltage_data = voltage_data_sets[0]
+        label = "Bias Data"
+        if np.any(np.isnan(cap_data[col, row, :])):
+            return False
+
+        effective_capacitance_error_data = np.reciprocal(cap_data[col, row, :] * CAPACITANCE_CONVERSION_FACTOR) ** 3 * \
+                                           cap_errors[col, row, :] if np.all(
+            np.isfinite(cap_errors[col, row, :])) else None
+        eff_cap_errors = cap_errors[col, row, :] if np.all(np.isfinite(cap_errors[col, row, :])) else None
+        ax[0].set(title="Bias data from the \nmeasurement for pixel ({col},{row})".format(col=col, row=row),
+                  xlabel=BIAS_CURVE_X_LABEL, ylabel=CAPACITANCE_LABEL)
+        ax[0].errorbar(voltage_data, cap_data[col, row, :] * CAPACITANCE_CONVERSION_FACTOR, yerr=eff_cap_errors,
+                       fmt='o', label=label)
+        ax[1].set(title="Suited Bias data from the \nmeasurement for pixel ({col},{row})".format(col=col, row=row),
+                  xlabel=BIAS_CURVE_X_LABEL, ylabel="$1/ C^2$ in $1/(fF)^2$")
+        ax[1].errorbar(voltage_data, 1 / (cap_data[col, row, :] * CAPACITANCE_CONVERSION_FACTOR) ** 2,
+                       yerr=effective_capacitance_error_data, fmt='o', label=label, alpha=0.5)
+        ax[1].set_xlim(np.min(voltage_data) - 10, 5 + np.max(voltage_data))
+        ax[1].set_ylim(np.min(1 / (cap_data[col, row, :] * CAPACITANCE_CONVERSION_FACTOR) ** 2),
+                       np.max(1 / (cap_data[col, row, :] * CAPACITANCE_CONVERSION_FACTOR) ** 2))
+        return True
+    cap_data = None
+    y_limits = None
+    x_limits = None
+    for d_group, a_group, voltage_data, label in zip(data, analysis, voltage_data_sets, labels):
+        try:
+            cap_data = check_leaf_unit(a_group.UCHist, HIST_CAP_UNIT)
+            cap_errors = check_leaf_unit(a_group.UCErrHist, HIST_CAP_UNIT)
+        except AssertionError:
+            print("react to assertion for", row, col)
+            continue
+
+        if np.any(np.isnan(cap_data[col, row, :])):
+            cap_data = None
+            continue
+        effective_capacitance_error_data = np.reciprocal(
+            cap_data[col, row, :] * CAPACITANCE_CONVERSION_FACTOR) ** 3 * \
+                                           cap_errors[col, row, :] if np.all(
+            np.isfinite(cap_errors[col, row, :])) else None
+        eff_cap_errors = cap_errors[col, row, :] if np.all(np.isfinite(cap_errors[col, row, :])) else None
+        ax[0].set(xlabel=BIAS_CURVE_X_LABEL, ylabel=CAPACITANCE_LABEL)
+        ax[0].errorbar(voltage_data, cap_data[col, row, :] * CAPACITANCE_CONVERSION_FACTOR, yerr=eff_cap_errors,
+                       fmt='o', label=label)
+        ax[1].set(xlabel=BIAS_CURVE_X_LABEL, ylabel="$1/ C^2$ in $1/(fF)^2$")
+        ax[1].errorbar(voltage_data, 1 / (cap_data[col, row, :] * CAPACITANCE_CONVERSION_FACTOR) ** 2,
+                       yerr=effective_capacitance_error_data, fmt='o', label=label, alpha=0.5)
+
+        x_limits = get_x_limits(voltage_data, x_limits)
+
+        y_limits = __get_y_limits(cap_data, col, row, y_limits)
+
+    if cap_data is None:
+        return False
+
+    # if None in (cap_data, y_limits, x_limits):
+    #     return False
+
+    ax[0].set_title("Bias data from the \nmeasurement for pixel ({col},{row})".format(col=col, row=row))
+    ax[1].set_title("Suited Bias data from the \nmeasurement for pixel ({col},{row})".format(col=col, row=row))
+    ax[1].set_xlim(*x_limits)
+    ax[1].set_ylim(*y_limits)
+    return True
+
+
+def __get_y_limits(cap_data: np.ndarray, col, row,
+                   y_limits: Optional[Iterable]) -> Iterable:
+    if y_limits is None:
+        y_limits = [np.min(1 / (cap_data[col, row, :] * CAPACITANCE_CONVERSION_FACTOR) ** 2),
+                    np.max(1 / (cap_data[col, row, :] * CAPACITANCE_CONVERSION_FACTOR) ** 2)]
+    else:
+        actual_lower_limit = np.min(1 / (cap_data[col, row, :] * CAPACITANCE_CONVERSION_FACTOR) ** 2)
+        actual_upper_limit = np.max(1 / (cap_data[col, row, :] * CAPACITANCE_CONVERSION_FACTOR) ** 2)
+        if y_limits[0] > actual_lower_limit:
+            y_limits[0] = actual_lower_limit
+        if y_limits[1] < actual_upper_limit:
+            y_limits[1] = actual_upper_limit
+    return y_limits
+
+
+def get_x_limits(voltage_data, x_limits: Optional[Iterable]) -> Iterable:
+    if x_limits is None:
+        x_limits = [np.min(voltage_data) - 10, 5 + np.max(voltage_data)]
+    else:
+        actual_lower_limit = np.min(voltage_data) - 10
+        actual_upper_limit = np.max(voltage_data) + 10
+        if x_limits[0] > actual_lower_limit:
+            x_limits[0] = actual_lower_limit
+        if x_limits[1] < actual_upper_limit:
+            x_limits[1] = actual_upper_limit
+    return x_limits
 
 
 def plot_data_delegate(data_group: tb.Group, analysis_group: tb.Group, output_pdf: PdfPages, **kwargs):
@@ -545,22 +686,6 @@ def plot_data_delegate(data_group: tb.Group, analysis_group: tb.Group, output_pd
             ax.grid()
             output_pdf.savefig(fig, bbox_inches='tight')
             plt.close(fig)
-
-            # ax.plot(freq_sweep_array, fit_fn, label = 'a={a:.3E}, b={b:.3E}'.format(a=a, b=b))
-
-        # TODO: move these commented lines from the old script to a new legacy file!
-        # #apply linear fit to measured current values; also returns covariance matrix.
-        # matrix = np.polyfit(freq_sweep_array, current_array, 1, cov=True)
-
-        # a, b = matrix[0][0], matrix[0][1]
-        # #da = matrix[1][0][0] #squared fit error of a
-        # #db = matrix[1][1][1] #squared fit error of b
-
-        # #data structure in txt file: "slope, offset (y-intercept)"
-
-        # # fit_fn = a*freq_sweep_array + b
-        # # pl.plot(freq_sweep_array, current_array, 'o', label = 'COL({i_col})PIX(0)'.format(i_col=i_col))
-        # # pl.plot(freq_sweep_array, fit_fn, label = 'a={a:.3E}, b={b:.3E}'.format(a=a, b=b))
 
 
 def plot_inter_pix_data_delegate(data_group: tb.Group, analysis_group: tb.Group, output_pdf: PdfPages, total_group=None,
@@ -796,7 +921,7 @@ def plot_current_data(ax: Axes, col, row, scan_parameters, current_hist, current
     :param plot_args: further arguments directly provided to the fit object.
     """
     assert "parasitic_correction" not in plot_args
-    plot_args.setdefault('marker', 'o')
+    plot_args.setdefault('marker', 'x')
     plot_args.setdefault('ls', '')
     assert "prefix" not in plot_args
     if 'fmt' in plot_args:
@@ -807,7 +932,7 @@ def plot_current_data(ax: Axes, col, row, scan_parameters, current_hist, current
         ax.errorbar(scan_parameters['frequency'], current_hist[col, row] * 1e9,
                     yerr=current_err_hist[col, row] * 1e9,
                     label=SIMPLE_PIXEL_LABEL.format(i_col=col, i_row=row, prefix=prefix),
-                    color=cmap(color), **plot_args)
+                    color=cmap(color), capsize=6., **plot_args)
     else:
         ax.plot(scan_parameters['frequency'], current_hist[col, row] * 1e9,
                 label=SIMPLE_PIXEL_LABEL.format(i_col=col, i_row=row, prefix=prefix),
@@ -943,7 +1068,6 @@ def plot_depletion_pixel_delegate(bias_voltages: TABLES_LEAF_COMPAT_TYPE, i_col,
             ax[0].plot(bias_voltages[bias_mask], depletion_width_plate[i_col, i_row][bias_mask], label='d-measurement')
 
         # sample_voltage = -1 * np.linspace(np.min(-bias_voltages), np.max(-bias_voltages) * 1.1, 1000)
-        # TODO: use here the correct values
         sample_voltage = np.linspace(np.min(bias_voltages[bias_mask]) * 1.1, np.max(bias_voltages[bias_mask]) / 1.1,
                                      1000)
         ax[0].plot(sample_voltage, model_depletion(sample_voltage, **depletion_fit_propagate_parameters),
@@ -988,10 +1112,9 @@ if __name__ == '__main__':
     plot_data(interpreted_data="packaged/X2_2_Scan.h5", base_path="ATLAS_ITk/X2/biased_80_V_full", use_group=True,
               exclude_test_cap=True, use_corrected=True)
     plot_combined_data(interpreted_data="packaged/X2_2_Scan.h5", base_path="ATLAS_ITk/X2/C_V_Characteristic_refined",
-                       use_group=True, first_lower=-60, first_upper=-20, second_lower=-5, second_upper=0)
+                       use_group=True)
     plot_combined_data(interpreted_data="packaged/X2_2_Scan.h5", base_path="ATLAS_ITk/X2/C_V_Characteristic_refined",
-                       use_group=True, first_lower=-60, first_upper=-20, second_lower=-5, second_upper=0,
-                       use_corrected=True,
+                       use_group=True, use_corrected=True,
                        apply_doping=False, distribution=True)
 
     plot_data(interpreted_data="Reference_Evelyn_Scan.h5", base_path="Reference/E1/unbiased_4_full", use_group=True)
@@ -1015,3 +1138,30 @@ if __name__ == '__main__':
     #                     distribution=True, set_parasitic=False, total_path="Reference/R13/unbiased_12_full")
     # plot_bias_data(interpreted_data='Data/r13-measurement/R13_BIAS_2.h5')
     # plot_combined_data(interpreted_data='Data/r13-measurement/R13_BIAS_CV_COMBI_6.h5', first_lower=-100,first_upper=-40, second_lower=-10, second_upper=0)
+
+    # collect all our IV groups
+    iv_file_names = ['pixcap65/Data/r13-measurement/R13_BIAS_2.h5', 'pixcap65/Data/New_1_Initial_6_Scan.h5',
+                     'New_2_Scan.h5', ]
+    iv_group_names = [None, "ATLAS ITk/I_V_Characteristic", "ATLAS_Itk/X2/I_V_Characteristic", ]
+    iv_labels = ['R13', "(HPK) X1", "(HPK) X2"]
+    normalisation = [64*64, 384*400, 384*400] * 50 * 50
+    plot_bias_data(iv_file_names, iv_group_names, pdf_name="I-V Combination.pdf",
+                   labels=["Bias Data for {}".format(item) for item in iv_labels])
+    plot_bias_data(iv_file_names, iv_group_names, pdf_name="I-V Combination-2.pdf",
+                   labels=["Bias Data for {}".format(item) for item in iv_labels], area_normalisation=normalisation)
+    print("CV Combination X2")
+    plot_cv_data(['New_2_Scan.h5', 'New_2_Scan.h5'],
+                 ["ATLAS_Itk/X2/C_V_Characteristic", "ATLAS_Itk/X2/C_V_Characteristic_refined"],
+                 pdf_name="C-V Combination.pdf", labels=["CV Data for {}".format(item) for item in ['X2_1', "X2_2"]],
+                 use_corrected=True)
+    print("CV Combination R13 only")
+    plot_cv_data(["packaged/Reference_Demo.h5", "packaged/Reference_Demo.h5"],
+                 ["Reference/TESTS/cv_only_simple", "Reference/TESTS/cv_only_advanced"],
+                 pdf_name="C-V Combination 2.pdf", labels=["CV Data for {}".format(item) for item in ['simple', "advanced"]],
+                 use_corrected=True)
+    print("CV Combination R13 combined")
+    plot_cv_data(["packaged/Reference_Demo.h5", "packaged/Reference_Demo.h5"],
+                 ["Reference/TESTS/cv_combined_simple", "Reference/TESTS/cv_combined_advanced"],
+                 pdf_name="C-V Combination 3.pdf",
+                 labels=["CV Data for {}".format(item) for item in ['simple', "advanced"]],
+                 use_corrected=True)

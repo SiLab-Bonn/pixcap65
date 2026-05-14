@@ -9,13 +9,12 @@
 #  $Date:: 2015-01-04 10:56:36 #$:
 #
 import logging
-from typing import Any
-
 import numpy as np
 import time
 from basil.RL.FunctionalRegister import FunctionalRegister
 from basil.dut import Dut
 from numpy import ndarray
+from typing import Any
 
 from pixcap65.utility import pixcap65_constants as c
 
@@ -226,7 +225,8 @@ class Pixcap65(Dut):
             Dut.init(self, init_conf=init_conf, **kwargs)
         except USBTimeoutError:
             # perform a power cycle if possible
-            logger.error("A USB error occured try to solve the issue by a power cycle.")
+            # ocured
+            logger.error("A USB error occurred try to solve the issue by a power cycle.")
             if "power" in list(self._hardware_layer.keys()):
                 # FIXME: type error (very static for the used psu)
                 power_driver = self._hardware_layer["power"]

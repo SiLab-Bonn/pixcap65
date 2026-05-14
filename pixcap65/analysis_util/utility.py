@@ -2,12 +2,11 @@
 This file contains some utilities needed for the analysis and the plotting.
 """
 
-from typing import Union, Mapping
-
 import numpy as np
 import tables as tb
 from tables import File
 from tables.group import RootGroup
+from typing import Union, Mapping
 
 from pixcap65.utility.utils_2 import walk_to_node, UNITS_ATTRIBUTE_KEY, prevent_group_mix_up
 
@@ -114,6 +113,7 @@ def check_leaf_unit(leaf: TABLES_LEAF_TYPE, unit: str) -> np.ndarray:
     """
     assert isinstance(leaf, TABLES_PART_LEAF_TYPE)
     if UNITS_ATTRIBUTE_KEY not in leaf.attrs or leaf.attrs[UNITS_ATTRIBUTE_KEY] != unit:
+        print(f"The units key is {leaf.attrs[UNITS_ATTRIBUTE_KEY]}")
         raise AssertionError
     result = leaf[:]
     assert isinstance(result, np.ndarray)
@@ -230,7 +230,6 @@ def handle_minuit_advanced_options(fit_object, apply_contour, x_label, y_label, 
     model_parameters = ""
     for key, value in fit_object.values.to_dict().items():
         model_parameters += f"{key} = {value:.4g}\n"
-    # TODO: the legend might be wrong presented
     ax.legend(["model", "data"],
               title=f"{model_parameters}\nGoF={conv_result['x']:.4f}\nndf={conv_result['ndf']}\np={conv_result['p']:.4f}",
               frameon=False)

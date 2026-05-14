@@ -1,7 +1,6 @@
-from warnings import deprecated
-
 import numpy as np
 import tables as tb
+from warnings import deprecated
 
 from pixcap65.analysis import analyze_depletion_delegate, apply_correction_simple
 from pixcap65.analysis_util import analyze_data_delegate
@@ -18,8 +17,6 @@ def analyze_data(raw_data, base_path=None, is_cv=False, first_boundaries=None, s
     """
     analyze data
 
-
-    # FIXME: update the docstring
     Analyze the provided raw data to determine the (total) capacitance of each pixel in the measurement.
     Due to its simplified analysis strategy this method is only valid for sufficiently small frequencies.
     What sufficiently smalls is, depends on the measured capacitance and the on-resistance of the measurement circuit.
@@ -139,7 +136,6 @@ def analyze_data_handle_data(file: tb.File, data_group: GroupType, result_group:
     """
         analyze data_delegate
 
-        # FIXME: implement the correct doc string here.
         Analyze the provided raw data to determine the (total) capacitance of each pixel in the measurement.
         Due to its simplified analysis strategy this method is only valid for sufficiently small frequencies.
         What sufficiently smalls is, depends on the measured capacitance and the on-resistance of the measurement circuit.
