@@ -264,6 +264,13 @@ class PixCapSetup(Dut):
             print(self["power"].get_current(channel=1))
 
             # init the pixcap system
+            if "out_file" not in self.measurement_arguments and "output_file" in self.measurement_arguments:
+                self.measurement_arguments["out_file"] = self.measurement_arguments["output_file"]
+
+            if "out_file" in self.measurement_arguments and "output_file" not in self.measurement_arguments:
+                self.measurement_arguments["output_file"] = self.measurement_arguments["out_file"]
+
+
             self.pixcap = self.measurement_class(**self.measurement_arguments)
             assert self.pixcap is not None
             self.pixcap.configure()

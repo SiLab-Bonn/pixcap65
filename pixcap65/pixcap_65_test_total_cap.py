@@ -42,6 +42,11 @@ from tqdm.contrib import DummyTqdmFile
 from typing import Iterable, Mapping, Any, Optional
 from warnings import warn, deprecated
 
+
+
+
+
+
 from pixcap65.analysis import analysis_data_handle
 from pixcap65.analysis_util.utility import HIST_CURRENT_MEAS_UNIT, HIST_BIAS_MEAS_UNIT, handle_analysis_mix_up
 from pixcap65.configs.config_handler import extract_smu_current_error, extract_smu_voltage_error
@@ -53,8 +58,8 @@ from pixcap65.utility.tables_util import get_group_attributes, set_group_attribu
     get_group_attribute, group_get_file, back_node
 from pixcap65.utility.tqdm_logging_utils import logging_redirect_tqdm
 from pixcap65.utility.utils_2 import prevent_group_mix_up
-from utility.basil_utils import extract_basil_layers
-from utility.utils_2 import walk_to_node
+from pixcap65.utility.basil_utils import extract_basil_layers
+from pixcap65.utility.utils_2 import walk_to_node
 
 START_HV_VOLTAGE = 0.
 
@@ -83,6 +88,15 @@ log_handler.setFormatter(log_formater)
 logger.addHandler(log_handler)
 logger.propagate = True
 
+def _get_enumerate(iter, **kwargs) -> Iterable:
+    use_tqdm = kwargs.pop("pbar", False)
+    if use_tqdm:
+        try:
+            from tqdm.contrib import tenumerate
+            return tenumerate(iter, **kwargs)
+        except ImportError:
+            return enumerate(iter)
+    return enumerate(iter)
 
 # noinspection PyMissingOrEmptyDocstring
 def default_callback(group: tb.Group):
@@ -155,16 +169,16 @@ class ScanConfigurationKeys(StrEnum):
 
 
 scan_configuration = {
-    'start_column': 20,
-    'stop_column': 22,
-    'start_row': 20,
-    'stop_row': 22,
-    # "average_measurements": 30,
+    'start_column': 10,
+    'stop_column': 35,
+    'start_row': 10,
+    'stop_row': 35,
+    # "average_measurements": 120,
     # "bias_average_measurements": 3,
 
     'Vin': 1.0,  # input voltage in V
-    'frequency_range': np.arange(1, 12.1, 0.5),  # frequency sweep in MHz
-    # 'bias_range': -1 * np.arange(1, 100.1, 0.5),
+    'frequency_range': np.arange(1, 4.1, 0.75),  # frequency sweep in MHz
+    'bias_range': -1 * np.geomspace(1, 80, 20),
     # 'bias': -80.0,   # bias voltage to apply in V
 
     'data_path': "Reference/TESTS",
@@ -178,17 +192,6 @@ class BiasTable(tb.IsDescription):
     DI = tb.Float32Col()
     U = tb.Float32Col()
     DU = tb.Float32Col()
-
-
-def _get_enumerate(iter, **kwargs) -> Iterable:
-    use_tqdm = kwargs.pop("pbar", False)
-    if use_tqdm:
-        try:
-            from tqdm.contrib import tenumerate
-            return tenumerate(iter, **kwargs)
-        except ImportError:
-            return enumerate(iter)
-    return enumerate(iter)
 
 
 class MeasurementAbstract(object, metaclass=ABCMeta):
