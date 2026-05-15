@@ -1428,65 +1428,6 @@ class PixCap65TotalCap(PixCap65Measurement):
         self.pre_scan_handler()
         logging.info(self.mode_logging_text)
         logger.info(self.mode_logging_text)
-        continue_error = None
-        try:
-            self.set_bias_measurement(data_group, sequence_call)
-            with logging_redirect_tqdm():
-                for i_row in tqdm(self.row_range, desc="Grid row Loop", leave=not sequence_call, unit="column"):
-                    for i_col in tqdm(self.col_range, desc="Grid column Loop", leave=False, unit="pixel"):
-                        logging.info(MEASURING_PIXEL_TEXT % (i_col, i_row))
-                        logger.info(MEASURING_PIXEL_TEXT % (i_col, i_row))
-                        self.dut.disable_all_pixels()
-                        self.dut.disable_all_columns()
-
-                        self.dut.enable_column(i_col, c.EN_EOC_3)
-                        self.dut.enable_pixel_clk(i_col, i_row, c.EN_CLK_0 | c.EN_CLK_3)
-
-                        for k, freq in enumerate(frequency_range):
-                            self.pixcap.cvm_frequency = freq
-                            self.verify_stable_current()
-                            self.handle_measurement(i_col, i_row, k)
-                            self.store_iteration_parameters(freq, k)
-        except KeyboardInterrupt as e:
-            logger.info("Caught KeyboardInterrupt. Will terminate the program softly.")
-            continue_error = e
-            continue_saving_operation = True
-        else:
-            continue_saving_operation = True
-        if continue_saving_operation:
-            self.post_scan_handler(data_group, sequence_call, group=data_group)
-
-        if continue_error is not None:
-            self.out_file_h5.flush()
-            raise continue_error
-        logging.info('Done')
-        logger.info('Done')
-
-    def second_scan(self, data_group_spec=None, sequence_call=False):
-        """
-        scan
-
-        Performs the scan over the pixels on the sensor and measures the requested quantities in dependence on some
-        other quantities. Will scan the specified frequency range for each pixel specified by the scan configuration
-        and measure the current to determine the total pixel capacitance.
-
-        :param data_group_spec: specifier of the data group in hdf file where the measurements are stored.
-        :param sequence_call: boolean, indicating whether the pixel-frequency scan is started from another measurement
-            procedure.
-        """
-        # select the group to write the analysis results to
-        data_group = self.get_data_group(data_group_spec, "total_cap")
-        set_group_attribute(data_group, "frequencies", self.n_frequencies)
-
-        # perform also a down sweep in frequency
-        if "double_sweep" in self.scan_config and self.scan_config["double_sweep"]:
-            frequency_range = np.concatenate((self.frequency_range, np.flip(self.frequency_range)))
-        else:
-            frequency_range = self.frequency_range
-
-        self.pre_scan_handler()
-        logging.info(self.mode_logging_text)
-        logger.info(self.mode_logging_text)
         with self.measurement_procedure(data_group, sequence_call):
             for i_row in tqdm(self.row_range, desc="Grid row Loop", leave=not sequence_call, unit="column"):
                 for i_col in tqdm(self.col_range, desc="Grid column Loop", leave=False, unit="pixel"):

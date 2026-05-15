@@ -143,6 +143,7 @@ class Pixcap65InterCap(PixCap65Measurement):
                         # Which SMU takes which role here?
                         for k, freq in enumerate(self.frequency_range):
                             self.pixcap.cvm_frequency = freq
+                            self.verify_stable_current(self.pixcap.vm2_smu_key)
 
                             self.inter_hist_current_1[i_col, i_row, k] = self.pixcap.vm3_measure_current()
 
