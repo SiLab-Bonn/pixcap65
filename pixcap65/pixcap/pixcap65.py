@@ -18,6 +18,9 @@ from typing import Any
 
 from pixcap65.utility import pixcap65_constants as c
 
+SMU_DISABLED_MSG = "The voltage could only be measured for an active smu but '%s' is inactive."
+SMU_DISABLED_CURRENT_MSG = "The current could only be measured for an active smu but '%s' is inactive."
+
 # perhaps add the channel information to the pixcap config file and extract it from here!
 float_initialiser = np.float32
 
@@ -361,7 +364,7 @@ class Pixcap65(Dut):
         self.update_spi()
 
     # noinspection PyPep8Naming
-    def enable_column(self, i_col, EOC_MASK):
+    def enable_column(self, i_col, eoc_mask):
         """
         enable_column
 
@@ -370,9 +373,9 @@ class Pixcap65(Dut):
 
         :param i_col: column for which to activate a 'feature'/function !!no bit mask for specifying
             multiple columns at once.!!
-        :param EOC_MASK: Bit mask (multiply by bitwise OR) of the functions to be activated.
+        :param eoc_mask: Bit mask (multiply by bitwise OR) of the functions to be activated.
         """
-        self['SPI']['COL'][c.COL_NMAX - i_col]['EOC'] = EOC_MASK
+        self['SPI']['COL'][c.COL_NMAX - i_col]['EOC'] = eoc_mask
         self.update_spi()
 
     def disable_all_pixels(self):
@@ -699,7 +702,7 @@ class Pixcap65(Dut):
         :return: measured current in A or nan if the measurement fails or the SMU is not connected/active.
         """
         if not self.has_configured_smu(smu):
-            logger.debug("The current could only be measured for an active smu but '%s' is inactive.", smu)
+            logger.debug(SMU_DISABLED_MSG, smu)
             return np.nan
         if kwargs is None:
             kwargs = {}
@@ -732,7 +735,7 @@ class Pixcap65(Dut):
         :return: measured voltage in V or nan if the measurement fails or the SMU is not connected/active.
         """
         if not self.has_configured_smu(smu):
-            logger.debug("The voltage could only be measured for an active smu but '%s' is inactive.", smu)
+            logger.debug(SMU_DISABLED_MSG, smu)
             return np.nan
         if kwargs is None:
             kwargs = {}
@@ -753,6 +756,82 @@ class Pixcap65(Dut):
             raise ValueError("The current returned {current} was not recognized as a number.".format(current=voltage))
         return voltage
 
+    def smu_initiate_multiple_current(self, n: int, smu: str, kwargs=None):
+        if not self.has_configured_smu(smu):
+            logger.debug(SMU_DISABLED_CURRENT_MSG, smu)
+            return
+
+        if kwargs is None:
+            kwargs = {}
+        try:
+            self[smu].disable_filter()
+        except ValueError:
+            pass
+
+        if n is not None and self.__n_measurements[smu] != n:
+            self.set_smu_measurements(smu, n, kwargs)
+
+        self[smu].multi_current_measurement(**kwargs)
+
+    def smu_initiate_multiple_voltage(self, n: int, smu: str, kwargs=None):
+        if not self.has_configured_smu(smu):
+            logger.debug(SMU_DISABLED_MSG, smu)
+            return
+
+        if kwargs is None:
+            kwargs = {}
+        try:
+            self[smu].disable_filter()
+        except ValueError:
+            pass
+
+        if n is not None and self.__n_measurements[smu] != n:
+            self.set_smu_measurements(smu, n, kwargs)
+
+        self[smu].multi_voltage_measurement(**kwargs)
+
+    def smu_read_multiple_current(self, n: int, smu: str, kwargs=None) -> np.ndarray:
+        if not self.has_configured_smu(smu):
+            logger.debug(SMU_DISABLED_CURRENT_MSG, smu)
+            if n is not None and self.__n_measurements[smu] != n:
+                return np.full(n, np.nan)
+            else:
+                return np.full(self.__n_measurements[smu], np.nan)
+
+        if kwargs is None:
+            kwargs = {}
+        result = self[smu].get_multi_current(**kwargs)
+        if "binary_enabled" in kwargs and kwargs["binary_enabled"]:
+            n = self.__n_measurements[smu]
+            assert isinstance(n, int)
+            if result.shape[0] > n:
+                offset = int(result.shape[0] % n)
+                shift = int(result.shape[0] // n)
+                return result[offset::shift]
+            return result
+        return np.array(result.split(','), dtype=float_initialiser)
+
+    def smu_read_multiple_current(self, n: int, smu: str, kwargs = None) -> np.ndarray:
+        if not self.has_configured_smu(smu):
+            logger.debug(SMU_DISABLED_CURRENT_MSG, smu)
+            if n is not None and self.__n_measurements[smu] != n:
+                return np.full(n, np.nan)
+            else:
+                return np.full(self.__n_measurements[smu], np.nan)
+
+        if kwargs is None:
+            kwargs = {}
+        result = self[smu].get_multi_voltage(**kwargs)
+        if "binary_enabled" in kwargs and kwargs["binary_enabled"]:
+            n = self.__n_measurements[smu]
+            assert isinstance(n, int)
+            if result.shape[0] > n:
+                offset = int(result.shape[0] % n)
+                shift = int(result.shape[0] // n)
+                return result[offset::shift]
+            return result
+        return np.array(result.split(','), dtype=float_initialiser)
+
     def smu_averaged_current(self, n: int, smu: str, kwargs=None) -> tuple[float, ...]:
         """
         smu_averaged_current
@@ -769,7 +848,7 @@ class Pixcap65(Dut):
         :return: (average current reading, uncertainty of the current reading) in A.
         """
         if not self.has_configured_smu(smu):
-            logger.debug("The current could only be measured for an active smu but '%s' is inactive.", smu)
+            logger.debug(SMU_DISABLED_CURRENT_MSG, smu)
             if n is not None and self.__n_measurements[smu] != n:
                 return np.full(n, np.nan)
             else:
@@ -784,7 +863,8 @@ class Pixcap65(Dut):
         self[smu].multi_current_measurement(**kwargs)
         self[smu].create_average_current(**kwargs)
         result = self[smu].get_averaged_current(**kwargs)
-        return tuple([float(elem) for elem in result.split(',')[:2]])
+        split = result.split(',', 1)
+        return float(split[0]), float(split[1])
 
     def smu_averaged_voltage(self, n: int, smu: str, kwargs=None) -> tuple[float, float]:
         """
@@ -802,7 +882,7 @@ class Pixcap65(Dut):
         :return: (average voltage reading, uncertainty of the voltage reading) in V.
         """
         if not self.has_configured_smu(smu):
-            logger.debug("The voltage could only be measured for an active smu but '%s' is inactive.", smu)
+            logger.debug(SMU_DISABLED_MSG, smu)
             if n is not None and self.__n_measurements[smu] != n:
                 return np.full(n, np.nan)
             else:
@@ -817,7 +897,8 @@ class Pixcap65(Dut):
         self[smu].multi_voltage_measurement(**kwargs)
         self[smu].create_average_voltage(**kwargs)
         result = self[smu].get_averaged_voltage(**kwargs)
-        return tuple([float(elem) for elem in result.split(',')[:2]])
+        split = result.split(',', 1)
+        return float(split[0]), float(split[1])
 
     def smu_advanced_current_multiple(self, n: int | None, smu: str, kwargs=None) -> ndarray:
         """
@@ -841,7 +922,7 @@ class Pixcap65(Dut):
             array.
         """
         if not self.has_configured_smu(smu):
-            logger.debug("The current could only be measured for an active smu but '%s' is inactive.", smu)
+            logger.debug(SMU_DISABLED_CURRENT_MSG, smu)
             if n is not None and self.__n_measurements[smu] != n:
                 return np.full(n, np.nan)
             else:
@@ -888,7 +969,7 @@ class Pixcap65(Dut):
             array.
         """
         if not self.has_configured_smu(smu):
-            logger.debug("The voltage could only be measured for an active smu but '%s' is inactive.", smu)
+            logger.debug(SMU_DISABLED_MSG, smu)
             if n is not None and self.__n_measurements[smu] != n:
                 return np.full(n, np.nan)
             else:
@@ -934,7 +1015,7 @@ class Pixcap65(Dut):
             array.
         """
         if not self.has_configured_smu(smu):
-            logger.debug("The current could only be measured for an active smu but '%s' is inactive.", smu)
+            logger.debug(SMU_DISABLED_CURRENT_MSG, smu)
             if n is not None and self.__n_measurements[smu] != n:
                 return np.full(n, np.nan)
             else:
@@ -975,7 +1056,7 @@ class Pixcap65(Dut):
             array.
         """
         if not self.has_configured_smu(smu):
-            logger.debug("The voltage could only be measured for an active smu but '%s' is inactive.", smu)
+            logger.debug(SMU_DISABLED_MSG, smu)
             if n is not None and self.__n_measurements[smu] != n:
                 return np.full(n, np.nan)
             else:
@@ -1061,7 +1142,6 @@ class Pixcap65(Dut):
             except ValueError:
                 pass
         self.__n_measurements[smu] = value
-
     # endregion
 
     # implementations for the different SMU's in use with pixcap

@@ -49,20 +49,25 @@ channel:
   multi_voltage_measurement: smuX.measure.v(smuX.nvbuffer2)
   get_multi_current: printbuffer(1, smuX.measure.count, smuX.nvbuffer1)
   get_multi_voltage: printbuffer(1, smuX.measure.count, smuX.nvbuffer2)
-  get_advanced_current: smuX.measure.i(smuX.nvbuffer1);printbuffer(1, smuX.measure.count, smuX.nvbuffer1)
-  get_advanced_voltage: smuX.measure.v(smuX.nvbuffer2);printbuffer(1, smuX.measure.count, smuX.nvbuffer2)
+  get_advanced_current: smuX.measure.i(smuX.nvbuffer1);printbuffer(1,
+    smuX.measure.count, smuX.nvbuffer1)
+  get_advanced_voltage: smuX.measure.v(smuX.nvbuffer2);printbuffer(1,
+    smuX.measure.count, smuX.nvbuffer2)
   create_average_current: statistics1 = smuX.buffer.getstats(smuX.nvbuffer1)
   create_average_voltage: statistics2 = smuX.buffer.getstats(smuX.nvbuffer2)
   get_averaged_current: print(statistics1.mean,statistics1.stddev)
   get_averaged_voltage: print(statistics2.mean, statistics2.stddev)
-  get_avg_current: 'smuX.measure.i(smuX.nvbuffer1);statistics1 = smuX.buffer.getstats(smuX.nvbuffer1);print(statistics1.mean,statistics1.stddev)'
-  get_avg_voltage: 'smuX.measure.v(smuX.nvbuffer2);statistics2 = smuX.buffer.getstats(smuX.nvbuffer2);print(statistics2.mean,statistics2.stddev)'
+  get_avg_current: smuX.measure.i(smuX.nvbuffer1);statistics1 =
+    smuX.buffer.getstats(smuX.nvbuffer1);print(statistics1.mean,statistics1.stddev)
+  get_avg_voltage: smuX.measure.v(smuX.nvbuffer2);statistics2 =
+    smuX.buffer.getstats(smuX.nvbuffer2);print(statistics2.mean,statistics2.stddev)
   set_number_measurements: smuX.measure.count =
   get_number_measurements: print(smuX.measure.count)
   get_sense_interval: print(smuX.measure.interval)
   set_sense_interval: smuX.measure.interval =
   set_mode_measure_current_A: display.smuX.measure.func = display.MEASURE_DCAMPS
-  set_mode_measure_voltage_V: display.smuX.measure.func = display.MEASURE_DCVOLTS
+  set_mode_measure_voltage_V: display.smuX.measure.func =
+    display.MEASURE_DCVOLTS
   set_mode_measure_ohms_O: display.smuX.measure.func = display.MEASURE_OHMS
   set_mode_measure_watts_W: display.smuX.measure.func = display.MEASURE_WATTS
   get_mode_measure: print(display.smuX.measure.func)
@@ -84,14 +89,19 @@ top_back:
   get_error_severity: print(severity)
   get_error_node: print(errorNode)
   get_lan_config_method: print(lan.config.method)
+  get_lan_ip_adress: print(lan.config.ipaddress)
 
   __scpi_binary_commands:
     get_multi_current:
-      datatype: 'f'
+      datatype: d
     get_multi_voltage:
-      datatype: 'f'
+      datatype: d
     get_averaged_voltage:
-      datatype: 'f'
+      datatype: d
+    get_advanced_current:
+      datatype: d
+    get_advanced_voltage:
+      datatype: d
 
 template_config:
   channels: 2
