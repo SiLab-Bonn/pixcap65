@@ -210,8 +210,8 @@ def plot_inter_pix_data(interpreted_data, base_path=None, suffix="general_inter_
 @contextmanager
 def multi_sensor_file_handler_simple(interpreted_data, base_path, **kwargs):
     pdf_name = kwargs.pop("pdf_name", "I-V-Collection.pdf")
-    # to simplify the operation we need a mapping of a file to all the group_mapping it should be used for
-    # and we need a mapping to the opend files
+    # to simplify the operation we need a mapping of a file to all the group_mapping it should be used for,
+    # and we need a mapping to the opened files
     group_mapping = {}
     files = {}
     groups = []
@@ -237,8 +237,8 @@ def multi_sensor_file_handler_simple(interpreted_data, base_path, **kwargs):
 @contextmanager
 def multi_sensor_file_handler_advanced(interpreted_data, base_path, **kwargs):
     pdf_name = kwargs.pop("pdf_name", "I-V-Collection.pdf")
-    # to simplify the operation we need a mapping of a file to all the group_mapping it should be used for
-    # and we need a mapping to the opend files
+    # to simplify the operation we need a mapping of a file to all the group_mapping it should be used for,
+    # and we need a mapping to the opened files
     group_mapping = {}
     files = {}
     groups = []
@@ -326,8 +326,8 @@ def plot_combined_data(interpreted_data, base_path=None, suffix="combined_bias_c
     Plot the results of the C-V characterization of the scanned pixels.
     To achieve this we need the different c-v-data.
     Then the C-V curve is plotted for every pixel.
-    If requested also fits to the boundary regions of the c-v-curve are performed to determine t
-    he depletion voltage of the pixel.
+    If requested also fits to the boundary regions of the c-v-curve are performed to determine the
+    depletion voltage of the pixel.
     To do so, two fit ranges for the two boundaries with physically distinct behaviour needs to be supplied.
 
     :param interpreted_data: path to the hdf file which holds the raw data and the analysis results.
@@ -388,7 +388,7 @@ def _bias_voltage_plotter(ax, tabular: tb.Table, label, norm=1):
     if not np.all(np.isfinite(voltage_data)):
         current_errors = None
     ax.set(title="Bias data from the measurement", xlabel=BIAS_CURVE_X_LABEL, ylabel=BIAS_CURVE_Y_LABEL)
-    # currently we could not use the correct voltage range but we assume the errors to be within
+    # currently we could not use the correct voltage range, but we assume the errors to be within
     ax.errorbar(voltage_data, current_data * CURRENT_CONVERSION_FACTOR / norm, xerr=voltage_error,
                 yerr=current_errors / norm, fmt='o', label=label)
 
@@ -423,7 +423,7 @@ def plot_cv_data_delegate(data_group: Union[tb.Group, SENSOR_ITERABLE],
         voltage_data_sets = np.array([check_leaf_unit(data_group.BiasVoltageHist, HIST_BIAS_MEAS_UNIT)])
         approx_depletion = False
     else:
-        voltage_data_sets = [check_leaf_unit(set.BiasVoltageHist, HIST_BIAS_MEAS_UNIT) for set in data_group]
+        voltage_data_sets = [check_leaf_unit(data_set.BiasVoltageHist, HIST_BIAS_MEAS_UNIT) for data_set in data_group]
 
     labels = kwargs.pop('labels', [])
     # investigate all the pixel for plotting
@@ -1147,7 +1147,7 @@ if __name__ == '__main__':
                        use_corrected=True,
                        apply_doping=False, distribution=False)
 
-    # .. noqa S125
+    # noqa: S125
     # examples
     # plot_data(interpreted_data='pixcap65/Data/r13-measurement/R13_Full_Scan_80V.h5', suffix="general_data",
     #           use_group=False)

@@ -7,6 +7,7 @@ from enum import StrEnum
 from typing import Optional, OrderedDict, Union
 
 from pixcap65.pixcap_65_test_total_cap import PixCap65Measurement
+from pixcap65.utility.basil_utils import extract_basil_layers
 
 logger = logging.getLogger(__name__)
 
@@ -72,9 +73,12 @@ class PixCapSetup(Dut):
             tl_keys = []
 
         # map the names of the layer items to their index in the layer list
-        rl_mapping = {}
-        tl_mapping = {}
-        hl_mapping = {}
+        hl_mapping, tl_mapping, rl_mapping = extract_basil_layers(adjusted_config)
+
+
+        # rl_mapping = {}
+        # tl_mapping = {}
+        # hl_mapping = {}
 
         # remember which keys are already processed.
         processed_rl_keys = []
@@ -87,26 +91,26 @@ class PixCapSetup(Dut):
         rl_remove_indices = []
 
         # create the key-index mappings
-        if "transfer_layer" in adjusted_config:
-            for idx, layer in enumerate(adjusted_config["transfer_layer"]):
-                if "name" in layer:
-                    tl_mapping[layer["name"]] = idx
-                else:
-                    logger.info("Transfer layer at %i has no name. Will skip it.", idx)
-
-        if "hw_drivers" in adjusted_config:
-            for idx, layer in enumerate(adjusted_config["hw_drivers"]):
-                if "name" in layer:
-                    hl_mapping[layer["name"]] = idx
-                else:
-                    logger.info("Hardware driver at %i has no name. Will skip it.", idx)
-
-        if "registers" in adjusted_config:
-            for idx, layer in enumerate(adjusted_config["registers"]):
-                if "name" in layer:
-                    rl_mapping[layer["name"]] = idx
-                else:
-                    logger.info("Register at %i has no name. Will skip it.", idx)
+        # if "transfer_layer" in adjusted_config:
+        #     for idx, layer in enumerate(adjusted_config["transfer_layer"]):
+        #         if "name" in layer:
+        #             tl_mapping[layer["name"]] = idx
+        #         else:
+        #             logger.info("Transfer layer at %i has no name. Will skip it.", idx)
+        #
+        # if "hw_drivers" in adjusted_config:
+        #     for idx, layer in enumerate(adjusted_config["hw_drivers"]):
+        #         if "name" in layer:
+        #             hl_mapping[layer["name"]] = idx
+        #         else:
+        #             logger.info("Hardware driver at %i has no name. Will skip it.", idx)
+        #
+        # if "registers" in adjusted_config:
+        #     for idx, layer in enumerate(adjusted_config["registers"]):
+        #         if "name" in layer:
+        #             rl_mapping[layer["name"]] = idx
+        #         else:
+        #             logger.info("Register at %i has no name. Will skip it.", idx)
 
         # process the provided config
         if "power" in hl_mapping:
@@ -264,6 +268,13 @@ class PixCapSetup(Dut):
             print(self["power"].get_current(channel=1))
 
             # init the pixcap system
+            if "out_file" not in self.measurement_arguments and "output_file" in self.measurement_arguments:
+                self.measurement_arguments["out_file"] = self.measurement_arguments["output_file"]
+
+            if "out_file" in self.measurement_arguments and "output_file" not in self.measurement_arguments:
+                self.measurement_arguments["output_file"] = self.measurement_arguments["out_file"]
+
+
             self.pixcap = self.measurement_class(**self.measurement_arguments)
             assert self.pixcap is not None
             self.pixcap.configure()
