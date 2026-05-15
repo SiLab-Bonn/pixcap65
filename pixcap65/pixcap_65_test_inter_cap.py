@@ -46,6 +46,10 @@ class InterCap(tb.IsDescription):
 
 
 class Pixcap65InterCap(PixCap65Measurement):
+    def pre_scan_handler(self, unit):
+        # here is nothing to do as averaging measurements are not used here.
+        pass
+
     def __init__(self, scan_config, out_file, **kwargs):
         super(Pixcap65InterCap, self).__init__(scan_config, out_file, **kwargs)
 

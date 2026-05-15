@@ -81,24 +81,25 @@ HV_CURRENT_LIMIT = 1e-7
 
 logging.getLogger().setLevel(logging.INFO)
 logger = logging.getLogger(__name__)
-logger.setLevel(logging.DEBUG)
+logger.setLevel(logging.INFO)
 log_handler = logging.FileHandler('pixcap_65_test.log')
 log_formater = logging.Formatter('%(asctime)s - %(name)s - [%(levelname)-8s] (%(threadName)-10s) %(message)s')
 log_handler.setFormatter(log_formater)
 logger.addHandler(log_handler)
 logger.propagate = True
 
-def _get_enumerate(iter, **kwargs) -> Iterable:
+def _get_enumerate(iterator, **kwargs) -> Iterable:
     use_tqdm = kwargs.pop("pbar", False)
     if use_tqdm:
         try:
             from tqdm.contrib import tenumerate
-            return tenumerate(iter, **kwargs)
+            return tenumerate(iterator, **kwargs)
         except ImportError:
-            return enumerate(iter)
-    return enumerate(iter)
+            return enumerate(iterator)
+    return enumerate(iterator)
 
-# noinspection PyMissingOrEmptyDocstring
+
+# noinspection PyMissingOrEmptyDocstring,PyUnusedLocal
 def default_callback(group: tb.Group):
     # stub function for callback when no callback is required at all.
     pass
@@ -169,19 +170,19 @@ class ScanConfigurationKeys(StrEnum):
 
 
 scan_configuration = {
-    'start_column': 10,
-    'stop_column': 35,
-    'start_row': 10,
-    'stop_row': 35,
-    # "average_measurements": 120,
+    'start_column': 0,
+    'stop_column': 40,
+    'start_row': 0,
+    'stop_row': 40,
+    "average_measurements": 40,
     # "bias_average_measurements": 3,
 
     'Vin': 1.0,  # input voltage in V
-    'frequency_range': np.arange(1, 4.1, 0.75),  # frequency sweep in MHz
-    'bias_range': -1 * np.geomspace(1, 80, 20),
+    'frequency_range': np.arange(1, 10.1, 0.75),  # frequency sweep in MHz
+    # 'bias_range': -1 * np.geomspace(1, 80, 20),
     # 'bias': -80.0,   # bias voltage to apply in V
 
-    'data_path': "Reference/TESTS",
+    'data_path': "Reference/Bare",
     "out_file_mode": "append",
 }
 
@@ -399,13 +400,13 @@ class PixCap65Measurement(Pixcap65BaseMeasurement, metaclass=ABCMeta):
         :author: Dominik Fischer
         :date: 2026-05-14
 
-        Contextmanager and iterable to consolidate all the common elements of the differen scan over different
+        Contextmanager and iterable to consolidate all the common elements of the different scan over different
         HV bias voltages.
-        First the general parameters are setup and the we iterate over all the provided bias voltages.
+        First the general parameters are set up, and then we iterate over all the provided bias voltages.
         The iteration includes checks for stable HV voltages and leakage currents.
 
         After the voltage scan the (general) results are stored and some post handler could be performed
-        if one is speciefied.
+        if one is specified.
 
         The iterable object returned will be the current iteration index, the bias voltage and the data group
         for storage.
@@ -416,7 +417,7 @@ class PixCap65Measurement(Pixcap65BaseMeasurement, metaclass=ABCMeta):
         :param parameters: mapping to store the scan parameters to.
         :param data_group_spec: specifier of the hdf files groups to store the results to.
         :param unit: :ref: `unit` specifier/argument for measurement storage.
-        :param kwargs: further keyword arguments to be propagted to the progress bar handler.
+        :param kwargs: further keyword arguments to be propagated to the progress bar handler.
         :key pbar: boolean, whether to use tqdm for progress bars or not.
         """
         assert 'bias_range' in self.scan_config
@@ -489,10 +490,10 @@ class PixCap65Measurement(Pixcap65BaseMeasurement, metaclass=ABCMeta):
         :date: 2026-05-14
 
         Verify that a stable working point w.r.t. the leakage current through the sensor is reached for the HV by
-        performing repeated current measureement and waiting for a sufficiently small variation between the
+        performing repeated current measurement and waiting for a sufficiently small variation between the
         measurements. For these current measurements always single measurements are used without averaging.
 
-        If the protection current is exceed the waiting for a stable working point is aborted immeditatley.
+        If the protection current is exceeded the waiting for a stable working point is aborted immediately.
 
         :param hv_less: :ref: `pixcap65.pixcap.Pixcap65` object to perform the measurements with.
         :return: float, leakage current from last measurement cycle.
@@ -527,7 +528,7 @@ class PixCap65Measurement(Pixcap65BaseMeasurement, metaclass=ABCMeta):
         :date: 2026-05-14
 
         Verify that a stable working point w.r.t. the applied voltage is reached for the HV by
-        performing repeated voltage measureement and waiting for a sufficiently small variation between the
+        performing repeated voltage measurement and waiting for a sufficiently small variation between the
         measurements. For these voltage measurements always single measurements are used without averaging.
 
         :param hv_less: :ref: `pixcap65.pixcap.Pixcap65` object to perform the measurements with.
@@ -731,8 +732,8 @@ class PixCap65Measurement(Pixcap65BaseMeasurement, metaclass=ABCMeta):
         :author: Dominik Fischer
         :date: 2026-05-14
 
-        Get the hdf files group where the data should be stored from the additonal path specific for this scan and the
-        measurements objects base group extracted from the scan configuration on initializtation.
+        Get the hdf files group where the data should be stored from the additional path specific for this scan and the
+        measurements objects base group extracted from the scan configuration on initialization.
 
         :param data_group_spec: specifier for the last part of the groups absolute path.
         :param particular_group: specifier for the particular kind of measurement which needs a group.
@@ -751,7 +752,7 @@ class PixCap65Measurement(Pixcap65BaseMeasurement, metaclass=ABCMeta):
                                                        create=True,
                                                        verify_create=True)
             if not verify_creation:
-                back_node(data_group, data_group, rename_target=data_group)
+                back_node(data_group, data_group)
 
         assert isinstance(data_group, tb.Group)
         return data_group
@@ -764,7 +765,7 @@ class PixCap65Measurement(Pixcap65BaseMeasurement, metaclass=ABCMeta):
         :date: 2026-05-14
 
         Stores the parameters of the current iteration into the scan parameters mapping to be written later to disk.
-        It distinguishs between a bias scan and a 'regular' scan without varying the bias voltage.
+        It distinguishes between a bias scan and a 'regular' scan without varying the bias voltage.
         In the first case also the currently applied bias voltage is stored.
 
         :param freq: frequency set for this iteration
@@ -814,6 +815,7 @@ class PixCap65Measurement(Pixcap65BaseMeasurement, metaclass=ABCMeta):
 
         :param kwargs: further keyword arguments to be submitted as a dictionary.
         :param unit: measurement kind (regular or bias or None)
+        :param data_group: hdf files group where the measurement data is stored.
         """
         # Template method, formerly abstract
         pass
@@ -896,7 +898,7 @@ class PixCap65Measurement(Pixcap65BaseMeasurement, metaclass=ABCMeta):
         (not the HV Supply)
 
         When the context is ending the changes will be reverted. In this mode a static plc value of 2 is used when
-        more then 5 values should be acquired for each current measurement.
+        more than 5 values should be acquired for each current measurement.
         """
         try:
             self.pixcap.binary_active = True
@@ -1051,7 +1053,7 @@ class PixCap65Measurement(Pixcap65BaseMeasurement, metaclass=ABCMeta):
         :param current_limit: maximum current which should be measured by the SMU. Set the current protection of the SMU.
         :param plc: number of power cycles to average the measured quantity over.
         :param kwargs: further keyword arguments to be propagated to the dut. (all not explicitly named keyword
-        arguments are proagated to the dut SMU handler.)
+        arguments are propagated to the dut SMU handler.)
         :key plc_cycles: :ref: `plc`
         :key current_range: maximum current to be measured by the SMU.
         """
@@ -1175,7 +1177,7 @@ class PixCap65Measurement(Pixcap65BaseMeasurement, metaclass=ABCMeta):
         :author: Dominik Fischer
         :date: 2026-05-14
 
-        Performs all further measurements/scans within an enviornment where averaging and therefore multiple current
+        Performs all further measurements/scans within an environment where averaging and therefore multiple current
         measurements are disabled for the HV supply SMU.
         """
         if self.bias_averaging:
@@ -1197,7 +1199,7 @@ class PixCap65Measurement(Pixcap65BaseMeasurement, metaclass=ABCMeta):
         :author: Dominik Fischer
         :date: 2026-05-14
 
-        Performs all further measurements/scans within an enviornment where averaging and therefore multiple current
+        Performs all further measurements/scans within an environment where averaging and therefore multiple current
         measurements are disabled in general.
         :return:
         """
@@ -1239,8 +1241,8 @@ class PixCap65Measurement(Pixcap65BaseMeasurement, metaclass=ABCMeta):
         :date: 2026-05-14
 
         Contextmanager for the general procedure when measuring capacitance's over the sensor connected.
-        The setup of the HV and the necessary log redirection for usage of progess bars will be handled.
-        Also the general error handling is done at this point to prevent data loss by keyboard interupt commands
+        The setup of the HV and the necessary log redirection for usage of progress bars will be handled.
+        Also, the general error handling is done at this point to prevent data loss by keyboard interrupt commands
         or similar aspects.
         At last the storage of the measurement data is triggered.
 
@@ -1282,9 +1284,9 @@ class PixCap65Measurement(Pixcap65BaseMeasurement, metaclass=ABCMeta):
         :date: 2026-05-14
 
         Verify that a stable working point w.r.t. the leakage current through the sensor is reached for the primary SMU
-        of this measurement by performing repeated current measureement and waiting for a
+        of this measurement by performing repeated current measurement and waiting for a
         sufficiently small variation between the measurements. For these current measurements always
-        single measurements with an plc of 1 are used without averaging.
+        single measurements with a plc of 1 are used without averaging.
 
         :param smu: str, dut key for the SMU working as the primary SMU.
         :return: float, leakage current from last measurement cycle.
@@ -1308,6 +1310,7 @@ class PixCap65Measurement(Pixcap65BaseMeasurement, metaclass=ABCMeta):
                     logger.warning("Could not stabilize the current.")
             finally:
                 smu_less[smu].set_current_nlpc(back_nlpc)
+                logger.debug("Stabilized the measurement current and set the plc to %f", back_nlpc)
 
     @abstractmethod
     def pre_scan_handler(self, unit):
@@ -1447,7 +1450,7 @@ class PixCap65TotalCap(PixCap65Measurement):
 
                         for k, freq in enumerate(frequency_range):
                             self.pixcap.cvm_frequency = freq
-                            self.verify_stable_current()
+                            self.verify_stable_current(self.pixcap.primary_smu_key)
                             self.handle_measurement(i_col, i_row, k)
                             self.store_iteration_parameters(freq, k)
         except KeyboardInterrupt as e:
@@ -1503,7 +1506,7 @@ class PixCap65TotalCap(PixCap65Measurement):
 
                     for k, freq in enumerate(frequency_range):
                         self.pixcap.cvm_frequency = freq
-                        self.verify_stable_current()
+                        self.verify_stable_current(self.pixcap.primary_smu_key)
                         self.handle_measurement(i_col, i_row, k)
                         self.store_iteration_parameters(freq, k)
 
@@ -1530,6 +1533,7 @@ class PixCap65TotalCap(PixCap65Measurement):
             self.scan_parameters = OrderedDict()
             self.scan(data_group_spec=scan_group, sequence_call=True)
 
+    # noinspection PyMethodMayBeStatic
     def prepare_biased_regular_scan(self, bias_voltage, data_group: Group) -> Node:
         """
         prepare_biased_regular_scan
@@ -1537,7 +1541,7 @@ class PixCap65TotalCap(PixCap65Measurement):
         :author: Dominik Fischer
         :date: 2026-05-14
 
-        Prepare the scan of the sensor and its capacitances when performing measurements of the C-V-Characteristics.
+        Prepare the scan of the sensor and its capacitance when performing measurements of the C-V-Characteristics.
 
         :param bias_voltage: bias voltage for which to perform the next scan.
         :param data_group: hdf files group to store the results to.
@@ -1566,6 +1570,7 @@ class PixCap65TotalCap(PixCap65Measurement):
         :param data_group_spec: specifier of the data group in hdf file where the measurements are stored.
         """
 
+        # noinspection PyUnusedLocal
         def _post_handle(callback_group: tb.Group):
             # stub function to be provided by default as there are also applications where an additional handler is
             # required
@@ -1587,6 +1592,7 @@ class PixCap65TotalCap(PixCap65Measurement):
         :param data_group_spec: specifier of the data group in hdf file where the measurements are stored.
         """
 
+        # noinspection PyUnusedLocal
         def _post_handle(callback_group: tb.Group):
             # stub function, required as there are applications where an additional handler is needed
             pass
@@ -1728,6 +1734,7 @@ class PixCap65TotalCap(PixCap65Measurement):
 
         :param kwargs: further keyword arguments to be submitted as a dictionary.
         :param unit: measurement kind (regular or bias or None)
+        :param data_group: hdf files group where the measurement data is stored.
         """
         if unit == "bias" and "group" in kwargs:
             data_group = kwargs["group"]
@@ -1843,13 +1850,13 @@ class PixCap65TotalCap(PixCap65Measurement):
 
 
 if __name__ == '__main__':
-    output_file_2 = "../Reference_Demo.h5"
+    output_file_2 = "../Reference_Bare_renewed.h5"
     from pixcap65.utils import PixCapSetup, PixcapMeasurements
-
+    # logging.basicConfig()
     # initial measurement sample
     with PixCapSetup(scan_configuration, output_file_2, measurement=PixcapMeasurements.TOTAL_CAPACITANCE) as pix:
         # for larger averages
-        pix.scan(data_group_spec="unbiased_4_full")
+        pix.second_scan(data_group_spec="unbiased_31_renew")
 
     # with PixCap65TotalCap(scan_configuration, output_file_2) as pix:
     #     try:

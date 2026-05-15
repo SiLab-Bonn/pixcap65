@@ -22,6 +22,7 @@ from pixcap65.utility import pixcap65_constants as c
 float_initialiser = np.float32
 
 logger = logging.getLogger(__name__)
+logger.setLevel(logging.INFO)
 
 
 class Pixcap65(Dut):
@@ -718,6 +719,8 @@ class Pixcap65(Dut):
         if np.isnan(current):
             logging.warning("It was a NaN value measured by the SMU.")
             raise ValueError("The current returned {current} was not recognized as a number.".format(current=current))
+
+        logger.debug("The measured current is %g A.", current)
         return current
 
     def smu_measure_voltage(self, smu: str, kwargs=None) -> float:
