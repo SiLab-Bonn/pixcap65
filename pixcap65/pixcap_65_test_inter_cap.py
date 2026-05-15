@@ -143,6 +143,25 @@ class Pixcap65InterCap(PixCap65Measurement):
                         # Which SMU takes which role here?
                         for k, freq in enumerate(self.frequency_range):
                             self.pixcap.cvm_frequency = freq
+                            with self.without_averaging() as smu_less:
+                                # stabilize the currents
+                                try:
+                                    back_nlpc = float(smu_less[smu_less.bias_smu_key].get_current_nlpc())
+                                    smu_less[smu_less.bias_smu_key].set_current_nlpc(1)
+                                    previous_measurement = self.pixcap.vm2_measure_current()
+                                    time.sleep(1e-4)
+                                    current_measurement = self.pixcap.vm2_measure_current()
+                                    for _ in range(100):
+                                        if np.abs(
+                                                current_measurement - previous_measurement) < 0.01 * np.abs(
+                                                current_measurement):
+                                            break
+                                        previous_measurement = current_measurement
+                                        current_measurement = self.pixcap.vm2_measure_current()
+                                    else:
+                                        logger.warning("Could not stabilize the current.")
+                                finally:
+                                    smu_less[smu_less.bias_smu_key].set_current_nlpc(back_nlpc)
 
                             self.inter_hist_current_1[i_col, i_row, k] = self.pixcap.vm3_measure_current()
 

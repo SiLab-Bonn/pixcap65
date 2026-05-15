@@ -129,7 +129,7 @@ exclude = [
 installer = "pip"
 
 [tool.uv.sources]
-basil-daq = { path = "../basil-pixcap", editable = true }
+basil-daq = { path = "../basil-tree", editable = true }
 
 [tool.uv.build-backend]
 module-name = "pixcap65"
