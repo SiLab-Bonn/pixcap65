@@ -7,8 +7,9 @@
 
 from __future__ import annotations
 
-from pixcap.pixcap_structure import BasilConfigKeys
-from pixcap_65_test_total_cap import logger
+import logging
+
+from pixcap65.pixcap.pixcap_structure import BasilConfigKeys
 
 
 def extract_basil_layers(adjusted_config) -> tuple[dict, dict, dict]:
@@ -22,7 +23,7 @@ def extract_basil_layers(adjusted_config) -> tuple[dict, dict, dict]:
                 if "name" in layer:
                     result[layer["name"]] = idx
                 else:
-                    logger.info("%s at %i has no name. Will skip it.", name, idx)
+                    logging.info("%s at %i has no name. Will skip it.", name, idx)
 
     handle_basil_component(adjusted_config, BasilConfigKeys.TRANSFER_LAYER, tl_mapping, "Transfer layer")
     handle_basil_component(adjusted_config, BasilConfigKeys.HARDWARE_LAYER, hl_mapping, "Hardware driver")

@@ -93,5 +93,8 @@ def back_node(node: tb.Group, group: tb.Group, rename_target=None):
     for key, value in get_children(node):
         new_name = key
         while new_name in group:
+            print("old name: ", new_name)
             new_name = "{old}_backing".format(old=new_name)
+            print("new name: ", new_name)
+
         rename_node(value if rename_target is None else rename_target, new_name)
