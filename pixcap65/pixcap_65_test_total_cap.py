@@ -174,11 +174,11 @@ scan_configuration = {
     'stop_column': 40,
     'start_row': 0,
     'stop_row': 40,
-    "average_measurements": 40,
+    "average_measurements": 25,
     # "bias_average_measurements": 3,
 
     'Vin': 1.0,  # input voltage in V
-    'frequency_range': np.arange(1, 10.1, 0.75),  # frequency sweep in MHz
+    'frequency_range': np.arange(1, 10.1, 1),  # frequency sweep in MHz
     # 'bias_range': -1 * np.geomspace(1, 80, 20),
     # 'bias': -80.0,   # bias voltage to apply in V
 
@@ -904,7 +904,7 @@ class PixCap65Measurement(Pixcap65BaseMeasurement, metaclass=ABCMeta):
             self.pixcap.binary_active = True
             self._smu_setup(self.pixcap.primary_smu_key).binary_format()
             if self.n_measurements > 5:
-                self.pixcap[self.pixcap.primary_smu_key].set_current_nlpc(2)
+                self.pixcap[self.pixcap.primary_smu_key].set_current_nlpc(1)
             yield self
         finally:
             self.pixcap[self.pixcap.primary_smu_key].set_current_nlpc(10)
@@ -1293,13 +1293,17 @@ class PixCap65Measurement(Pixcap65BaseMeasurement, metaclass=ABCMeta):
         """
         with self.without_averaging() as smu_less:
             # stabilize the currents
+            i = 0
             try:
+                back_binary = self.pixcap.binary_active
+                self.pixcap.binary_active = False
+                self._smu_setup(self.pixcap.primary_smu_key).text_format()
                 back_nlpc = float(smu_less[smu].get_current_nlpc())
                 smu_less[smu].set_current_nlpc(1)
                 previous_measurement = smu_less.smu_measure_current(smu)
-                time.sleep(1e-4)
+                time.sleep(1e-3)
                 current_measurement = smu_less.smu_measure_current(smu)
-                for _ in range(100):
+                for i in range(100):
                     if np.abs(
                             current_measurement - previous_measurement) < 0.01 * np.abs(
                         current_measurement):
@@ -1310,7 +1314,10 @@ class PixCap65Measurement(Pixcap65BaseMeasurement, metaclass=ABCMeta):
                     logger.warning("Could not stabilize the current.")
             finally:
                 smu_less[smu].set_current_nlpc(back_nlpc)
-                logger.debug("Stabilized the measurement current and set the plc to %f", back_nlpc)
+                if back_binary:
+                    self.pixcap.binary_active = True
+                    self._smu_setup(self.pixcap.primary_smu_key).binary_format()
+                logger.debug("Stabilized the measurement current and set the plc to %f after %i iterations.", back_nlpc, i)
 
     @abstractmethod
     def pre_scan_handler(self, unit):
@@ -1856,7 +1863,8 @@ if __name__ == '__main__':
     # initial measurement sample
     with PixCapSetup(scan_configuration, output_file_2, measurement=PixcapMeasurements.TOTAL_CAPACITANCE) as pix:
         # for larger averages
-        pix.second_scan(data_group_spec="unbiased_31_renew")
+        with pix.binary_readout_mode() as binary_pix:
+            binary_pix.second_scan(data_group_spec="unbiased_31_renew")
 
     # with PixCap65TotalCap(scan_configuration, output_file_2) as pix:
     #     try:
