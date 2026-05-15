@@ -31,7 +31,7 @@ from pixcap65.analysis_util.utility import check_leaf_unit, str_join, ANALYSIS_C
     PARASITIC_SUBTRACTION, get_base_group, handle_analysis_mix_up, HIST_CAP_UNIT, HIST_CURRENT_MEAS_UNIT, \
     HIST_BIAS_MEAS_UNIT, get_analysis_group, investigate_fit_convergence, TABLES_LEAF_COMPAT_TYPE, \
     CVDistributionData, CVDepletionCapacitanceData, handle_fitter_advanced_options
-from pixcap65.plotting import CAPACITANCE_CONVERSION_FACTOR, evaluate_pixel_mask
+from pixcap65.plotting import CAPACITANCE_CONVERSION_FACTOR, evaluate_pixel_mask, REFERENCE_TEST_FILE, X2_SCAN_2_FILE
 from pixcap65.utility.tables_util import get_groups, get_leaves, copy_node, list_attributes, group_get_file, \
     set_group_attribute, get_group_attribute, get_group_attributes, get_parent_group
 from pixcap65.utility.utils_2 import walk_to_node, GroupType, create_carray, prevent_group_mix_up
@@ -808,7 +808,6 @@ def analyze_depletion_delegate(data_group: tb.Group, analysis_group: tb.Group,
                   title="Data for the effective doping from the cv-analysis",
                   filters=GLOBAL_FILTERS, obj=doping_result_storage.effective_doping_table, unit="cm^-3")
     file_h5.flush()
-    # TODO: is the unit correct?
 
 
 def depletion_delegation_impl(cap_data, cap_error_data, first_lower, first_upper, second_lower, second_upper,
@@ -1540,6 +1539,7 @@ if __name__ == '__main__':
         "bare_hdf_path": "Reference/bare/unbiased_8/total_cap",
     }
 
+    # noqa: S125
     # analyze_capacitance_distribution(raw_data='Bare_Repeat_2_Scan.h5', base_path="Reference/bare/unbiased_8",
     #                                  corrected_distribution=False,
     #                                  exclude_test_cap=True, use_kafe2=False,
@@ -1554,11 +1554,18 @@ if __name__ == '__main__':
     #              chip_group_name="ATLAS ITk/sensor",
     #              first_boundaries=[(-60, -40), (-80, -75)], second_boundaries=[(-5, 0), (-70, -65)],
     #              **bare_correction_args)
-    analyze_data(raw_data="packaged/X2_2_Scan.h5", base_path="ATLAS_ITk/X2/unbiased_1_full", is_advanced=True,
+    analyze_data(raw_data="packaged/R13_2_Scan.h5", base_path="ATLAS_ITk/X2/unbiased_1_full", is_advanced=True, **bare_correction_args)
+    analyze_data(raw_data="packaged/R13_2_Scan.h5", base_path="ATLAS_ITk/X2/biased_80_V_full", is_advanced=True,
                  **bare_correction_args)
-    analyze_data(raw_data="packaged/X2_2_Scan.h5", base_path="ATLAS_ITk/X2/biased_80_V_full", is_advanced=True,
+    analyze_data(raw_data="packaged/R13_3_Scan.h5", base_path="Reference/R13/C_V_Characteristic_refined", is_advanced=True, full_model=False, is_cv=True,
                  **bare_correction_args)
-    analyze_data(raw_data="packaged/X2_2_Scan.h5", base_path="ATLAS_ITk/X2/C_V_Characteristic_refined",
+
+
+    analyze_data(raw_data=X2_SCAN_2_FILE, base_path="ATLAS_ITk/X2/unbiased_1_full", is_advanced=True,
+                 **bare_correction_args)
+    analyze_data(raw_data=X2_SCAN_2_FILE, base_path="ATLAS_ITk/X2/biased_80_V_full", is_advanced=True,
+                 **bare_correction_args)
+    analyze_data(raw_data=X2_SCAN_2_FILE, base_path="ATLAS_ITk/X2/C_V_Characteristic_refined",
                  is_advanced=True, full_model=False, is_cv=True, use_corrected=True,
                  first_boundaries=[(-60, -40), (-80, -75)], second_boundaries=[(-5, 0), (-70, -65)],
                  **bare_correction_args)
@@ -1574,16 +1581,21 @@ if __name__ == '__main__':
                  is_advanced=True, full_model=False, is_cv=True, use_corrected=True, **e1_depletion_args,
                  **bare_correction_args)
 
-    analyze_data(raw_data="packaged/Reference_Demo.h5", base_path="Reference/TESTS/cv_only_simple",
+    analyze_data(raw_data=REFERENCE_TEST_FILE, base_path="Reference/TESTS/cv_only_simple",
                  is_advanced=True, is_cv=True, use_corrected=True,
                  **bare_correction_args)
-    analyze_data(raw_data="packaged/Reference_Demo.h5", base_path="Reference/TESTS/cv_only_advanced",
+    analyze_data(raw_data=REFERENCE_TEST_FILE, base_path="Reference/TESTS/cv_only_advanced",
                  is_advanced=True, is_cv=True, use_corrected=True,
                  **bare_correction_args)
-    analyze_data(raw_data="packaged/Reference_Demo.h5", base_path="Reference/TESTS/cv_combined_simple",
+    analyze_data(raw_data=REFERENCE_TEST_FILE, base_path="Reference/TESTS/cv_combined_simple",
                  is_advanced=True, is_cv=True, use_corrected=True,
                  **bare_correction_args)
-    analyze_data(raw_data="packaged/Reference_Demo.h5", base_path="Reference/TESTS/cv_combined_advanced",
+    analyze_data(raw_data=REFERENCE_TEST_FILE, base_path="Reference/TESTS/cv_combined_advanced",
                  is_advanced=True, is_cv=True, use_corrected=True,
                  **bare_correction_args)
+
+    analyze_data(raw_data=REFERENCE_TEST_FILE, base_path="Reference/TESTS/unbiased_30",
+                 is_advanced=True, full_model=False, is_cv=False, use_corrected=False)
+    analyze_data(raw_data=REFERENCE_TEST_FILE, base_path="Reference/TESTS/unbiased_31",
+                 is_advanced=True, full_model=False, is_cv=False, use_corrected=False)
 

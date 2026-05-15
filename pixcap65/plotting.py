@@ -11,6 +11,7 @@ import os.path
 import logging
 from contextlib import contextmanager
 from matplotlib.axes import Axes
+from types import NoneType
 from typing import Any, Optional, Union, List, Tuple
 
 from pixcap65.analysis_util.physics_modelling import model_depletion
@@ -55,6 +56,11 @@ DEFAULT_TEST_CAP_EXCLUSION = True
 logger = logging.getLogger(__name__)
 NUMBER_DEPLETION_PLOT_POINTS = 1000
 CAPACITANCE_LABEL = "C in fF"
+X2_SCAN_2_FILE = "packaged/X2_2_Scan.h5"
+E1_SCAN_FILE = "Reference_Evelyn_Scan.h5"
+X2_SCAN_FILE = 'New_2_Scan.h5'
+REFERENCE_TEST_FILE = "packaged/Reference_Demo.h5"
+CV_DATA_FOR_ = "CV Data for {}"
 
 
 def evaluate_pixel_mask(hist, perform_filter=False, **kwargs):
@@ -547,11 +553,9 @@ def _cv_plotter(data, analysis, row, col, ax, voltage_data_sets, labels):
 
         y_limits = __get_y_limits(cap_data, col, row, y_limits)
 
-    if cap_data is None:
+    if cap_data is None or isinstance(x_limits, NoneType) or isinstance(y_limits, NoneType):
         return False
 
-    # if None in (cap_data, y_limits, x_limits):
-    #     return False
 
     ax[0].set_title("Bias data from the \nmeasurement for pixel ({col},{row})".format(col=col, row=row))
     ax[1].set_title("Suited Bias data from the \nmeasurement for pixel ({col},{row})".format(col=col, row=row))
@@ -673,13 +677,12 @@ def plot_data_delegate(data_group: tb.Group, analysis_group: tb.Group, output_pd
             fig = Figure()
             _ = FigureCanvas(fig)
             ax = fig.add_subplot(111)
-            # res = np.polyfit(scan_parameters['frequency'], current_hist[col, row] * 1e9, deg=1, cov=True)
             f = np.arange(0, scan_parameters['frequency'].max() * 1.1, 0.1)
             actual_cap = cap_hist[col, row] * CAPACITANCE_CONVERSION_FACTOR
 
             plot_current_model(ax, col, row, analysis_group, actual_cap, leak_hist, f,
                                parasitic_correction=extract_parasitic_capacitance(analysis_group.HistCap))
-            plot_current_data(ax, col, row, scan_parameters, current_hist, current_err_hist, marker='o', ls='')
+            plot_current_data(ax, col, row, scan_parameters, current_hist, current_err_hist, marker='x', ls='')
             ax.set_ylabel(CURRENT_LABEL)
             ax.set_xlabel(FREQUENCY_LABEL)
             ax.legend()
@@ -932,7 +935,7 @@ def plot_current_data(ax: Axes, col, row, scan_parameters, current_hist, current
         ax.errorbar(scan_parameters['frequency'], current_hist[col, row] * 1e9,
                     yerr=current_err_hist[col, row] * 1e9,
                     label=SIMPLE_PIXEL_LABEL.format(i_col=col, i_row=row, prefix=prefix),
-                    color=cmap(color), capsize=6., **plot_args)
+                    color=cmap(color), capsize=2., **plot_args)
     else:
         ax.plot(scan_parameters['frequency'], current_hist[col, row] * 1e9,
                 label=SIMPLE_PIXEL_LABEL.format(i_col=col, i_row=row, prefix=prefix),
@@ -1049,6 +1052,7 @@ def plot_depletion_pixel_delegate(bias_voltages: TABLES_LEAF_COMPAT_TYPE, i_col,
                                   depletion_width_plate: TABLES_LEAF_COMPAT_TYPE,
                                   depletion_width_plate_error: TABLES_LEAF_COMPAT_TYPE,
                                   effective_doping_table: TABLES_LEAF_COMPAT_TYPE, output_pdf: PdfPages, i_row, table):
+    print("Called the pixel depletion plotter!")
     if np.all(np.isfinite(depletion_width_plate[i_col, i_row])):
         condition = """(row == {}) & (col == {})""".format(i_row, i_col)
         for x in table.where(condition):
@@ -1067,6 +1071,7 @@ def plot_depletion_pixel_delegate(bias_voltages: TABLES_LEAF_COMPAT_TYPE, i_col,
         else:
             ax[0].plot(bias_voltages[bias_mask], depletion_width_plate[i_col, i_row][bias_mask], label='d-measurement')
 
+        # noqa: S125
         # sample_voltage = -1 * np.linspace(np.min(-bias_voltages), np.max(-bias_voltages) * 1.1, 1000)
         sample_voltage = np.linspace(np.min(bias_voltages[bias_mask]) * 1.1, np.max(bias_voltages[bias_mask]) / 1.1,
                                      1000)
@@ -1097,38 +1102,52 @@ if __name__ == '__main__':
     # some usage examples
     from pixcap65.utility.homogenize_plots import set_params
 
+    logging.basicConfig(level=logging.INFO)
+
     set_params(latex=True,
                latex_extra=r"\sisetup{separate-uncertainty}\sisetup{locale = DE}\sisetup{uncertainty-descriptors={"
                            r"stat,sys}}\sisetup{uncertainty-descriptor-mode=subscript}\sisetup{"
                            r"retain-zero-uncertainty}", fig_height=8.26772, fig_width=11.69291, )
 
+    # NOSONAR
+    plot_data(interpreted_data="packaged/R13_2_Scan.h5", base_path="ATLAS_ITk/X2/unbiased_1_full", use_group=True,)
+    # noqa: S1192
+    plot_data(interpreted_data="packaged/R13_2_Scan.h5", base_path="ATLAS_ITk/X2/biased_80_V_full", use_group=True,)
+    plot_cv_data(interpreted_data="packaged/R13_3_Scan.h5", base_path="Reference/R13/C_V_Characteristic_refined", use_group=True,)
+
+    plot_data(interpreted_data=REFERENCE_TEST_FILE, base_path="Reference/TESTS/unbiased_30", use_group=True,
+              exclude_test_cap=True)
+    plot_data(interpreted_data=REFERENCE_TEST_FILE, base_path="Reference/TESTS/unbiased_31", use_group=True,
+              exclude_test_cap=True)
+
     # current measurement
-    plot_data(interpreted_data="packaged/X2_2_Scan.h5", base_path="ATLAS_ITk/X2/unbiased_1_full", use_group=True,
+    plot_data(interpreted_data=X2_SCAN_2_FILE, base_path="ATLAS_ITk/X2/unbiased_1_full", use_group=True,
               exclude_test_cap=True)
-    plot_data(interpreted_data="packaged/X2_2_Scan.h5", base_path="ATLAS_ITk/X2/unbiased_1_full", use_group=True,
+    plot_data(interpreted_data=X2_SCAN_2_FILE, base_path="ATLAS_ITk/X2/unbiased_1_full", use_group=True,
               exclude_test_cap=True, use_corrected=True)
-    plot_data(interpreted_data="packaged/X2_2_Scan.h5", base_path="ATLAS_ITk/X2/biased_80_V_full", use_group=True,
+    plot_data(interpreted_data=X2_SCAN_2_FILE, base_path="ATLAS_ITk/X2/biased_80_V_full", use_group=True,
               exclude_test_cap=True)
-    plot_data(interpreted_data="packaged/X2_2_Scan.h5", base_path="ATLAS_ITk/X2/biased_80_V_full", use_group=True,
+    plot_data(interpreted_data=X2_SCAN_2_FILE, base_path="ATLAS_ITk/X2/biased_80_V_full", use_group=True,
               exclude_test_cap=True, use_corrected=True)
-    plot_combined_data(interpreted_data="packaged/X2_2_Scan.h5", base_path="ATLAS_ITk/X2/C_V_Characteristic_refined",
+    plot_combined_data(interpreted_data=X2_SCAN_2_FILE, base_path="ATLAS_ITk/X2/C_V_Characteristic_refined",
                        use_group=True)
-    plot_combined_data(interpreted_data="packaged/X2_2_Scan.h5", base_path="ATLAS_ITk/X2/C_V_Characteristic_refined",
+    plot_combined_data(interpreted_data=X2_SCAN_2_FILE, base_path="ATLAS_ITk/X2/C_V_Characteristic_refined",
                        use_group=True, use_corrected=True,
                        apply_doping=False, distribution=True)
 
-    plot_data(interpreted_data="Reference_Evelyn_Scan.h5", base_path="Reference/E1/unbiased_4_full", use_group=True)
-    plot_data(interpreted_data="Reference_Evelyn_Scan.h5", base_path="Reference/E1/unbiased_4_full", use_group=True,
+    plot_data(interpreted_data=E1_SCAN_FILE, base_path="Reference/E1/unbiased_4_full", use_group=True)
+    plot_data(interpreted_data=E1_SCAN_FILE, base_path="Reference/E1/unbiased_4_full", use_group=True,
               use_corrected=True, distribution=True, exclude_test_cap=True)
-    plot_bias_data(interpreted_data="Reference_Evelyn_Scan.h5", base_path="Reference/E1/I_V_Characteristic",
+    plot_bias_data(interpreted_data=E1_SCAN_FILE, base_path="Reference/E1/I_V_Characteristic",
                    use_group=True)
-    plot_combined_data(interpreted_data="Reference_Evelyn_Scan.h5", base_path="Reference/E1/C_V_Characteristic",
+    plot_combined_data(interpreted_data=E1_SCAN_FILE, base_path="Reference/E1/C_V_Characteristic",
                        use_group=True)
-    plot_combined_data(interpreted_data="Reference_Evelyn_Scan.h5", base_path="Reference/E1/C_V_Characteristic",
+    plot_combined_data(interpreted_data=E1_SCAN_FILE, base_path="Reference/E1/C_V_Characteristic",
                        use_group=True,
                        use_corrected=True,
                        apply_doping=False, distribution=False)
 
+    # .. noqa S125
     # examples
     # plot_data(interpreted_data='pixcap65/Data/r13-measurement/R13_Full_Scan_80V.h5', suffix="general_data",
     #           use_group=False)
@@ -1141,7 +1160,7 @@ if __name__ == '__main__':
 
     # collect all our IV groups
     iv_file_names = ['pixcap65/Data/r13-measurement/R13_BIAS_2.h5', 'pixcap65/Data/New_1_Initial_6_Scan.h5',
-                     'New_2_Scan.h5', ]
+                     X2_SCAN_FILE, ]
     iv_group_names = [None, "ATLAS ITk/I_V_Characteristic", "ATLAS_Itk/X2/I_V_Characteristic", ]
     iv_labels = ['R13', "(HPK) X1", "(HPK) X2"]
     normalisation = [64*64, 384*400, 384*400] * 50 * 50
@@ -1150,18 +1169,18 @@ if __name__ == '__main__':
     plot_bias_data(iv_file_names, iv_group_names, pdf_name="I-V Combination-2.pdf",
                    labels=["Bias Data for {}".format(item) for item in iv_labels], area_normalisation=normalisation)
     print("CV Combination X2")
-    plot_cv_data(['New_2_Scan.h5', 'New_2_Scan.h5'],
+    plot_cv_data([X2_SCAN_FILE, X2_SCAN_FILE],
                  ["ATLAS_Itk/X2/C_V_Characteristic", "ATLAS_Itk/X2/C_V_Characteristic_refined"],
-                 pdf_name="C-V Combination.pdf", labels=["CV Data for {}".format(item) for item in ['X2_1', "X2_2"]],
+                 pdf_name="C-V Combination.pdf", labels=[CV_DATA_FOR_.format(item) for item in ['X2_1', "X2_2"]],
                  use_corrected=True)
     print("CV Combination R13 only")
-    plot_cv_data(["packaged/Reference_Demo.h5", "packaged/Reference_Demo.h5"],
+    plot_cv_data([REFERENCE_TEST_FILE, REFERENCE_TEST_FILE],
                  ["Reference/TESTS/cv_only_simple", "Reference/TESTS/cv_only_advanced"],
-                 pdf_name="C-V Combination 2.pdf", labels=["CV Data for {}".format(item) for item in ['simple', "advanced"]],
+                 pdf_name="C-V Combination 2.pdf", labels=[CV_DATA_FOR_.format(item) for item in ['simple', "advanced"]],
                  use_corrected=True)
     print("CV Combination R13 combined")
-    plot_cv_data(["packaged/Reference_Demo.h5", "packaged/Reference_Demo.h5"],
+    plot_cv_data([REFERENCE_TEST_FILE, REFERENCE_TEST_FILE],
                  ["Reference/TESTS/cv_combined_simple", "Reference/TESTS/cv_combined_advanced"],
                  pdf_name="C-V Combination 3.pdf",
-                 labels=["CV Data for {}".format(item) for item in ['simple', "advanced"]],
+                 labels=[CV_DATA_FOR_.format(item) for item in ['simple', "advanced"]],
                  use_corrected=True)
