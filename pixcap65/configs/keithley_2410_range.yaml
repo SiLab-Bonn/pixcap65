@@ -30,7 +30,7 @@ voltage:
       resistance: NaN
       temperature: 23
     normalised: '2.e+01'
-  - range: 200.0
+  - range: 1000.0
     unit: V
     prefix: 1.0
     resolution:
@@ -39,7 +39,7 @@ voltage:
       amps: 5e-2
       resistance: NaN
       temperature: 23
-    normalised: '2.e+02'
+    normalised: '1.e+03'
 current:
   - range: 1.0
     unit: µA

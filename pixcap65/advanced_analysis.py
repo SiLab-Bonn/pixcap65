@@ -1,9 +1,8 @@
-from typing import Any, Callable, Union
-from warnings import deprecated
-
 import numpy as np
 import tables as tb
 from matplotlib.backends.backend_pdf import PdfPages
+from typing import Any, Callable, Union
+from warnings import deprecated
 
 from pixcap65.analysis import analyze_depletion_delegate, apply_correction_simple
 from pixcap65.analysis_util.physics_modelling import full_capacitance_model, simple_capacitance_model
@@ -350,11 +349,12 @@ def _perform_advanced_fit(file: tb.File, group: tb.Group, current_hist: np.ndarr
 
     # Fit pixel data in order to extract capacitance for each pixel
     for ii, jj in np.ndindex(current_hist.shape[:2]):
-        if not np.all(np.isfinite(current_hist[ii, jj, :])):
+        if np.count_nonzero(np.isfinite(current_hist[ii, jj, :])) < 3:
             continue
-        frequencies = scan_parameters['frequency']
-        currents = current_hist[ii, jj]
-        current_errors = current_error_hist[ii, jj]
+        mask = np.isfinite(current_hist[ii, jj, :])
+        frequencies = scan_parameters['frequency'][mask]
+        currents = current_hist[ii, jj, mask]
+        current_errors = current_error_hist[ii, jj, mask]
         cap, cap_error, fit_cov_temp, fitter, leakage, leakage_error, resistor, resistor_error = __perform_pixel_fit(
             currents, current_errors, frequencies, effective_expression, effective_label, effective_model,
             effective_parameter_dict, full_model, initial_guess, use_kafe2)

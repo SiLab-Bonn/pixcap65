@@ -1,8 +1,13 @@
+import logging
 import numpy as np
 import tables as tb
+import yaml
 
-from pixcap65.analysis_util.utility import HIST_BIAS_MEAS_UNIT, HIST_CURRENT_MEAS_UNIT
-from pixcap65.utility.tables_util import set_group_attribute, group_get_file, get_groups
+from pixcap65.analysis_util.utility import HIST_BIAS_MEAS_UNIT, HIST_CURRENT_MEAS_UNIT, GLOBAL_FILTERS
+from pixcap65.configs.config_handler import extract_smu_voltage_error
+from pixcap65.pixcap_65_test_total_cap import BiasTable, ScanConfigurationKeys
+from pixcap65.utility.tables_util import set_group_attribute, group_get_file, get_groups, list_group_attributes, \
+    get_group_attribute
 from pixcap65.utility.utils_2 import UNITS_ATTRIBUTE_KEY, create_carray, prevent_group_mix_up
 
 
@@ -115,17 +120,71 @@ def regenerate_measurement_errors(group):
                 group.HistCurrErr[:] = errors
 
 
+def regenerate_basi_table(group):
+    assert "scan_params" in group
+    out_file = group_get_file(group)
+    table = out_file.create_table(group, name="BiasTable", description=BiasTable,
+                                          filters=GLOBAL_FILTERS)
+    entry = table.row
+
+    # need to handle the actually measured voltages.
+    try:
+        internal_parameters = group.scan_parameters[:]
+    except (KeyError, tb.exceptions.NoSuchNodeError):
+        internal_parameters = group.scan_params[:]
+    voltages = internal_parameters["hv_voltage"]
+    try:
+        with open("pixcap65/configs/keithley_2410_range.yaml", "r") as conf_file:
+            scan_range_config = yaml.safe_load(conf_file)
+
+        voltage_errors = extract_smu_voltage_error(scan_range_config, voltages, 1000)
+    except:
+        logging.warn("Could not extract voltage errors from keithley_2410_range.yaml", exc_info=True)
+        voltage_errors = np.full_like(voltages, np.nan)
+
+    scan_configuration = {}
+    for key in list_group_attributes(group):
+        if key.startswith("configuration_"):
+            scan_configuration[key.removeprefix("configuration_")] = get_group_attribute(group, key)
+
+    print(scan_configuration)
+    scan_configuration[ScanConfigurationKeys.BIAS_VOLTAGE_RANGE] = -1 * np.arange(1, 350, 0.25)
+
+    hist_bias_current = group.HistCurr[:]
+    hist_bias_current_errors = group.HistCurrErr[:]
+    for set_voltage, leak_current, current_error, meas_voltage, meas_voltage_error in zip(
+            scan_configuration[ScanConfigurationKeys.BIAS_VOLTAGE_RANGE], hist_bias_current,
+            hist_bias_current_errors, voltages, voltage_errors):
+        try:
+            entry['Us'] = set_voltage
+            entry['U'] = meas_voltage
+            entry['I'] = leak_current
+            entry['DI'] = current_error
+            entry['DU'] = meas_voltage_error
+            entry.append()
+        except ValueError as e:
+            logging.info("scan parameters")
+            logging.info(set_voltage)
+            logging.info("currents")
+            logging.info(hist_bias_current.shape)
+            logging.info(leak_current)
+            logging.info("Errors")
+            logging.info(hist_bias_current_errors.shape)
+            logging.info(current_error)
+            raise e
+
+
 # FIXME: Why are there no error estimations for I-V curves?
 
 if __name__ == "__main__":
-    with tb.open_file("packaged/Reference_Demo.h5", "a") as h5_file:
+    with tb.open_file("packaged/X1_4_Renew_Scan.h5", "a") as h5_file:
         # adjust_cap_measurement(h5_file.root.ATLAS_Itk.X2.unbiased_1.total_cap.measurements, has_values=True)
         # adjust_cap_measurement(h5_file.root.ATLAS_Itk.X2.biased_80_V.total_cap.measurements, has_values=True)
         # adjust_i_v_measurement(h5_file.root.ATLAS_Itk.X2.I_V_Characteristic.biasing.measurements)
         # adjust_c_v_measurement(h5_file.root.ATLAS_Itk.X2.C_V_Characteristic.biasing.measurements)
         # adjust_cap_measurement(h5_file.root.total_cap.measurements, has_values=False)
-        regenerate_measurement_errors(h5_file.root.Reference.TESTS.unbiased_5_full.total_cap.measurements)
-        regenerate_measurement_errors(h5_file.root.Reference.TESTS.unbiased_4_full.total_cap.measurements)
+        # regenerate_measurement_errors(h5_file.root.Reference.TESTS.unbiased_5_full.total_cap.measurements)
+        # regenerate_measurement_errors(h5_file.root.Reference.TESTS.unbiased_4_full.total_cap.measurements)
         # regenerate_measurement_errors(h5_file.root["ATLAS ITk"].unbiased_3.total_cap.measurements)
         # regenerate_measurement_errors(h5_file.root["ATLAS ITk"].run_2.total_cap.measurements)
         # regenerate_measurement_errors(h5_file.root["ATLAS ITk"].run_1.total_cap.measurements)
@@ -156,3 +215,4 @@ if __name__ == "__main__":
         #         subgroup.HistCurr.attrs["Units"] = "A"
         #         subgroup.HistCurrErr.attrs["Units"] = "A"
         #         # subgroup.HistCurrValues.attrs["Units"] = "A"
+        regenerate_basi_table(h5_file.root.ATLAS_ITk.X1.I_V_Characteristic.biasing.measurements)
