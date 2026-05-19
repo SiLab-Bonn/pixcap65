@@ -1,8 +1,11 @@
 import logging
+from collections.abc import Iterable
 from contextlib import contextmanager, redirect_stdout, redirect_stderr
 from typing import Union, Optional, Type, List, Iterator
 
 import sys
+
+from tqdm import tqdm
 # noinspection PyProtectedMember
 from tqdm.contrib import DummyTqdmFile as StdTqdmFile
 from tqdm.std import tqdm as std_tqdm
@@ -206,3 +209,69 @@ def tqdm_logging_redirect(
     with tqdm_class(*args, **tqdm_kwargs) as pbar:
         with logging_redirect_tqdm(loggers=loggers, tqdm_class=tqdm_class):
             yield pbar
+
+# noinspection PyIncorrectDocstring
+@contextmanager
+def tqdm_logging_writing_redirect(
+        *args,
+        # loggers=None,  # type: Optional[List[logging.Logger]]
+        # tqdm=None,  # type: Optional[Type[tqdm.tqdm]]
+        **kwargs
+):
+    # type: (...) -> Iterator[None]
+    """
+    Convenience shortcut for:
+    ```python
+    with tqdm_class(*args, **tqdm_kwargs) as pbar:
+        with logging_redirect_tqdm(loggers=loggers, tqdm_class=tqdm_class):
+            yield pbar
+    ```
+
+    Parameters
+    ----------
+    tqdm_class  : optional, (default: tqdm.std.tqdm).
+    loggers  : optional, list.
+    **tqdm_kwargs  : passed to `tqdm_class`.
+    """
+    tqdm_kwargs = kwargs.copy()
+    loggers = tqdm_kwargs.pop('loggers', None)
+    tqdm_class = tqdm_kwargs.pop('tqdm_class', std_tqdm)
+    with tqdm_class(*args, **tqdm_kwargs) as pbar:
+
+        with logging_redirect_tqdm(loggers=loggers, tqdm_class=tqdm_class):
+            yield pbar
+
+def advanced_tqdm_iterator(*args, tqdm_class=tqdm, logger: Optional[logging.Logger]=None, **tqdm_kwargs):
+    loggers = tqdm_kwargs.pop('loggers', None)
+    if loggers is None:
+        loggers = [logging.root]
+    if logger is not None:
+        loggers.append(logger)
+    postfix_formatter = tqdm_kwargs.pop('postfix_formatter', "{}")
+    postfix_iterator = tqdm_kwargs.pop("iterator_postfix", False)
+    pre_iteration_hook = tqdm_kwargs.pop("pre_iteration_hook", None)
+    post_iteration_hook = tqdm_kwargs.pop("post_iteration_hook", None)
+    with tqdm_class(*args, **tqdm_kwargs) as pbar:
+        with logging_redirect_tqdm(loggers=loggers, tqdm_class=tqdm_class):
+            if pre_iteration_hook is not None and callable(pre_iteration_hook):
+                pre_iteration_hook(pbar)
+            for i in pbar:
+                if postfix_iterator and isinstance(i, Iterable):
+                    pbar.set_postfix(iteration=postfix_formatter.format(*i))
+                else:
+                    pbar.set_postfix(iteration=postfix_formatter.format(i))
+                yield i
+
+            if post_iteration_hook is not None and callable(post_iteration_hook):
+                post_iteration_hook(pbar)
+            if logger is not None:
+                try:
+                    logger.info(str(pbar))
+                    pbar.colour = 'red'
+                except:
+                    logger.exception("Could not log the progress bar final state")
+
+
+
+
+
