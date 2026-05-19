@@ -30,7 +30,7 @@ import sys
 import tables as tb
 import time
 import yaml
-from abc import abstractmethod, ABCMeta
+from abc import abstractmethod, ABCMeta, abstractproperty
 from collections.abc import Callable
 from contextlib import contextmanager
 from enum import StrEnum
@@ -55,6 +55,7 @@ from pixcap65.utility.tqdm_logging_utils import logging_redirect_tqdm
 from pixcap65.utility.utils_2 import prevent_group_mix_up
 from pixcap65.utility.basil_utils import extract_basil_layers
 from pixcap65.utility.utils_2 import walk_to_node
+from pixcap65.utility.tqdm_logging_utils import advanced_tqdm_iterator
 
 START_HV_VOLTAGE = 0.
 
@@ -85,13 +86,13 @@ logger.propagate = True
 
 def _get_enumerate(iterator, **kwargs) -> Iterable:
     use_tqdm = kwargs.pop("pbar", False)
-    if use_tqdm:
-        try:
-            from tqdm.contrib import tenumerate
-            return tenumerate(iterator, **kwargs)
-        except ImportError:
-            return enumerate(iterator)
-    return enumerate(iterator)
+    try:
+        from tqdm.contrib import tenumerate
+        if not use_tqdm:
+            kwargs["disable"] = True
+        return advanced_tqdm_iterator(iterator, tqdm_class=tenumerate, **kwargs)
+    except ImportError:
+        return enumerate(iterator)
 
 
 # noinspection PyMissingOrEmptyDocstring,PyUnusedLocal
@@ -387,7 +388,7 @@ class PixCap65Measurement(Pixcap65BaseMeasurement, metaclass=ABCMeta):
         """
         raise NotImplementedError("`scan` is abstract and therefore not implemented.")
 
-    def perform_bias_scan(self, bias_voltages: np.ndarray, post_handler: Callable, parameters, data_group_spec, unit,
+    def perform_bias_scan(self, bias_voltages: np.ndarray, post_handler: Callable, parameters, data_group_spec, handle_unit,
                           **kwargs):
         """
         perform_bias_scan
@@ -411,7 +412,7 @@ class PixCap65Measurement(Pixcap65BaseMeasurement, metaclass=ABCMeta):
         :param post_handler: callback to be executed after scan the is performed.
         :param parameters: mapping to store the scan parameters to.
         :param data_group_spec: specifier of the hdf files groups to store the results to.
-        :param unit: :ref: `unit` specifier/argument for measurement storage.
+        :param handle_unit: :ref: `unit` specifier/argument for measurement storage.
         :param kwargs: further keyword arguments to be propagated to the progress bar handler.
         :key pbar: boolean, whether to use tqdm for progress bars or not.
         """
@@ -439,34 +440,33 @@ class PixCap65Measurement(Pixcap65BaseMeasurement, metaclass=ABCMeta):
         self.dut.disable_all_columns()
 
         try:
-            with logging_redirect_tqdm():
-                for k, bias_voltage in _get_enumerate(bias_voltages, **kwargs):
-                    self.pixcap.bias_voltage = bias_voltage
-                    # check for the SMU's settling here
-                    with self.bias_without_averaging() as hv_less:
-                        current_measurement = self.verify_stable_hv(hv_less)
-                        logger.debug("The hv voltage measurement is %f V", current_measurement)
+            for k, bias_voltage in _get_enumerate(bias_voltages, **kwargs):
+                self.pixcap.bias_voltage = bias_voltage
+                # check for the SMU's settling here
+                with self.bias_without_averaging() as hv_less:
+                    current_measurement = self.verify_stable_hv(hv_less)
+                    logger.debug("The hv voltage measurement is %f V", current_measurement)
 
-                        # stabilize the currents
-                        current_measurement = self.verify_hv_current(hv_less)
+                    # stabilize the currents
+                    current_measurement = self.verify_hv_current(hv_less)
 
-                        if np.abs(current_measurement) > self.hv_limit:
-                            self.pixcap.bias_voltage = -0.1
-                            logger.error("The measured current %f has exceeded the protection limit %f.",
-                                         current_measurement, self.hv_limit)
-                            break
+                    if np.abs(current_measurement) > self.hv_limit:
+                        self.pixcap.bias_voltage = -0.1
+                        logger.error("The measured current %f has exceeded the protection limit %f.",
+                                     current_measurement, self.hv_limit)
+                        break
 
-                        logger.debug(LOG_SET_BIAS % bias_voltage)
+                    logger.debug(LOG_SET_BIAS % bias_voltage)
 
-                    yield k, bias_voltage, data_group
-                    with self.bias_without_averaging() as hv_less:
-                        actual_bias_voltage = hv_less.bias_measure_volts()
-                    store_scan_par_values(scan_parameters=parameters, scan_param_id=k,
-                                          bias_voltage=bias_voltage, hv_voltage=actual_bias_voltage)
+                yield k, bias_voltage, data_group
+                with self.bias_without_averaging() as hv_less:
+                    actual_bias_voltage = hv_less.bias_measure_volts()
+                store_scan_par_values(scan_parameters=parameters, scan_param_id=k,
+                                      bias_voltage=bias_voltage, hv_voltage=actual_bias_voltage)
 
         finally:
             post_handler(data_group)
-            self.post_scan_handler(data_group, False, unit=unit, saving_unit=unit, group=data_group)
+            self.post_scan_handler(data_group, False, unit=handle_unit, saving_unit=handle_unit, group=data_group)
             # save the bias voltages
             if self.has_bias_supply:
                 self.pixcap.bias_off()
@@ -1227,6 +1227,16 @@ class PixCap65Measurement(Pixcap65BaseMeasurement, metaclass=ABCMeta):
         except:
             return 1
 
+    @property
+    @abstractmethod
+    def col_range(self):
+        raise NotImplementedError("`col_range` is abstract and therefore not implemented.")
+
+    @property
+    @abstractmethod
+    def row_range(self):
+        raise NotImplementedError("`row_range` is abstract and therefore not implemented.")
+
     @contextmanager
     def measurement_procedure(self, data_group, sequence_call, post_hook: Callable[tb.Group] = None):
         """
@@ -1292,7 +1302,10 @@ class PixCap65Measurement(Pixcap65BaseMeasurement, metaclass=ABCMeta):
             try:
                 back_binary = self.pixcap.binary_active
                 self.pixcap.binary_active = False
-                self._smu_setup(self.pixcap.primary_smu_key).text_format()
+                try:
+                    self._smu_setup(smu).text_format()
+                except:
+                    pass
                 back_nlpc = float(smu_less[smu].get_current_nlpc())
                 smu_less[smu].set_current_nlpc(1)
                 previous_measurement = smu_less.smu_measure_current(smu)
@@ -1311,7 +1324,7 @@ class PixCap65Measurement(Pixcap65BaseMeasurement, metaclass=ABCMeta):
                 smu_less[smu].set_current_nlpc(back_nlpc)
                 if back_binary:
                     self.pixcap.binary_active = True
-                    self._smu_setup(self.pixcap.primary_smu_key).binary_format()
+                    self._smu_setup(smu).binary_format()
                 logger.debug("Stabilized the measurement current and set the plc to %f after %i iterations.", back_nlpc, i)
 
     @abstractmethod
@@ -1437,8 +1450,8 @@ class PixCap65TotalCap(PixCap65Measurement):
         logging.info(self.mode_logging_text)
         logger.info(self.mode_logging_text)
         with self.measurement_procedure(data_group, sequence_call):
-            for i_row in tqdm(self.row_range, desc="Grid row Loop", leave=not sequence_call, unit="column"):
-                for i_col in tqdm(self.col_range, desc="Grid column Loop", leave=False, unit="pixel"):
+            for i_row in advanced_tqdm_iterator(self.row_range, tqdm_class=tqdm, desc="Grid row Loop", leave=not sequence_call, unit="column", logger=logger, colour='green'):
+                for i_col in advanced_tqdm_iterator(self.col_range, tqdm_class=tqdm, desc="Grid column Loop", leave=False, unit="pixel", logger=logger, colour='blue'):
                     logging.info(MEASURING_PIXEL_TEXT % (i_col, i_row))
                     logger.info(MEASURING_PIXEL_TEXT % (i_col, i_row))
                     self.dut.disable_all_pixels()
@@ -1471,7 +1484,7 @@ class PixCap65TotalCap(PixCap65Measurement):
         for k, bias_voltage, data_group in self.perform_bias_scan(self.bias_voltages, _post_handle,
                                                                   self.bias_scan_parameters,
                                                                   data_group_spec, None, pbar=True,
-                                                                  desc="Bias voltage scan"):
+                                                                  desc="Bias voltage scan", logger=logger):
             scan_group = self.prepare_biased_regular_scan(bias_voltage, data_group)
             self.scan_parameters = OrderedDict()
             self.scan(data_group_spec=scan_group, sequence_call=True)
@@ -1519,8 +1532,8 @@ class PixCap65TotalCap(PixCap65Measurement):
             # required
             pass
 
-        for k, voltage in self.perform_bias_scan(self.bias_voltages, _post_handle, self.bias_scan_parameters,
-                                                 data_group_spec, "bias"):
+        for k, voltage, data_group in self.perform_bias_scan(self.bias_voltages, _post_handle, self.bias_scan_parameters,
+                                                 data_group_spec, "bias", logger=logger):
             self.handle_bias_measurement(k)
 
     def combined_bias_cv_scan(self, data_group_spec=None):
@@ -1543,7 +1556,7 @@ class PixCap65TotalCap(PixCap65Measurement):
         for k, bias_voltage, data_group in self.perform_bias_scan(self.bias_voltages, _post_handle,
                                                                   self.bias_scan_parameters,
                                                                   data_group_spec, "bias", pbar=True,
-                                                                  desc="Bias Voltage Scan"):
+                                                                  desc="Bias Voltage Scan", logger=logger):
             scan_group = self.prepare_biased_regular_scan(bias_voltage, data_group)
             self.handle_bias_measurement(k)
             self.scan_parameters = OrderedDict()
@@ -1686,7 +1699,11 @@ class PixCap65TotalCap(PixCap65Measurement):
             entry = table.row
 
             # need to handle the actually measured voltages.
-            internal_parameters = data_group.scan_parameters[:]
+            try:
+                internal_parameters = data_group.scan_parameters[:]
+            except tb.exceptions.NoSuchNodeError:
+                logger.error("Tried to access the false scan parameters table")
+                internal_parameters = data_group.scan_params[:]
             voltages = internal_parameters["hv_voltage"]
             try:
                 voltage_errors = extract_smu_voltage_error(self.smu_range_config[self.pixcap.bias_smu_key], voltages, 1000)

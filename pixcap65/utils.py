@@ -90,28 +90,6 @@ class PixCapSetup(Dut):
         hl_remove_indices = []
         rl_remove_indices = []
 
-        # create the key-index mappings
-        # if "transfer_layer" in adjusted_config:
-        #     for idx, layer in enumerate(adjusted_config["transfer_layer"]):
-        #         if "name" in layer:
-        #             tl_mapping[layer["name"]] = idx
-        #         else:
-        #             logger.info("Transfer layer at %i has no name. Will skip it.", idx)
-        #
-        # if "hw_drivers" in adjusted_config:
-        #     for idx, layer in enumerate(adjusted_config["hw_drivers"]):
-        #         if "name" in layer:
-        #             hl_mapping[layer["name"]] = idx
-        #         else:
-        #             logger.info("Hardware driver at %i has no name. Will skip it.", idx)
-        #
-        # if "registers" in adjusted_config:
-        #     for idx, layer in enumerate(adjusted_config["registers"]):
-        #         if "name" in layer:
-        #             rl_mapping[layer["name"]] = idx
-        #         else:
-        #             logger.info("Register at %i has no name. Will skip it.", idx)
-
         # process the provided config
         if "power" in hl_mapping:
             logger.info("Found the power supply in the list of devices in use.")
@@ -269,13 +247,19 @@ class PixCapSetup(Dut):
 
             # init the pixcap system
             if "out_file" not in self.measurement_arguments and "output_file" in self.measurement_arguments:
+                logger.warn("added out_file argument")
                 self.measurement_arguments["out_file"] = self.measurement_arguments["output_file"]
-
-            if "out_file" in self.measurement_arguments and "output_file" not in self.measurement_arguments:
+            elif "out_file" in self.measurement_arguments and "output_file" not in self.measurement_arguments:
                 self.measurement_arguments["output_file"] = self.measurement_arguments["out_file"]
+                logger.warn("added output_file argument")
 
-
-            self.pixcap = self.measurement_class(**self.measurement_arguments)
+            try:
+                self.pixcap = self.measurement_class(**self.measurement_arguments)
+            except TypeError:
+                logger.error("Failed to instantiate the measurement object.")
+                logger.error(self.measurement_arguments)
+                logger.error(self.measurement_arguments.keys())
+                raise
             assert self.pixcap is not None
             self.pixcap.configure()
             return self.pixcap
