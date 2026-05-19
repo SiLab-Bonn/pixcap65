@@ -66,6 +66,9 @@ def get_group_attributes(group: tb.Group) -> Any:
     # noinspection PyProtectedMember
     return group._v_attrs
 
+def list_group_attributes(group: tb.Group) -> list[str]:
+    return get_group_attributes(group)._f_list()
+
 
 def get_parent_group(group: tb.Group) -> tb.Group:
     # noinspection PyProtectedMember

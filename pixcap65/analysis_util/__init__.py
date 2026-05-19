@@ -20,7 +20,8 @@ def analyze_data_delegate(file: tb.File, group: tb.Group, current_hist: TABLES_A
     for col in range(current_hist.shape[0]):
         for row in range(current_hist.shape[1]):
             if np.isfinite(current_hist[col, row, 0]):
-                res = np.polyfit(scan_parameters['frequency'], current_hist[col, row], deg=1, cov=True)
+                mask = np.isfinite(current_hist[col, row, :])
+                res = np.polyfit(scan_parameters['frequency'][mask], current_hist[col, row][mask], deg=1, cov=True)
                 cap = res[0][0] * 1e-6  # convert to F
                 leak = res[0][1] * 1e9  # convert to nA
                 cov = transform_covariance(res[1])
@@ -38,19 +39,6 @@ def analyze_data_delegate(file: tb.File, group: tb.Group, current_hist: TABLES_A
             leak_hist[col, row] = leak
             leak_error_hist[col, row] = leak_error
             fit_cov[col, row] = cov
-
-        # #apply linear fit to measured current values; also returns covariance matrix.
-        # matrix = np.polyfit(freq_sweep_array, current_array, 1, cov=True)
-
-        # a, b = matrix[0][0], matrix[0][1]
-        # #da = matrix[1][0][0] #squared fit error of a
-        # #db = matrix[1][1][1] #squared fit error of b
-
-        # #data structure in txt file: "slope, offset (y-intercept)"
-
-        # # fit_fn = a*freq_sweep_array + b
-        # # pl.plot(freq_sweep_array, current_array, 'o', label = 'COL({i_col})PIX(0)'.format(i_col=i_col))
-        # # pl.plot(freq_sweep_array, fit_fn, label = 'a={a:.3E}, b={b:.3E}'.format(a=a, b=b))
 
     # Store capacitance values
     temp_array = file.create_carray(group,

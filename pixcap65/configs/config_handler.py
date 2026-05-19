@@ -175,7 +175,7 @@ def extract_smu_range_error(smu_config: dict, data, range_spec: float, kind: str
             reading_error = result_floating_type(entry[ConfigElements.RESOLUTION][ResolutionElements.ACCURACY]) * 0.01
             absolute_error = result_floating_type(
                 entry[ConfigElements.RESOLUTION][ResolutionElements.ACCURACY.AMPS]
-            ) * range_spec
+            ) * result_floating_type(entry[ConfigElements.UNIT_PREFIX_VALUE])
             break
     else:
         raise ValueError(f"Could not find range {range_spec} in SMU configuration")

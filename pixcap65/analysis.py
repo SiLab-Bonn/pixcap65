@@ -31,7 +31,8 @@ from pixcap65.analysis_util.utility import check_leaf_unit, str_join, ANALYSIS_C
     PARASITIC_SUBTRACTION, get_base_group, handle_analysis_mix_up, HIST_CAP_UNIT, HIST_CURRENT_MEAS_UNIT, \
     HIST_BIAS_MEAS_UNIT, get_analysis_group, investigate_fit_convergence, TABLES_LEAF_COMPAT_TYPE, \
     CVDistributionData, CVDepletionCapacitanceData, handle_fitter_advanced_options
-from pixcap65.plotting import CAPACITANCE_CONVERSION_FACTOR, evaluate_pixel_mask, REFERENCE_TEST_FILE, X2_SCAN_2_FILE
+from pixcap65.plotting import CAPACITANCE_CONVERSION_FACTOR, evaluate_pixel_mask, REFERENCE_TEST_FILE, X2_SCAN_2_FILE, \
+    X1_SCAN_2_FILE
 from pixcap65.utility.tables_util import get_groups, get_leaves, copy_node, list_attributes, group_get_file, \
     set_group_attribute, get_group_attribute, get_group_attributes, get_parent_group
 from pixcap65.utility.utils_2 import walk_to_node, GroupType, create_carray, prevent_group_mix_up
@@ -543,6 +544,9 @@ def analysis_data_handle(file: tb.File, data_group: GroupType, result_group: Gro
 
     else:
         current_hist = check_leaf_unit(data_group.HistCurr, HIST_CURRENT_MEAS_UNIT)
+        if np.any(current_hist > 1e30):
+            data_group.HistCurr[data_group.HistCurr[:] > 1e30] = np.nan
+            current_hist = check_leaf_unit(data_group.HistCurr, HIST_CURRENT_MEAS_UNIT)
         if is_advanced and "HistCurrErr" in data_group:
             check_leaf_unit(data_group.HistCurrErr, HIST_CURRENT_MEAS_UNIT)
             current_error_hist = data_group.HistCurrErr[:]
@@ -1288,6 +1292,7 @@ def analyze_capacitance_distribution_delegate(analysis_group: Optional[tb.Group]
     :key exclude_cap_hist: boolean, whether to exclude the test capacitator row from the histograms.
     :key hist_bins: integer, number of bins to use for the histogram.
     :key capacitance: histogram of the capacitance
+    :key: set_parasitic: boolean, whether to set the parasitic capacitance
     """
     from pixcap65.plotting import CAPACITANCE_CONVERSION_FACTOR
     from pixcap65.plotting import DEFAULT_BIN_NUMBER
@@ -1539,6 +1544,8 @@ if __name__ == '__main__':
         "bare_hdf_path": "Reference/bare/unbiased_8/total_cap",
     }
 
+
+
     # noqa: S125
     # analyze_capacitance_distribution(raw_data='Bare_Repeat_2_Scan.h5', base_path="Reference/bare/unbiased_8",
     #                                  corrected_distribution=False,
@@ -1554,13 +1561,28 @@ if __name__ == '__main__':
     #              chip_group_name="ATLAS ITk/sensor",
     #              first_boundaries=[(-60, -40), (-80, -75)], second_boundaries=[(-5, 0), (-70, -65)],
     #              **bare_correction_args)
+
+    # Second Try Bare
+    analyze_data(raw_data="packaged/Reference_Bare_renewed.h5", base_path="Reference/Bare/unbiased_31_renew", is_advanced=True, full_model=False)
+
+    # Second Try R13
     analyze_data(raw_data="packaged/R13_2_Scan.h5", base_path="ATLAS_ITk/X2/unbiased_1_full", is_advanced=True, **bare_correction_args)
     analyze_data(raw_data="packaged/R13_2_Scan.h5", base_path="ATLAS_ITk/X2/biased_80_V_full", is_advanced=True,
                  **bare_correction_args)
-    analyze_data(raw_data="packaged/R13_3_Scan.h5", base_path="Reference/R13/C_V_Characteristic_refined", is_advanced=True, full_model=False, is_cv=True,
+    analyze_data(raw_data="packaged/R13_3_Scan.h5", base_path="Reference/R13/C_V_Characteristic_refined", is_advanced=True, full_model=False, is_cv=True, first_boundaries=(-80,-40), second_boundaries=(-10,0),
                  **bare_correction_args)
 
+    # Second Try X1
+    analyze_data(raw_data=X1_SCAN_2_FILE, base_path="ATLAS_ITk/X1/unbiased_61_full", is_advanced=True,
+                 **bare_correction_args)
+    analyze_data(raw_data=X1_SCAN_2_FILE, base_path="ATLAS_ITk/X1/biased_80_V_full", is_advanced=True,
+                 **bare_correction_args)
+    analyze_data(raw_data=X1_SCAN_2_FILE, base_path="ATLAS_ITk/X1/C_V_Characteristic_refined",
+                 is_advanced=True, full_model=False, is_cv=True, use_corrected=True,
+                 first_boundaries=[(-60, -40), (-80, -75)], second_boundaries=[(-5, 0), (-70, -65)],
+                 **bare_correction_args)
 
+    # Second Try X2
     analyze_data(raw_data=X2_SCAN_2_FILE, base_path="ATLAS_ITk/X2/unbiased_1_full", is_advanced=True,
                  **bare_correction_args)
     analyze_data(raw_data=X2_SCAN_2_FILE, base_path="ATLAS_ITk/X2/biased_80_V_full", is_advanced=True,
