@@ -317,7 +317,7 @@ def plot_cv_data(interpreted_data, base_path=None, suffix="C_V_characteristic", 
                 base_group = get_base_group(base_path, in_file_h5)
                 plot_cv_data_delegate(base_group.biasing.measurements,
                                       get_analysis_group(base_group.biasing, **kwargs), output_pdf,
-                                      **kwargs)
+                                      apply_doping=kwargs.get('apply_doping', False))
 
 
 def plot_combined_data(interpreted_data, base_path=None, suffix="combined_bias_cv_curve", use_group=False, **kwargs):
@@ -419,15 +419,20 @@ def plot_cv_data_delegate(data_group: Union[tb.Group, SENSOR_ITERABLE],
         should be investigated.
     """
     # extract the bias data
-    voltage_data_sets = np.asarray([check_leaf_unit(data_group.BiasVoltageHist, HIST_BIAS_MEAS_UNIT)] if isinstance(data_group, tb.Node) else [check_leaf_unit(data_set.BiasVoltageHist, HIST_BIAS_MEAS_UNIT) for data_set in data_group])
-    approx_depletion = isinstance(data_group, tb.Node)
+    approx_depletion = True
+    if isinstance(data_group, tb.Node):
+        voltage_data_sets = np.array([check_leaf_unit(data_group.BiasVoltageHist, HIST_BIAS_MEAS_UNIT)])
+    else:
+        voltage_data_sets = [check_leaf_unit(data_set.BiasVoltageHist, HIST_BIAS_MEAS_UNIT) for data_set in data_group]
+        approx_depletion = False
 
     labels = kwargs.pop('labels', [])
     # investigate all the pixel for plotting
+
+
+
     for ii, jj in np.ndindex(GENERAL_PIXCAP_SHAPE):
-        with interactive_lock:
-            fig, ax = plt.subplots(ncols=2)
-        # will not only generate the title string of the figure but also the figure with the depletion fits.
+        fig, ax = plt.subplots(ncols=2)
         title_str = __plot_depletion_estimation(analysis_group, approx_depletion, ax, ii, jj, voltage_data_sets[0])
 
         if not _cv_plotter(data_group, analysis_group, ii, jj, ax, voltage_data_sets, labels):
@@ -439,12 +444,10 @@ def plot_cv_data_delegate(data_group: Union[tb.Group, SENSOR_ITERABLE],
         ax[1].grid(True)
         fig.suptitle("C-V Characterization for Pixel ({}, {})".format(ii, jj))
         output_pdf.savefig(fig, bbox_inches='tight')
-        with interactive_lock:
-            plt.close(fig)
+        plt.close(fig)
 
         # Plot the doping analysis only for single-sensor samplings.
-        if apply_doping and isinstance(data_group, tb.Group):
-            # TODO: Refactor this part to support plotting for multiple sensors/data sets.
+        if apply_doping and approx_depletion:
             depletion_width_plate = check_leaf_unit(analysis_group.DepletionWidth, "um")
             depletion_width_plate_error = check_leaf_unit(analysis_group.DepletionWidthErr, "um")
             effective_doping_table = check_leaf_unit(analysis_group.DepletionEffDoping, "cm^-3")
@@ -453,101 +456,16 @@ def plot_cv_data_delegate(data_group: Union[tb.Group, SENSOR_ITERABLE],
             plot_depletion_pixel_delegate(bias_voltages, ii, depletion_width_plate, depletion_width_plate_error,
                                           effective_doping_table, output_pdf, jj, table)
 
-    if not (kwargs.pop("distribution", False) and approx_depletion):
-        return
-    assert isinstance(voltage_data_sets[0], Iterable)
-    def iterator_filter(item):
-        return voltage_data_sets[0].shape[0] < 10 or item[0] % 10 == 0
-
-    iterator = filter(iterator_filter, enumerate(voltage_data_sets[0]))
-    for k, bias_voltage in iterator:
-        fig, ax = plt.subplots()
-        ax.set(title="Capacitance distribution for bias voltage {}".format(bias_voltage), xlabel=CAPACITANCE_LABEL)
-        ax.hist(analysis_group.UCHist[:, :, k].reshape(-1) * 1e15, bins=50)
-        output_pdf.savefig(fig, bbox_inches='tight')
-        plt.close(fig)
-
-
-    fig, ax = plt.subplots(ncols=2)
-    title_str = ""
-    # TODO: make this distributed code usable with multiple sensors.
-    if "SensorDepletionRaw" in analysis_group:
-        depletion_data = analysis_group.SensorDepletionRaw[:]
-        print(type(depletion_data))
-        try:
-            depletion_fit_a = depletion_data["a"]
-            depletion_fit_b = depletion_data["b"]
-            depletion_fit_c = depletion_data["c"]
-            depletion_fit_d = depletion_data["d"]
-            dep_voltage = depletion_data["Ubi"]
-        except (KeyError, TypeError, IndexError):
-            print(depletion_data.coldescrs)
-            print(depletion_data.description)
-            raise
-        voltage_data = analysis_group.CVDistribution[:]["bias"]
-        assert isinstance(depletion_fit_a, np.ndarray)
-        assert isinstance(depletion_fit_b, np.ndarray)
-        assert isinstance(depletion_fit_c, np.ndarray)
-        assert isinstance(depletion_fit_d, np.ndarray)
-        if len(depletion_fit_a.shape) == 1:
-            depletion_fit_a = depletion_fit_a.reshape(1, depletion_fit_a.shape[0])
-            depletion_fit_b = depletion_fit_b.reshape(1, depletion_fit_a.shape[0])
-            depletion_fit_c = depletion_fit_c.reshape(1, depletion_fit_a.shape[0])
-            depletion_fit_d = depletion_fit_d.reshape(1, depletion_fit_a.shape[0])
-
-
-        for dep_idx in range(depletion_fit_a.shape[1]):
-            dep_voltage_2 = dep_voltage[dep_idx]
-            first_voltage_x = np.linspace(np.min(voltage_data) - 10, dep_voltage_2 / 1.1,
-                                          NUMBER_DEPLETION_PLOT_POINTS)
-            second_voltage_x = np.linspace(dep_voltage_2 * 1.1, np.max(voltage_data) + 10,
-                                           NUMBER_DEPLETION_PLOT_POINTS)
-            first_cap_calc = depletion_fit_a[dep_idx] * first_voltage_x + depletion_fit_b[dep_idx]
-            second_cap_calc = depletion_fit_c[dep_idx] * second_voltage_x + depletion_fit_d[dep_idx]
-            ax[1].plot(first_voltage_x, first_cap_calc, '-', label="First section fit")
-            ax[1].plot(second_voltage_x, second_cap_calc, '-', label="Second section fit")
-            # TODO: What about the covariance matrix here!
-            title_str += "U = {} V\n".format(dep_voltage_2)
-
-    # since distribution is selected we should assume that this condition is always fulfilled.
-    assert "CVDistribution" in analysis_group
-    # FIXME: this could not handle the appearance of multiple files
-    print(analysis_group)
-    depletion_data = analysis_group.CVDistribution[:]
-    voltage_data = depletion_data["bias"]
-    print(voltage_data)
-    cap_data = depletion_data["capacitance"]
-    cap_data_errors = depletion_data["cap_std"]
-    title_format = "sensor distribution"
-    label = "capacitance data"
-
-    if np.any(np.isnan(cap_data)):
-        plt.close(fig)
-        return
-
-    # Beginning the same part section
-    effective_capacitance_error_data = np.reciprocal(cap_data * CAPACITANCE_CONVERSION_FACTOR) ** 3 * cap_data_errors if np.all(np.isfinite(cap_data_errors)) else None
-    eff_cap_errors = cap_data_errors if np.all(np.isfinite(cap_data_errors)) else None
-    try:
-        ax[0].set(title="Bias data from the \nmeasurement for {}".format(title_format), xlabel=BIAS_CURVE_X_LABEL, ylabel=CAPACITANCE_LABEL)
-        ax[0].errorbar(voltage_data, cap_data * CAPACITANCE_CONVERSION_FACTOR, yerr=eff_cap_errors,
-                       fmt='o', label=label)
-        ax[1].set(title="Suited Bias data from the \nmeasurement for {}".format(title_format), xlabel=BIAS_CURVE_X_LABEL, ylabel="$1/ C^2$ in $1/(fF)^2$")
-        ax[1].errorbar(voltage_data, 1 / (cap_data * CAPACITANCE_CONVERSION_FACTOR) ** 2,
-                       yerr=effective_capacitance_error_data, fmt='o', label=label, alpha=0.5)
-        print(effective_capacitance_error_data)
-    except:
-        print(effective_capacitance_error_data)
-        raise
-
-    # end of the common part.
-    ax[1].set_xlim(np.min(voltage_data), np.max(voltage_data))
-    ax[1].set_ylim(0, np.max(effective_capacitance_error_data) * 1.2)
-    fig.suptitle(title_str)
-    output_pdf.savefig(fig, bbox_inches='tight')
-    plt.close(fig)
-
-
+    if kwargs.pop("distribution", False):
+        assert isinstance(voltage_data_sets[0], Iterable)
+        for k, bias_voltage in enumerate(voltage_data_sets[0]):
+            if voltage_data_sets[0].shape[0] > 10 and k % 10 != 0:
+                continue
+            fig, ax = plt.subplots()
+            ax.set(title="Capacitance distribution for bias voltage {}".format(bias_voltage), xlabel=CAPACITANCE_LABEL)
+            ax.hist(analysis_group.UCHist[:, :, k].reshape(-1) * 1e15, bins=50)
+            output_pdf.savefig(fig, bbox_inches='tight')
+            plt.close(fig)
 
 
 def __plot_depletion_estimation(analysis_group: Union[tb.Group, SENSOR_ITERABLE],
@@ -561,7 +479,6 @@ def __plot_depletion_estimation(analysis_group: Union[tb.Group, SENSOR_ITERABLE]
         assert isinstance(depletion_fit_data, np.ndarray)
         assert isinstance(depletion_hist, np.ndarray)
         if len(depletion_fit_data.shape) == 3:
-            # could the reshape throw things althogether
             depletion_fit_data_temp = depletion_fit_data.reshape((40, 40, 1, 4))
             depletion_fit_data = depletion_fit_data_temp
             depletion_hist = depletion_hist.reshape((40, 40, 1))
@@ -583,136 +500,79 @@ def __plot_depletion_estimation(analysis_group: Union[tb.Group, SENSOR_ITERABLE]
     return title_str
 
 def _cv_plotter(data, analysis, row, col, ax, voltage_data_sets, labels):
-    title_format = "pixel ({col},{row})".format(col=col, row=row)
-    # it should be quite simply to combine this two implementation branches into just a single one!
-    # first get data iterators from the group iterators!
-    if len(labels) == 0:
-        labels = ["Bias Data"]
-
     if isinstance(data, tb.Group):
-        data = [data]
-        analysis = [analysis]
-
-    cap_data_sets = [check_leaf_unit(item.UCHist, HIST_CAP_UNIT)[col, row, :] for item in analysis]
-    cap_data_errors_sets = [check_leaf_unit(item.UCErrHist, HIST_CAP_UNIT)[col, row, :] for item in analysis]
-
-    eff_cap_data = None
-    y_limits = None
-    x_limits = None
-    for cap_data, cap_data_errors, voltage_data, label in zip(cap_data_sets, cap_data_errors_sets, voltage_data_sets, labels):
-        eff_cap_data = cap_data
-        # could this be made common?
-        if np.any(np.isnan(cap_data)):
-            eff_cap_data = None
-            continue
-
-        # begin of the common part
-        effective_capacitance_error_data = np.reciprocal(cap_data * CAPACITANCE_CONVERSION_FACTOR) ** 3 * cap_data_errors if np.all(np.isfinite(cap_data_errors)) else None
-        eff_cap_errors = cap_data_errors if np.all(np.isfinite(cap_data_errors)) else None
-        ax[0].set(title="Bias data from the \nmeasurement for {}".format(title_format), xlabel=BIAS_CURVE_X_LABEL,
-                  ylabel=CAPACITANCE_LABEL)
-        ax[0].errorbar(voltage_data, cap_data * CAPACITANCE_CONVERSION_FACTOR, yerr=eff_cap_errors,
-                       fmt='o', label=label)
-        ax[1].set(title="Suited Bias data from the \nmeasurement for {}".format(title_format),
-                  xlabel=BIAS_CURVE_X_LABEL, ylabel="$1/ C^2$ in $1/(fF)^2$")
-        ax[1].errorbar(voltage_data, 1 / (cap_data * CAPACITANCE_CONVERSION_FACTOR) ** 2,
-                       yerr=effective_capacitance_error_data, fmt='o', label=label, alpha=0.5)
-
-        # end of the common part
-        x_limits = get_x_limits(voltage_data, x_limits)
-        y_limits = __get_y_limits(cap_data, y_limits)
-
-    if eff_cap_data is None or isinstance(x_limits, NoneType) or isinstance(y_limits, NoneType):
-        return False
-
-    ax[1].set_xlim(*x_limits)
-    ax[1].set_ylim(*y_limits)
-    return True
-
-    # TODO: make this here usable from distribution code.
-    if isinstance(data, tb.Group):
-        cap_data_set = check_leaf_unit(analysis.UCHist, HIST_CAP_UNIT)
+        cap_data = check_leaf_unit(analysis.UCHist, HIST_CAP_UNIT)
         cap_errors = check_leaf_unit(analysis.UCErrHist, HIST_CAP_UNIT)
-        cap_data = cap_data_set[row, col, :]
-        cap_data_errors = cap_errors[col, row, :]
         voltage_data = voltage_data_sets[0]
         label = "Bias Data"
-
-        # Could this be made common?
-        if np.any(np.isnan(cap_data)):
+        if np.any(np.isnan(cap_data[col, row, :])):
             return False
 
-        # Begin the duplicate section except that the arrays are only sliced here and not upfront
-        # Begin of the common part
-        effective_capacitance_error_data = np.reciprocal(cap_data * CAPACITANCE_CONVERSION_FACTOR) ** 3 * cap_data_errors if np.all(np.isfinite(cap_data_errors)) else None
-        eff_cap_errors = cap_data_errors if np.all(np.isfinite(cap_data_errors)) else None
-        ax[0].set(title="Bias data from the \nmeasurement for {}".format(title_format), xlabel=BIAS_CURVE_X_LABEL, ylabel=CAPACITANCE_LABEL)
-        ax[0].errorbar(voltage_data, cap_data * CAPACITANCE_CONVERSION_FACTOR, yerr=eff_cap_errors, fmt='o', label=label)
-        ax[1].set(title="Suited Bias data from the \nmeasurement for {}".format(title_format), xlabel=BIAS_CURVE_X_LABEL, ylabel="$1/ C^2$ in $1/(fF)^2$")
-        ax[1].errorbar(voltage_data, 1 / (cap_data * CAPACITANCE_CONVERSION_FACTOR) ** 2, yerr=effective_capacitance_error_data, fmt='o', label=label, alpha=0.5)
-
-        # end of the common part
+        effective_capacitance_error_data = np.reciprocal(cap_data[col, row, :] * CAPACITANCE_CONVERSION_FACTOR) ** 3 * \
+                                           cap_errors[col, row, :] if np.all(
+            np.isfinite(cap_errors[col, row, :])) else None
+        eff_cap_errors = cap_errors[col, row, :] if np.all(np.isfinite(cap_errors[col, row, :])) else None
+        ax[0].set(title="Bias data from the \nmeasurement for pixel ({col},{row})".format(col=col, row=row),
+                  xlabel=BIAS_CURVE_X_LABEL, ylabel=CAPACITANCE_LABEL)
+        ax[0].errorbar(voltage_data, cap_data[col, row, :] * CAPACITANCE_CONVERSION_FACTOR, yerr=eff_cap_errors,
+                       fmt='o', label=label)
+        ax[1].set(title="Suited Bias data from the \nmeasurement for pixel ({col},{row})".format(col=col, row=row),
+                  xlabel=BIAS_CURVE_X_LABEL, ylabel="$1/ C^2$ in $1/(fF)^2$")
+        ax[1].errorbar(voltage_data, 1 / (cap_data[col, row, :] * CAPACITANCE_CONVERSION_FACTOR) ** 2,
+                       yerr=effective_capacitance_error_data, fmt='o', label=label, alpha=0.5)
         ax[1].set_xlim(np.min(voltage_data) - 10, 5 + np.max(voltage_data))
-        ax[1].set_ylim(np.min(1 / (cap_data * CAPACITANCE_CONVERSION_FACTOR) ** 2),
-                       np.max(1 / (cap_data * CAPACITANCE_CONVERSION_FACTOR) ** 2))
+        ax[1].set_ylim(np.min(1 / (cap_data[col, row, :] * CAPACITANCE_CONVERSION_FACTOR) ** 2),
+                       np.max(1 / (cap_data[col, row, :] * CAPACITANCE_CONVERSION_FACTOR) ** 2))
         return True
-    cap_data_set = None
+    cap_data = None
     y_limits = None
     x_limits = None
-
-    # d_group is iterated but never used in the loop
-    # agroup is iterated and used only under the first try
-    # voltage_data is iterated and used for limits
-    # label is used for the plot labels.
-
-
     for d_group, a_group, voltage_data, label in zip(data, analysis, voltage_data_sets, labels):
         try:
-            cap_data_set = check_leaf_unit(a_group.UCHist, HIST_CAP_UNIT)
+            cap_data = check_leaf_unit(a_group.UCHist, HIST_CAP_UNIT)
             cap_errors = check_leaf_unit(a_group.UCErrHist, HIST_CAP_UNIT)
-            cap_data = cap_data_set[row, col, :]
-            cap_data_errors = cap_errors[col, row, :]
         except AssertionError:
             print("react to assertion for", row, col)
             continue
 
-        # could this be made common?
-        if np.any(np.isnan(cap_data)):
-            cap_data_set = None
+        if np.any(np.isnan(cap_data[col, row, :])):
+            cap_data = None
             continue
-
-        # begin of the common part
-        effective_capacitance_error_data = np.reciprocal(cap_data * CAPACITANCE_CONVERSION_FACTOR) ** 3 * cap_data_errors if np.all(np.isfinite(cap_data_errors)) else None
-        eff_cap_errors = cap_data_errors if np.all(np.isfinite(cap_data_errors)) else None
-        ax[0].set(title="Bias data from the \nmeasurement for {}".format(title_format), xlabel=BIAS_CURVE_X_LABEL, ylabel=CAPACITANCE_LABEL)
-        ax[0].errorbar(voltage_data, cap_data * CAPACITANCE_CONVERSION_FACTOR, yerr=eff_cap_errors,
+        effective_capacitance_error_data = np.reciprocal(
+            cap_data[col, row, :] * CAPACITANCE_CONVERSION_FACTOR) ** 3 * \
+                                           cap_errors[col, row, :] if np.all(
+            np.isfinite(cap_errors[col, row, :])) else None
+        eff_cap_errors = cap_errors[col, row, :] if np.all(np.isfinite(cap_errors[col, row, :])) else None
+        ax[0].set(xlabel=BIAS_CURVE_X_LABEL, ylabel=CAPACITANCE_LABEL)
+        ax[0].errorbar(voltage_data, cap_data[col, row, :] * CAPACITANCE_CONVERSION_FACTOR, yerr=eff_cap_errors,
                        fmt='o', label=label)
-        ax[1].set(title="Suited Bias data from the \nmeasurement for {}".format(title_format), xlabel=BIAS_CURVE_X_LABEL, ylabel="$1/ C^2$ in $1/(fF)^2$")
-        ax[1].errorbar(voltage_data, 1 / (cap_data * CAPACITANCE_CONVERSION_FACTOR) ** 2,
+        ax[1].set(xlabel=BIAS_CURVE_X_LABEL, ylabel="$1/ C^2$ in $1/(fF)^2$")
+        ax[1].errorbar(voltage_data, 1 / (cap_data[col, row, :] * CAPACITANCE_CONVERSION_FACTOR) ** 2,
                        yerr=effective_capacitance_error_data, fmt='o', label=label, alpha=0.5)
 
-
-        # end of the common part
         x_limits = get_x_limits(voltage_data, x_limits)
-        y_limits = __get_y_limits(cap_data_set, y_limits, col, row)
 
-    if cap_data_set is None or isinstance(x_limits, NoneType) or isinstance(y_limits, NoneType):
+        y_limits = __get_y_limits(cap_data, col, row, y_limits)
+
+    if cap_data is None or isinstance(x_limits, NoneType) or isinstance(y_limits, NoneType):
         return False
 
+
+    ax[0].set_title("Bias data from the \nmeasurement for pixel ({col},{row})".format(col=col, row=row))
+    ax[1].set_title("Suited Bias data from the \nmeasurement for pixel ({col},{row})".format(col=col, row=row))
     ax[1].set_xlim(*x_limits)
     ax[1].set_ylim(*y_limits)
     return True
 
 
-def __get_y_limits(cap_data: np.ndarray, y_limits: Optional[Iterable], col=None, row=None) -> Iterable:
-    if col and row:
-        cap_data = cap_data[row, col, :]
+def __get_y_limits(cap_data: np.ndarray, col, row,
+                   y_limits: Optional[Iterable]) -> Iterable:
     if y_limits is None:
-        y_limits = [np.min(1 / (cap_data * CAPACITANCE_CONVERSION_FACTOR) ** 2),
-                    np.max(1 / (cap_data * CAPACITANCE_CONVERSION_FACTOR) ** 2)]
+        y_limits = [np.min(1 / (cap_data[col, row, :] * CAPACITANCE_CONVERSION_FACTOR) ** 2),
+                    np.max(1 / (cap_data[col, row, :] * CAPACITANCE_CONVERSION_FACTOR) ** 2)]
     else:
-        actual_lower_limit = np.min(1 / (cap_data * CAPACITANCE_CONVERSION_FACTOR) ** 2)
-        actual_upper_limit = np.max(1 / (cap_data * CAPACITANCE_CONVERSION_FACTOR) ** 2)
+        actual_lower_limit = np.min(1 / (cap_data[col, row, :] * CAPACITANCE_CONVERSION_FACTOR) ** 2)
+        actual_upper_limit = np.max(1 / (cap_data[col, row, :] * CAPACITANCE_CONVERSION_FACTOR) ** 2)
         if y_limits[0] > actual_lower_limit:
             y_limits[0] = actual_lower_limit
         if y_limits[1] < actual_upper_limit:
@@ -762,30 +622,28 @@ def plot_data_delegate(data_group: tb.Group, analysis_group: tb.Group, output_pd
     scan_parameters = data_group.scan_params[:]
 
     # 2D Pixel Capacitance Hist
-    with interactive_lock:
-        fig = Figure()
-        _ = FigureCanvas(fig)
-        ax = fig.add_subplot(111)
-        im = ax.imshow(cap_hist * CAPACITANCE_CONVERSION_FACTOR)
-        divider = make_axes_locatable(ax)
-        cax = divider.append_axes('right', size='5%', pad=0.05)
+    fig = Figure()
+    _ = FigureCanvas(fig)
+    ax = fig.add_subplot(111)
+    im = ax.imshow(cap_hist * CAPACITANCE_CONVERSION_FACTOR)
+    divider = make_axes_locatable(ax)
+    cax = divider.append_axes('right', size='5%', pad=0.05)
     fig.colorbar(im, cax=cax, label=HIST_PIX_CAP_LABEL)
     ax.set_ylabel(COLUMN_LABEL)
     ax.set_xlabel(ROW_LABEL)
     output_pdf.savefig(fig, bbox_inches='tight')
-    with interactive_lock:
-        plt.close(fig)
+    plt.close(fig)
 
     if kwargs.get("exclude_test_cap", False):
         # another heat map which do not consider masked or boundary caps
         assert isinstance(cap_hist, np.ndarray)
         masked_cap_hist = cap_hist.copy()
         masked_cap_hist = evaluate_pixel_mask(masked_cap_hist, **kwargs)
-        with interactive_lock:
-            fig, ax = plt.subplots()
-            im = ax.imshow(masked_cap_hist * CAPACITANCE_CONVERSION_FACTOR)
-            divider = make_axes_locatable(ax)
-            cax = divider.append_axes('right', size='5%', pad=0.05)
+
+        fig, ax = plt.subplots()
+        im = ax.imshow(masked_cap_hist * CAPACITANCE_CONVERSION_FACTOR)
+        divider = make_axes_locatable(ax)
+        cax = divider.append_axes('right', size='5%', pad=0.05)
         fig.colorbar(im, cax=cax, label=HIST_PIX_CAP_LABEL)
         ax.set_ylabel(COLUMN_LABEL)
         ax.set_xlabel(ROW_LABEL)
@@ -794,10 +652,9 @@ def plot_data_delegate(data_group: tb.Group, analysis_group: tb.Group, output_pd
         plt.close(fig)
 
     # 1D Pixel Capacitance Hist
-    with interactive_lock:
-        fig = Figure()
-        _ = FigureCanvas(fig)
-        ax = fig.add_subplot(111)
+    fig = Figure()
+    _ = FigureCanvas(fig)
+    ax = fig.add_subplot(111)
     hist_cap_hist = evaluate_pixel_mask(cap_hist, **kwargs)
     ax.hist(hist_cap_hist[~np.isnan(hist_cap_hist)].reshape(-1) * CAPACITANCE_CONVERSION_FACTOR,
             bins=kwargs.get("hist_bins", DEFAULT_BIN_NUMBER))
@@ -805,8 +662,7 @@ def plot_data_delegate(data_group: tb.Group, analysis_group: tb.Group, output_pd
     ax.set_xlabel(HIST_PIX_CAP_LABEL)
     ax.grid()
     output_pdf.savefig(fig, bbox_inches='tight')
-    with interactive_lock:
-        plt.close(fig)
+    plt.close(fig)
     if kwargs.pop("distribution", False):
         from pixcap65.analysis import analyze_capacitance_distribution_delegate
 
@@ -820,10 +676,9 @@ def plot_data_delegate(data_group: tb.Group, analysis_group: tb.Group, output_pd
         if verify_pixel_mask and (col, row) in kwargs["mask_pixel"]:
             continue
         if np.isfinite(current_hist[col, row, 0]):
-            with interactive_lock:
-                fig = Figure()
-                _ = FigureCanvas(fig)
-                ax = fig.add_subplot(111)
+            fig = Figure()
+            _ = FigureCanvas(fig)
+            ax = fig.add_subplot(111)
             f = np.arange(0, scan_parameters['frequency'].max() * 1.1, 0.1)
             actual_cap = cap_hist[col, row] * CAPACITANCE_CONVERSION_FACTOR
 
@@ -835,8 +690,7 @@ def plot_data_delegate(data_group: tb.Group, analysis_group: tb.Group, output_pd
             ax.legend()
             ax.grid()
             output_pdf.savefig(fig, bbox_inches='tight')
-            with interactive_lock:
-                plt.close(fig)
+            plt.close(fig)
 
 
 def plot_inter_pix_data_delegate(data_group: tb.Group, analysis_group: tb.Group, output_pdf: PdfPages, total_group=None,
@@ -886,11 +740,10 @@ def plot_inter_pix_data_delegate(data_group: tb.Group, analysis_group: tb.Group,
     scan_parameters = data_group.scan_params[:]
 
     # 2D Pixel Capacitance Hist
-    with interactive_lock:
-        fig = Figure()
-        _ = FigureCanvas(fig)
-        ax = fig.add_subplot(111)
-        im = ax.imshow(total_cap_hist * CAPACITANCE_CONVERSION_FACTOR)
+    fig = Figure()
+    _ = FigureCanvas(fig)
+    ax = fig.add_subplot(111)
+    im = ax.imshow(total_cap_hist * CAPACITANCE_CONVERSION_FACTOR)
     divider = make_axes_locatable(ax)
     cax = divider.append_axes('right', size='5%', pad=0.05)
     fig.colorbar(im, cax=cax, label=HIST_PIX_CAP_LABEL)
@@ -898,14 +751,12 @@ def plot_inter_pix_data_delegate(data_group: tb.Group, analysis_group: tb.Group,
     ax.set_xlabel(ROW_LABEL)
     ax.set_title("Total Pixel Capacitance")
     output_pdf.savefig(fig, bbox_inches='tight')
-    with interactive_lock:
-        plt.close(fig)
+    plt.close(fig)
     if total_ref_cap_hist is not None:
-        with interactive_lock:
-            fig = Figure()
-            _ = FigureCanvas(fig)
-            ax = fig.add_subplot(111)
-            im = ax.imshow((total_ref_cap_hist - total_cap_hist) * CAPACITANCE_CONVERSION_FACTOR)
+        fig = Figure()
+        _ = FigureCanvas(fig)
+        ax = fig.add_subplot(111)
+        im = ax.imshow((total_ref_cap_hist - total_cap_hist) * CAPACITANCE_CONVERSION_FACTOR)
         divider = make_axes_locatable(ax)
         cax = divider.append_axes('right', size='5%', pad=0.05)
         fig.colorbar(im, cax=cax, label=HIST_PIX_CAP_LABEL)
@@ -913,28 +764,24 @@ def plot_inter_pix_data_delegate(data_group: tb.Group, analysis_group: tb.Group,
         ax.set_xlabel(ROW_LABEL)
         ax.set_title("Inter Pixel capacitance from In-Pix C")
         output_pdf.savefig(fig, bbox_inches='tight')
-        with interactive_lock:
-            plt.close(fig)
+        plt.close(fig)
 
-    with interactive_lock:
-        fig = Figure()
-        _ = FigureCanvas(fig)
-        ax = fig.add_subplot(111)
-        im = ax.imshow(inter_a_cap_hist * CAPACITANCE_CONVERSION_FACTOR)
-        divider = make_axes_locatable(ax)
+    fig = Figure()
+    _ = FigureCanvas(fig)
+    ax = fig.add_subplot(111)
+    im = ax.imshow(inter_a_cap_hist * CAPACITANCE_CONVERSION_FACTOR)
+    divider = make_axes_locatable(ax)
     cax = divider.append_axes('right', size='5%', pad=0.05)
     fig.colorbar(im, cax=cax, label=HIST_PIX_CAP_LABEL)
     ax.set_ylabel(COLUMN_LABEL)
     ax.set_xlabel(ROW_LABEL)
     ax.set_title("Inter-Pixel Capacitance A")
     output_pdf.savefig(fig, bbox_inches='tight')
-    with interactive_lock:
-        plt.close(fig)
+    plt.close(fig)
 
-    with interactive_lock:
-        fig = Figure()
-        _ = FigureCanvas(fig)
-        ax = fig.add_subplot(111)
+    fig = Figure()
+    _ = FigureCanvas(fig)
+    ax = fig.add_subplot(111)
     im = ax.imshow(inter_b_cap_hist * CAPACITANCE_CONVERSION_FACTOR)
     divider = make_axes_locatable(ax)
     cax = divider.append_axes('right', size='5%', pad=0.05)
@@ -943,16 +790,14 @@ def plot_inter_pix_data_delegate(data_group: tb.Group, analysis_group: tb.Group,
     ax.set_xlabel(ROW_LABEL)
     ax.set_title("Inter-Pixel Capacitance B")
     output_pdf.savefig(fig, bbox_inches='tight')
-    with interactive_lock:
-        plt.close(fig)
+    plt.close(fig)
 
     # 1D Pixel Capacitance Hist
     n_bins = kwargs.get("hist_bins", DEFAULT_BIN_NUMBER)
     if np.count_nonzero(np.isfinite(total_cap_hist)) > 2:
-        with interactive_lock:
-            fig = Figure()
-            _ = FigureCanvas(fig)
-            ax = fig.add_subplot(111)
+        fig = Figure()
+        _ = FigureCanvas(fig)
+        ax = fig.add_subplot(111)
         hist_cap_hist = evaluate_pixel_mask(total_cap_hist, **kwargs)
         ax.hist(hist_cap_hist[~np.isnan(hist_cap_hist)].reshape(-1) * CAPACITANCE_CONVERSION_FACTOR,
                 bins=n_bins)
@@ -961,18 +806,16 @@ def plot_inter_pix_data_delegate(data_group: tb.Group, analysis_group: tb.Group,
         ax.set_title("Pixel Total Capacitance Distribution")
         ax.grid()
         output_pdf.savefig(fig, bbox_inches='tight')
-        with interactive_lock:
-            plt.close(fig)
+        plt.close(fig)
         if need_distribution:
             from pixcap65.analysis import analyze_capacitance_distribution_delegate
             analyze_capacitance_distribution_delegate(analysis_group, output_pdf, capacitance=total_cap_hist, **kwargs)
 
         if total_ref_cap_hist is not None:
             effective_inter_cap_hist = total_ref_cap_hist - total_cap_hist
-            with interactive_lock:
-                fig = Figure()
-                _ = FigureCanvas(fig)
-                ax = fig.add_subplot(111)
+            fig = Figure()
+            _ = FigureCanvas(fig)
+            ax = fig.add_subplot(111)
             hist_inter_cap_hist = evaluate_pixel_mask(effective_inter_cap_hist, **kwargs)
             ax.hist(hist_inter_cap_hist[~np.isnan(hist_inter_cap_hist)].reshape(-1) * CAPACITANCE_CONVERSION_FACTOR,
                     bins=n_bins)
@@ -981,18 +824,16 @@ def plot_inter_pix_data_delegate(data_group: tb.Group, analysis_group: tb.Group,
             ax.set_title("Pixel Inter Capacitance Distribution")
             ax.grid()
             output_pdf.savefig(fig, bbox_inches='tight')
-            with interactive_lock:
-                plt.close(fig)
+            plt.close(fig)
             if need_distribution:
                 from pixcap65.analysis import analyze_capacitance_distribution_delegate
                 analyze_capacitance_distribution_delegate(analysis_group, output_pdf,
                                                           capacitance=effective_inter_cap_hist, **kwargs)
 
     if np.count_nonzero(np.isfinite(inter_a_current_hist)) > 2:
-        with interactive_lock:
-            fig = Figure()
-            _ = FigureCanvas(fig)
-            ax = fig.add_subplot(111)
+        fig = Figure()
+        _ = FigureCanvas(fig)
+        ax = fig.add_subplot(111)
         hist_cap_hist = evaluate_pixel_mask(inter_a_current_hist, **kwargs)
         ax.hist(hist_cap_hist[~np.isnan(hist_cap_hist)].reshape(-1) * CAPACITANCE_CONVERSION_FACTOR,
                 bins=n_bins)
@@ -1001,18 +842,16 @@ def plot_inter_pix_data_delegate(data_group: tb.Group, analysis_group: tb.Group,
         ax.set_title("Inter-Pixel A Capacitance Distribution")
         ax.grid()
         output_pdf.savefig(fig, bbox_inches='tight')
-        with interactive_lock:
-            plt.close(fig)
+        plt.close(fig)
         if need_distribution:
             from pixcap65.analysis import analyze_capacitance_distribution_delegate
             analyze_capacitance_distribution_delegate(analysis_group, output_pdf, capacitance=inter_a_cap_hist,
                                                       **kwargs)
 
     if np.count_nonzero(np.isfinite(inter_b_current_hist)) > 2:
-        with interactive_lock:
-            fig = Figure()
-            _ = FigureCanvas(fig)
-            ax = fig.add_subplot(111)
+        fig = Figure()
+        _ = FigureCanvas(fig)
+        ax = fig.add_subplot(111)
         hist_cap_hist = evaluate_pixel_mask(inter_b_current_hist, **kwargs)
         ax.hist(hist_cap_hist[~np.isnan(hist_cap_hist)].reshape(-1) * CAPACITANCE_CONVERSION_FACTOR,
                 bins=n_bins)
@@ -1021,8 +860,7 @@ def plot_inter_pix_data_delegate(data_group: tb.Group, analysis_group: tb.Group,
         ax.set_title("Inter-Pixel B Capacitance Distribution")
         ax.grid()
         output_pdf.savefig(fig, bbox_inches='tight')
-        with interactive_lock:
-            plt.close(fig)
+        plt.close(fig)
         if need_distribution:
             from pixcap65.analysis import analyze_capacitance_distribution_delegate
             analyze_capacitance_distribution_delegate(analysis_group, output_pdf, capacitance=inter_b_cap_hist,
@@ -1035,10 +873,9 @@ def plot_inter_pix_data_delegate(data_group: tb.Group, analysis_group: tb.Group,
         if verify_mask_pixel and (col, row) in kwargs["mask_pixel"]:
             continue
         elif np.isfinite(total_current_hist[col, row, 0]):
-            with interactive_lock:
-                fig = Figure()
-                _ = FigureCanvas(fig)
-                ax = fig.add_subplot(111)
+            fig = Figure()
+            _ = FigureCanvas(fig)
+            ax = fig.add_subplot(111)
             f = np.arange(0, scan_parameters['frequency'].max() * 1.1, 0.1)
             actual_cap = total_cap_hist[col, row] * CAPACITANCE_CONVERSION_FACTOR
             plot_current_model(ax, col, row, analysis_group, actual_cap, total_leak_hist, f, prefix="Total ",
@@ -1064,8 +901,7 @@ def plot_inter_pix_data_delegate(data_group: tb.Group, analysis_group: tb.Group,
             ax.legend()
             ax.grid()
             output_pdf.savefig(fig, bbox_inches='tight')
-            with interactive_lock:
-                plt.close(fig)
+            plt.close(fig)
 
 
 def plot_current_data(ax: Axes, col, row, scan_parameters, current_hist, current_err_hist, color=0.2, prefix="",
@@ -1174,10 +1010,9 @@ def plot_compare_delegate(first_group: tb.Group, second_group: tb.Group, output_
     diff_cap_hist = np.where(full_mask, first_cap_hist - second_cap_hist, np.nan)
 
     # create the figure
-    with interactive_lock:
-        fig = Figure()
-        _ = FigureCanvas(fig)
-        ax = fig.add_subplot(111)
+    fig = Figure()
+    _ = FigureCanvas(fig)
+    ax = fig.add_subplot(111)
     im = ax.imshow(diff_cap_hist * CAPACITANCE_CONVERSION_FACTOR, )
     divider = make_axes_locatable(ax)
     cax = divider.append_axes('right', size='5%', pad=0.05)
@@ -1187,8 +1022,7 @@ def plot_compare_delegate(first_group: tb.Group, second_group: tb.Group, output_
     output_pdf.savefig(fig, bbox_inches='tight')
 
     # close the figures at last to not waste any memory resources
-    with interactive_lock:
-        plt.close(fig)
+    plt.close(fig)
 
 
 def plot_depletion_delegate(data_group: tb.Group, analysis_group: GroupType, output_pdf: PdfPages):
@@ -1230,8 +1064,7 @@ def plot_depletion_pixel_delegate(bias_voltages: TABLES_LEAF_COMPAT_TYPE, i_col,
             depletion_fit_propagate_parameters = {}
         doping_acceptor = depletion_fit_propagate_parameters["NAD"]
         effective_doping = effective_doping_table[i_col, i_row]
-        with interactive_lock:
-            fig, ax = plt.subplots(3)
+        fig, ax = plt.subplots(3)
         logger.info("The type of bias_voltages is %s", type(bias_voltages))
         bias_mask = bias_voltages < -0.5
         if np.all(np.isfinite(depletion_width_plate_error[i_col, i_row])):
@@ -1262,125 +1095,126 @@ def plot_depletion_pixel_delegate(bias_voltages: TABLES_LEAF_COMPAT_TYPE, i_col,
         ax[2].set_yscale('log')
         output_pdf.savefig(fig, bbox_inches='tight')
         # close the figures at last, to not waste any memory resources
-        with interactive_lock:
-            plt.close(fig)
+        plt.close(fig)
 
 
 if __name__ == '__main__':
-    # plot_data(interpreted_data=os.path.expanduser('~/git/pixcap65/pixcap_LF_50x50_DC_R3_80V_HV.h5'))
+    plot_bias_data(interpreted_data="3D_Sensor_221_Scan.h5", base_path="Thesis/ATLAS_ITk/X3/I_V_Characteristic", use_group=True)
+    plot_bias_data(interpreted_data="3D_Sensor_221_W13_X_Scan.h5", base_path="Thesis/ATLAS_ITk/X3/I_V_Characteristic", use_group=True)
+    plot_combined_data(interpreted_data="3D_Sensor_221_W13_X_Scan.h5", base_path="Thesis/ATLAS_ITk/X3/C_V_Characteristic", use_group=True)
+    plot_bias_data(interpreted_data="3D_Sensor_221_W6_j_Scan.h5", base_path="Thesis/ATLAS_ITk/X5/I_V_Characteristic",
+                   use_group=True)
+    plot_combined_data(interpreted_data="3D_Sensor_221_W6_j_Scan.h5",
+                       base_path="Thesis/ATLAS_ITk/X5/C_V_Characteristic", use_group=True)
 
-    # some usage examples
-    from pixcap65.utility.homogenize_plots import set_params
-
-    logging.basicConfig(level=logging.INFO)
-
-    set_params(latex=True,
-               latex_extra=r"\sisetup{separate-uncertainty}\sisetup{locale = DE}\sisetup{uncertainty-descriptors={"
-                           r"stat,sys}}\sisetup{uncertainty-descriptor-mode=subscript}\sisetup{"
-                           r"retain-zero-uncertainty}", fig_height=8.26772, fig_width=11.69291, )
-
-    # second try Bare
-    print("Plot Bare")
-    # plot_data(interpreted_data="packaged/Reference_Bare_renewed.h5", base_path="Reference/Bare/unbiased_31_renew", suffix="general_data_bare-2", use_group=True, exclude_test_cap=True, distribution=True)
-
-    # second try R13
-    # NOSONAR
-    print("Plot R13")
+    # # plot_data(interpreted_data=os.path.expanduser('~/git/pixcap65/pixcap_LF_50x50_DC_R3_80V_HV.h5'))
+    #
+    # # some usage examples
+    # from pixcap65.utility.homogenize_plots import set_params
+    #
+    # logging.basicConfig(level=logging.INFO)
+    #
+    # set_params(latex=True,
+    #            latex_extra=r"\sisetup{separate-uncertainty}\sisetup{locale = DE}\sisetup{uncertainty-descriptors={"
+    #                        r"stat,sys}}\sisetup{uncertainty-descriptor-mode=subscript}\sisetup{"
+    #                        r"retain-zero-uncertainty}", fig_height=8.26772, fig_width=11.69291, )
+    #
+    # # second try Bare
+    # plot_data(interpreted_data="packaged/Reference_Bare_renewed.h5", base_path="Reference/Bare/unbiased_31_renew", suffix="general_data_bare-2", use_group=True, exclude_test_cap=True)
+    #
+    # # second try R13
+    # # NOSONAR
     # plot_data(interpreted_data="packaged/R13_2_Scan.h5", base_path="ATLAS_ITk/X2/unbiased_1_full", use_group=True, exclude_test_cap=True, distribution=True)
-    # noqa: S1192
-    # plot_data(interpreted_data="packaged/R13_2_Scan.h5", base_path="ATLAS_ITk/X2/biased_80_V_full", use_group=True, distribution=True)
-    plot_combined_data(interpreted_data="packaged/R13_3_Scan.h5", base_path="Reference/R13/C_V_Characteristic_refined", use_group=True, exclude_test_cap=True, distribution=True)
-
-    # some test evaluations
+    # # noqa: S1192
+    # plot_data(interpreted_data="packaged/R13_2_Scan.h5", base_path="ATLAS_ITk/X2/biased_80_V_full", use_group=True, exclude_test_cap=True, distribution=True)
+    # plot_cv_data(interpreted_data="packaged/R13_3_Scan.h5", base_path="Reference/R13/C_V_Characteristic_refined", use_group=True,exclude_test_cap=True, distribution=True)
+    #
+    # # some test evaluations
     # plot_data(interpreted_data=REFERENCE_TEST_FILE, base_path="Reference/TESTS/unbiased_30", use_group=True,
     #           exclude_test_cap=True)
     # plot_data(interpreted_data=REFERENCE_TEST_FILE, base_path="Reference/TESTS/unbiased_31", use_group=True,
     #           exclude_test_cap=True)
-
-    # second try X1
-    print("Plot X1")
-    x1_second_pixel_mask = [[39, 39], [38, 39]]
-    plot_data(interpreted_data=X1_SCAN_2_FILE, base_path="ATLAS_ITk/X1/unbiased_61_full", use_group=True,
-              exclude_test_cap=True, mask_pixel=x1_second_pixel_mask, distribution=True)
-    plot_data(interpreted_data=X1_SCAN_2_FILE, base_path="ATLAS_ITk/X1/unbiased_61_full", use_group=True,
-              exclude_test_cap=True, use_corrected=True, mask_pixel=x1_second_pixel_mask, distribution=True)
-    plot_data(interpreted_data=X1_SCAN_2_FILE, base_path="ATLAS_ITk/X1/biased_80_V_full", use_group=True,
-              exclude_test_cap=True, mask_pixel=x1_second_pixel_mask, distribution=True)
-    plot_data(interpreted_data=X1_SCAN_2_FILE, base_path="ATLAS_ITk/X1/biased_80_V_full", use_group=True,
-              exclude_test_cap=True, use_corrected=True, mask_pixel=x1_second_pixel_mask, distribution=True)
-    plot_bias_data(interpreted_data=X1_SCAN_2_FILE, base_path="ATLAS_ITk/X1/I_V_Characteristic",use_group=True,)
-    plot_combined_data(interpreted_data=X1_SCAN_2_FILE, base_path="ATLAS_ITk/X1/C_V_Characteristic_refined",
-                       use_group=True, mask_pixel=x1_second_pixel_mask, distribution=True)
-    plot_combined_data(interpreted_data=X1_SCAN_2_FILE, base_path="ATLAS_ITk/X1/C_V_Characteristic_refined",
-                       use_group=True, use_corrected=True,
-                       apply_doping=False, distribution=True, mask_pixel=x1_second_pixel_mask)
-
-    # second Try X2
-    print("Plot X2")
-    plot_data(interpreted_data=X2_SCAN_2_FILE, base_path="ATLAS_ITk/X2/unbiased_1_full", use_group=True,
-              exclude_test_cap=True)
-    plot_data(interpreted_data=X2_SCAN_2_FILE, base_path="ATLAS_ITk/X2/unbiased_1_full", use_group=True,
-              exclude_test_cap=True, use_corrected=True)
-    plot_data(interpreted_data=X2_SCAN_2_FILE, base_path="ATLAS_ITk/X2/biased_80_V_full", use_group=True,
-              exclude_test_cap=True)
-    plot_data(interpreted_data=X2_SCAN_2_FILE, base_path="ATLAS_ITk/X2/biased_80_V_full", use_group=True,
-              exclude_test_cap=True, use_corrected=True)
-    plot_combined_data(interpreted_data=X2_SCAN_2_FILE, base_path="ATLAS_ITk/X2/C_V_Characteristic_refined",
-                       use_group=True)
-    plot_combined_data(interpreted_data=X2_SCAN_2_FILE, base_path="ATLAS_ITk/X2/C_V_Characteristic_refined",
-                       use_group=True, use_corrected=True,
-                       apply_doping=False, distribution=False)
-
-    # E1 first run
-    print("Plot E1")
-    plot_data(interpreted_data=E1_SCAN_FILE, base_path="Reference/E1/unbiased_4_full", use_group=True, exclude_test_cap=True, mask_pixel=[[39,1]])
-    plot_data(interpreted_data=E1_SCAN_FILE, base_path="Reference/E1/unbiased_4_full", use_group=True,
-              use_corrected=True, distribution=True, exclude_test_cap=True, mask_pixel=[[39,1]])
-    plot_bias_data(interpreted_data=E1_SCAN_FILE, base_path="Reference/E1/I_V_Characteristic",
-                   use_group=True)
-    plot_combined_data(interpreted_data=E1_SCAN_FILE, base_path="Reference/E1/C_V_Characteristic",
-                       use_group=True)
-    plot_combined_data(interpreted_data=E1_SCAN_FILE, base_path="Reference/E1/C_V_Characteristic",
-                       use_group=True,
-                       use_corrected=True,
-                       apply_doping=False, distribution=False)
-
-    print("Plot Presentable")
-    # noqa: S125
-    # examples
-    # plot_data(interpreted_data='pixcap65/Data/r13-measurement/R13_Full_Scan_80V.h5', suffix="general_data",
-    #           use_group=False)
-    # plot_inter_pix_data(interpreted_data='R13-Interpixel_Scan.h5',
-    #                     base_path="Reference/R13/demo_measurement_65_unbiased_1_discharge",
-    #                     use_group=True, suffix="inter_pix_65", total_data='Reference_R13_Scan.h5',
-    #                     distribution=True, set_parasitic=False, total_path="Reference/R13/unbiased_12_full")
-    # plot_bias_data(interpreted_data='Data/r13-measurement/R13_BIAS_2.h5')
-    # plot_combined_data(interpreted_data='Data/r13-measurement/R13_BIAS_CV_COMBI_6.h5', first_lower=-100,first_upper=-40, second_lower=-10, second_upper=0)
-
-    # collect all our IV groups
-    iv_file_names = ['pixcap65/Data/r13-measurement/R13_BIAS_2.h5', 'pixcap65/Data/New_1_Initial_6_Scan.h5',
-                     X2_SCAN_FILE, X1_SCAN_2_FILE]
-    iv_group_names = [None, "ATLAS ITk/I_V_Characteristic", "ATLAS_Itk/X2/I_V_Characteristic", "ATLAS_ITk/X1/I_V_Characteristic",]
-    iv_labels = ['R13', "(HPK) X1", "(HPK) X2", "X1 (second)"]
-    normalisation = [64*64, 384*400, 384*400, 384*400] * 50 * 50
-    plot_bias_data(iv_file_names, iv_group_names, pdf_name="I-V Combination.pdf",
-                   labels=["Bias Data for {}".format(item) for item in iv_labels])
-    plot_bias_data(iv_file_names, iv_group_names, pdf_name="I-V Combination-2.pdf",
-                   labels=["Bias Data for {}".format(item) for item in iv_labels], area_normalisation=normalisation)
-    print("CV Combination")
-    plot_cv_data([X2_SCAN_FILE, X2_SCAN_FILE, X2_SCAN_2_FILE, X1_SCAN_2_FILE, "packaged/R13_3_Scan.h5"],
-                 ["ATLAS_Itk/X2/C_V_Characteristic", "ATLAS_Itk/X2/C_V_Characteristic_refined", "ATLAS_ITk/X2/C_V_Characteristic_refined",
-                  "ATLAS_ITk/X1/C_V_Characteristic_refined", "Reference/R13/C_V_Characteristic_refined",],
-                 pdf_name="C-V Combination.pdf", labels=[CV_DATA_FOR_.format(item) for item in ['X2_1_1', "X2_1_2", "X2_2", "X1", "R13 (second)"]],
-                 use_corrected=True)
-    print("CV Combination R13 only")
-    plot_cv_data([REFERENCE_TEST_FILE, REFERENCE_TEST_FILE],
-                 ["Reference/TESTS/cv_only_simple", "Reference/TESTS/cv_only_advanced"],
-                 pdf_name="C-V Combination 2.pdf", labels=[CV_DATA_FOR_.format(item) for item in ['simple', "advanced"]],
-                 use_corrected=True)
-    print("CV Combination R13 combined")
-    plot_cv_data([REFERENCE_TEST_FILE, REFERENCE_TEST_FILE],
-                 ["Reference/TESTS/cv_combined_simple", "Reference/TESTS/cv_combined_advanced"],
-                 pdf_name="C-V Combination 3.pdf",
-                 labels=[CV_DATA_FOR_.format(item) for item in ['simple', "advanced"]],
-                 use_corrected=True)
+    #
+    # # second try X1
+    # x1_second_pixel_mask = [[39, 39], [38, 39]]
+    # plot_data(interpreted_data=X1_SCAN_2_FILE, base_path="ATLAS_ITk/X1/unbiased_61_full", use_group=True,
+    #           exclude_test_cap=True, mask_pixel=x1_second_pixel_mask, distribution=True)
+    # plot_data(interpreted_data=X1_SCAN_2_FILE, base_path="ATLAS_ITk/X1/unbiased_61_full", use_group=True,
+    #           exclude_test_cap=True, use_corrected=True, mask_pixel=x1_second_pixel_mask, distribution=True)
+    # plot_data(interpreted_data=X1_SCAN_2_FILE, base_path="ATLAS_ITk/X1/biased_80_V_full", use_group=True,
+    #           exclude_test_cap=True, mask_pixel=x1_second_pixel_mask, distribution=True)
+    # plot_data(interpreted_data=X1_SCAN_2_FILE, base_path="ATLAS_ITk/X1/biased_80_V_full", use_group=True,
+    #           exclude_test_cap=True, use_corrected=True, mask_pixel=x1_second_pixel_mask, distribution=True)
+    # plot_bias_data(interpreted_data=X1_SCAN_2_FILE, base_path="ATLAS_ITk/X1/I_V_Characteristic",use_group=True,)
+    # plot_combined_data(interpreted_data=X1_SCAN_2_FILE, base_path="ATLAS_ITk/X1/C_V_Characteristic_refined",
+    #                    use_group=True, mask_pixel=x1_second_pixel_mask, distribution=True)
+    # plot_combined_data(interpreted_data=X1_SCAN_2_FILE, base_path="ATLAS_ITk/X1/C_V_Characteristic_refined",
+    #                    use_group=True, use_corrected=True,
+    #                    apply_doping=False, distribution=True, mask_pixel=x1_second_pixel_mask)
+    #
+    # # second Try X2
+    # plot_data(interpreted_data=X2_SCAN_2_FILE, base_path="ATLAS_ITk/X2/unbiased_1_full", use_group=True,
+    #           exclude_test_cap=True)
+    # plot_data(interpreted_data=X2_SCAN_2_FILE, base_path="ATLAS_ITk/X2/unbiased_1_full", use_group=True,
+    #           exclude_test_cap=True, use_corrected=True)
+    # plot_data(interpreted_data=X2_SCAN_2_FILE, base_path="ATLAS_ITk/X2/biased_80_V_full", use_group=True,
+    #           exclude_test_cap=True)
+    # plot_data(interpreted_data=X2_SCAN_2_FILE, base_path="ATLAS_ITk/X2/biased_80_V_full", use_group=True,
+    #           exclude_test_cap=True, use_corrected=True)
+    # plot_combined_data(interpreted_data=X2_SCAN_2_FILE, base_path="ATLAS_ITk/X2/C_V_Characteristic_refined",
+    #                    use_group=True)
+    # plot_combined_data(interpreted_data=X2_SCAN_2_FILE, base_path="ATLAS_ITk/X2/C_V_Characteristic_refined",
+    #                    use_group=True, use_corrected=True,
+    #                    apply_doping=False, distribution=False)
+    #
+    # # E1 first run
+    # plot_data(interpreted_data=E1_SCAN_FILE, base_path="Reference/E1/unbiased_4_full", use_group=True, exclude_test_cap=True, mask_pixel=[[39,1]])
+    # plot_data(interpreted_data=E1_SCAN_FILE, base_path="Reference/E1/unbiased_4_full", use_group=True,
+    #           use_corrected=True, distribution=True, exclude_test_cap=True, mask_pixel=[[39,1]])
+    # plot_bias_data(interpreted_data=E1_SCAN_FILE, base_path="Reference/E1/I_V_Characteristic",
+    #                use_group=True)
+    # plot_combined_data(interpreted_data=E1_SCAN_FILE, base_path="Reference/E1/C_V_Characteristic",
+    #                    use_group=True)
+    # plot_combined_data(interpreted_data=E1_SCAN_FILE, base_path="Reference/E1/C_V_Characteristic",
+    #                    use_group=True,
+    #                    use_corrected=True,
+    #                    apply_doping=False, distribution=False)
+    #
+    # # noqa: S125
+    # # examples
+    # # plot_data(interpreted_data='pixcap65/Data/r13-measurement/R13_Full_Scan_80V.h5', suffix="general_data",
+    # #           use_group=False)
+    # # plot_inter_pix_data(interpreted_data='R13-Interpixel_Scan.h5',
+    # #                     base_path="Reference/R13/demo_measurement_65_unbiased_1_discharge",
+    # #                     use_group=True, suffix="inter_pix_65", total_data='Reference_R13_Scan.h5',
+    # #                     distribution=True, set_parasitic=False, total_path="Reference/R13/unbiased_12_full")
+    # # plot_bias_data(interpreted_data='Data/r13-measurement/R13_BIAS_2.h5')
+    # # plot_combined_data(interpreted_data='Data/r13-measurement/R13_BIAS_CV_COMBI_6.h5', first_lower=-100,first_upper=-40, second_lower=-10, second_upper=0)
+    #
+    # # collect all our IV groups
+    # iv_file_names = ['pixcap65/Data/r13-measurement/R13_BIAS_2.h5', 'pixcap65/Data/New_1_Initial_6_Scan.h5',
+    #                  X2_SCAN_FILE, X1_SCAN_2_FILE]
+    # iv_group_names = [None, "ATLAS ITk/I_V_Characteristic", "ATLAS_Itk/X2/I_V_Characteristic", "ATLAS_ITk/X1/I_V_Characteristic",]
+    # iv_labels = ['R13', "(HPK) X1", "(HPK) X2", "X1 (second)"]
+    # normalisation = [64*64, 384*400, 384*400, 384*400] * 50 * 50
+    # plot_bias_data(iv_file_names, iv_group_names, pdf_name="I-V Combination.pdf",
+    #                labels=["Bias Data for {}".format(item) for item in iv_labels])
+    # plot_bias_data(iv_file_names, iv_group_names, pdf_name="I-V Combination-2.pdf",
+    #                labels=["Bias Data for {}".format(item) for item in iv_labels], area_normalisation=normalisation)
+    # print("CV Combination")
+    # plot_cv_data([X2_SCAN_FILE, X2_SCAN_FILE, X2_SCAN_2_FILE, X1_SCAN_2_FILE, "packaged/R13_3_Scan.h5"],
+    #              ["ATLAS_Itk/X2/C_V_Characteristic", "ATLAS_Itk/X2/C_V_Characteristic_refined", "ATLAS_ITk/X2/C_V_Characteristic_refined",
+    #               "ATLAS_ITk/X1/C_V_Characteristic_refined", "Reference/R13/C_V_Characteristic_refined",],
+    #              pdf_name="C-V Combination.pdf", labels=[CV_DATA_FOR_.format(item) for item in ['X2_1_1', "X2_1_2", "X2_2", "X1", "R13 (second)"]],
+    #              use_corrected=True)
+    # print("CV Combination R13 only")
+    # plot_cv_data([REFERENCE_TEST_FILE, REFERENCE_TEST_FILE],
+    #              ["Reference/TESTS/cv_only_simple", "Reference/TESTS/cv_only_advanced"],
+    #              pdf_name="C-V Combination 2.pdf", labels=[CV_DATA_FOR_.format(item) for item in ['simple', "advanced"]],
+    #              use_corrected=True)
+    # print("CV Combination R13 combined")
+    # plot_cv_data([REFERENCE_TEST_FILE, REFERENCE_TEST_FILE],
+    #              ["Reference/TESTS/cv_combined_simple", "Reference/TESTS/cv_combined_advanced"],
+    #              pdf_name="C-V Combination 3.pdf",
+    #              labels=[CV_DATA_FOR_.format(item) for item in ['simple', "advanced"]],
+    #              use_corrected=True)

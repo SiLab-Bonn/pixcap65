@@ -252,8 +252,11 @@ def advanced_tqdm_iterator(*args, tqdm_class=tqdm, logger: Optional[logging.Logg
     postfix_iterator = tqdm_kwargs.pop("iterator_postfix", False)
     pre_iteration_hook = tqdm_kwargs.pop("pre_iteration_hook", None)
     post_iteration_hook = tqdm_kwargs.pop("post_iteration_hook", None)
+    propagate_tqdm_class = tqdm_kwargs.pop("propagate_class", std_tqdm)
+    if type(std_tqdm) != type(tqdm_class):
+        tqdm_kwargs["tqdm_class"] = propagate_tqdm_class
     with tqdm_class(*args, **tqdm_kwargs) as pbar:
-        with logging_redirect_tqdm(loggers=loggers, tqdm_class=tqdm_class):
+        with logging_redirect_tqdm(loggers=loggers, tqdm_class=tqdm_class if type(tqdm_class) == type(std_tqdm) else std_tqdm):
             if pre_iteration_hook is not None and callable(pre_iteration_hook):
                 pre_iteration_hook(pbar)
             for i in pbar:
