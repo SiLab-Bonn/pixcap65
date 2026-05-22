@@ -30,7 +30,7 @@ import sys
 import tables as tb
 import time
 import yaml
-from abc import abstractmethod, ABCMeta, abstractproperty
+from abc import abstractmethod, ABCMeta
 from collections.abc import Callable
 from contextlib import contextmanager
 from enum import StrEnum
@@ -49,13 +49,13 @@ from pixcap65.pixcap.pixcap65 import Pixcap65
 from pixcap65.pixcap.pixcap_structure import BasilConfigKeys
 from pixcap65.plotting import plot_data_delegate
 from pixcap65.utility import pixcap65_constants as c
+from pixcap65.utility.basil_utils import extract_basil_layers
 from pixcap65.utility.tables_util import get_group_attributes, set_group_attribute, \
     get_group_attribute, group_get_file, back_node
+from pixcap65.utility.tqdm_logging_utils import advanced_tqdm_iterator
 from pixcap65.utility.tqdm_logging_utils import logging_redirect_tqdm
 from pixcap65.utility.utils_2 import prevent_group_mix_up
-from pixcap65.utility.basil_utils import extract_basil_layers
 from pixcap65.utility.utils_2 import walk_to_node
-from pixcap65.utility.tqdm_logging_utils import advanced_tqdm_iterator
 
 START_HV_VOLTAGE = 0.
 
@@ -165,6 +165,9 @@ class ScanConfigurationKeys(StrEnum):
     BIAS_VOLTAGE_SINGLE = "bias"
     BIAS_CURRENT_LIMIT = "bias_limit"
     BIAS_CURRENT_RANGE = "bias_range"
+    BIAS_HV_CURRENT_LIMIT = "bias_hv_limit"
+    SMU_CURRENT_RANGE = "pixcap_range"
+    SMU_CURRENT_LIMIT = "pixcap_limit"
 
 
 scan_configuration = {
@@ -323,7 +326,7 @@ class PixCap65Measurement(Pixcap65BaseMeasurement, metaclass=ABCMeta):
             logging.warning("Bias supply is now active.")
             logger.warning("Bias supply is now active.")
             self.pixcap.init_bias(voltage=-0.1, voltage_range=1000, current_range=self.bias_sense_range,
-                                  current_limit=self.scan_config["bias_limit"])
+                                  current_limit=self.bias_limit)
 
             self._smu_setup(self.pixcap.bias_smu_key).drain_error_queue()
             self.pixcap.bias_voltage = -0.1  # need to go to a save voltage for the setup
@@ -420,6 +423,7 @@ class PixCap65Measurement(Pixcap65BaseMeasurement, metaclass=ABCMeta):
         """
         assert 'bias_range' in self.scan_config
         assert self.has_bias_supply
+        allow_continuous_measurement = kwargs.pop('allow_continuous_measurement', False)
         data_group = self.get_data_group(data_group_spec, 'biasing')
         set_group_attribute(data_group, 'bias_unit', HIST_BIAS_MEAS_UNIT)
 
@@ -430,6 +434,9 @@ class PixCap65Measurement(Pixcap65BaseMeasurement, metaclass=ABCMeta):
         self.hist_bias_individual_currents = np.full(shape=(self.n_voltages, self.bias_measurements),
                                                      fill_value=np.nan)
         self.hist_bias_current_errors = np.full(shape=self.n_voltages, fill_value=np.nan)
+        hist_bias_voltage = np.full(shape=self.n_voltages, fill_value=np.nan)
+        hist_bias_voltage_error = np.full(shape=self.n_voltages, fill_value=np.nan)
+        hist_bias_individual_voltages = np.full(shape=(self.n_voltages, 3), fill_value=np.nan)
 
         prevent_group_mix_up(data_group, 'BiasVoltageHist')
         self.pre_scan_handler(unit='bias')
@@ -460,20 +467,42 @@ class PixCap65Measurement(Pixcap65BaseMeasurement, metaclass=ABCMeta):
 
                     logger.debug(LOG_SET_BIAS % bias_voltage)
 
+                if allow_continuous_measurement:
+                    self.pixcap.bias_initiate_multiple_voltage(3)
+
                 yield k, bias_voltage, data_group
-                with self.bias_without_averaging() as hv_less:
-                    actual_bias_voltage = hv_less.bias_measure_volts()
+                if allow_continuous_measurement:
+                    temp = self.pixcap.bias_read_multiple_voltage(3)
+                    hist_bias_individual_voltages[k, :] = temp
+                    actual_bias_voltage = np.mean(temp)
+                    hist_bias_voltage[k] = actual_bias_voltage
+                    hist_bias_voltage_error[k] = np.std(temp)
+                else:
+                    with self.bias_without_averaging() as hv_less:
+                        actual_bias_voltage = hv_less.bias_measure_volts()
+                        hist_bias_voltage_error = extract_smu_voltage_error(
+                            self.smu_range_config[self.pixcap.bias_smu_key], bias_voltages, 1000)
+
+                hist_bias_voltage[k] = actual_bias_voltage
                 store_scan_par_values(scan_parameters=parameters, scan_param_id=k,
                                       bias_voltage=bias_voltage, hv_voltage=actual_bias_voltage)
 
         finally:
-            post_handler(data_group)
-            self.post_scan_handler(data_group, False, unit=handle_unit, saving_unit=handle_unit, group=data_group)
             # save the bias voltages
             if self.has_bias_supply:
                 self.pixcap.bias_off()
-            self.create_carray(where=data_group, name='BiasVoltageHist', title='Histogram of chosen bias voltages',
-                               obj=bias_voltages, filters=self.filters, unit=HIST_BIAS_MEAS_UNIT)
+            try:
+                bias_result = np.full(shape=(self.n_voltages, 3), fill_value=np.nan)
+                bias_result[:, 0] = bias_voltages
+                bias_result[:, 1] = hist_bias_voltage
+                bias_result[:, 2] = hist_bias_voltage_error
+                self.create_carray(where=data_group, name='BiasVoltageHist', title='Histogram of chosen bias voltages',
+                                   obj=bias_result, filters=self.filters, unit=HIST_BIAS_MEAS_UNIT)
+            except:
+                self.create_carray(where=data_group, name='BiasVoltageHist', title='Histogram of chosen bias voltages',
+                                   obj=bias_voltages, filters=self.filters, unit=HIST_BIAS_MEAS_UNIT)
+            post_handler(data_group)
+            self.post_scan_handler(data_group, False, unit=handle_unit, saving_unit=handle_unit, group=data_group)
             set_group_attribute(data_group, 'bias_voltage_unit', HIST_BIAS_MEAS_UNIT)
             set_group_attribute(data_group, 'voltages', self.n_voltages)
             logging.info('Done bias measurements.')
@@ -931,12 +960,20 @@ class PixCap65Measurement(Pixcap65BaseMeasurement, metaclass=ABCMeta):
     @property
     def current_sense_range(self):
         """Get the current sense range for capacitance measurement SMUs"""
-        return 0.000001
+        return self.scan_config.get(ScanConfigurationKeys.SMU_CURRENT_RANGE, 0.000001)
+
+    @property
+    def current_limit(self):
+        return self.scan_config.get(ScanConfigurationKeys.SMU_CURRENT_LIMIT, 0.0001)
 
     @property
     def bias_sense_range(self):
         """Get the current sense range for the HV supply."""
-        return 0.000001
+        return self.scan_config(ScanConfigurationKeys.BIAS_CURRENT_RANGE, 0.000001)
+
+    @property
+    def bias_limit(self):
+        return self.scan_config(ScanConfigurationKeys.BIAS_CURRENT_LIMIT, 0.00000005)
 
     @property
     def base_group(self) -> tb.Group:
@@ -1036,7 +1073,7 @@ class PixCap65Measurement(Pixcap65BaseMeasurement, metaclass=ABCMeta):
     # region Handling of the Pixcap SMUs
     # Handle the SMU!
     # these will now just forward the commands to the pixcap object
-    def init_smu(self, voltage_range=1.5, current_limit=0.0001, plc=None, **kwargs):
+    def init_smu(self, voltage_range=1.5, plc=None, **kwargs):
         """
         init_smu
 
@@ -1047,7 +1084,7 @@ class PixCap65Measurement(Pixcap65BaseMeasurement, metaclass=ABCMeta):
         Should only be called on measurement run configuration.
 
         :param voltage_range: maximum voltage which should be sourced by the SMU.
-        :param current_limit: maximum current which should be measured by the SMU. Set the current protection of the SMU.
+        :key current_limit: maximum current which should be measured by the SMU. Set the current protection of the SMU.
         :param plc: number of power cycles to average the measured quantity over.
         :param kwargs: further keyword arguments to be propagated to the dut. (all not explicitly named keyword
         arguments are propagated to the dut SMU handler.)
@@ -1056,6 +1093,7 @@ class PixCap65Measurement(Pixcap65BaseMeasurement, metaclass=ABCMeta):
         """
         if plc is None:
             plc = self.scan_config.get('plc_cycles', 10)
+        current_limit = kwargs.pop('current_limit', self.current_limit)
         current_range = kwargs.pop('current_range', self.current_sense_range)
         self.pixcap.init_smu(self.scan_config[ScanConfigurationKeys.VIN], current_range, voltage_range,
                              current_limit, plc, **kwargs)
@@ -1214,7 +1252,7 @@ class PixCap65Measurement(Pixcap65BaseMeasurement, metaclass=ABCMeta):
     @property
     def hv_limit(self):
         """Get the high voltage current limit to protect the pixel sensors from breakdown."""
-        return HV_CURRENT_LIMIT
+        return self.scan_config.get(ScanConfigurationKeys.BIAS_HV_CURRENT_LIMIT, HV_CURRENT_LIMIT)
 
     @property
     def bias_voltages(self):
@@ -1701,16 +1739,23 @@ class PixCap65TotalCap(PixCap65Measurement):
             entry = table.row
 
             # need to handle the actually measured voltages.
-            try:
-                internal_parameters = data_group.scan_parameters[:]
-            except tb.exceptions.NoSuchNodeError:
-                logger.error("Tried to access the false scan parameters table")
-                internal_parameters = data_group.scan_params[:]
-            voltages = internal_parameters["hv_voltage"]
-            try:
-                voltage_errors = extract_smu_voltage_error(self.smu_range_config[self.pixcap.bias_smu_key], voltages, 1000)
-            except:
+            internal_parameters = data_group.scan_params[:]
+            hist_parameters = data_group.BiasVoltageHist[:]
+            if np.any(np.isfinite(hist_parameters)):
+                if len(hist_parameters) > 1:
+                    voltages = hist_parameters[1]
+                    voltage_errors = hist_parameters[2]
+                else:
+                    voltages = hist_parameters
+                    voltage_errors = np.full_like(voltages, np.nan)
+            else:
+                voltages = internal_parameters["hv_voltage"]
                 voltage_errors = np.full_like(voltages, np.nan)
+            if np.all(~np.isfinite(voltage_errors)):
+                try:
+                    voltage_errors = extract_smu_voltage_error(self.smu_range_config[self.pixcap.bias_smu_key], voltages, 1000)
+                except:
+                    voltage_errors = np.full_like(voltages, np.nan)
 
             for set_voltage, leak_current, current_error, meas_voltage, meas_voltage_error in zip(
                     self.scan_config[ScanConfigurationKeys.BIAS_VOLTAGE_RANGE], self.hist_bias_current,

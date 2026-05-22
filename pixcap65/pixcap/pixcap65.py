@@ -814,7 +814,7 @@ class Pixcap65(Dut):
             return result
         return np.array(result.split(','), dtype=float_initialiser)
 
-    def smu_read_multiple_current(self, n: int, smu: str, kwargs = None) -> np.ndarray:
+    def smu_read_multiple_voltage(self, n: int, smu: str, kwargs = None) -> np.ndarray:
         if not self.has_configured_smu(smu):
             logger.debug(SMU_DISABLED_CURRENT_MSG, smu)
             if n is not None and self.__n_measurements[smu] != n:
@@ -1149,7 +1149,6 @@ class Pixcap65(Dut):
 
     # implementations for the different SMU's in use with pixcap
     # region Primary SMU used for VM 3
-    # primary smu used for VM 3
     def init_smu(self, src_u, current_range, voltage_range=1.5, current_limit=0.001, plc=10, **kwargs):
         """
         init_smu
@@ -1368,6 +1367,18 @@ class Pixcap65(Dut):
         kargs['binary_enabled'] = self.binary_active
         kargs['data_points'] = self.n_measurements
         return self.smu_advanced_voltage_multiple(n, self.__primary_smu_key, kwargs=kargs)
+
+    def initiate_multiple_current(self, n: int, kwargs=None):
+        self.smu_initiate_multiple_current(n, self.primary_smu_key, kwargs=kwargs)
+
+    def initiate_multiple_voltage(self, n: int, kwargs=None):
+        self.smu_initiate_multiple_voltage(n, self.primary_smu_key, kwargs)
+
+    def get_read_multiple_current(self, n: int, kwargs=None) -> np.ndarray:
+        return self.smu_read_multiple_current(n, self.primary_smu_key, kwargs=kwargs)
+
+    def get_read_multiple_voltage(self, n: int, kwargs=None) -> np.ndarray:
+        return self.smu_read_multiple_voltage(n, self.primary_smu_key, kwargs)
 
     # endregion
 
@@ -1631,6 +1642,18 @@ class Pixcap65(Dut):
             return np.full(10, fill_value=np.nan)
         return np.full(n, fill_value=np.nan)
 
+    def bias_initiate_multiple_current(self, n: int, kwargs=None):
+        self.smu_initiate_multiple_current(n, self.bias_smu_key, kwargs=kwargs)
+
+    def bias_initiate_multiple_voltage(self, n: int, kwargs=None):
+        self.smu_initiate_multiple_voltage(n, self.bias_smu_key, kwargs=kwargs)
+
+    def bias_read_multiple_current(self, n: int, kwargs=None) -> np.ndarray:
+        return self.smu_read_multiple_current(n, self.bias_smu_key, kwargs=kwargs)
+
+    def bias_read_multiple_voltage(self, n: int, kwargs=None) -> np.ndarray:
+        return self.smu_read_multiple_voltage(n, self.bias_smu_key, kwargs=kwargs)
+
     # endregion
 
     # region Handle the VM1 Connector SMU
@@ -1845,6 +1868,18 @@ class Pixcap65(Dut):
             array.
         """
         return self.smu_advanced_voltage_multiple(n, self.__vm1_smu_key, kwargs=self.smu_vm1_kwargs)
+
+    def vm1_initiate_multiple_current(self, n: int, kwargs=None):
+        self.smu_initiate_multiple_current(n, self.vm1_smu_key, kwargs=kwargs)
+
+    def vm1_initiate_multiple_voltage(self, n: int, kwargs=None):
+        self.smu_initiate_multiple_voltage(n, self.vm1_smu_key, kwargs=kwargs)
+
+    def vm1_read_multiple_current(self, n: int, kwargs=None) -> np.ndarray:
+        return self.smu_read_multiple_current(n, self.vm1_smu_key, kwargs=kwargs)
+
+    def vm1_read_multiple_voltage(self, n: int, kwargs=None) -> np.ndarray:
+        return self.smu_read_multiple_voltage(n, self.vm1_smu_key, kwargs=kwargs)
 
     # endregion
 
@@ -2061,6 +2096,17 @@ class Pixcap65(Dut):
         """
         return self.smu_advanced_voltage_multiple(n, self.__vm2_smu_key, kwargs=self.smu_vm2_kwargs)
 
+    def vm2_initiate_multiple_current(self, n: int, kwargs=None):
+        self.smu_initiate_multiple_current(n, self.vm2_smu_key, kwargs=kwargs)
+
+    def vm2_initiate_multiple_voltage(self, n: int, kwargs=None):
+        self.smu_initiate_multiple_voltage(n, self.vm2_smu_key, kwargs=kwargs)
+
+    def vm2_read_multiple_current(self, n: int, kwargs=None) -> np.ndarray:
+        return self.smu_read_multiple_current(n, self.vm2_smu_key, kwargs=kwargs)
+
+    def vm2_read_multiple_voltage(self, n: int, kwargs=None) -> np.ndarray:
+        return self.smu_read_multiple_voltage(n, self.vm2_smu_key, kwargs=kwargs)
     # endregion
 
     # region Handle the VM3 Connector SMU
@@ -2276,4 +2322,15 @@ class Pixcap65(Dut):
         """
         return self.smu_advanced_voltage_multiple(n, self.__vm3_smu_key, kwargs=self.smu_vm3_kwargs)
 
+    def vm3_initiate_multiple_current(self, n: int, kwargs=None):
+        self.smu_initiate_multiple_current(n, self.vm3_smu_key, kwargs=kwargs)
+
+    def vm3_initiate_multiple_voltage(self, n: int, kwargs=None):
+        self.smu_initiate_multiple_voltage(n, self.vm3_smu_key, kwargs=kwargs)
+
+    def vm3_read_multiple_current(self, n: int, kwargs=None) -> np.ndarray:
+        return self.smu_read_multiple_current(n, self.vm3_smu_key, kwargs=kwargs)
+
+    def vm3_read_multiple_voltage(self, n: int, kwargs=None) -> np.ndarray:
+        return self.smu_read_multiple_voltage(n, self.vm3_smu_key, kwargs=kwargs)
     # endregion
