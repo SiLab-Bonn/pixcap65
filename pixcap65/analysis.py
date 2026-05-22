@@ -1533,91 +1533,93 @@ if __name__ == '__main__':
     # some usage examples
     from pixcap65.utility.homogenize_plots import set_params
 
-    set_params(latex=True,
-               latex_extra=r"\sisetup{separate-uncertainty}\sisetup{locale = DE}\sisetup{uncertainty-descriptors="
-                           r"{stat,sys}}\sisetup{uncertainty-descriptor-mode=subscript}"
-                           r"\sisetup{retain-zero-uncertainty}")
-
-    bare_correction_args = {
-        "apply_correction": True,
-        "bare_file": "Bare_Repeat_2_Scan.h5",
-        "bare_hdf_path": "Reference/bare/unbiased_8/total_cap",
-    }
-
-
-
-    # noqa: S125
-    # analyze_capacitance_distribution(raw_data='Bare_Repeat_2_Scan.h5', base_path="Reference/bare/unbiased_8",
-    #                                  corrected_distribution=False,
-    #                                  exclude_test_cap=True, use_kafe2=False,
-    #                                  fit_plot_pdf_name="Bare_analysis_parasitic.pdf")
-    # analyze_data(raw_data='pixcap65/Data/r13-measurement/R13_Full_Scan_80V.h5', is_advanced=True,
+    analyze_data(raw_data="3D_Sensor_221_W13_X_Scan.h5", base_path="Thesis/ATLAS_ITk/X3/C_V_Characteristic", is_cv=True)
+    analyze_data(raw_data="3D_Sensor_221_W6_j_Scan.h5", base_path="Thesis/ATLAS_ITk/X5/C_V_Characteristic", is_cv=True)
+    # set_params(latex=True,
+    #            latex_extra=r"\sisetup{separate-uncertainty}\sisetup{locale = DE}\sisetup{uncertainty-descriptors="
+    #                        r"{stat,sys}}\sisetup{uncertainty-descriptor-mode=subscript}"
+    #                        r"\sisetup{retain-zero-uncertainty}")
+    #
+    # bare_correction_args = {
+    #     "apply_correction": True,
+    #     "bare_file": "Bare_Repeat_2_Scan.h5",
+    #     "bare_hdf_path": "Reference/bare/unbiased_8/total_cap",
+    # }
+    #
+    #
+    #
+    # # noqa: S125
+    # # analyze_capacitance_distribution(raw_data='Bare_Repeat_2_Scan.h5', base_path="Reference/bare/unbiased_8",
+    # #                                  corrected_distribution=False,
+    # #                                  exclude_test_cap=True, use_kafe2=False,
+    # #                                  fit_plot_pdf_name="Bare_analysis_parasitic.pdf")
+    # # analyze_data(raw_data='pixcap65/Data/r13-measurement/R13_Full_Scan_80V.h5', is_advanced=True,
+    # #              **bare_correction_args)
+    # # analyze_data(raw_data='R13-Interpixel_Scan.h5',
+    # #              base_path="Reference/R13/demo_measurement_65_unbiased_1_discharge",
+    # #              is_inter_pixel=True, is_advanced=True)
+    # # analyze_data(raw_data='pixcap65/Data/New_1_Initial_6_Scan.h5', base_path="ATLAS ITk/C_V_Characteristic",
+    # #              is_advanced=False, is_cv=True, use_corrected=True, apply_doping=True,
+    # #              chip_group_name="ATLAS ITk/sensor",
+    # #              first_boundaries=[(-60, -40), (-80, -75)], second_boundaries=[(-5, 0), (-70, -65)],
+    # #              **bare_correction_args)
+    #
+    # # Second Try Bare
+    # analyze_data(raw_data="packaged/Reference_Bare_renewed.h5", base_path="Reference/Bare/unbiased_31_renew", is_advanced=True, full_model=False)
+    #
+    # # Second Try R13
+    # analyze_data(raw_data="packaged/R13_2_Scan.h5", base_path="ATLAS_ITk/X2/unbiased_1_full", is_advanced=True, **bare_correction_args)
+    # analyze_data(raw_data="packaged/R13_2_Scan.h5", base_path="ATLAS_ITk/X2/biased_80_V_full", is_advanced=True,
     #              **bare_correction_args)
-    # analyze_data(raw_data='R13-Interpixel_Scan.h5',
-    #              base_path="Reference/R13/demo_measurement_65_unbiased_1_discharge",
-    #              is_inter_pixel=True, is_advanced=True)
-    # analyze_data(raw_data='pixcap65/Data/New_1_Initial_6_Scan.h5', base_path="ATLAS ITk/C_V_Characteristic",
-    #              is_advanced=False, is_cv=True, use_corrected=True, apply_doping=True,
-    #              chip_group_name="ATLAS ITk/sensor",
+    # analyze_data(raw_data="packaged/R13_3_Scan.h5", base_path="Reference/R13/C_V_Characteristic_refined", is_advanced=True, full_model=False, is_cv=True, first_boundaries=(-80,-40), second_boundaries=(-10,0),
+    #              **bare_correction_args)
+    #
+    # # Second Try X1
+    # analyze_data(raw_data=X1_SCAN_2_FILE, base_path="ATLAS_ITk/X1/unbiased_61_full", is_advanced=True,
+    #              **bare_correction_args)
+    # analyze_data(raw_data=X1_SCAN_2_FILE, base_path="ATLAS_ITk/X1/biased_80_V_full", is_advanced=True,
+    #              **bare_correction_args)
+    # analyze_data(raw_data=X1_SCAN_2_FILE, base_path="ATLAS_ITk/X1/C_V_Characteristic_refined",
+    #              is_advanced=True, full_model=False, is_cv=True, use_corrected=True,
     #              first_boundaries=[(-60, -40), (-80, -75)], second_boundaries=[(-5, 0), (-70, -65)],
     #              **bare_correction_args)
-
-    # Second Try Bare
-    analyze_data(raw_data="packaged/Reference_Bare_renewed.h5", base_path="Reference/Bare/unbiased_31_renew", is_advanced=True, full_model=False)
-
-    # Second Try R13
-    analyze_data(raw_data="packaged/R13_2_Scan.h5", base_path="ATLAS_ITk/X2/unbiased_1_full", is_advanced=True, **bare_correction_args)
-    analyze_data(raw_data="packaged/R13_2_Scan.h5", base_path="ATLAS_ITk/X2/biased_80_V_full", is_advanced=True,
-                 **bare_correction_args)
-    analyze_data(raw_data="packaged/R13_3_Scan.h5", base_path="Reference/R13/C_V_Characteristic_refined", is_advanced=True, full_model=False, is_cv=True, first_boundaries=(-80,-40), second_boundaries=(-10,0),
-                 **bare_correction_args)
-
-    # Second Try X1
-    analyze_data(raw_data=X1_SCAN_2_FILE, base_path="ATLAS_ITk/X1/unbiased_61_full", is_advanced=True,
-                 **bare_correction_args)
-    analyze_data(raw_data=X1_SCAN_2_FILE, base_path="ATLAS_ITk/X1/biased_80_V_full", is_advanced=True,
-                 **bare_correction_args)
-    analyze_data(raw_data=X1_SCAN_2_FILE, base_path="ATLAS_ITk/X1/C_V_Characteristic_refined",
-                 is_advanced=True, full_model=False, is_cv=True, use_corrected=True,
-                 first_boundaries=[(-60, -40), (-80, -75)], second_boundaries=[(-5, 0), (-70, -65)],
-                 **bare_correction_args)
-
-    # Second Try X2
-    analyze_data(raw_data=X2_SCAN_2_FILE, base_path="ATLAS_ITk/X2/unbiased_1_full", is_advanced=True,
-                 **bare_correction_args)
-    analyze_data(raw_data=X2_SCAN_2_FILE, base_path="ATLAS_ITk/X2/biased_80_V_full", is_advanced=True,
-                 **bare_correction_args)
-    analyze_data(raw_data=X2_SCAN_2_FILE, base_path="ATLAS_ITk/X2/C_V_Characteristic_refined",
-                 is_advanced=True, full_model=False, is_cv=True, use_corrected=True,
-                 first_boundaries=[(-60, -40), (-80, -75)], second_boundaries=[(-5, 0), (-70, -65)],
-                 **bare_correction_args)
-
-    # remaining analysis of the E1 sample
-    analyze_data(raw_data="Reference_Evelyn_Scan.h5", base_path="Reference/E1/unbiased_4_full", is_advanced=True,
-                 **bare_correction_args)
-    e1_depletion_args = {
-        "first_boundaries": (-100, -80),
-        "second_boundaries": (-10, 0),
-    }
-    analyze_data(raw_data="Reference_Evelyn_Scan.h5", base_path="Reference/E1/C_V_Characteristic",
-                 is_advanced=True, full_model=False, is_cv=True, use_corrected=True, **e1_depletion_args,
-                 **bare_correction_args)
-
-    analyze_data(raw_data=REFERENCE_TEST_FILE, base_path="Reference/TESTS/cv_only_simple",
-                 is_advanced=True, is_cv=True, use_corrected=True,
-                 **bare_correction_args)
-    analyze_data(raw_data=REFERENCE_TEST_FILE, base_path="Reference/TESTS/cv_only_advanced",
-                 is_advanced=True, is_cv=True, use_corrected=True,
-                 **bare_correction_args)
-    analyze_data(raw_data=REFERENCE_TEST_FILE, base_path="Reference/TESTS/cv_combined_simple",
-                 is_advanced=True, is_cv=True, use_corrected=True,
-                 **bare_correction_args)
-    analyze_data(raw_data=REFERENCE_TEST_FILE, base_path="Reference/TESTS/cv_combined_advanced",
-                 is_advanced=True, is_cv=True, use_corrected=True,
-                 **bare_correction_args)
-
-    analyze_data(raw_data=REFERENCE_TEST_FILE, base_path="Reference/TESTS/unbiased_30",
-                 is_advanced=True, full_model=False, is_cv=False, use_corrected=False)
-    analyze_data(raw_data=REFERENCE_TEST_FILE, base_path="Reference/TESTS/unbiased_31",
-                 is_advanced=True, full_model=False, is_cv=False, use_corrected=False)
+    #
+    # # Second Try X2
+    # analyze_data(raw_data=X2_SCAN_2_FILE, base_path="ATLAS_ITk/X2/unbiased_1_full", is_advanced=True,
+    #              **bare_correction_args)
+    # analyze_data(raw_data=X2_SCAN_2_FILE, base_path="ATLAS_ITk/X2/biased_80_V_full", is_advanced=True,
+    #              **bare_correction_args)
+    # analyze_data(raw_data=X2_SCAN_2_FILE, base_path="ATLAS_ITk/X2/C_V_Characteristic_refined",
+    #              is_advanced=True, full_model=False, is_cv=True, use_corrected=True,
+    #              first_boundaries=[(-60, -40), (-80, -75)], second_boundaries=[(-5, 0), (-70, -65)],
+    #              **bare_correction_args)
+    #
+    # # remaining analysis of the E1 sample
+    # analyze_data(raw_data="Reference_Evelyn_Scan.h5", base_path="Reference/E1/unbiased_4_full", is_advanced=True,
+    #              **bare_correction_args)
+    # e1_depletion_args = {
+    #     "first_boundaries": (-100, -80),
+    #     "second_boundaries": (-10, 0),
+    # }
+    # analyze_data(raw_data="Reference_Evelyn_Scan.h5", base_path="Reference/E1/C_V_Characteristic",
+    #              is_advanced=True, full_model=False, is_cv=True, use_corrected=True, **e1_depletion_args,
+    #              **bare_correction_args)
+    #
+    # analyze_data(raw_data=REFERENCE_TEST_FILE, base_path="Reference/TESTS/cv_only_simple",
+    #              is_advanced=True, is_cv=True, use_corrected=True,
+    #              **bare_correction_args)
+    # analyze_data(raw_data=REFERENCE_TEST_FILE, base_path="Reference/TESTS/cv_only_advanced",
+    #              is_advanced=True, is_cv=True, use_corrected=True,
+    #              **bare_correction_args)
+    # analyze_data(raw_data=REFERENCE_TEST_FILE, base_path="Reference/TESTS/cv_combined_simple",
+    #              is_advanced=True, is_cv=True, use_corrected=True,
+    #              **bare_correction_args)
+    # analyze_data(raw_data=REFERENCE_TEST_FILE, base_path="Reference/TESTS/cv_combined_advanced",
+    #              is_advanced=True, is_cv=True, use_corrected=True,
+    #              **bare_correction_args)
+    #
+    # analyze_data(raw_data=REFERENCE_TEST_FILE, base_path="Reference/TESTS/unbiased_30",
+    #              is_advanced=True, full_model=False, is_cv=False, use_corrected=False)
+    # analyze_data(raw_data=REFERENCE_TEST_FILE, base_path="Reference/TESTS/unbiased_31",
+    #              is_advanced=True, full_model=False, is_cv=False, use_corrected=False)
 

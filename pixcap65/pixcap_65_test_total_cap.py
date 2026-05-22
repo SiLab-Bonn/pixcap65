@@ -73,7 +73,7 @@ BACKING_FORMAT_TEXT = "{old}_backing"
 HV_WAIT = 0.01
 HV_VOLTAGE_TOL = 1e-2
 HV_CURRENT_STABLE_TOL = 1e-2
-HV_CURRENT_LIMIT = 1e-7
+HV_CURRENT_LIMIT = 2.e-7
 
 logging.getLogger().setLevel(logging.INFO)
 logger = logging.getLogger(__name__)
@@ -163,6 +163,8 @@ class ScanConfigurationKeys(StrEnum):
     FREQUENCY_RANGE = "frequency_range"
     BIAS_VOLTAGE_RANGE = "bias_range"
     BIAS_VOLTAGE_SINGLE = "bias"
+    BIAS_CURRENT_LIMIT = "bias_limit"
+    BIAS_CURRENT_RANGE = "bias_range"
 
 
 scan_configuration = {
@@ -321,7 +323,7 @@ class PixCap65Measurement(Pixcap65BaseMeasurement, metaclass=ABCMeta):
             logging.warning("Bias supply is now active.")
             logger.warning("Bias supply is now active.")
             self.pixcap.init_bias(voltage=-0.1, voltage_range=1000, current_range=self.bias_sense_range,
-                                  current_limit=0.000000050)
+                                  current_limit=self.scan_config["bias_limit"])
 
             self._smu_setup(self.pixcap.bias_smu_key).drain_error_queue()
             self.pixcap.bias_voltage = -0.1  # need to go to a save voltage for the setup
