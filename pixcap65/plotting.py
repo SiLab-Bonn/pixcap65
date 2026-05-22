@@ -1273,6 +1273,14 @@ if __name__ == '__main__':
     from pixcap65.utility.homogenize_plots import set_params
 
     logging.basicConfig(level=logging.INFO)
+    plot_bias_data(interpreted_data="3D_Sensor_221_Scan.h5", base_path="Thesis/ATLAS_ITk/X3/I_V_Characteristic", use_group=True)
+    plot_bias_data(interpreted_data="3D_Sensor_221_W13_X_Scan.h5", base_path="Thesis/ATLAS_ITk/X3/I_V_Characteristic", use_group=True)
+    plot_combined_data(interpreted_data="3D_Sensor_221_W13_X_Scan.h5", base_path="Thesis/ATLAS_ITk/X3/C_V_Characteristic", use_group=True)
+    plot_bias_data(interpreted_data="3D_Sensor_221_W6_j_Scan.h5", base_path="Thesis/ATLAS_ITk/X5/I_V_Characteristic",
+                   use_group=True)
+    plot_combined_data(interpreted_data="3D_Sensor_221_W6_j_Scan.h5",
+                       base_path="Thesis/ATLAS_ITk/X5/C_V_Characteristic", use_group=True)
+
 
     set_params(latex=True,
                latex_extra=r"\sisetup{separate-uncertainty}\sisetup{locale = DE}\sisetup{uncertainty-descriptors={"
