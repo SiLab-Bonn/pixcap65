@@ -1,14 +1,12 @@
 import logging
+import sys
 from collections.abc import Iterable
 from contextlib import contextmanager, redirect_stdout, redirect_stderr
-from typing import Union, Optional, Type, List, Iterator
-
-import sys
-
 from tqdm import tqdm
 # noinspection PyProtectedMember
 from tqdm.contrib import DummyTqdmFile as StdTqdmFile
 from tqdm.std import tqdm as std_tqdm
+from typing import Union, Optional, Type, List, Iterator
 
 
 class _TqdmLoggingHandler(logging.StreamHandler):
@@ -24,8 +22,8 @@ class _TqdmLoggingHandler(logging.StreamHandler):
             msg = self.format(record)
             # self.tqdm_class.write(msg)
             # this change was necessary to resolve issues with the progress bars.
-            # self.tqdm_class.write(msg, file=self.stream)
-            self.tqdm_class.write(msg, file=sys.__stderr__)
+            self.tqdm_class.write(msg, file=self.stream)
+            # self.tqdm_class.write(msg, file=sys.__stderr__)
             self.flush()
         except (KeyboardInterrupt, SystemExit):
             raise
@@ -160,9 +158,12 @@ def logging_redirect_tqdm(
             orig_handler = _get_first_found_console_logging_handler(logger.handlers)
             if orig_handler is not None and isinstance(orig_handler, logging.StreamHandler):
                 assert hasattr(orig_handler, 'stream')
-                # print(f"Redirect the logging for logger: {logger.name}")
+                assert hasattr(tqdm_handler, 'stream')
+                print("TYPE STREAM: ", type(orig_handler), orig_handler.stream)
+                print(f"Redirect the logging for logger: {logger.name}")
                 tqdm_handler.setFormatter(orig_handler.formatter)
-                tqdm_handler.stream = orig_handler.stream
+                # tqdm_handler.stream = orig_handler.stream
+                tqdm_handler.stream = sys.stderr
             logger.handlers = [
                                   handler for handler in logger.handlers
                                   if not _is_console_logging_handler(handler)] + [tqdm_handler]

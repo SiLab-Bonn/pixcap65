@@ -2,7 +2,9 @@
 Analysis of Pixcap65 data. Fits freq vs current to extract the capacitance. A 2D histogram containing the capacitance
 for each pixel is stored.
 """
+
 import logging
+from matplotlib.backends.backend_pdf import PdfPages
 from tables import File, Group
 
 from pixcap65.analysis_util.data_store import DepletionDataStore, DepletionTableStore, DepletionArrayStore, \
@@ -31,8 +33,7 @@ from pixcap65.analysis_util.utility import check_leaf_unit, str_join, ANALYSIS_C
     PARASITIC_SUBTRACTION, get_base_group, handle_analysis_mix_up, HIST_CAP_UNIT, HIST_CURRENT_MEAS_UNIT, \
     HIST_BIAS_MEAS_UNIT, get_analysis_group, investigate_fit_convergence, TABLES_LEAF_COMPAT_TYPE, \
     CVDistributionData, CVDepletionCapacitanceData, handle_fitter_advanced_options
-from pixcap65.plotting import CAPACITANCE_CONVERSION_FACTOR, evaluate_pixel_mask, REFERENCE_TEST_FILE, X2_SCAN_2_FILE, \
-    X1_SCAN_2_FILE
+from pixcap65.plotting import CAPACITANCE_CONVERSION_FACTOR, evaluate_pixel_mask, X1_SCAN_2_FILE
 from pixcap65.utility.tables_util import get_groups, get_leaves, copy_node, list_attributes, group_get_file, \
     set_group_attribute, get_group_attribute, get_group_attributes, get_parent_group
 from pixcap65.utility.utils_2 import walk_to_node, GroupType, create_carray, prevent_group_mix_up
@@ -240,6 +241,7 @@ def analyze_data(raw_data, base_path=None, is_advanced=False, is_cv=False,
             else:
                 dist_entry = {}
 
+            # get capacitance to correct for.
             if kwargs.get("apply_correction", False):
                 # extract the parasitic capacitance right here!
                 with tb.open_file(kwargs["bare_file"], mode='r') as correction_h5:
@@ -250,7 +252,7 @@ def analyze_data(raw_data, base_path=None, is_advanced=False, is_cv=False,
                 parasitic = 0
                 parasitic_error = 0
 
-            # no progressbar as the overhead for this is much too large in must cases.
+            # no progressbar as the overhead for this is much too large in most cases.
             for k, bias_voltage in enumerate(base_group.biasing.measurements.BiasVoltageHist):
                 bias_name = "bias_{volt}_V".format(volt=bias_voltage).replace('-', "M_").replace(".", "__")
                 data_group = base_group.biasing.measurements[bias_name]
@@ -277,7 +279,7 @@ def analyze_data(raw_data, base_path=None, is_advanced=False, is_cv=False,
 
                     # try to get to the on-resistance datasets to perform the same distribution handler!
                     # only issue with this attempt the capacitance will be saved as a parasitic one!
-                    if "HistRes" in ana_group:
+                    if "HistRes" in ana_group and np.any(np.isfinite(ana_group.HistRes)):
                         resistance_data = ana_group.HistRes[:]
                         temp_tuple = analyze_capacitance_distribution_delegate(None,
                                                                                kwargs.get(
@@ -294,30 +296,34 @@ def analyze_data(raw_data, base_path=None, is_advanced=False, is_cv=False,
 
                     dist_entry['bias'] = bias_voltage
                     dist_entry['n_pixel'] = n_pix
-                    dist_entry['capacitance'] = cap
-                    dist_entry['cap_err'] = cap_err
-                    dist_entry['cap_std'] = cap_std
-                    dist_entry['cap_std_err'] = cap_std_err
+                    dist_entry['capacitance'] = cap / CAPACITANCE_CONVERSION_FACTOR
+                    dist_entry['cap_err'] = cap_err / CAPACITANCE_CONVERSION_FACTOR
+                    dist_entry['cap_std'] = cap_std / CAPACITANCE_CONVERSION_FACTOR
+                    dist_entry['cap_std_err'] = cap_std_err / CAPACITANCE_CONVERSION_FACTOR
                     dist_entry['r_on'] = res
                     dist_entry['r_on_err'] = res_err
                     dist_entry['r_on_std'] = res_std
                     dist_entry['r_on_std_err'] = res_std_err
                     if kwargs.get("apply_correction", False):
-                        dist_entry['cap_corrected'] = cap - parasitic
-                        dist_entry['cap_corrected_err'] = cap_std
+                        dist_entry['cap_corrected'] = (cap - parasitic) / CAPACITANCE_CONVERSION_FACTOR
+                        dist_entry['cap_corrected_err'] = cap_std / CAPACITANCE_CONVERSION_FACTOR
                         dist_entry['cap_parasitic'] = parasitic
-                        dist_entry['cap_systematic_error'] = np.sqrt(cap_err ** 2 + parasitic_error ** 2)
+                        dist_entry['cap_systematic_error'] = np.sqrt(cap_err ** 2 + parasitic_error ** 2) / CAPACITANCE_CONVERSION_FACTOR
                     else:
-                        dist_entry['cap_corrected'] = cap
-                        dist_entry['cap_corrected_err'] = cap_std
+                        dist_entry['cap_corrected'] = cap / CAPACITANCE_CONVERSION_FACTOR
+                        dist_entry['cap_corrected_err'] = cap_std / CAPACITANCE_CONVERSION_FACTOR
                         dist_entry['cap_parasitic'] = 0
-                        dist_entry['cap_systematic_error'] = cap_err
+                        dist_entry['cap_systematic_error'] = cap_err / CAPACITANCE_CONVERSION_FACTOR
 
                     if isinstance(dist_entry, tb.tableextension.Row):
                         dist_entry.append()
                     else:
                         print("No append of the distribution!")
 
+            if kwargs.get("distribution", False):
+                dist_table.flush()
+
+            in_file_h5.flush()
             # in case of active correction, also the summary capacitance tables needs to be corrected, but it should
             # also an uncorrected table present.
             if apply_correction_arg:
@@ -370,36 +376,115 @@ def analyze_data(raw_data, base_path=None, is_advanced=False, is_cv=False,
                                            first_boundaries, second_boundaries, **kwargs)
 
                 if kwargs.get("distribution", False):
+                    # the appropriate options are in this case: create one combination table for each of the
+                    # fit boundaries or save numpy arrays within the table?
                     dist_table.flush()
                     dist_table = base_group.biasing.analysis.CVDistribution[:]
-                    first_lower, first_upper = first_boundaries
-                    second_lower, second_upper = second_boundaries
                     pixel_cap_data = dist_table['capacitance']
                     pixel_cap_error_data = dist_table['cap_std']
                     voltage_data = dist_table['bias']
-                    depletion_data_table = in_file_h5.create_table(where=base_group.biasing.analysis,
-                                                                   name="SensorDepletionRaw", description=DepletionData,
-                                                                   filters=GLOBAL_FILTERS)
-                    depletion_distribution_table = in_file_h5.create_table(where=base_group.biasing.analysis,
-                                                                           name="SensorDepletion",
-                                                                           description=CVDepletionCapacitanceData,
-                                                                           filters=GLOBAL_FILTERS)
-                    fit_result_storage = DepletionTableStore(depletion_data_table)
-                    analyze_pixel_depletion(first_lower, first_upper, pixel_cap_data, pixel_cap_error_data,
-                                            second_lower,
-                                            second_upper, voltage_data, fit_result_storage,
-                                            fit_description_text=" Sensor Distribution", **kwargs)
+                    if isinstance(first_boundaries, Iterable) and not isinstance(first_boundaries, Tuple):
+                        assert first_boundaries is not None
+                        assert second_boundaries is not None
+                        assert isinstance(first_boundaries, Sized)
+                        n_depletion_regions = len(first_boundaries)
+                        class AdvancedDepletionData(tb.IsDescription):
+                            Ubi = tb.Col.from_kind('float', itemsize=8, shape=(n_depletion_regions,), pos=0)
+                            Ubi_error = tb.Col.from_kind('float', itemsize=8, shape=(n_depletion_regions,), pos=1)
+                            a = tb.Col.from_kind('float', itemsize=8, shape=(n_depletion_regions,), pos=2)
+                            a_error = tb.Col.from_kind('float', itemsize=8, shape=(n_depletion_regions,), pos=3)
+                            b = tb.Col.from_kind('float', itemsize=8, shape=(n_depletion_regions,), pos=4)
+                            b_error = tb.Col.from_kind('float', itemsize=8, shape=(n_depletion_regions,), pos=5)
+                            c = tb.Col.from_kind('float', itemsize=8, shape=(n_depletion_regions,), pos=6)
+                            c_error = tb.Col.from_kind('float', itemsize=8, shape=(n_depletion_regions,), pos=7)
+                            d = tb.Col.from_kind('float', itemsize=8, shape=(n_depletion_regions,), pos=8)
+                            d_error = tb.Col.from_kind('float', itemsize=8, shape=(n_depletion_regions,), pos=9)
 
-                    depletion_data_table.flush()
-                    # now combine the two tables at last!
-                    for first_row, second_row in zip(base_group.biasing.analysis.CVDistribution.iterrows(),
-                                                     base_group.biasing.analysis.SensorDepletionRaw.iterrows()):
-                        distribution_data = first_row[:]
-                        depletion_data = second_row[:]
-                        new_data = np.concat((distribution_data, depletion_data), )
-                        assert distribution_data != depletion_data
-                        depletion_distribution_table.append(new_data)
-                    depletion_distribution_table.flush()
+                        class AdvancedCVDepletionCapacitanceData(tb.IsDescription):
+                            bias = tb.Float64Col(pos=0)
+                            n_pixel = tb.Int64Col(pos=1)
+                            capacitance = tb.Float64Col(pos=2)
+                            cap_err = tb.Float64Col(pos=3)
+                            cap_std = tb.Float64Col(pos=4)
+                            cap_std_err = tb.Float64Col(pos=5)
+                            r_on = tb.Float64Col(pos=6)
+                            r_on_err = tb.Float64Col(pos=7)
+                            r_on_std = tb.Float64Col(pos=8)
+                            r_on_std_err = tb.Float64Col(pos=9)
+                            cap_corrected = tb.Float64Col(pos=10)
+                            cap_corrected_err = tb.Float64Col(pos=11)
+                            cap_parasitic = tb.Float64Col(pos=12)
+                            cap_systematic_error = tb.Float64Col(pos=13)
+                            Ubi = tb.Col.from_kind('float', itemsize=8, shape=(n_depletion_regions,), pos=14)
+                            Ubi_error = tb.Col.from_kind('float', itemsize=8, shape=(n_depletion_regions,), pos=15)
+                            a = tb.Col.from_kind('float', itemsize=8, shape=(n_depletion_regions,), pos=16)
+                            a_error = tb.Col.from_kind('float', itemsize=8, shape=(n_depletion_regions,), pos=17)
+                            b = tb.Col.from_kind('float', itemsize=8, shape=(n_depletion_regions,), pos=18)
+                            b_error = tb.Col.from_kind('float', itemsize=8, shape=(n_depletion_regions,), pos=19)
+                            c = tb.Col.from_kind('float', itemsize=8, shape=(n_depletion_regions,), pos=20)
+                            c_error = tb.Col.from_kind('float', itemsize=8, shape=(n_depletion_regions,), pos=21)
+                            d = tb.Col.from_kind('float', itemsize=8, shape=(n_depletion_regions,), pos=22)
+                            d_error = tb.Col.from_kind('float', itemsize=8, shape=(n_depletion_regions,), pos=23)
+
+                        depletion_data_table = in_file_h5.create_table(where=base_group.biasing.analysis,
+                                                                       name="SensorDepletionRaw",
+                                                                       description=AdvancedDepletionData,
+                                                                       filters=GLOBAL_FILTERS)
+                        depletion_distribution_table = in_file_h5.create_table(where=base_group.biasing.analysis,
+                                                                               name="SensorDepletion",
+                                                                               description=AdvancedCVDepletionCapacitanceData,
+                                                                               filters=GLOBAL_FILTERS)
+                        fit_result_storage = DepletionTableStore(depletion_data_table, n_depletions=n_depletion_regions,)
+                        for k, (first_bound, second_bound) in enumerate(zip(first_boundaries, second_boundaries)):
+                            first_lower, first_upper = first_bound
+                            second_lower, second_upper = second_bound
+                            fit_result_storage.set_depletion_region(k)
+
+                            # Now the real implementation starts.
+                            analyze_pixel_depletion(first_lower, first_upper, pixel_cap_data, pixel_cap_error_data,
+                                                    second_lower,
+                                                    second_upper, voltage_data, fit_result_storage,
+                                                    fit_description_text=" Sensor Distribution", **kwargs)
+                        depletion_data_table.flush()
+
+                        # now combine the two tables at last
+                        for first_row, second_row in zip(base_group.biasing.analysis.CVDistribution.iterrows(),
+                                                         base_group.biasing.analysis.SensorDepletionRaw.iterrows()):
+                            distribution_data = first_row[:]
+                            depletion_data = second_row[:]
+                            new_data = np.rec.array([(*distribution_data, *depletion_data)], dtype=[*base_group.biasing.analysis.CVDistribution.description._v_dtype.descr, *base_group.biasing.analysis.SensorDepletionRaw.description._v_dtype.descr])
+                            depletion_distribution_table.append(new_data)
+                        depletion_distribution_table.flush()
+
+
+                    else:
+                        first_lower, first_upper = first_boundaries
+                        second_lower, second_upper = second_boundaries
+                        depletion_data_table = in_file_h5.create_table(where=base_group.biasing.analysis,
+                                                                       name="SensorDepletionRaw", description=DepletionData,
+                                                                       filters=GLOBAL_FILTERS)
+                        depletion_distribution_table = in_file_h5.create_table(where=base_group.biasing.analysis,
+                                                                               name="SensorDepletion",
+                                                                               description=CVDepletionCapacitanceData,
+                                                                               filters=GLOBAL_FILTERS)
+                        fit_result_storage = DepletionTableStore(depletion_data_table)
+                        analyze_pixel_depletion(first_lower, first_upper, pixel_cap_data, pixel_cap_error_data,
+                                                second_lower,
+                                                second_upper, voltage_data, fit_result_storage,
+                                                fit_description_text=" Sensor Distribution", **kwargs)
+
+                        depletion_data_table.flush()
+
+                        # now combine the two tables at last!
+                        for first_row, second_row in zip(base_group.biasing.analysis.CVDistribution.iterrows(),
+                                                         base_group.biasing.analysis.SensorDepletionRaw.iterrows()):
+                            distribution_data = first_row[:]
+                            depletion_data = second_row[:]
+                            new_data = np.rec.array([(*distribution_data, *depletion_data)], dtype=[
+                                *base_group.biasing.analysis.CVDistribution.description._v_dtype.descr,
+                                *base_group.biasing.analysis.SensorDepletionRaw.description._v_dtype.descr])
+                            depletion_distribution_table.append(new_data)
+                        depletion_distribution_table.flush()
 
         else:
             if is_inter_pixel:
@@ -1036,6 +1121,9 @@ def analyze_pixel_depletion(first_lower, first_upper,
     """
     # extract the additional parameters for advanced fitting procedures
     verbose_output = kwargs.pop("verbose", False)
+    if "cv_fit_plot_pdf" in kwargs:
+        kwargs["fit_plot_pdf"] = kwargs.pop("cv_fit_plot_pdf")
+        kwargs["plot"] = True
     # extract the information about the depletion voltage
     assert not isinstance(voltage_data, tb.Leaf)
     first_section_upper_mask = voltage_data <= first_upper
@@ -1382,6 +1470,7 @@ def analyze_capacitance_distribution_delegate(analysis_group: Optional[tb.Group]
     ax.plot(binning_span, model_data, ":",
             label="Model for C =  \\qty{{{c:.2f}\\pm{error:.2f}}}{{\\femto\\farad}}".format(c=mean_value,
                                                                                             error=std_value))
+
     try:
         from jacobi import propagate
         # noinspection PyTypeChecker
@@ -1401,14 +1490,27 @@ def analyze_capacitance_distribution_delegate(analysis_group: Optional[tb.Group]
             pass
     except np.linalg.LinAlgError:
         pass
+    except TypeError as e:
+        if str(e).startswith("unsupported operand type(s) for *"):
+            print("THE ERROR ESTIMATION FAILED!")
+        else:
+            raise
+
     # add some information about the model
     hypo_test = investigate_fit_convergence(fitter)
     ax.set_ylabel(COUNTS_HIST_LABEL)
     ax.set_xlabel(HIST_PIX_CAP_LABEL)
     ax.grid()
-    ax.legend(
-        title=f"GoF = {hypo_test['x']:.4f}\nndf = {hypo_test['ndf']: .4f}\np = {hypo_test['p']: .4f}\nu = "
-              f"{mean_value:.3f}+-{mean_error:.3f}\ns = {std_value:.3f}+-{std_error:.3f}")
+    if fit_cov is None:
+        print(hist_data)
+        print(bins)
+        print(temp_hist_back_data)
+        plt.show()
+        raise ValueError("The fit failed by estimating the covariance matrix.")
+    else:
+        ax.legend(
+            title=f"GoF = {hypo_test['x']:.4f}\nndf = {hypo_test['ndf']: .4f}\np = {hypo_test['p']: .4f}\nu = "
+                  f"{mean_value:.3f}+-{mean_error:.3f}\ns = {std_value:.3f}+-{std_error:.3f}")
     if kwargs.get('no_plot', False):
         plt.close(fig)
     elif output_pdf is None:
@@ -1566,58 +1668,66 @@ if __name__ == '__main__':
     analyze_data(raw_data="packaged/Reference_Bare_renewed.h5", base_path="Reference/Bare/unbiased_31_renew", is_advanced=True, full_model=False)
 
     # Second Try R13
+    print("Analyze R13")
     analyze_data(raw_data="packaged/R13_2_Scan.h5", base_path="ATLAS_ITk/X2/unbiased_1_full", is_advanced=True, **bare_correction_args)
     analyze_data(raw_data="packaged/R13_2_Scan.h5", base_path="ATLAS_ITk/X2/biased_80_V_full", is_advanced=True,
                  **bare_correction_args)
-    analyze_data(raw_data="packaged/R13_3_Scan.h5", base_path="Reference/R13/C_V_Characteristic_refined", is_advanced=True, full_model=False, is_cv=True, first_boundaries=(-80,-40), second_boundaries=(-10,0),
-                 **bare_correction_args)
+    with PdfPages("R13_3_Scan_Combined_reference_fits.pdf") as pdf:
+        analyze_data(raw_data="packaged/R13_3_Scan.h5", base_path="Reference/R13/C_V_Characteristic_refined", is_advanced=True, full_model=False, is_cv=True, first_boundaries=(-85,-33), second_boundaries=(-4,0), distribution=True, cv_fit_plot_pdf=pdf,
+                     **bare_correction_args)
 
     # Second Try X1
-    analyze_data(raw_data=X1_SCAN_2_FILE, base_path="ATLAS_ITk/X1/unbiased_61_full", is_advanced=True,
-                 **bare_correction_args)
-    analyze_data(raw_data=X1_SCAN_2_FILE, base_path="ATLAS_ITk/X1/biased_80_V_full", is_advanced=True,
-                 **bare_correction_args)
-    analyze_data(raw_data=X1_SCAN_2_FILE, base_path="ATLAS_ITk/X1/C_V_Characteristic_refined",
-                 is_advanced=True, full_model=False, is_cv=True, use_corrected=True,
-                 first_boundaries=[(-60, -40), (-80, -75)], second_boundaries=[(-5, 0), (-70, -65)],
-                 **bare_correction_args)
+    print("Analyze X1")
+    # analyze_data(raw_data=X1_SCAN_2_FILE, base_path="ATLAS_ITk/X1/unbiased_61_full", is_advanced=True,
+    #              **bare_correction_args)
+    # analyze_data(raw_data=X1_SCAN_2_FILE, base_path="ATLAS_ITk/X1/biased_80_V_full", is_advanced=True,
+    #              **bare_correction_args)
+    with PdfPages("X1_Scan_Combined_reference_fits.pdf") as pdf:
+        analyze_data(raw_data=X1_SCAN_2_FILE, base_path="ATLAS_ITk/X1/C_V_Characteristic_refined",
+                     is_advanced=True, full_model=False, is_cv=True, use_corrected=True,
+                     first_boundaries=[(-60, -40), (-82, -77)], second_boundaries=[(-2, 0), (-73, -65)], distribution=True, cv_fit_plot_pdf=pdf,
+                     **bare_correction_args)
 
     # Second Try X2
-    analyze_data(raw_data=X2_SCAN_2_FILE, base_path="ATLAS_ITk/X2/unbiased_1_full", is_advanced=True,
-                 **bare_correction_args)
-    analyze_data(raw_data=X2_SCAN_2_FILE, base_path="ATLAS_ITk/X2/biased_80_V_full", is_advanced=True,
-                 **bare_correction_args)
-    analyze_data(raw_data=X2_SCAN_2_FILE, base_path="ATLAS_ITk/X2/C_V_Characteristic_refined",
-                 is_advanced=True, full_model=False, is_cv=True, use_corrected=True,
-                 first_boundaries=[(-60, -40), (-80, -75)], second_boundaries=[(-5, 0), (-70, -65)],
-                 **bare_correction_args)
+    print("Analyze X2")
+    # analyze_data(raw_data=X2_SCAN_2_FILE, base_path="ATLAS_ITk/X2/unbiased_1_full", is_advanced=True,
+    #              **bare_correction_args)
+    # analyze_data(raw_data=X2_SCAN_2_FILE, base_path="ATLAS_ITk/X2/biased_80_V_full", is_advanced=True,
+    #              **bare_correction_args)
+    # with PdfPages("X2_SCAN_Combined_reference_fits.pdf") as pdf:
+    #     analyze_data(raw_data=X2_SCAN_2_FILE, base_path="ATLAS_ITk/X2/C_V_Characteristic_refined",
+    #                  is_advanced=True, full_model=False, is_cv=True, use_corrected=True,
+    #                  first_boundaries=[(-55, -20), (-78, -73)], second_boundaries=[(-5, 0), (-68, -60)], distribution=True, cv_fit_plot_pdf=pdf,
+    #                  **bare_correction_args)
 
     # remaining analysis of the E1 sample
-    analyze_data(raw_data="Reference_Evelyn_Scan.h5", base_path="Reference/E1/unbiased_4_full", is_advanced=True,
-                 **bare_correction_args)
-    e1_depletion_args = {
-        "first_boundaries": (-100, -80),
-        "second_boundaries": (-10, 0),
-    }
-    analyze_data(raw_data="Reference_Evelyn_Scan.h5", base_path="Reference/E1/C_V_Characteristic",
-                 is_advanced=True, full_model=False, is_cv=True, use_corrected=True, **e1_depletion_args,
-                 **bare_correction_args)
+    print("Analyze E1")
+    # analyze_data(raw_data="Reference_Evelyn_Scan.h5", base_path="Reference/E1/unbiased_4_full", is_advanced=True,
+    #              **bare_correction_args)
+    # e1_depletion_args = {
+    #     "first_boundaries": (-100, -80),
+    #     "second_boundaries": (-10, 0),
+    # }
+    # analyze_data(raw_data="Reference_Evelyn_Scan.h5", base_path="Reference/E1/C_V_Characteristic",
+    #              is_advanced=True, full_model=False, is_cv=True, use_corrected=True, distribution=True, cv_fit_plot_pdf_name="E1_C_V_Verify.pdf", **e1_depletion_args,
+    #              **bare_correction_args)
 
-    analyze_data(raw_data=REFERENCE_TEST_FILE, base_path="Reference/TESTS/cv_only_simple",
-                 is_advanced=True, is_cv=True, use_corrected=True,
-                 **bare_correction_args)
-    analyze_data(raw_data=REFERENCE_TEST_FILE, base_path="Reference/TESTS/cv_only_advanced",
-                 is_advanced=True, is_cv=True, use_corrected=True,
-                 **bare_correction_args)
-    analyze_data(raw_data=REFERENCE_TEST_FILE, base_path="Reference/TESTS/cv_combined_simple",
-                 is_advanced=True, is_cv=True, use_corrected=True,
-                 **bare_correction_args)
-    analyze_data(raw_data=REFERENCE_TEST_FILE, base_path="Reference/TESTS/cv_combined_advanced",
-                 is_advanced=True, is_cv=True, use_corrected=True,
-                 **bare_correction_args)
-
-    analyze_data(raw_data=REFERENCE_TEST_FILE, base_path="Reference/TESTS/unbiased_30",
-                 is_advanced=True, full_model=False, is_cv=False, use_corrected=False)
-    analyze_data(raw_data=REFERENCE_TEST_FILE, base_path="Reference/TESTS/unbiased_31",
-                 is_advanced=True, full_model=False, is_cv=False, use_corrected=False)
+    print("Analyze Tests")
+    # analyze_data(raw_data=REFERENCE_TEST_FILE, base_path="Reference/TESTS/cv_only_simple",
+    #              is_advanced=True, is_cv=True, use_corrected=True,
+    #              **bare_correction_args)
+    # analyze_data(raw_data=REFERENCE_TEST_FILE, base_path="Reference/TESTS/cv_only_advanced",
+    #              is_advanced=True, is_cv=True, use_corrected=True,
+    #              **bare_correction_args)
+    # analyze_data(raw_data=REFERENCE_TEST_FILE, base_path="Reference/TESTS/cv_combined_simple",
+    #              is_advanced=True, is_cv=True, use_corrected=True,
+    #              **bare_correction_args)
+    # analyze_data(raw_data=REFERENCE_TEST_FILE, base_path="Reference/TESTS/cv_combined_advanced",
+    #              is_advanced=True, is_cv=True, use_corrected=True,
+    #              **bare_correction_args)
+    #
+    # analyze_data(raw_data=REFERENCE_TEST_FILE, base_path="Reference/TESTS/unbiased_30",
+    #              is_advanced=True, full_model=False, is_cv=False, use_corrected=False)
+    # analyze_data(raw_data=REFERENCE_TEST_FILE, base_path="Reference/TESTS/unbiased_31",
+    #              is_advanced=True, full_model=False, is_cv=False, use_corrected=False)
 
