@@ -164,7 +164,7 @@ class ScanConfigurationKeys(StrEnum):
     BIAS_VOLTAGE_RANGE = "bias_range"
     BIAS_VOLTAGE_SINGLE = "bias"
     BIAS_CURRENT_LIMIT = "bias_limit"
-    BIAS_CURRENT_RANGE = "bias_range"
+    BIAS_CURRENT_RANGE = "bias_sense_range"
     BIAS_HV_CURRENT_LIMIT = "bias_hv_limit"
     SMU_CURRENT_RANGE = "pixcap_range"
     SMU_CURRENT_LIMIT = "pixcap_limit"
@@ -969,11 +969,11 @@ class PixCap65Measurement(Pixcap65BaseMeasurement, metaclass=ABCMeta):
     @property
     def bias_sense_range(self):
         """Get the current sense range for the HV supply."""
-        return self.scan_config(ScanConfigurationKeys.BIAS_CURRENT_RANGE, 0.000001)
+        return self.scan_config.get(ScanConfigurationKeys.BIAS_CURRENT_RANGE, 0.000001)
 
     @property
     def bias_limit(self):
-        return self.scan_config(ScanConfigurationKeys.BIAS_CURRENT_LIMIT, 0.00000005)
+        return self.scan_config.get(ScanConfigurationKeys.BIAS_CURRENT_LIMIT, 0.00000005)
 
     @property
     def base_group(self) -> tb.Group:

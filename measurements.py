@@ -14,37 +14,38 @@ scan_configuration = {
     'frequency_range': np.arange(1, 6.1, 0.5),  # frequency sweep in MHz
     # 'bias_range': -1 * np.geomspace(1, 80, 25),
     # 'bias': -80.0,   # bias voltage to apply in V
-    'bias_limit': 0.0000005,
+    'bias_sense_limit': 0.0000005,
+    'bias_hv_limit': 0.0000005,
 
-    'data_path': "Thesis/ATLAS_ITk/X2",
+    'data_path': "Thesis/ATLAS_ITk/X5",
     "out_file_mode": "append",
 }
 
 if __name__ == "__main__":
     import shutil
     # one setup trial per measurement
-    output_file = "3D_Sensor_I14_S24_Scan.h5"
+    output_file = "3D_Sensor_221_W6_J_Scan.h5"
 
     # initial measurement sample
     scan_configuration[ScanConfigurationKeys.AVERAGE_MEASUREMENTS] = 30
-    scan_configuration[ScanConfigurationKeys.FREQUENCY_RANGE] = np.arange(1, 10.1, 1)
-    # with PixCapSetup(scan_configuration, output_file, measurement=PixcapMeasurements.TOTAL_CAPACITANCE) as pix:
-    #     pix.pixcap.frequency_settling = 0.3
-    #     with pix.binary_readout_mode() as binary_pix:
-    #         binary_pix.scan(data_group_spec="unbiased_full")
+    scan_configuration[ScanConfigurationKeys.FREQUENCY_RANGE] = np.arange(1, 10.1, 0.75)
+    with PixCapSetup(scan_configuration, output_file, measurement=PixcapMeasurements.TOTAL_CAPACITANCE) as pix:
+        pix.pixcap.frequency_settling = 0.3
+        with pix.binary_readout_mode() as binary_pix:
+            binary_pix.scan(data_group_spec="unbiased_full")
     del scan_configuration[ScanConfigurationKeys.AVERAGE_MEASUREMENTS]
     try:
         time.sleep(5)
-        # shutil.copyfile(output_file, output_file.replace(".h5", "_1.h5"))
+        shutil.copyfile(output_file, output_file.replace(".h5", "_1.h5"))
     except:
         pass
 
     # I-V characterization!
-    scan_configuration[ScanConfigurationKeys.BIAS_VOLTAGE_RANGE] = -1 * np.arange(1, 450, 0.25)
+    scan_configuration[ScanConfigurationKeys.BIAS_VOLTAGE_RANGE] = -1 * np.arange(1, 70, 0.25)
     scan_configuration[ScanConfigurationKeys.BIAS_AVERAGE_MEASUREMENTS] = 10
     assert np.all(0 > scan_configuration[ScanConfigurationKeys.BIAS_VOLTAGE_RANGE])
     with PixCapSetup(scan_configuration, output_file, measurement=PixcapMeasurements.TOTAL_CAPACITANCE) as pix:
-        pix.bias_scan(data_group_spec="I_V_Characteristic_2")
+        pix.bias_scan(data_group_spec="I_V_Characteristic")
     del scan_configuration[ScanConfigurationKeys.BIAS_AVERAGE_MEASUREMENTS]
     try:
         time.sleep(5)
@@ -54,17 +55,15 @@ if __name__ == "__main__":
 
 
     # C-V characterization sample
-    coarse_bias_range = -1 * np.arange(1, 400, 0.5)
+    coarse_bias_range = -1 * np.arange(1, 70, 0.5)
     fine_bias_range = -1 * np.concat((
-        np.geomspace(0.1, 20, 20),
-        np.arange(20, 60.1, 5),
-        np.geomspace(60, 85, 20)
+        np.geomspace(0,20,20),
+        np.geomspace(20,60,25),
     ))
     # noqa: S125
-    # scan_configuration[ScanConfigurationKeys.BIAS_VOLTAGE_RANGE] = coarse_bias_range
-    # scan_configuration.update(start_row=20, stop_row=25, start_column=20, stop_column=25)
-    scan_configuration.update(start_row=20, stop_row=22, start_column=20, stop_column=22)
-    scan_configuration[ScanConfigurationKeys.FREQUENCY_RANGE] = np.arange(1, 4.1, 0.25)
+    scan_configuration[ScanConfigurationKeys.BIAS_VOLTAGE_RANGE] = coarse_bias_range
+    scan_configuration.update(start_row=20, stop_row=25, start_column=20, stop_column=25)
+    scan_configuration[ScanConfigurationKeys.FREQUENCY_RANGE] = np.arange(1, 4.1, 0.5)
     if ScanConfigurationKeys.BIAS_AVERAGE_MEASUREMENTS in scan_configuration:
         del scan_configuration[ScanConfigurationKeys.BIAS_AVERAGE_MEASUREMENTS]
     if ScanConfigurationKeys.AVERAGE_MEASUREMENTS in scan_configuration:
@@ -84,38 +83,38 @@ if __name__ == "__main__":
     time.sleep(60)
 
     # fine scan
-    scan_configuration[ScanConfigurationKeys.BIAS_VOLTAGE_RANGE] = -1 * np.geomspace(0.1, 80, 25)
+    scan_configuration[ScanConfigurationKeys.BIAS_VOLTAGE_RANGE] = fine_bias_range
     scan_configuration.update(start_row=10, stop_row=35, start_column=10, stop_column=35)
-    scan_configuration[ScanConfigurationKeys.FREQUENCY_RANGE] = np.arange(1, 4.1, 0.75)
+    scan_configuration[ScanConfigurationKeys.FREQUENCY_RANGE] = np.arange(1, 4.8, 0.75)
     assert np.all(scan_configuration[ScanConfigurationKeys.BIAS_VOLTAGE_RANGE] < 0)
-    # with PixCapSetup(scan_configuration, output_file, measurement=PixcapMeasurements.TOTAL_CAPACITANCE) as pix:
-    #     pix.frequency_settling = 0.3
-    #     pix.combined_bias_cv_scan(data_group_spec="C_V_Characteristic_refined")
+    with PixCapSetup(scan_configuration, output_file, measurement=PixcapMeasurements.TOTAL_CAPACITANCE) as pix:
+        pix.frequency_settling = 0.3
+        pix.combined_bias_cv_scan(data_group_spec="C_V_Characteristic_refined")
     try:
         time.sleep(5)
-        # shutil.copyfile(output_file, output_file.replace(".h5", "_4.h5"))
+        shutil.copyfile(output_file, output_file.replace(".h5", "_4.h5"))
     except:
         pass
 
     # completing scan
     if ScanConfigurationKeys.BIAS_VOLTAGE_RANGE in scan_configuration:
         del scan_configuration[ScanConfigurationKeys.BIAS_VOLTAGE_RANGE]
-    scan_configuration.update(start_row=1, stop_row=40, start_column=0, stop_column=40, bias=-80,
+    scan_configuration.update(start_row=1, stop_row=40, start_column=0, stop_column=40, bias=-40,
                               average_measurements=40)
     scan_configuration[ScanConfigurationKeys.FREQUENCY_RANGE] = np.arange(1, 10.1, 1)
     scan_configuration[ScanConfigurationKeys.AVERAGE_MEASUREMENTS] = 30
-    # with PixCapSetup(scan_configuration, output_file, measurement=PixcapMeasurements.TOTAL_CAPACITANCE) as pix:
-    #     pix.pixcap.frequency_settling = 0.3
-    #     with pix.binary_readout_mode() as binary_pix:
-    #         binary_pix.scan(data_group_spec="biased_80_V_full")
+    with PixCapSetup(scan_configuration, output_file, measurement=PixcapMeasurements.TOTAL_CAPACITANCE) as pix:
+        pix.pixcap.frequency_settling = 0.3
+        with pix.binary_readout_mode() as binary_pix:
+            binary_pix.scan(data_group_spec="biased_80_V_full")
     try:
         time.sleep(5)
-        # shutil.copyfile(output_file, output_file.replace(".h5", "_5.h5"))
+        shutil.copyfile(output_file, output_file.replace(".h5", "_5.h5"))
     except:
         pass
 
     del scan_configuration[ScanConfigurationKeys.AVERAGE_MEASUREMENTS]
-    scan_configuration[ScanConfigurationKeys.FREQUENCY_RANGE] = np.arange(1,6.1,0.25)
+    scan_configuration[ScanConfigurationKeys.FREQUENCY_RANGE] = np.arange(1,6.1,0.5)
     scan_configuration.update(start_row=5, stop_row=35, start_column=5, stop_column=35)
     if ScanConfigurationKeys.BIAS_VOLTAGE_SINGLE in scan_configuration:
         del scan_configuration[ScanConfigurationKeys.BIAS_VOLTAGE_SINGLE]
@@ -128,7 +127,7 @@ if __name__ == "__main__":
     except:
         pass
 
-    scan_configuration[ScanConfigurationKeys.BIAS_VOLTAGE_SINGLE] = -80
+    scan_configuration[ScanConfigurationKeys.BIAS_VOLTAGE_SINGLE] = -40
     with PixCapSetup(scan_configuration, output_file, measurement=PixcapMeasurements.INTER_CAPACITANCE) as pix:
         pix.frequency_settling = 0.3
         pix.scan(data_group_spec="inter_biased_M_80_V_full")
