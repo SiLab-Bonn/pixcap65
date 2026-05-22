@@ -1,12 +1,12 @@
 """
 This file contains some utilities needed for the analysis and the plotting.
 """
-
 import numpy as np
 import tables as tb
+from collections.abc import Sequence
 from tables import File
 from tables.group import RootGroup
-from typing import Union, Mapping
+from typing import Union, Mapping, Any
 
 from pixcap65.utility.utils_2 import walk_to_node, UNITS_ATTRIBUTE_KEY, prevent_group_mix_up
 
@@ -468,6 +468,15 @@ class DepletionData(tb.IsDescription):
     c_error = tb.Float64Col(pos=7)
     d = tb.Float64Col(pos=8)
     d_error = tb.Float64Col(pos=9)
+
+    def __new__(cls, classname: str, bases: Sequence, classdict: dict[str, Any]):
+        print("Called new!")
+        return tb.IsDescription.__new__(cls, classname, bases, classdict)
+
+
+    def __init__(self):
+        print("Called __init__!")
+        self.avg_cap = tb.Float64Col(pos=10)
 
 
 class CVDepletionCapacitanceData(tb.IsDescription):

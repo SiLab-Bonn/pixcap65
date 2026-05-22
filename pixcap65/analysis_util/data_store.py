@@ -24,9 +24,11 @@ class DepletionDataStore:
 
 
 class DepletionTableStore(DepletionDataStore):
-    def __init__(self, table: tb.Table):
+    def __init__(self, table: tb.Table, n_depletions=None):
         self.table = table
         self.entry = self.table.row
+        self.depletion_reg = None
+        self.n_values = n_depletions
 
     def store_data(self, key, data):
         match key:
@@ -48,6 +50,10 @@ class DepletionTableStore(DepletionDataStore):
                 self.entry["d_error"] = data[1]
             case _:
                 raise ValueError(f"The provided storage key is unknown: {key}")
+
+    def set_depletion_region(self, i):
+        assert i < self.n_values
+        self.depletion_reg = i
 
     def flush_data(self):
         self.entry.append()
