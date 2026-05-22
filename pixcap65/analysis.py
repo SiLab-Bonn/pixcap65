@@ -253,7 +253,10 @@ def analyze_data(raw_data, base_path=None, is_advanced=False, is_cv=False,
                 parasitic_error = 0
 
             # no progressbar as the overhead for this is much too large in most cases.
-            for k, bias_voltage in enumerate(base_group.biasing.measurements.BiasVoltageHist):
+            bias_voltage_data = base_group.biasing.measurements.BiasVoltageHist[:]
+            if len(bias_voltage_data.shape) > 1:
+                bias_voltage_data = bias_voltage_data[:,0]
+            for k, bias_voltage in enumerate(bias_voltage_data):
                 bias_name = "bias_{volt}_V".format(volt=bias_voltage).replace('-', "M_").replace(".", "__")
                 data_group = base_group.biasing.measurements[bias_name]
                 ana_group, _ = walk_to_node(base_group.biasing,
@@ -330,7 +333,7 @@ def analyze_data(raw_data, base_path=None, is_advanced=False, is_cv=False,
                 # perform the transfer
                 apply_correction_simple(bare_file_arg, bare_path_arg, base_group.biasing.analysis, )
 
-                for k, bias_voltage in enumerate(base_group.biasing.measurements.BiasVoltageHist):
+                for k, bias_voltage in enumerate(bias_voltage_data):
                     ana_group_correction, _ = walk_to_node(base_group.biasing,
                                                            str_join("/", ANALYSIS_CORRECTED_GROUP_NAME, bias_name),
                                                            create=True, verify_create=True)
@@ -1687,7 +1690,7 @@ if __name__ == '__main__':
     with PdfPages("X1_Scan_Combined_reference_fits.pdf") as pdf:
         analyze_data(raw_data=X1_SCAN_2_FILE, base_path="ATLAS_ITk/X1/C_V_Characteristic_refined",
                      is_advanced=True, full_model=False, is_cv=True, use_corrected=True,
-                     first_boundaries=[(-60, -40), (-82, -77)], second_boundaries=[(-2, 0), (-73, -65)], distribution=True, cv_fit_plot_pdf=pdf,
+                     first_boundaries=[(-60, -40), (-82, -77)], second_boundaries=[(-0.8, 0), (-73, -65)], distribution=True, cv_fit_plot_pdf=pdf,
                      **bare_correction_args)
 
     # Second Try X2
