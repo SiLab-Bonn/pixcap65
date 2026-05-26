@@ -626,6 +626,8 @@ def _cv_plotter(analysis, row, col, ax, voltage_data_sets, labels, **kwargs):
     y_limits = None
     x_limits = None
     for cap_data, cap_data_errors, voltage_data, label in zip(cap_data_sets, cap_data_errors_sets, voltage_data_sets, labels):
+        if len(voltage_data.shape) > 1:
+            voltage_data = voltage_data[:, 0]
         eff_cap_data = cap_data
         # could this be made common?
         if np.any(np.isnan(cap_data)):
@@ -1234,57 +1236,51 @@ if __name__ == '__main__':
     from pixcap65.utility.homogenize_plots import set_params
 
     logging.basicConfig(level=logging.INFO)
-    # plot_bias_data(interpreted_data="3D_Sensor_221_Scan.h5", base_path="Thesis/ATLAS_ITk/X3/I_V_Characteristic",
-    #                use_group=True)
-    # plot_bias_data(interpreted_data="3D_Sensor_221_W13_X_Scan.h5", base_path="Thesis/ATLAS_ITk/X3/I_V_Characteristic",
-    #                use_group=True)
-    # plot_combined_data(interpreted_data="3D_Sensor_221_W13_X_Scan.h5",
-    #                    base_path="Thesis/ATLAS_ITk/X3/C_V_Characteristic", use_group=True)
-    # plot_bias_data(interpreted_data="3D_Sensor_221_W6_j_Scan.h5", base_path="Thesis/ATLAS_ITk/X5/I_V_Characteristic",
-    #                use_group=True)
-    # plot_combined_data(interpreted_data="3D_Sensor_221_W6_j_Scan.h5",
-    #                    base_path="Thesis/ATLAS_ITk/X5/C_V_Characteristic", use_group=True)
-    try:
-        from subprocess import run
+    plot_bias_data(interpreted_data="3D_Sensor_221_Scan.h5", base_path="Thesis/ATLAS_ITk/X3/I_V_Characteristic",
+                   use_group=True)
+    plot_bias_data(interpreted_data="3D_Sensor_221_W13_X_Scan.h5", base_path="Thesis/ATLAS_ITk/X3/I_V_Characteristic",
+                   use_group=True)
+    plot_combined_data(interpreted_data="3D_Sensor_221_W13_X_Scan.h5",
+                       base_path="Thesis/ATLAS_ITk/X3/C_V_Characteristic", use_group=True)
+    plot_bias_data(interpreted_data="3D_Sensor_221_W6_j_Scan.h5", base_path="Thesis/ATLAS_ITk/X5/I_V_Characteristic",
+                   use_group=True)
+    plot_combined_data(interpreted_data="3D_Sensor_221_W6_j_Scan.h5",
+                       base_path="Thesis/ATLAS_ITk/X5/C_V_Characteristic", use_group=True)
+    plot_bias_data(interpreted_data="3D_Sensor_I14_S24_Scan.h5", base_path="Thesis/ATLAS_ITk/X6/I_V_Characteristic",
+                   use_group=True)
+    plot_combined_data(interpreted_data="3D_Sensor_I14_S24_Scan.h5",
+                       base_path="Thesis/ATLAS_ITk/X6/C_V_Characteristic", use_group=True)
+    plot_bias_data(interpreted_data="3D_Sensor_H23_S24_Scan.h5", base_path="Thesis/ATLAS_ITk/X7/I_V_Characteristic",
+                   use_group=True)
+    plot_combined_data(interpreted_data="3D_Sensor_H23_S24_Scan.h5",
+                       base_path="Thesis/ATLAS_ITk/X7/C_V_Characteristic", use_group=True)
 
-        run_result = run(['pdflatex', '--version'], check=True, capture_output=True)
-        has_latex = True
-        logger.info("The latex compiler to use is: %s", run_result.stdout.decode("utf-8"))
-    except (FileNotFoundError, ImportError):
-        # proceed as if no latex exists
-        logger.exception("Could not verify whether latex exists.")
-        has_latex = False
-    set_params(latex=False,
-               latex_extra=r"\sisetup{separate-uncertainty}\sisetup{locale = DE}\sisetup{uncertainty-descriptors={"
-                           r"stat,sys}}\sisetup{uncertainty-descriptor-mode=subscript}\sisetup{"
-                           r"retain-zero-uncertainty}", fig_height=8.26772, fig_width=11.69291, )
-
-    # some test evaluations
-    # plot_data(interpreted_data=REFERENCE_TEST_FILE, base_path="Reference/TESTS/unbiased_30", use_group=True,
-    #           exclude_test_cap=True)
-    # plot_data(interpreted_data=REFERENCE_TEST_FILE, base_path="Reference/TESTS/unbiased_31", use_group=True,
-    #           exclude_test_cap=True)
-
-    # second try R13
-
-    # some placeholder!
-
-    # second try X1
-    while True:
-        try:
-            with tb.open_file(X1_SCAN_2_FILE, mode="r") as h5_file:
-                break
-        except FileNotFoundError:
-            raise
-        except:
-            print("Will try to access again, later.")
-            time.sleep(120)
-
-
-
-
-    print("Plot X1 Second Try.")
-    x1_second_pixel_mask = [[39, 39], [38, 39]]
+    # set_params(latex=True,
+    #            latex_extra=r"\sisetup{separate-uncertainty}\sisetup{locale = DE}\sisetup{uncertainty-descriptors={"
+    #                        r"stat,sys}}\sisetup{uncertainty-descriptor-mode=subscript}\sisetup{"
+    #                        r"retain-zero-uncertainty}", fig_height=8.26772, fig_width=11.69291, )
+    #
+    # # second try Bare
+    # print("Plot Bare")
+    # # plot_data(interpreted_data="packaged/Reference_Bare_renewed.h5", base_path="Reference/Bare/unbiased_31_renew", suffix="general_data_bare-2", use_group=True, exclude_test_cap=True, distribution=True)
+    #
+    # # second try R13
+    # # NOSONAR
+    # print("Plot R13")
+    # # plot_data(interpreted_data="packaged/R13_2_Scan.h5", base_path="ATLAS_ITk/X2/unbiased_1_full", use_group=True, exclude_test_cap=True, distribution=True)
+    # # noqa: S1192
+    # # plot_data(interpreted_data="packaged/R13_2_Scan.h5", base_path="ATLAS_ITk/X2/biased_80_V_full", use_group=True, distribution=True)
+    # plot_combined_data(interpreted_data="packaged/R13_3_Scan.h5", base_path="Reference/R13/C_V_Characteristic_refined", use_group=True, exclude_test_cap=True, distribution=True)
+    #
+    # # some test evaluations
+    # # plot_data(interpreted_data=REFERENCE_TEST_FILE, base_path="Reference/TESTS/unbiased_30", use_group=True,
+    # #           exclude_test_cap=True)
+    # # plot_data(interpreted_data=REFERENCE_TEST_FILE, base_path="Reference/TESTS/unbiased_31", use_group=True,
+    # #           exclude_test_cap=True)
+    #
+    # # second try X1
+    # print("Plot X1")
+    # x1_second_pixel_mask = [[39, 39], [38, 39]]
     # plot_data(interpreted_data=X1_SCAN_2_FILE, base_path="ATLAS_ITk/X1/unbiased_61_full", use_group=True,
     #           exclude_test_cap=True, mask_pixel=x1_second_pixel_mask, distribution=True)
     # plot_data(interpreted_data=X1_SCAN_2_FILE, base_path="ATLAS_ITk/X1/unbiased_61_full", use_group=True,
@@ -1293,163 +1289,71 @@ if __name__ == '__main__':
     #           exclude_test_cap=True, mask_pixel=x1_second_pixel_mask, distribution=True)
     # plot_data(interpreted_data=X1_SCAN_2_FILE, base_path="ATLAS_ITk/X1/biased_80_V_full", use_group=True,
     #           exclude_test_cap=True, use_corrected=True, mask_pixel=x1_second_pixel_mask, distribution=True)
-    # plot_bias_data(interpreted_data=X1_SCAN_2_FILE, base_path="ATLAS_ITk/X1/I_V_Characteristic", use_group=True, )
-    plot_combined_data(interpreted_data=X1_SCAN_2_FILE, base_path="ATLAS_ITk/X1/C_V_Characteristic_refined",
-                       use_group=True, mask_pixel=x1_second_pixel_mask, distribution=True)
-    plot_combined_data(interpreted_data=X1_SCAN_2_FILE, base_path="ATLAS_ITk/X1/C_V_Characteristic_refined",
-                       use_group=True, use_corrected=True,
-                       apply_doping=False, distribution=True, mask_pixel=x1_second_pixel_mask)
-    # plot_inter_pix_data(interpreted_data=X1_SCAN_2_FILE, base_path="Thesis/ATLAS_ITk/X1/inter_unbiased_full",
-    #                     use_group=True, exclude_test_cap=True, distribution=True,
-    #                     total_data=X1_SCAN_2_FILE, total_path="ATLAS_ITk/X1/unbiased_61_full")
-    # plot_inter_pix_data(interpreted_data=X1_SCAN_2_FILE, base_path="Thesis/ATLAS_ITk/X1/inter_biased_M_80_V_full",
-    #                     use_group=True, exclude_test_cap=True, distribution=True,
-    #                     total_data=X1_SCAN_2_FILE, total_path="ATLAS_ITk/X1/unbiased_61_full")
-
-    plot_combined_data(interpreted_data=X1_SCAN_2_FILE, base_path="Thesis/ATLAS_ITk/X1/C_V_Characteristic_Second_Extended",
-                       use_group=True, mask_pixel=x1_second_pixel_mask, distribution=True)
-    plot_combined_data(interpreted_data=X1_SCAN_2_FILE, base_path="Thesis/ATLAS_ITk/X1/C_V_Characteristic_Second_Extended",
-                       use_group=True, use_corrected=True,
-                       apply_doping=False, distribution=True, mask_pixel=x1_second_pixel_mask)
-
-    # REMARK: This is not written back by now to the full analysis script.
-    # E1 first run
+    # plot_bias_data(interpreted_data=X1_SCAN_2_FILE, base_path="ATLAS_ITk/X1/I_V_Characteristic",use_group=True,)
+    # plot_combined_data(interpreted_data=X1_SCAN_2_FILE, base_path="ATLAS_ITk/X1/C_V_Characteristic_refined",
+    #                    use_group=True, mask_pixel=x1_second_pixel_mask, distribution=True)
+    # plot_combined_data(interpreted_data=X1_SCAN_2_FILE, base_path="ATLAS_ITk/X1/C_V_Characteristic_refined",
+    #                    use_group=True, use_corrected=True,
+    #                    apply_doping=False, distribution=True, mask_pixel=x1_second_pixel_mask)
+    #
+    # # second Try X2
+    # print("Plot X2")
+    # plot_data(interpreted_data=X2_SCAN_2_FILE, base_path="ATLAS_ITk/X2/unbiased_1_full", use_group=True,
+    #           exclude_test_cap=True)
+    # plot_data(interpreted_data=X2_SCAN_2_FILE, base_path="ATLAS_ITk/X2/unbiased_1_full", use_group=True,
+    #           exclude_test_cap=True, use_corrected=True)
+    # plot_data(interpreted_data=X2_SCAN_2_FILE, base_path="ATLAS_ITk/X2/biased_80_V_full", use_group=True,
+    #           exclude_test_cap=True)
+    # plot_data(interpreted_data=X2_SCAN_2_FILE, base_path="ATLAS_ITk/X2/biased_80_V_full", use_group=True,
+    #           exclude_test_cap=True, use_corrected=True)
+    # plot_combined_data(interpreted_data=X2_SCAN_2_FILE, base_path="ATLAS_ITk/X2/C_V_Characteristic_refined",
+    #                    use_group=True)
+    # plot_combined_data(interpreted_data=X2_SCAN_2_FILE, base_path="ATLAS_ITk/X2/C_V_Characteristic_refined",
+    #                    use_group=True, use_corrected=True,
+    #                    apply_doping=False, distribution=False)
+    #
+    # # E1 first run
     # print("Plot E1")
-    # e1_pixel_mask = [[39, 1]]
+    # plot_data(interpreted_data=E1_SCAN_FILE, base_path="Reference/E1/unbiased_4_full", use_group=True, exclude_test_cap=True, mask_pixel=[[39,1]])
     # plot_data(interpreted_data=E1_SCAN_FILE, base_path="Reference/E1/unbiased_4_full", use_group=True,
-    #           exclude_test_cap=True, mask_pixel=e1_pixel_mask, )
-    # plot_data(interpreted_data=E1_SCAN_FILE, base_path="Reference/E1/unbiased_4_full", use_group=True,
-    #           use_corrected=True, distribution=True, exclude_test_cap=True, mask_pixel=e1_pixel_mask, )
+    #           use_corrected=True, distribution=True, exclude_test_cap=True, mask_pixel=[[39,1]])
     # plot_bias_data(interpreted_data=E1_SCAN_FILE, base_path="Reference/E1/I_V_Characteristic",
     #                use_group=True)
     # plot_combined_data(interpreted_data=E1_SCAN_FILE, base_path="Reference/E1/C_V_Characteristic",
-    #                    use_group=True, distribution=True)
+    #                    use_group=True)
     # plot_combined_data(interpreted_data=E1_SCAN_FILE, base_path="Reference/E1/C_V_Characteristic",
     #                    use_group=True,
     #                    use_corrected=True,
     #                    apply_doping=False, distribution=False)
-    # plot_data(interpreted_data="packaged/E1_Renew_Scan.h5", use_group=True, base_path="Reference/E1/unbiased_full",
-    #           exclude_test_cap=True,
-    #           mask_pixel=e1_pixel_mask,)
-    # plot_data(interpreted_data="packaged/E1_Renew_Scan.h5", use_group=True, base_path="Reference/E1/unbiased_full",
-    #           exclude_test_cap=True,
-    #           mask_pixel=e1_pixel_mask, use_corrected=True)
-    # plot_data(interpreted_data="packaged/E1_Renew_Scan.h5", use_group=True, base_path="Reference/E1/biased_80_V_full",
-    #           mask_pixel=e1_pixel_mask, exclude_test_cap=True)
-    # plot_data(interpreted_data="packaged/E1_Renew_Scan.h5", use_group=True, base_path="Reference/E1/biased_80_V_full",
-    #           mask_pixel=e1_pixel_mask, use_corrected=True, exclude_test_cap=True)
-    # plot_combined_data(interpreted_data="packaged/E1_Renew_Scan.h5",
-    #                    base_path="Reference/E1/C_V_Characteristic_refined",
-    #                    use_group=True, distribution=True, mask_pixel=e1_pixel_mask,)
-    # plot_combined_data(interpreted_data="packaged/E1_Renew_Scan.h5",
-    #                    base_path="Reference/E1/C_V_Characteristic_refined",
-    #                    use_group=True, distribution=True, mask_pixel=e1_pixel_mask, use_corrected=True)
-    # plot_bias_data(interpreted_data="packaged/E1_Renew_Scan.h5", base_path="Reference/E1/I_V_Characteristic",
-    #                use_group=True)
-    # plot_inter_pix_data(interpreted_data="packaged/E1_Renew_Scan.h5", base_path="Reference/E1/inter_unbiased_full",
-    #                     use_group=True, total_data="packaged/E1_Renew_Scan.h5", total_path="Reference/E1/unbiased_full")
-    # plot_inter_pix_data(interpreted_data="packaged/E1_Renew_Scan.h5", base_path="Reference/E1/inter_biased_M_80_V_full",
-    #                     use_group=True, total_data="packaged/E1_Renew_Scan.h5", total_path="Reference/E1/biased_80_V_full")
-
-
-
-    print("Plot Presentable")
-    # noqa: S125
-    # examples
-    # plot_data(interpreted_data='pixcap65/Data/r13-measurement/R13_Full_Scan_80V.h5', suffix="general_data",
-    #           use_group=False)
-    # plot_inter_pix_data(interpreted_data='R13-Interpixel_Scan.h5',
-    #                     base_path="Reference/R13/demo_measurement_65_unbiased_1_discharge",
-    #                     use_group=True, suffix="inter_pix_65", total_data='Reference_R13_Scan.h5',
-    #                     distribution=True, set_parasitic=False, total_path="Reference/R13/unbiased_12_full")
-    # plot_bias_data(interpreted_data='Data/r13-measurement/R13_BIAS_2.h5')
-    # plot_combined_data(interpreted_data='Data/r13-measurement/R13_BIAS_CV_COMBI_6.h5', first_lower=-100,first_upper=-40, second_lower=-10, second_upper=0)
-
-    # collect all our IV groups
-    iv_file_names = [
-        'pixcap65/Data/r13-measurement/R13_BIAS_2.h5',
-        'pixcap65/Data/New_1_Initial_6_Scan.h5',
-        X2_SCAN_FILE,
-        X1_SCAN_2_FILE,
-        "packaged/E1_Renew_Scan.h5",
-        X2_SCAN_2_FILE,
-        X2_SCAN_2_FILE,
-        X1_SCAN_2_FILE,
-        "packaged/R13_Renew_Scan.h5",
-        X2_SCAN_FILE,
-        X2_SCAN_FILE,
-        'pixcap65/Data/New_1_Initial_6_Scan.h5',
-    ]
-    iv_group_names = [
-        None,
-        "ATLAS ITk/I_V_Characteristic",
-        "ATLAS_Itk/X2/I_V_Characteristic",
-        "ATLAS_ITk/X1/I_V_Characteristic",
-        "Reference/E1/C_V_Characteristic_refined",
-        "Thesis/ATLAS_ITk/X2/I_V_Characteristic_2",
-        "ATLAS_ITk/X2/C_V_Characteristic_refined",
-        "ATLAS_ITk/X1/C_V_Characteristic_refined",
-        "Reference/R13/C_V_Characteristic_refined",
-        "ATLAS_Itk/X2/C_V_Characteristic",
-        "ATLAS_Itk/X2/C_V_Characteristic_refined",
-        "ATLAS ITk/C_V_Characteristic",
-    ]
-    iv_labels = [
-        'R13',
-        "(HPK) X1",
-        "(HPK) X2",
-        "X1 (second)",
-        "E1 (second, CV)",
-        "X2 (third?)",
-        "X2 (second, CV)",
-        "X1 (second, CV)",
-        "R13 (second, CV)",
-        "X2 (CV)",
-        "X2 (CV, refined)",
-        "X1 (CV)",
-    ]
-    normalisation = [64*64, 384*400, 384*400, 384*400] * 30 * 30
-    plot_bias_data(iv_file_names, iv_group_names, pdf_name="I-V Combination.pdf",
-                   labels=["Bias Data for {}".format(item) for item in iv_labels])
-    plot_bias_data(iv_file_names, iv_group_names, pdf_name="I-V Combination-2.pdf",
-                   labels=["Bias Data for {}".format(item) for item in iv_labels], area_normalisation=normalisation)
-    print("CV Combination")
-    cv_file_names = [
-        X2_SCAN_FILE,
-        X2_SCAN_FILE,
-        X2_SCAN_2_FILE,
-        X1_SCAN_2_FILE,
-        "packaged/R13_Renew_Scan.h5",
-        X1_SCAN_2_FILE,
-        "packaged/E1_Renew_Scan.h5",
-        E1_SCAN_FILE,
-        'pixcap65/Data/New_1_Initial_6_Scan.h5',
-    ]
-    cv_groups = [
-        "ATLAS_Itk/X2/C_V_Characteristic",
-        "ATLAS_Itk/X2/C_V_Characteristic_refined",
-        "ATLAS_ITk/X2/C_V_Characteristic_refined",
-        "ATLAS_ITk/X1/C_V_Characteristic_refined",
-        "Reference/R13/C_V_Characteristic_refined",
-        "Thesis/ATLAS_ITk/X1/C_V_Characteristic_Second_Extended",
-        "Reference/E1/C_V_Characteristic_refined",
-        "Reference/E1/C_V_Characteristic",
-        "ATLAS ITk/C_V_Characteristic",
-    ]
-    cv_labels = [
-        'X2_1_1',
-        "X2_1_2",
-        "X2_2",
-        "X1 (second)",
-        "R13 (second)",
-        "X1 (second, extended)",
-        "E1 (second)",
-        "E1",
-        "X1",
-    ]
-    plot_cv_data(cv_file_names, cv_groups,
-                 pdf_name="C-V Combination.pdf", labels=[CV_DATA_FOR_.format(item) for item in cv_labels],
-                 use_corrected=True)
+    #
+    # print("Plot Presentable")
+    # # noqa: S125
+    # # examples
+    # # plot_data(interpreted_data='pixcap65/Data/r13-measurement/R13_Full_Scan_80V.h5', suffix="general_data",
+    # #           use_group=False)
+    # # plot_inter_pix_data(interpreted_data='R13-Interpixel_Scan.h5',
+    # #                     base_path="Reference/R13/demo_measurement_65_unbiased_1_discharge",
+    # #                     use_group=True, suffix="inter_pix_65", total_data='Reference_R13_Scan.h5',
+    # #                     distribution=True, set_parasitic=False, total_path="Reference/R13/unbiased_12_full")
+    # # plot_bias_data(interpreted_data='Data/r13-measurement/R13_BIAS_2.h5')
+    # # plot_combined_data(interpreted_data='Data/r13-measurement/R13_BIAS_CV_COMBI_6.h5', first_lower=-100,first_upper=-40, second_lower=-10, second_upper=0)
+    #
+    # # collect all our IV groups
+    # iv_file_names = ['pixcap65/Data/r13-measurement/R13_BIAS_2.h5', 'pixcap65/Data/New_1_Initial_6_Scan.h5',
+    #                  X2_SCAN_FILE, X1_SCAN_2_FILE]
+    # iv_group_names = [None, "ATLAS ITk/I_V_Characteristic", "ATLAS_Itk/X2/I_V_Characteristic", "ATLAS_ITk/X1/I_V_Characteristic",]
+    # iv_labels = ['R13', "(HPK) X1", "(HPK) X2", "X1 (second)"]
+    # normalisation = [64*64, 384*400, 384*400, 384*400] * 50 * 50
+    # plot_bias_data(iv_file_names, iv_group_names, pdf_name="I-V Combination.pdf",
+    #                labels=["Bias Data for {}".format(item) for item in iv_labels])
+    # plot_bias_data(iv_file_names, iv_group_names, pdf_name="I-V Combination-2.pdf",
+    #                labels=["Bias Data for {}".format(item) for item in iv_labels], area_normalisation=normalisation)
+    # print("CV Combination")
+    # plot_cv_data([X2_SCAN_FILE, X2_SCAN_FILE, X2_SCAN_2_FILE, X1_SCAN_2_FILE, "packaged/R13_3_Scan.h5"],
+    #              ["ATLAS_Itk/X2/C_V_Characteristic", "ATLAS_Itk/X2/C_V_Characteristic_refined", "ATLAS_ITk/X2/C_V_Characteristic_refined",
+    #               "ATLAS_ITk/X1/C_V_Characteristic_refined", "Reference/R13/C_V_Characteristic_refined",],
+    #              pdf_name="C-V Combination.pdf", labels=[CV_DATA_FOR_.format(item) for item in ['X2_1_1', "X2_1_2", "X2_2", "X1", "R13 (second)"]],
+    #              use_corrected=True)
     # print("CV Combination R13 only")
     # plot_cv_data([REFERENCE_TEST_FILE, REFERENCE_TEST_FILE],
     #              ["Reference/TESTS/cv_only_simple", "Reference/TESTS/cv_only_advanced"],

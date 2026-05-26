@@ -14,7 +14,8 @@ scan_configuration = {
     'frequency_range': np.arange(1, 6.1, 0.5),  # frequency sweep in MHz
     # 'bias_range': -1 * np.geomspace(1, 80, 25),
     # 'bias': -80.0,   # bias voltage to apply in V
-    'bias_sense_limit': 0.0000005,
+    'bias_limit': 0.0000005,
+    'bias_sense_range': 0.000001,
     'bias_hv_limit': 0.0000005,
 
     'data_path': "Thesis/ATLAS_ITk/X5",
@@ -29,14 +30,14 @@ if __name__ == "__main__":
     # initial measurement sample
     scan_configuration[ScanConfigurationKeys.AVERAGE_MEASUREMENTS] = 30
     scan_configuration[ScanConfigurationKeys.FREQUENCY_RANGE] = np.arange(1, 10.1, 0.75)
-    with PixCapSetup(scan_configuration, output_file, measurement=PixcapMeasurements.TOTAL_CAPACITANCE) as pix:
-        pix.pixcap.frequency_settling = 0.3
-        with pix.binary_readout_mode() as binary_pix:
-            binary_pix.scan(data_group_spec="unbiased_full")
+    # with PixCapSetup(scan_configuration, output_file, measurement=PixcapMeasurements.TOTAL_CAPACITANCE) as pix:
+    #     pix.pixcap.frequency_settling = 0.3
+    #     with pix.binary_readout_mode() as binary_pix:
+    #         binary_pix.scan(data_group_spec="unbiased_full")
     del scan_configuration[ScanConfigurationKeys.AVERAGE_MEASUREMENTS]
     try:
         time.sleep(5)
-        shutil.copyfile(output_file, output_file.replace(".h5", "_1.h5"))
+        # shutil.copyfile(output_file, output_file.replace(".h5", "_1.h5"))
     except:
         pass
 
@@ -44,12 +45,12 @@ if __name__ == "__main__":
     scan_configuration[ScanConfigurationKeys.BIAS_VOLTAGE_RANGE] = -1 * np.arange(1, 70, 0.25)
     scan_configuration[ScanConfigurationKeys.BIAS_AVERAGE_MEASUREMENTS] = 10
     assert np.all(0 > scan_configuration[ScanConfigurationKeys.BIAS_VOLTAGE_RANGE])
-    with PixCapSetup(scan_configuration, output_file, measurement=PixcapMeasurements.TOTAL_CAPACITANCE) as pix:
-        pix.bias_scan(data_group_spec="I_V_Characteristic")
+    # with PixCapSetup(scan_configuration, output_file, measurement=PixcapMeasurements.TOTAL_CAPACITANCE) as pix:
+    #     pix.bias_scan(data_group_spec="I_V_Characteristic")
     del scan_configuration[ScanConfigurationKeys.BIAS_AVERAGE_MEASUREMENTS]
     try:
         time.sleep(5)
-        shutil.copyfile(output_file, output_file.replace(".h5", "_2.h5"))
+        # shutil.copyfile(output_file, output_file.replace(".h5", "_2.h5"))
     except:
         pass
 
@@ -57,13 +58,13 @@ if __name__ == "__main__":
     # C-V characterization sample
     coarse_bias_range = -1 * np.arange(1, 70, 0.5)
     fine_bias_range = -1 * np.concat((
-        np.geomspace(0,20,20),
+        np.geomspace(0.01,20,20),
         np.geomspace(20,60,25),
     ))
     # noqa: S125
     scan_configuration[ScanConfigurationKeys.BIAS_VOLTAGE_RANGE] = coarse_bias_range
     scan_configuration.update(start_row=20, stop_row=25, start_column=20, stop_column=25)
-    scan_configuration[ScanConfigurationKeys.FREQUENCY_RANGE] = np.arange(1, 4.1, 0.5)
+    scan_configuration[ScanConfigurationKeys.FREQUENCY_RANGE] = np.arange(1, 4.8, 0.75)
     if ScanConfigurationKeys.BIAS_AVERAGE_MEASUREMENTS in scan_configuration:
         del scan_configuration[ScanConfigurationKeys.BIAS_AVERAGE_MEASUREMENTS]
     if ScanConfigurationKeys.AVERAGE_MEASUREMENTS in scan_configuration:
@@ -106,7 +107,7 @@ if __name__ == "__main__":
     with PixCapSetup(scan_configuration, output_file, measurement=PixcapMeasurements.TOTAL_CAPACITANCE) as pix:
         pix.pixcap.frequency_settling = 0.3
         with pix.binary_readout_mode() as binary_pix:
-            binary_pix.scan(data_group_spec="biased_80_V_full")
+            binary_pix.scan(data_group_spec="biased_40_V_full")
     try:
         time.sleep(5)
         shutil.copyfile(output_file, output_file.replace(".h5", "_5.h5"))
@@ -130,7 +131,7 @@ if __name__ == "__main__":
     scan_configuration[ScanConfigurationKeys.BIAS_VOLTAGE_SINGLE] = -40
     with PixCapSetup(scan_configuration, output_file, measurement=PixcapMeasurements.INTER_CAPACITANCE) as pix:
         pix.frequency_settling = 0.3
-        pix.scan(data_group_spec="inter_biased_M_80_V_full")
+        pix.scan(data_group_spec="inter_biased_M_40_V_full")
 
     try:
         time.sleep(5)

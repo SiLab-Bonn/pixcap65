@@ -12,6 +12,7 @@ from pixcap65.utility.tables_util import set_group_attribute, group_get_file, ge
     get_group_attribute
 from pixcap65.utility.utils_2 import UNITS_ATTRIBUTE_KEY, create_carray, prevent_group_mix_up
 
+logger = logging.getLogger(__name__)
 
 def adjust_i_v_measurement(group, has_values=False):
     group.HistCurr.attrs[UNITS_ATTRIBUTE_KEY] = HIST_CURRENT_MEAS_UNIT
@@ -174,19 +175,75 @@ def regenerate_basi_table(group):
             logging.info(current_error)
             raise e
 
+def generate_bias_table(group):
+    file = group_get_file(group)
+    if "BiasTable" in group:
+        group["BiasTable"]._f_remove()
+    table = file.create_table(group, name="BiasTable", description=BiasTable,
+                                          filters=tb.Filters(complib='blosc', fletcher32=False, complevel=5))
+    entry = table.row
+
+    # need to handle the actually measured voltages.
+    internal_parameters = group.scan_params[:]
+    hist_parameters = group.BiasVoltageHist[:]
+    bias_currents = group.HistCurr[:]
+    bias_errors = group.HistCurrErr[:]
+    if np.any(np.isfinite(hist_parameters)):
+        if len(hist_parameters) > 1:
+            voltages = hist_parameters[:, 1]
+            voltage_errors = hist_parameters[:, 2]
+            voltage_settings = hist_parameters[:, 0]
+        else:
+            voltages = hist_parameters
+            voltage_errors = np.full_like(voltages, np.nan)
+            voltage_settings = voltages.copy()
+    else:
+        voltages = internal_parameters["hv_voltage"]
+        voltage_errors = np.full_like(voltages, np.nan)
+    if np.all(~np.isfinite(voltage_errors)):
+        try:
+            with open("pixcap65/configs/keithley_2410_range.yaml") as f:
+                range_config = yaml.safe_load(f)
+                voltage_errors = extract_smu_voltage_error(range_config, voltages, 1000)
+        except:
+            voltage_errors = np.full_like(voltages, np.nan)
+
+    for set_voltage, leak_current, current_error, meas_voltage, meas_voltage_error in zip(
+            voltage_settings, bias_currents,
+            bias_errors, voltages, voltage_errors):
+        try:
+            entry['Us'] = set_voltage
+            entry['U'] = meas_voltage
+            entry['I'] = leak_current
+            entry['DI'] = current_error
+            entry['DU'] = meas_voltage_error
+            entry.append()
+        except ValueError as e:
+            logger.info("scan parameters")
+            logger.info(set_voltage)
+            logger.info("currents")
+            logger.info(bias_currents.shape)
+            logger.info(leak_current)
+            logger.info("Errors")
+            logger.info(bias_errors.shape)
+            logger.info(current_error)
+            raise e
+
 
 # FIXME: Why are there no error estimations for I-V curves?
+# simple answer: it measures no deviation!
 
 if __name__ == "__main__":
-    # with tb.open_file("packaged/3D_Sensor_H23_S24_Scan.h5", "a") as h5_file:
-    #     generate_bias_table(h5_file.root.Thesis.ATLAS_ITk.X7.I_V_Characteristic.biasing.measurements)
-    #     generate_bias_table(h5_file.root.Thesis.ATLAS_ITk.X7.C_V_Characteristic.biasing.measurements)
-    #
-    # with tb.open_file("packaged/3D_Sensor_I14_S24_Scan.h5", "a") as h5_file:
-    #     generate_bias_table(h5_file.root.Thesis.ATLAS_ITk.X6.I_V_Characteristic.biasing.measurements)
-    #     generate_bias_table(h5_file.root.Thesis.ATLAS_ITk.X6.C_V_Characteristic.biasing.measurements)
+    with tb.open_file("3D_Sensor_H23_S24_Scan.h5", "a") as h5_file:
+        generate_bias_table(h5_file.root.Thesis.ATLAS_ITk.X7.I_V_Characteristic.biasing.measurements)
+        generate_bias_table(h5_file.root.Thesis.ATLAS_ITk.X7.C_V_Characteristic.biasing.measurements)
+    with tb.open_file("3D_Sensor_I14_S24_Scan.h5", "a") as h5_file:
+        generate_bias_table(h5_file.root.Thesis.ATLAS_ITk.X6.I_V_Characteristic.biasing.measurements)
+        generate_bias_table(h5_file.root.Thesis.ATLAS_ITk.X6.C_V_Characteristic.biasing.measurements)
 
-    with tb.open_file(X1_SCAN_2_FILE, "a") as h5_file:
+
+
+    with tb.open_file("packaged/X1_4_Renew_Scan.h5", "a") as h5_file:
         # adjust_cap_measurement(h5_file.root.ATLAS_Itk.X2.unbiased_1.total_cap.measurements, has_values=True)
         # adjust_cap_measurement(h5_file.root.ATLAS_Itk.X2.biased_80_V.total_cap.measurements, has_values=True)
         # adjust_i_v_measurement(h5_file.root.ATLAS_Itk.X2.I_V_Characteristic.biasing.measurements)

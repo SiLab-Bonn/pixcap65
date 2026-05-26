@@ -183,7 +183,7 @@ def analyze_data(raw_data, base_path=None, is_advanced=False, is_cv=False,
         corrected immediately; Will require the presence of further arguments as information about
         the parasitic capacitance needs to be submitted.
     :key use_corrected: boolean, False, indicates whether to use the corrected capacitance for the depletion
-        analysis. WILL be removed in the future.
+        analysis. Will be removed in the future.
     :key fit_plot_pdf_name:  Name of the PDF file to save fitting figures from the advanced procedures to.
         (Only used for the advanced procedure)
     :key bare_file: hdf file containing the measurements and investigation of a bare pix cap sample to obtain
@@ -555,7 +555,7 @@ def analyze_data(raw_data, base_path=None, is_advanced=False, is_cv=False,
                 # TODO: handle the sensor distribution of this.
                 # perform individual distribution fits for the corrected data, also accounting for the uncertaintiy
                 # of the parasitic capacitance.
-                
+
 
 
 
@@ -1932,163 +1932,105 @@ if __name__ == '__main__':
     # some usage examples
     from pixcap65.utility.homogenize_plots import set_params
 
-    # analyze_data(raw_data="3D_Sensor_221_W13_X_Scan.h5", base_path="Thesis/ATLAS_ITk/X3/C_V_Characteristic", is_cv=True)
-    # analyze_data(raw_data="3D_Sensor_221_W6_j_Scan.h5", base_path="Thesis/ATLAS_ITk/X5/C_V_Characteristic", is_cv=True)
-    try:
-        from subprocess import run
-
-        run_result = run(['pdflatex', '--version'], check=True, capture_output=True)
-        has_latex = True
-        logger.info("The latex compiler to use is: %s", run_result.stdout.decode("utf-8"))
-    except (FileNotFoundError, ImportError):
-        # proceed as if no latex exists
-        logger.exception("Could not verify whether latex exists.")
-        has_latex = False
-    set_params(latex=False,
-               latex_extra=r"\sisetup{separate-uncertainty}\sisetup{locale = DE}\sisetup{uncertainty-descriptors="
-                           r"{stat,sys}}\sisetup{uncertainty-descriptor-mode=subscript}"
-                           r"\sisetup{retain-zero-uncertainty}")
-
-    bare_correction_args = {
-        "apply_correction": True,
-        "bare_file": "Bare_Repeat_2_Scan.h5",
-        "bare_hdf_path": "Reference/bare/unbiased_8/total_cap",
-    }
-
-    # noqa: S125
-    # analyze_capacitance_distribution(raw_data='Bare_Repeat_2_Scan.h5', base_path="Reference/bare/unbiased_8",
-    #                                  corrected_distribution=False,
-    #                                  exclude_test_cap=True, use_kafe2=False,
-    #                                  fit_plot_pdf_name="Bare_analysis_parasitic.pdf")
-    # analyze_data(raw_data='pixcap65/Data/r13-measurement/R13_Full_Scan_80V.h5', is_advanced=True,
-    #              **bare_correction_args)
-    # analyze_data(raw_data='R13-Interpixel_Scan.h5',
-    #              base_path="Reference/R13/demo_measurement_65_unbiased_1_discharge",
-    #              is_inter_pixel=True, is_advanced=True)
-    # analyze_data(raw_data='pixcap65/Data/New_1_Initial_6_Scan.h5', base_path="ATLAS ITk/C_V_Characteristic",
-    #              is_advanced=False, is_cv=True, use_corrected=True, apply_doping=True,
-    #              chip_group_name="ATLAS ITk/sensor",
-    #              first_boundaries=[(-60, -40), (-80, -75)], second_boundaries=[(-5, 0), (-70, -65)],
-    #              **bare_correction_args)
-
-    # Second Try Bare
-    # analyze_data(raw_data="packaged/Reference_Bare_renewed.h5", base_path="Reference/Bare/unbiased_31_renew",
-    #              is_advanced=True, full_model=False)
-    # analyze_capacitance_distribution(raw_data="packaged/Reference_Bare_renewed.h5",
-    #                                  base_path="Reference/Bare/unbiased_31_renew",
-    #                                  corrected_distribution=False,
-    #                                  exclude_test_cap=True, use_kafe2=True,
-    #                                  fit_plot_pdf_name="Bare_analysis_parasitic_kafe2_new.pdf")
-    # analyze_capacitance_distribution(raw_data="packaged/Reference_Bare_renewed.h5",
-    #                                  base_path="Reference/Bare/unbiased_31_renew",
-    #                                  corrected_distribution=False,
-    #                                  exclude_test_cap=True, use_kafe2=False,
-    #                                  fit_plot_pdf_name="Bare_analysis_parasitic_new.pdf")
-
-    bare_correction_args = {
-        "apply_correction": True,
-        "bare_file": "packaged/Reference_Bare_renewed.h5",
-        "bare_hdf_path": "Reference/Bare/unbiased_31_renew/total_cap",
-    }
-
-    # FIXME: the measured inter-pix data might be an issue as there are some conversions processed which would be overriden on data retrieval.
-    # we will need to check the converter file very intensively to correct all the failures.
-
-    # print("Analyze R13 Second Try")
-    # r13_depletion_args = {
-    #     "first_boundaries": (-85, -25),
-    #     "second_boundaries": (-3.4, 0),
-    #     "distribution": True,
-    #     "apply_contour": True,
-    #     "apply_contours": True,
-    #     "chip_group_name": "Reference/R13/sensor",
-    #     "apply_doping": True,
-    # }
-    # r13_depletion_args.update(**bare_correction_args)
-    # analyze_data(raw_data="packaged/R13_Renew_Scan.h5", base_path="Reference/R13/unbiased_1_full", is_advanced=True,
-    #              **bare_correction_args)
-    # analyze_data(raw_data="packaged/R13_Renew_Scan.h5", base_path="Reference/R13/biased_80_V_full", is_advanced=True,
-    #              **bare_correction_args)
-    # with PdfPages("Fit References/R13_3_Scan_Combined_reference_fits.pdf") as pdf:
-    #     analyze_data(raw_data="packaged/R13_Renew_Scan.h5", base_path="Reference/R13/C_V_Characteristic_refined",
-    #                  is_advanced=True, full_model=False, is_cv=True, cv_fit_plot_pdf=pdf,
-    #                  **r13_depletion_args)
+    analyze_data(raw_data="3D_Sensor_221_W13_X_Scan.h5", base_path="Thesis/ATLAS_ITk/X3/C_V_Characteristic", is_cv=True)
+    analyze_data(raw_data="3D_Sensor_221_W6_j_Scan.h5", base_path="Thesis/ATLAS_ITk/X5/C_V_Characteristic", is_cv=True)
+    analyze_data(raw_data="3D_Sensor_I14_S24_Scan.h5", base_path="Thesis/ATLAS_ITk/X6/C_V_Characteristic", is_cv=True)
+    analyze_data(raw_data="3D_Sensor_H23_S24_Scan.h5", base_path="Thesis/ATLAS_ITk/X7/C_V_Characteristic", is_cv=True)
+    # set_params(latex=True,
+    #            latex_extra=r"\sisetup{separate-uncertainty}\sisetup{locale = DE}\sisetup{uncertainty-descriptors="
+    #                        r"{stat,sys}}\sisetup{uncertainty-descriptor-mode=subscript}"
+    #                        r"\sisetup{retain-zero-uncertainty}")
     #
-    # analyze_data(raw_data="packaged/R13_Renew_Scan.h5", base_path="Reference/R13/inter_unbiased_full",
-    #              is_advanced=True, full_model=False, is_inter_pixel=True)
-    # analyze_data(raw_data="packaged/R13_Renew_Scan.h5", base_path="Reference/R13/inter_biased_M_80_V_full",
-    #              is_advanced=True, full_model=False, is_inter_pixel=True)
-
-    print("Analyze X1")
-    x1_depletion_args = {
-        "first_boundaries": [(-60, -20), (-83, -77.5)],
-        "second_boundaries": [(-0.6, 0), (-77.5, -67.5)],
-        "distribution": False,
-        "apply_contour": False,
-        "apply_contours": False,
-        "chip_group_name": "ATLAS_ITk/X1/sensor",
-        "apply_doping": False
-    }
-    # analyze_data(raw_data=X1_SCAN_2_FILE, base_path="ATLAS_ITk/X1/unbiased_61_full", is_advanced=True,
+    # bare_correction_args = {
+    #     "apply_correction": True,
+    #     "bare_file": "Bare_Repeat_2_Scan.h5",
+    #     "bare_hdf_path": "Reference/bare/unbiased_8/total_cap",
+    # }
+    #
+    #
+    #
+    # # noqa: S125
+    # # analyze_capacitance_distribution(raw_data='Bare_Repeat_2_Scan.h5', base_path="Reference/bare/unbiased_8",
+    # #                                  corrected_distribution=False,
+    # #                                  exclude_test_cap=True, use_kafe2=False,
+    # #                                  fit_plot_pdf_name="Bare_analysis_parasitic.pdf")
+    # # analyze_data(raw_data='pixcap65/Data/r13-measurement/R13_Full_Scan_80V.h5', is_advanced=True,
+    # #              **bare_correction_args)
+    # # analyze_data(raw_data='R13-Interpixel_Scan.h5',
+    # #              base_path="Reference/R13/demo_measurement_65_unbiased_1_discharge",
+    # #              is_inter_pixel=True, is_advanced=True)
+    # # analyze_data(raw_data='pixcap65/Data/New_1_Initial_6_Scan.h5', base_path="ATLAS ITk/C_V_Characteristic",
+    # #              is_advanced=False, is_cv=True, use_corrected=True, apply_doping=True,
+    # #              chip_group_name="ATLAS ITk/sensor",
+    # #              first_boundaries=[(-60, -40), (-80, -75)], second_boundaries=[(-5, 0), (-70, -65)],
+    # #              **bare_correction_args)
+    #
+    # # Second Try Bare
+    # analyze_data(raw_data="packaged/Reference_Bare_renewed.h5", base_path="Reference/Bare/unbiased_31_renew", is_advanced=True, full_model=False)
+    #
+    # # Second Try R13
+    # print("Analyze R13")
+    # analyze_data(raw_data="packaged/R13_2_Scan.h5", base_path="ATLAS_ITk/X2/unbiased_1_full", is_advanced=True, **bare_correction_args)
+    # analyze_data(raw_data="packaged/R13_2_Scan.h5", base_path="ATLAS_ITk/X2/biased_80_V_full", is_advanced=True,
     #              **bare_correction_args)
-    # analyze_data(raw_data=X1_SCAN_2_FILE, base_path="ATLAS_ITk/X1/biased_80_V_full", is_advanced=True,
-    #              **bare_correction_args)
-    # with PdfPages("Fit References/X1_Scan_Combined_reference_fits.pdf") as pdf:
+    # with PdfPages("R13_3_Scan_Combined_reference_fits.pdf") as pdf:
+    #     analyze_data(raw_data="packaged/R13_3_Scan.h5", base_path="Reference/R13/C_V_Characteristic_refined", is_advanced=True, full_model=False, is_cv=True, first_boundaries=(-85,-33), second_boundaries=(-4,0), distribution=True, cv_fit_plot_pdf=pdf,
+    #                  **bare_correction_args)
+    #
+    # # Second Try X1
+    # print("Analyze X1")
+    # # analyze_data(raw_data=X1_SCAN_2_FILE, base_path="ATLAS_ITk/X1/unbiased_61_full", is_advanced=True,
+    # #              **bare_correction_args)
+    # # analyze_data(raw_data=X1_SCAN_2_FILE, base_path="ATLAS_ITk/X1/biased_80_V_full", is_advanced=True,
+    # #              **bare_correction_args)
+    # with PdfPages("X1_Scan_Combined_reference_fits.pdf") as pdf:
     #     analyze_data(raw_data=X1_SCAN_2_FILE, base_path="ATLAS_ITk/X1/C_V_Characteristic_refined",
     #                  is_advanced=True, full_model=False, is_cv=True, use_corrected=True,
-    #                  cv_fit_plot_pdf=pdf, **x1_depletion_args,
+    #                  first_boundaries=[(-60, -40), (-82, -77)], second_boundaries=[(-2, 0), (-73, -65)], distribution=True, cv_fit_plot_pdf=pdf,
     #                  **bare_correction_args)
-    # analyze_data(raw_data=X1_SCAN_2_FILE, base_path="Thesis/ATLAS_ITk/X1/inter_unbiased_full",
-    #              is_advanced=True, full_model=False, is_inter_pixel=True)
-    # analyze_data(raw_data=X1_SCAN_2_FILE, base_path="Thesis/ATLAS_ITk/X1/inter_biased_M_80_V_full",
-    #              is_advanced=True, full_model=False, is_inter_pixel=True)
-    x1_depletion_args["first_boundaries"][1] = (-350, -150)
-    x1_depletion_args["second_boundaries"][1] = (-100, -50)
-    x1_depletion_args = {
-        "first_boundaries": [(-60, -20), (-350, -150)],
-        "second_boundaries": [(-2.6, 0), (-72, -62)],
-        "distribution": False,
-        "apply_contour": False,
-        "apply_contours": False,
-        "chip_group_name": "ATLAS_ITk/X1/sensor",
-        "apply_doping": False
-    }
-    with PdfPages("Fit References/X1_Scan_Combined_reference_fits_Extended.pdf") as pdf:
-        analyze_data(raw_data=X1_SCAN_2_FILE, base_path="Thesis/ATLAS_ITk/X1/C_V_Characteristic_Second_Extended",
-                     is_advanced=True, full_model=False, is_inter_pixel=False, is_cv=True, use_corrected=True,
-                     cv_fit_plot_pdf=pdf, **x1_depletion_args, **bare_correction_args)
-
-
     #
-    #
-    # print("Output the test capacitances.1")
-    # with tb.open_file("packaged/E1_Renew_Scan.h5") as h5_file:
-    #     get_test_capacitance_data(h5_file.root.Reference.E1.unbiased_full.total_cap.analysis)
-    #
+    # # Second Try X2
     # print("Analyze X2")
-    # x2_depletion_args = {
-    #     "first_boundaries": [(-59.5, -15), (-100, -60)],
-    #     "second_boundaries": [(-0.5, 0), (-75, -50)],
-    #     "distribution": True,
-    #     "apply_contour": False,
-    #     "apply_contours": False,
-    #     "chip_group_name": "ATLAS_ITk/X2/sensor",
-    #     "apply_doping": True
-    # }
-    # analyze_data(raw_data=X2_SCAN_2_FILE, base_path="ATLAS_ITk/X2/unbiased_1_full", is_advanced=True,
-    #              **bare_correction_args)
-    # analyze_data(raw_data=X2_SCAN_2_FILE, base_path="ATLAS_ITk/X2/biased_80_V_full", is_advanced=True,
-    #              **bare_correction_args)
-    # with PdfPages("Fit References/X2_SCAN_Combined_reference_fits.pdf") as pdf:
-    #     analyze_data(raw_data=X2_SCAN_2_FILE, base_path="ATLAS_ITk/X2/C_V_Characteristic_refined",
-    #                  is_advanced=True, full_model=False, is_cv=True, use_corrected=True,
-    #                  cv_fit_plot_pdf=pdf, **x2_depletion_args,
-    #                  **bare_correction_args)
+    # # analyze_data(raw_data=X2_SCAN_2_FILE, base_path="ATLAS_ITk/X2/unbiased_1_full", is_advanced=True,
+    # #              **bare_correction_args)
+    # # analyze_data(raw_data=X2_SCAN_2_FILE, base_path="ATLAS_ITk/X2/biased_80_V_full", is_advanced=True,
+    # #              **bare_correction_args)
+    # # with PdfPages("X2_SCAN_Combined_reference_fits.pdf") as pdf:
+    # #     analyze_data(raw_data=X2_SCAN_2_FILE, base_path="ATLAS_ITk/X2/C_V_Characteristic_refined",
+    # #                  is_advanced=True, full_model=False, is_cv=True, use_corrected=True,
+    # #                  first_boundaries=[(-55, -20), (-78, -73)], second_boundaries=[(-5, 0), (-68, -60)], distribution=True, cv_fit_plot_pdf=pdf,
+    # #                  **bare_correction_args)
     #
-    summary_files = ["packaged/R13_Renew_Scan.h5", X1_SCAN_2_FILE, X2_SCAN_2_FILE]
-    summary_groups = ["Reference/R13/unbiased_1_full/total_cap/analysis",
-                      "ATLAS_ITk/X1/unbiased_61_full/total_cap/analysis", "ATLAS_ITk/X2/unbiased_1_full/total_cap/analysis"]
-    summary_sensors = ["R13", "X1", "X2"]
+    # # remaining analysis of the E1 sample
+    # print("Analyze E1")
+    # # analyze_data(raw_data="Reference_Evelyn_Scan.h5", base_path="Reference/E1/unbiased_4_full", is_advanced=True,
+    # #              **bare_correction_args)
+    # # e1_depletion_args = {
+    # #     "first_boundaries": (-100, -80),
+    # #     "second_boundaries": (-10, 0),
+    # # }
+    # # analyze_data(raw_data="Reference_Evelyn_Scan.h5", base_path="Reference/E1/C_V_Characteristic",
+    # #              is_advanced=True, full_model=False, is_cv=True, use_corrected=True, distribution=True, cv_fit_plot_pdf_name="E1_C_V_Verify.pdf", **e1_depletion_args,
+    # #              **bare_correction_args)
+    #
+    # print("Analyze Tests")
+    # # analyze_data(raw_data=REFERENCE_TEST_FILE, base_path="Reference/TESTS/cv_only_simple",
+    # #              is_advanced=True, is_cv=True, use_corrected=True,
+    # #              **bare_correction_args)
+    # # analyze_data(raw_data=REFERENCE_TEST_FILE, base_path="Reference/TESTS/cv_only_advanced",
+    # #              is_advanced=True, is_cv=True, use_corrected=True,
+    # #              **bare_correction_args)
+    # # analyze_data(raw_data=REFERENCE_TEST_FILE, base_path="Reference/TESTS/cv_combined_simple",
+    # #              is_advanced=True, is_cv=True, use_corrected=True,
+    # #              **bare_correction_args)
+    # # analyze_data(raw_data=REFERENCE_TEST_FILE, base_path="Reference/TESTS/cv_combined_advanced",
+    # #              is_advanced=True, is_cv=True, use_corrected=True,
+    # #              **bare_correction_args)
+    # #
+    # # analyze_data(raw_data=REFERENCE_TEST_FILE, base_path="Reference/TESTS/unbiased_30",
+    # #              is_advanced=True, full_model=False, is_cv=False, use_corrected=False)
+    # # analyze_data(raw_data=REFERENCE_TEST_FILE, base_path="Reference/TESTS/unbiased_31",
+    # #              is_advanced=True, full_model=False, is_cv=False, use_corrected=False)
 
     print("generate summary")
     generate_test_summary(summary_files, summary_groups, summary_sensors, "conclude_result.h5")

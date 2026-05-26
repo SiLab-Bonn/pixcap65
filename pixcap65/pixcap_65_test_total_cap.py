@@ -470,6 +470,7 @@ class PixCap65Measurement(Pixcap65BaseMeasurement, metaclass=ABCMeta):
 
                 if allow_continuous_measurement:
                     self.pixcap.bias_initiate_multiple_voltage(3)
+                    logger.warn("Tried to perform multiple voltage measurements.")
 
                 yield k, bias_voltage, data_group
                 if allow_continuous_measurement:
