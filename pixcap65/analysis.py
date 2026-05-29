@@ -2,13 +2,15 @@
 Analysis of Pixcap65 data. Fits freq vs current to extract the capacitance. A 2D histogram containing the capacitance
 for each pixel is stored.
 """
-
 import logging
+import time
+import warnings
 from matplotlib.backends.backend_pdf import PdfPages
 from tables import File, Group
 
 from pixcap65.analysis_util.data_store import DepletionDataStore, DepletionTableStore, DepletionArrayStore, \
     DopingArrayStore
+from pixcap65.utility import synchronized_process_open_file
 
 try:
     # noinspection PyCompatibility
@@ -20,7 +22,7 @@ except ImportError:
 
 import numpy as np
 import tables as tb
-from typing import Optional, Tuple, Union, Callable, Any
+from typing import Optional, Tuple, Union, Callable, Any, Iterable
 from warnings import deprecated
 
 from pixcap65.analysis_util.physics_modelling import SILICON_V_BIAS, depletion_model, model_depletion, EPS_SILICON, \
@@ -32,8 +34,8 @@ from pixcap65.analysis_util.utility import check_leaf_unit, str_join, ANALYSIS_C
     handle_minuit_advanced_options, \
     PARASITIC_SUBTRACTION, get_base_group, handle_analysis_mix_up, HIST_CAP_UNIT, HIST_CURRENT_MEAS_UNIT, \
     HIST_BIAS_MEAS_UNIT, get_analysis_group, investigate_fit_convergence, TABLES_LEAF_COMPAT_TYPE, \
-    CVDistributionData, CVDepletionCapacitanceData, handle_fitter_advanced_options
-from pixcap65.plotting import CAPACITANCE_CONVERSION_FACTOR, evaluate_pixel_mask, X1_SCAN_2_FILE
+    CVDistributionData, handle_fitter_advanced_options
+from pixcap65.plotting import CAPACITANCE_CONVERSION_FACTOR, evaluate_pixel_mask, X1_SCAN_2_FILE, X2_SCAN_2_FILE
 from pixcap65.utility.tables_util import get_groups, get_leaves, copy_node, list_attributes, group_get_file, \
     set_group_attribute, get_group_attribute, get_group_attributes, get_parent_group
 from pixcap65.utility.utils_2 import walk_to_node, GroupType, create_carray, prevent_group_mix_up
@@ -179,7 +181,7 @@ def analyze_data(raw_data, base_path=None, is_advanced=False, is_cv=False,
         corrected immediately; Will require the presence of further arguments as information about
         the parasitic capacitance needs to be submitted.
     :key use_corrected: boolean, False, indicates whether to use the corrected capacitance for the depletion
-        analysis.
+        analysis. WILL be removed in the future.
     :key fit_plot_pdf_name:  Name of the PDF file to save fitting figures from the advanced procedures to.
         (Only used for the advanced procedure)
     :key bare_file: hdf file containing the measurements and investigation of a bare pix cap sample to obtain
@@ -191,7 +193,14 @@ def analyze_data(raw_data, base_path=None, is_advanced=False, is_cv=False,
     :key chip_group_name: HDF files hierarchy group with the data/specifications of the pixels on the current sensor.
         (Will only be usd if the depletion behaviour is investigated)
     """
-    # handle the additional PDF file in case of plotting enabled
+    # handle deprecated keyword arguments.
+    correction_key_value = kwargs.pop("use_corrected", None)
+    if correction_key_value is not None:
+        msg = "keyword argument `use_corrected` is deprecated, use `apply_correction` instead. If `apply_correction` is also present this value will take precedence, otherwise the provided value will be used. This keyword argument will be removed in the future."
+        warnings.warn(msg, DeprecationWarning, stacklevel=2)
+        kwargs.setdefault("apply_correction", correction_key_value)
+
+    # handle the additional PDF file in case of plotting enabled.
     fit_plot_pdf_name = kwargs.pop('fit_plot_pdf_name', None)
     if "plot" in kwargs and kwargs["plot"] and fit_plot_pdf_name is not None:
         from matplotlib.backends.backend_pdf import PdfPages
@@ -208,10 +217,30 @@ def analyze_data(raw_data, base_path=None, is_advanced=False, is_cv=False,
     kargs.pop("output_pdf", None)
     kargs['no_plot'] = True
 
-    # handle the real analysis
+    get_distribution = kwargs.get("distribution", False)
+    get_total_cap_file = kwargs.get("total_cap_file", None)
+    get_total_cap_group = kwargs.get("total_cap_group", None)
+
+    propagate_key_args = kwargs.copy()
+    apply_correction_arg = kwargs.pop("apply_correction", False)
+    bare_file_arg = kwargs.pop("bare_file", None)
+    bare_path_arg = kwargs.pop("bare_hdf_path", None)
+    # handle the real analysis.
     with tb.open_file(raw_data, mode='a') as in_file_h5:
         # extract the hdf file groups to perform the analysis on.
         base_group = get_base_group(base_path, in_file_h5)
+
+        # get capacitance to correct for.
+        if apply_correction_arg:
+            # extract the parasitic capacitance right here!
+            with tb.open_file(bare_file_arg, mode='r') as correction_h5:
+                assert isinstance(bare_path_arg, (str, None))
+                parasitic, parasitic_error = _handle_parasitic_cap(bare_path_arg, correction_h5)
+                if parasitic < 1.0:
+                    print("Unfortunatley the parasitic capacitance vanishs.")
+        else:
+            parasitic = 0
+            parasitic_error = 0
 
         # special handling for C-V characterization.
         if is_cv:
@@ -229,11 +258,11 @@ def analyze_data(raw_data, base_path=None, is_advanced=False, is_cv=False,
             # Why is this C-V specific? Due to the operation on a reference group otherwise.
             handle_analysis_mix_up(base_group.biasing)
 
-            apply_correction_arg = kwargs.pop("apply_correction", False)
-            bare_file_arg = kwargs.pop("bare_file", None)
-            bare_path_arg = kwargs.pop("bare_hdf_path", None)
+            # Why check this only for cv data and total cap?
+            # popping to make sure it is not propagated to the analysis handler to perform the parasitic correction
+            # not for each bias voltage individually but for altogether.
 
-            if kwargs.get("distribution", False):
+            if get_distribution:
                 in_file_h5.create_group(base_group.biasing, "analysis")
                 dist_table = in_file_h5.create_table(where=base_group.biasing.analysis, name="CVDistribution",
                                                      description=CVDistributionData, filters=GLOBAL_FILTERS)
@@ -241,21 +270,11 @@ def analyze_data(raw_data, base_path=None, is_advanced=False, is_cv=False,
             else:
                 dist_entry = {}
 
-            # get capacitance to correct for.
-            if kwargs.get("apply_correction", False):
-                # extract the parasitic capacitance right here!
-                with tb.open_file(kwargs["bare_file"], mode='r') as correction_h5:
-                    bare_path = kwargs.get("bare_hdf_file", None)
-                    assert isinstance(bare_path, (str, None))
-                    parasitic, parasitic_error = _handle_parasitic_cap(bare_path, correction_h5)
-            else:
-                parasitic = 0
-                parasitic_error = 0
-
             # no progressbar as the overhead for this is much too large in most cases.
             bias_voltage_data = base_group.biasing.measurements.BiasVoltageHist[:]
             if len(bias_voltage_data.shape) > 1:
-                bias_voltage_data = bias_voltage_data[:,0]
+                # this wont use available measured voltage data but the settings instead. This may lower accuracy.
+                bias_voltage_data = bias_voltage_data[:, 0]
             for k, bias_voltage in enumerate(bias_voltage_data):
                 bias_name = "bias_{volt}_V".format(volt=bias_voltage).replace('-', "M_").replace(".", "__")
                 data_group = base_group.biasing.measurements[bias_name]
@@ -272,7 +291,8 @@ def analyze_data(raw_data, base_path=None, is_advanced=False, is_cv=False,
                 cv_data[:, :, k] = cap_data[:, :]
                 cv_err_data[:, :, k] = cap_error_data[:, :]
 
-                if kwargs.get("distribution", False):
+                if get_distribution:
+                    # Will continue using tuples for performance!
                     # first get a histogram with all the data
                     temp_tuple = analyze_capacitance_distribution_delegate(None,
                                                                            None,
@@ -280,8 +300,43 @@ def analyze_data(raw_data, base_path=None, is_advanced=False, is_cv=False,
                                                                            **kargs)
                     n_pix, cap, cap_err, cap_std, cap_std_err = temp_tuple
 
+                    # we need an independent fit for the corrected distributions
+                    # interestingly only the parasitic negatives are present here.
+                    cap_data_para = np.where(np.isfinite(cap_data), cap_data - (parasitic / CAPACITANCE_CONVERSION_FACTOR), np.nan)
+                    cap_data_para_upper = np.where(np.isfinite(cap_data), cap_data - (parasitic + parasitic_error) / CAPACITANCE_CONVERSION_FACTOR, np.nan)
+                    cap_data_para_lower = np.where(np.isfinite(cap_data), cap_data - (parasitic - parasitic_error) / CAPACITANCE_CONVERSION_FACTOR, np.nan)
+                    try:
+                        temp_tuple = analyze_capacitance_distribution_delegate(None,None,
+                                                                               capacitance=cap_data_para,
+                                                                               **kargs)
+                        _, cap_corr, cap_err_corr, cap_std_corr, cap_std_err_corr = temp_tuple
+
+                        # TODO: Evaluate the systematic uncertainties for the different capacitances
+                        temp_tuple = analyze_capacitance_distribution_delegate(None, None,
+                                                                               capacitance=cap_data_para_upper,
+                                                                               **kargs)
+                        _, cap_corr_1, cap_err_corr_1, cap_std_corr_1, cap_std_err_corr_1 = temp_tuple
+
+                        temp_tuple = analyze_capacitance_distribution_delegate(None, None,
+                                                                               capacitance=cap_data_para_lower,
+                                                                               **kargs)
+                        _, cap_corr_2, cap_err_corr_2, cap_std_corr_2, cap_std_err_corr_2 = temp_tuple
+                    except:
+                        print(np.count_nonzero(np.isfinite(cap_data_para)))
+                        print(cap_data[np.isfinite(cap_data)])
+                        print(cap_data_para[np.isfinite(cap_data)])
+                        raise
+
+                    # Fehler von Fehlern werden i.d.R. unterdrückt.
+                    cap_corr_sys_abs = np.abs(np.array((cap_corr_1, cap_corr_2)) - cap_corr)
+                    cap_corr_sys_errors = np.array([np.sqrt(cap_err_corr_1 ** 2 + cap_err_corr ** 2),
+                                                    np.sqrt(cap_err_corr_2 ** 2 + cap_err_corr ** 2)])
+                    cap_corr_systematic = np.average(cap_corr_sys_abs, weights=np.reciprocal(cap_corr_sys_errors ** 2))
+
+
                     # try to get to the on-resistance datasets to perform the same distribution handler!
                     # only issue with this attempt the capacitance will be saved as a parasitic one!
+                    # FIXME: For interpix runs this will break as there are different names for the different channels.
                     if "HistRes" in ana_group and np.any(np.isfinite(ana_group.HistRes)):
                         resistance_data = ana_group.HistRes[:]
                         temp_tuple = analyze_capacitance_distribution_delegate(None,
@@ -307,26 +362,37 @@ def analyze_data(raw_data, base_path=None, is_advanced=False, is_cv=False,
                     dist_entry['r_on_err'] = res_err
                     dist_entry['r_on_std'] = res_std
                     dist_entry['r_on_std_err'] = res_std_err
-                    if kwargs.get("apply_correction", False):
-                        dist_entry['cap_corrected'] = (cap - parasitic) / CAPACITANCE_CONVERSION_FACTOR
-                        dist_entry['cap_corrected_err'] = cap_std / CAPACITANCE_CONVERSION_FACTOR
+                    if apply_correction_arg:
+                        # TODO: Rework this part to save all the results for all the value
+                        dist_entry['cap_corrected'] = cap_corr / CAPACITANCE_CONVERSION_FACTOR
+                        dist_entry['cap_corrected_err'] = cap_std_corr / CAPACITANCE_CONVERSION_FACTOR
                         dist_entry['cap_parasitic'] = parasitic
-                        dist_entry['cap_systematic_error'] = np.sqrt(cap_err ** 2 + parasitic_error ** 2) / CAPACITANCE_CONVERSION_FACTOR
+                        dist_entry['cap_systematic_error'] = np.sqrt(
+                            cap_err ** 2 + parasitic_error ** 2) / CAPACITANCE_CONVERSION_FACTOR
                     else:
                         dist_entry['cap_corrected'] = cap / CAPACITANCE_CONVERSION_FACTOR
                         dist_entry['cap_corrected_err'] = cap_std / CAPACITANCE_CONVERSION_FACTOR
                         dist_entry['cap_parasitic'] = 0
-                        dist_entry['cap_systematic_error'] = cap_err / CAPACITANCE_CONVERSION_FACTOR
+                        dist_entry['cap_systematic_error'] = cap_corr_systematic / CAPACITANCE_CONVERSION_FACTOR
 
                     if isinstance(dist_entry, tb.tableextension.Row):
                         dist_entry.append()
                     else:
                         print("No append of the distribution!")
 
-            if kwargs.get("distribution", False):
+            if get_distribution:
                 dist_table.flush()
 
             in_file_h5.flush()
+
+            create_carray(in_file_h5, base_group.biasing.analysis, name="UCHist", title="Histogram of the U-C-curve",
+                          filters=GLOBAL_FILTERS, obj=cv_data, unit=HIST_CAP_UNIT)
+            create_carray(in_file_h5, base_group.biasing.analysis, name="UCErrHist",
+                          title="Error Histogram of the U-C-curve",
+                          filters=GLOBAL_FILTERS,
+                          obj=cv_err_data,
+                          unit=HIST_CAP_UNIT)
+
             # in case of active correction, also the summary capacitance tables needs to be corrected, but it should
             # also an uncorrected table present.
             if apply_correction_arg:
@@ -342,16 +408,7 @@ def analyze_data(raw_data, base_path=None, is_advanced=False, is_cv=False,
                     cv_data_corrected[:, :, k] = cap_data[:, :]
                     cv_err_data_corrected[:, :, k] = cap_error_data[:, :]
 
-            create_carray(in_file_h5, base_group.biasing.analysis, name="UCHist", title="Histogram of the U-C-curve",
-                          filters=GLOBAL_FILTERS, obj=cv_data, unit=HIST_CAP_UNIT)
-            create_carray(in_file_h5, base_group.biasing.analysis, name="UCErrHist",
-                          title="Error Histogram of the U-C-curve",
-                          filters=GLOBAL_FILTERS,
-                          obj=cv_err_data,
-                          unit=HIST_CAP_UNIT)
-
-            # save also the corrected capacitance data if necessary
-            if apply_correction_arg:
+                # save also the corrected capacitance data
                 create_carray(in_file_h5, base_group.biasing.analysis_correction, name="UCHist",
                               title="Histogram of the U-C-curve",
                               filters=GLOBAL_FILTERS,
@@ -362,7 +419,8 @@ def analyze_data(raw_data, base_path=None, is_advanced=False, is_cv=False,
                               obj=cv_err_data, unit=HIST_CAP_UNIT)
 
             if first_boundaries is not None and second_boundaries is not None:
-                dep_ana_group = get_analysis_group(base_group.biasing, **kwargs)
+                # We will need all the usages as here might be a inconsitency with the data systems.
+                dep_ana_group = get_analysis_group(base_group.biasing, use_corrected=apply_correction_arg)
                 assert isinstance(dep_ana_group, tb.Group)
                 chip_name = kwargs.pop("chip_group_name", None)
                 # we need to put the plotting arguments back in
@@ -371,123 +429,80 @@ def analyze_data(raw_data, base_path=None, is_advanced=False, is_cv=False,
                     kwargs['chip_group'] = chip_spec_group
 
                 # Anyway it is necessary to perform this analysis also on a sensor-average basis!
-                if kwargs.pop("use_corrected", False):
+                if apply_correction_arg:
                     analyze_depletion_delegate(base_group.biasing.measurements,
                                                base_group.biasing.analysis,
                                                first_boundaries, second_boundaries, **kwargs)
                 analyze_depletion_delegate(base_group.biasing.measurements, dep_ana_group,
                                            first_boundaries, second_boundaries, **kwargs)
 
-                if kwargs.get("distribution", False):
+                if get_distribution:
+                    print("The analysis group is: ", dep_ana_group)
                     # the appropriate options are in this case: create one combination table for each of the
                     # fit boundaries or save numpy arrays within the table?
                     dist_table.flush()
                     dist_table = base_group.biasing.analysis.CVDistribution[:]
-                    pixel_cap_data = dist_table['capacitance']
-                    pixel_cap_error_data = dist_table['cap_std']
-                    voltage_data = dist_table['bias']
-                    if isinstance(first_boundaries, Iterable) and not isinstance(first_boundaries, Tuple):
-                        assert first_boundaries is not None
-                        assert second_boundaries is not None
-                        assert isinstance(first_boundaries, Sized)
-                        n_depletion_regions = len(first_boundaries)
-                        class AdvancedDepletionData(tb.IsDescription):
-                            Ubi = tb.Col.from_kind('float', itemsize=8, shape=(n_depletion_regions,), pos=0)
-                            Ubi_error = tb.Col.from_kind('float', itemsize=8, shape=(n_depletion_regions,), pos=1)
-                            a = tb.Col.from_kind('float', itemsize=8, shape=(n_depletion_regions,), pos=2)
-                            a_error = tb.Col.from_kind('float', itemsize=8, shape=(n_depletion_regions,), pos=3)
-                            b = tb.Col.from_kind('float', itemsize=8, shape=(n_depletion_regions,), pos=4)
-                            b_error = tb.Col.from_kind('float', itemsize=8, shape=(n_depletion_regions,), pos=5)
-                            c = tb.Col.from_kind('float', itemsize=8, shape=(n_depletion_regions,), pos=6)
-                            c_error = tb.Col.from_kind('float', itemsize=8, shape=(n_depletion_regions,), pos=7)
-                            d = tb.Col.from_kind('float', itemsize=8, shape=(n_depletion_regions,), pos=8)
-                            d_error = tb.Col.from_kind('float', itemsize=8, shape=(n_depletion_regions,), pos=9)
-
-                        class AdvancedCVDepletionCapacitanceData(tb.IsDescription):
-                            bias = tb.Float64Col(pos=0)
-                            n_pixel = tb.Int64Col(pos=1)
-                            capacitance = tb.Float64Col(pos=2)
-                            cap_err = tb.Float64Col(pos=3)
-                            cap_std = tb.Float64Col(pos=4)
-                            cap_std_err = tb.Float64Col(pos=5)
-                            r_on = tb.Float64Col(pos=6)
-                            r_on_err = tb.Float64Col(pos=7)
-                            r_on_std = tb.Float64Col(pos=8)
-                            r_on_std_err = tb.Float64Col(pos=9)
-                            cap_corrected = tb.Float64Col(pos=10)
-                            cap_corrected_err = tb.Float64Col(pos=11)
-                            cap_parasitic = tb.Float64Col(pos=12)
-                            cap_systematic_error = tb.Float64Col(pos=13)
-                            Ubi = tb.Col.from_kind('float', itemsize=8, shape=(n_depletion_regions,), pos=14)
-                            Ubi_error = tb.Col.from_kind('float', itemsize=8, shape=(n_depletion_regions,), pos=15)
-                            a = tb.Col.from_kind('float', itemsize=8, shape=(n_depletion_regions,), pos=16)
-                            a_error = tb.Col.from_kind('float', itemsize=8, shape=(n_depletion_regions,), pos=17)
-                            b = tb.Col.from_kind('float', itemsize=8, shape=(n_depletion_regions,), pos=18)
-                            b_error = tb.Col.from_kind('float', itemsize=8, shape=(n_depletion_regions,), pos=19)
-                            c = tb.Col.from_kind('float', itemsize=8, shape=(n_depletion_regions,), pos=20)
-                            c_error = tb.Col.from_kind('float', itemsize=8, shape=(n_depletion_regions,), pos=21)
-                            d = tb.Col.from_kind('float', itemsize=8, shape=(n_depletion_regions,), pos=22)
-                            d_error = tb.Col.from_kind('float', itemsize=8, shape=(n_depletion_regions,), pos=23)
-
-                        depletion_data_table = in_file_h5.create_table(where=base_group.biasing.analysis,
-                                                                       name="SensorDepletionRaw",
-                                                                       description=AdvancedDepletionData,
+                    depletion_data_table_raw = in_file_h5.create_table(where=base_group.biasing.analysis,
+                                                                       name="SensorDepletionRaw1",
+                                                                       description=DepletionData,
                                                                        filters=GLOBAL_FILTERS)
-                        depletion_distribution_table = in_file_h5.create_table(where=base_group.biasing.analysis,
-                                                                               name="SensorDepletion",
-                                                                               description=AdvancedCVDepletionCapacitanceData,
-                                                                               filters=GLOBAL_FILTERS)
-                        fit_result_storage = DepletionTableStore(depletion_data_table, n_depletions=n_depletion_regions,)
-                        for k, (first_bound, second_bound) in enumerate(zip(first_boundaries, second_boundaries)):
-                            first_lower, first_upper = first_bound
-                            second_lower, second_upper = second_bound
-                            fit_result_storage.set_depletion_region(k)
+                    corrected_depletion_data_table = in_file_h5.create_table(where=base_group.biasing.analysis,
+                                                                             name="SensorDepletionRaw2",
+                                                                             description=DepletionData,
+                                                                             filters=GLOBAL_FILTERS)
 
-                            # Now the real implementation starts.
-                            analyze_pixel_depletion(first_lower, first_upper, pixel_cap_data, pixel_cap_error_data,
-                                                    second_lower,
-                                                    second_upper, voltage_data, fit_result_storage,
-                                                    fit_description_text=" Sensor Distribution", **kwargs)
-                        depletion_data_table.flush()
+                    # will need to perform the operation with two different tables which only differ by their entries
+                    # corrected_depletion_data_table = depletion_data_table_raw.copy(base_group.biasing.analysis,
+                    #                                                                "SensorDepletionRaw2")
+                    __distribution_depletion_estimation(dist_table, first_boundaries,
+                                                        second_boundaries, depletion_data_table_raw, False, **kwargs)
+                    depletion_data_table_raw.flush()
+                    depletion_data_table = depletion_data_table_raw.copy(base_group.biasing.analysis,
+                                                                         "SensorDepletionRaw")
+                    depletion_data_table.flush()
 
-                        # now combine the two tables at last
-                        for first_row, second_row in zip(base_group.biasing.analysis.CVDistribution.iterrows(),
-                                                         base_group.biasing.analysis.SensorDepletionRaw.iterrows()):
-                            distribution_data = first_row[:]
-                            depletion_data = second_row[:]
-                            new_data = np.rec.array([(*distribution_data, *depletion_data)], dtype=[*base_group.biasing.analysis.CVDistribution.description._v_dtype.descr, *base_group.biasing.analysis.SensorDepletionRaw.description._v_dtype.descr])
-                            depletion_distribution_table.append(new_data)
-                        depletion_distribution_table.flush()
+                    if apply_correction_arg:
+                        print("Will try to apply the distribution data.")
+                        __distribution_depletion_estimation(dist_table, first_boundaries, second_boundaries,
+                                                            corrected_depletion_data_table, True, **kwargs)
+                        corrected_depletion_data_table.flush()
+                        depletion_data_table.cols.Ubi_corrected[:] = corrected_depletion_data_table.cols.Ubi[:]
+                        depletion_data_table.cols.Ubi_corrected_error[
+                            :] = corrected_depletion_data_table.cols.Ubi_error[:]
+                        depletion_data_table.cols.a_corrected[:] = corrected_depletion_data_table.cols.a[:]
+                        depletion_data_table.cols.a_corrected_error[:] = corrected_depletion_data_table.cols.a_error[:]
+                        depletion_data_table.cols.b_corrected[:] = corrected_depletion_data_table.cols.b[:]
+                        depletion_data_table.cols.b_corrected_error[:] = corrected_depletion_data_table.cols.b_error[:]
+                        depletion_data_table.cols.c_corrected[:] = corrected_depletion_data_table.cols.c[:]
+                        depletion_data_table.cols.c_corrected_error[:] = corrected_depletion_data_table.cols.c_error[:]
+                        depletion_data_table.cols.d_corrected[:] = corrected_depletion_data_table.cols.d[:]
+                        depletion_data_table.cols.d_corrected_error[:] = corrected_depletion_data_table.cols.d_error[:]
+                        depletion_data_table.cols.Ubi_systematic_corrected[
+                            :] = corrected_depletion_data_table.cols.Ubi_systematic[:]
 
-
+                        # What about the table in the corrected analysis group?
                     else:
-                        first_lower, first_upper = first_boundaries
-                        second_lower, second_upper = second_boundaries
-                        depletion_data_table = in_file_h5.create_table(where=base_group.biasing.analysis,
-                                                                       name="SensorDepletionRaw", description=DepletionData,
-                                                                       filters=GLOBAL_FILTERS)
-                        depletion_distribution_table = in_file_h5.create_table(where=base_group.biasing.analysis,
-                                                                               name="SensorDepletion",
-                                                                               description=CVDepletionCapacitanceData,
-                                                                               filters=GLOBAL_FILTERS)
-                        fit_result_storage = DepletionTableStore(depletion_data_table)
-                        analyze_pixel_depletion(first_lower, first_upper, pixel_cap_data, pixel_cap_error_data,
-                                                second_lower,
-                                                second_upper, voltage_data, fit_result_storage,
-                                                fit_description_text=" Sensor Distribution", **kwargs)
+                        placeholder_data = np.full_like(depletion_data_table_raw.cols.Ubi[:], fill_value=np.nan)
+                        depletion_data_table.cols.Ubi_corrected[:] = placeholder_data[:]
+                        depletion_data_table.cols.Ubi_corrected_error[:] = placeholder_data[:]
+                        depletion_data_table.cols.a_corrected[:] = placeholder_data[:]
+                        depletion_data_table.cols.a_corrected_error[:] = placeholder_data[:]
+                        depletion_data_table.cols.b_corrected[:] = placeholder_data[:]
+                        depletion_data_table.cols.b_corrected_error[:] = placeholder_data[:]
+                        depletion_data_table.cols.c_corrected[:] = placeholder_data[:]
+                        depletion_data_table.cols.c_corrected_error[:] = placeholder_data[:]
+                        depletion_data_table.cols.d_corrected[:] = placeholder_data[:]
+                        depletion_data_table.cols.d_corrected_error[:] = placeholder_data[:]
+                        depletion_data_table.cols.Ubi_systematic_corrected[:] = placeholder_data[:]
 
-                        depletion_data_table.flush()
+                    depletion_data_table.flush()
 
-                        # now combine the two tables at last!
-                        for first_row, second_row in zip(base_group.biasing.analysis.CVDistribution.iterrows(),
-                                                         base_group.biasing.analysis.SensorDepletionRaw.iterrows()):
-                            distribution_data = first_row[:]
-                            depletion_data = second_row[:]
-                            new_data = np.rec.array([(*distribution_data, *depletion_data)], dtype=[
-                                *base_group.biasing.analysis.CVDistribution.description._v_dtype.descr,
-                                *base_group.biasing.analysis.SensorDepletionRaw.description._v_dtype.descr])
-                            depletion_distribution_table.append(new_data)
-                        depletion_distribution_table.flush()
+                    if apply_correction_arg:
+                        in_file_h5.copy_node(where=base_group.biasing.analysis, newparent=dep_ana_group, name="SensorDepletionRaw", newname="SensorDepletionRaw")
+
+                    # remove the additonal tables
+                    depletion_data_table_raw.remove()
+                    corrected_depletion_data_table.remove()
 
         else:
             if is_inter_pixel:
@@ -501,7 +516,184 @@ def analyze_data(raw_data, base_path=None, is_advanced=False, is_cv=False,
 
             analysis_data_handle(in_file_h5, reference_group.measurements, ana_group,
                                  is_advanced=is_advanced,
-                                 is_inter_pixel=is_inter_pixel, **kwargs)
+                                 is_inter_pixel=is_inter_pixel, **propagate_key_args)
+
+        # TODO: implement further processing to estimate the inter-pixel and in-pix capacitance. Also for distribution.
+        if is_inter_pixel and get_total_cap_file is not None:
+            # without the additional data from the total capactiance measurement
+            assert get_total_cap_group is not None
+            with synchronized_process_open_file(get_total_cap_file, mode='a') as total_h5_file:
+                total_cap_data, _ = walk_to_node(total_h5_file.root, get_total_cap_group, create=False, verify_create=True)
+                total_cap = total_cap_data.analysis.HistCap[:]
+                total_cap_error = total_cap_data.analysis.HistCapErr[:]
+
+                inter_pix_cap = total_cap - reference_group.analysis.TotalHistCap[:]
+                inter_pix_cap_err = total_cap_error - reference_group.analysis.TotalHistCap_err[:]
+
+                # account for systematic effects?
+                in_pix_cap = reference_group.analysis.TotalHistCap[:]
+                in_pix_cap_err = reference_group.analysis.TotalHistCap_err[:]
+                create_carray(in_file_h5, where=reference_group.analysis, name="InPixHistCap", obj=in_pix_cap)
+                create_carray(in_file_h5, where=reference_group.analysis, name="InPixHistCapErr", obj=in_pix_cap_err)
+                create_carray(in_file_h5, where=reference_group.analysis, name="InterPixHistCap", obj=inter_pix_cap)
+                create_carray(in_file_h5, where=reference_group.analysis, name="InterPixHistCapErr", obj=inter_pix_cap_err)
+                if apply_correction_arg:
+                    # must retrieve the parasitics first.
+                    in_pix_cap -= parasitic
+                    in_pix_cap_err = np.where(np.isfinite(in_pix_cap), np.sqrt(in_pix_cap_err ** 2 + parasitic_error ** 2), np.nan)
+                    create_carray(in_file_h5, where=reference_group.analysis_correction, name="InPixHistCap", obj=in_pix_cap)
+                    create_carray(in_file_h5, where=reference_group.analysis_correction, name="InPixHistCapErr",
+                                  obj=in_pix_cap_err)
+                    in_file_h5.copy_node(where=reference_group.analysis, newparent=reference_group.analysis_correction,
+                                         newname="InterPixHistCap", name="InterPixHistCap")
+                    in_file_h5.copy_node(where=reference_group.analysis, newparent=reference_group.analysis_correction,
+                                         newname="InterPixHistCapErr", name="InterPixHistCapErr")
+                    in_file_h5.flush()
+
+                # TODO: handle the sensor distribution of this.
+                # perform individual distribution fits for the corrected data, also accounting for the uncertaintiy
+                # of the parasitic capacitance.
+                
+
+
+
+
+def _extract_table_data(key: str, is_corrected: bool, table: np.ndarray, ):
+    """
+    extract_table_data
+
+    Wrapper for the extraction of table column data. Only relevant to simplify the implementation for the usage of
+    corrected capacitance data. It replaces some of the keys to extract capacitance data from the table by the corrected
+    table columns.
+
+    :type key: str
+    :param key: name of the original column to extract data from
+    :type is_corrected: bool
+    :param is_corrected: boolean, whether to use the corrected capacitance data.
+    :param table: table (as a structured numpy array) to extract data from
+    :return: ??
+    """
+    if is_corrected:
+        match (key):
+            case 'capacitance':
+                return table['cap_corrected']
+            case 'cap_std':
+                return table['cap_corrected_err']
+            case _:
+                return table[key]
+    else:
+        return table[key]
+
+
+# perhaps extract the result table as an parameter in order to put the correct depletion values also in the table!
+def __distribution_depletion_estimation(dist_table,
+                                        first_boundaries: Union[tuple, Iterable[tuple]],
+                                        second_boundaries: Union[tuple, Iterable[tuple]], depletion_data_table,
+                                        is_corrected, **kwargs):
+    """
+    distribution_depletion_estimation
+
+    Internal handler function to estimate the depletion voltage / reversed bias for full depletion of the sensor.
+    This handler function uses the capacitance distribution over the full sensor (or at least the measured part)
+    assuming a gaussian pdf.
+    It takes the gaussian centered capacitances (more accuratley: the distributions c-v-curve), fits two straight lines
+    to low voltage limit for the capacitance behaviour of the undepleted sensor and the high voltage limit for the
+    capacitance behaviour for a depletion zone extending over the full physical dimensions of the sensor.
+    The depletion voltage is estimated as the intersection of these two straight lines.
+    Both the c-v-data is taken from a table and the results are written back to another table.
+
+    These estimation attempt is redone with slightly adjust fit ranges to estimate the systematic uncertainty.
+    This estimator for the systematic uncertainty ignores cross-correlation between different factors influencing
+    the fit. In particular this approach only accounts for systematic effects by the fit procedure itself.
+    In particular no systematic effects from the measurement setup itself or the parasitic capacitances are evaluated
+    at this point.
+
+    For the systmatic estimation another depeltion table will be temporarily created and then removed.
+
+    :type dist_table: numpy.ndarray, numpy.rec.array
+    :param dist_table: table of the measures capacitance data in dependence on the applied reverse bias. The data must be
+        provided by a structured numpy rec-array and not by a pytables table.
+    :param first_boundaries: tuple of bounds for the high voltage limit of the capacitance behaviour to estimate
+        the depletion voltage of the pixel. Depletion voltage will only be estimated if this argument is provided.
+        It is also possible to provide an Iterable of boundaries for multiple depletion regions to fit.
+    :param second_boundaries: tuple of bounds for the low voltage limit of the capacitance behaviour to estimate
+        the depletion voltage of the pixel. Depletion voltage will be estimated if this argument is provided.
+        It is also possible to provide an Iterable of boundaries for multiple depletion regions to fit.
+    :type depletion_data_table: pytables.Table
+    :param depletion_data_table: table to write the depletion voltage estimation data to.
+    :type is_corrected: bool
+    :param is_corrected: whether to use the corrected data for this operation.
+    :param kwargs: further keyword arguments for the fits to estimate the depletion voltage.
+    :key fit_description_text: text describing the fit performed for usage within the plot handler of the fits.
+    :key use_kafe2: boolean, False, indicates whether kafe2 is used for the fit.
+    :key apply_contours: boolean, indicates whether to determine the contours and try to plot them. (No effect for
+        the fit to estimate systematic effects)
+    :key plot: boolean, False, indicates whether to plot the data. AN output PDF object could be submitted here
+         instead of an explicitly created one. (No effect for the fit to estimate systematic effects)
+    :key fit_plot_pdf: PDF object to save the fit figures to. (No effect for
+        the fit to estimate systematic effects.)
+    :key verbose: boolean, indicating whether to use verbose output of the depletion voltages.
+    :key cv_fit_plot_pdf: analog to `fit_plot_pdf` to activate the plotting for c-v- and depletion fits independent from
+        the plotting for capacitance estimation fits. If this keyword argument is present also the `plot` arguments will
+        be set automatically. (This keyword argument will be ignored for the fits to estimate systematic effects)
+    """
+    pixel_cap_data = _extract_table_data('capacitance', is_corrected, dist_table)
+    pixel_cap_error_data = _extract_table_data('cap_std', is_corrected, dist_table)
+    voltage_data = _extract_table_data('bias', is_corrected, dist_table)
+    systematic_depletion_data = depletion_data_table.copy(depletion_data_table._v_parent, "SystematicDepletionTable")
+    systematic_offset = kwargs.pop("systematic_offset", 2)
+    systematic_key_args = kwargs.copy()
+    systematic_key_args.pop("plot", False)
+    systematic_key_args.pop("fit_plot_pdf", None)
+    systematic_key_args.pop("output_pdf", None)
+    systematic_key_args.pop("cv_fit_plot_pdf", None)
+    if isinstance(first_boundaries, Iterable) and not isinstance(first_boundaries, Tuple):
+        assert first_boundaries is not None
+        assert second_boundaries is not None
+        assert isinstance(first_boundaries, Sized)
+        n_depletion_regions = len(first_boundaries)
+        fit_result_storage = DepletionTableStore(depletion_data_table, n_depletions=n_depletion_regions, )
+        systematic_fit_result_storage = DepletionTableStore(systematic_depletion_data,
+                                                            n_depletions=n_depletion_regions, )
+        for k, (first_bound, second_bound) in enumerate(zip(first_boundaries, second_boundaries)):
+            first_lower, first_upper = first_bound
+            second_lower, second_upper = second_bound
+            fit_result_storage.set_depletion_region(k)
+
+            # Now the real implementation starts.
+            analyze_pixel_depletion(first_lower, first_upper, pixel_cap_data, pixel_cap_error_data,
+                                    second_lower,
+                                    second_upper, voltage_data, fit_result_storage,
+                                    fit_description_text=" Sensor Distribution", **kwargs)
+            analyze_pixel_depletion(first_lower - systematic_offset, first_upper + systematic_offset, pixel_cap_data,
+                                    pixel_cap_error_data,
+                                    second_lower - systematic_offset,
+                                    second_upper + systematic_offset, voltage_data, systematic_fit_result_storage,
+                                    fit_description_text=" Sensor Distribution Systematic", **systematic_key_args)
+    else:
+        first_lower, first_upper = first_boundaries
+        second_lower, second_upper = second_boundaries
+        fit_result_storage = DepletionTableStore(depletion_data_table)
+        systematic_fit_result_storage = DepletionTableStore(systematic_depletion_data, )
+        analyze_pixel_depletion(first_lower, first_upper, pixel_cap_data, pixel_cap_error_data,
+                                second_lower,
+                                second_upper, voltage_data, fit_result_storage,
+                                fit_description_text=" Sensor Distribution", **kwargs)
+        analyze_pixel_depletion(first_lower - systematic_offset, first_upper + systematic_offset, pixel_cap_data,
+                                pixel_cap_error_data,
+                                second_lower - systematic_offset,
+                                second_upper + systematic_offset, voltage_data, systematic_fit_result_storage,
+                                fit_description_text=" Sensor Distribution Systematic", **systematic_key_args)
+
+    depletion_data_table.flush()
+    systematic_depletion_data.flush()
+    depletion_data_table.cols.Ubi_systematic[:] = np.abs(
+        depletion_data_table.cols.Ubi[:] - systematic_depletion_data.cols.Ubi[:])
+    depletion_data_table.flush()
+    systematic_depletion_data.flush()
+    group_get_file(depletion_data_table).flush()
+    systematic_depletion_data.remove()
+    group_get_file(depletion_data_table).flush()
 
 
 def _handle_parasitic_cap(bare_path: Optional[str], in_file_h5: tb.File) -> tuple[Any, Any]:
@@ -793,6 +985,9 @@ def analyze_depletion_delegate(data_group: tb.Group, analysis_group: tb.Group,
     cap_data = check_leaf_unit(analysis_group.UCHist, HIST_CAP_UNIT)
     cap_error_data = check_leaf_unit(analysis_group.UCErrHist, HIST_CAP_UNIT)
     voltage_data = check_leaf_unit(data_group.BiasVoltageHist, HIST_BIAS_MEAS_UNIT)
+    if len(voltage_data.shape) > 1:
+        # TODO: adjust for usage of the correct voltages. Also find all the other places were the BiasVoltageHist is used.
+        voltage_data = voltage_data[:, 0]
 
     if isinstance(first_boundaries, Iterable) and not isinstance(first_boundaries, Tuple):
         assert first_boundaries is not None
@@ -1121,6 +1316,9 @@ def analyze_pixel_depletion(first_lower, first_upper,
          instead of an explicitly created one.
     :key fit_plot_pdf: PDF object to save the fit figures to.
     :key verbose: boolean, indicating whether to use verbose output of the depletion voltages.
+    :key cv_fit_plot_pdf: analog to `fit_plot_pdf` to activate the plotting for c-v- and depletion fits independent from
+        the plotting for capacitance estimation fits. If this keyword argument is present also the `plot` arguments will
+        be set automatically.
     """
     # extract the additional parameters for advanced fitting procedures
     verbose_output = kwargs.pop("verbose", False)
@@ -1133,15 +1331,19 @@ def analyze_pixel_depletion(first_lower, first_upper,
     first_section_lower_mask = voltage_data >= first_lower
     first_section_mask = np.logical_and(first_section_upper_mask, first_section_lower_mask)
 
+    # print(second_upper, second_lower)
     second_section_upper_mask = voltage_data <= second_upper
     second_section_lower_mask = voltage_data >= second_lower
+    # print(np.count_nonzero(second_section_upper_mask))
+    # print(np.count_nonzero(second_section_lower_mask))
+    # print(voltage_data)
     second_section_mask = np.logical_and(second_section_upper_mask, second_section_lower_mask)
 
     # extract and select the usable voltage and capacitance data for the two fit ranges.
     effective_capacitance_data = np.reciprocal(pixel_cap_data * CAPACITANCE_CONVERSION_FACTOR) ** 2
     effective_capacitance_error_data = np.reciprocal(
-        pixel_cap_data * CAPACITANCE_CONVERSION_FACTOR) ** 3 * pixel_cap_error_data \
-        if np.all(np.isfinite(pixel_cap_error_data)) else pixel_cap_error_data
+        pixel_cap_data * CAPACITANCE_CONVERSION_FACTOR) ** 3 * pixel_cap_error_data * CAPACITANCE_CONVERSION_FACTOR if np.all(
+        np.isfinite(pixel_cap_error_data)) else pixel_cap_error_data
     first_voltage_data = voltage_data[first_section_mask]
     second_voltage_data = voltage_data[second_section_mask]
     first_cap_data = effective_capacitance_data[first_section_mask]
@@ -1154,6 +1356,8 @@ def analyze_pixel_depletion(first_lower, first_upper,
                                                                               first_voltage_data, "First",
                                                                               **kwargs)
 
+    # print(second_cap_data)
+    # print(second_cap_data.shape)
     second_dep_cov, second_dep_errors, second_dep_parameters = get_depletion_fit(second_cap_data, second_cap_error_data,
                                                                                  second_voltage_data, "Second",
                                                                                  **kwargs)
@@ -1312,12 +1516,37 @@ def effective_doping(capacitance, bias_voltages, diode_area=None) -> np.ndarray:
 
     if diode_area is None:
         diode_area = 50 * 50  # measured in um^2
-    temp_capacitance = np.reciprocal(capacitance ** 2)
+    temp_capacitance = np.reciprocal((capacitance * CAPACITANCE_CONVERSION_FACTOR) ** 2)
 
     # noinspection PyTypeChecker
-    d_du = Diff(0, bias_voltages)
-    derivative = d_du(temp_capacitance)
-    n_eff = 2 / (constants.elementary_charge * constants.epsilon_0 * EPS_SILICON * (diode_area ** 2) * np.array(
+    try:
+        # handle duplicates
+        unique_voltage, cap_mask, voltage_counts = np.unique(bias_voltages, return_index=True, return_counts=True)
+        duplicate_mask = voltage_counts > 1
+        unique_temp_capacitance = temp_capacitance[cap_mask]
+        derivative = np.full_like(bias_voltages, np.nan)
+        d_du = Diff(0, unique_voltage, acc=2)
+        derivative[cap_mask] = d_du(unique_temp_capacitance)
+    except np.linalg.LinAlgError:
+        print("bias_voltages", bias_voltages.shape)
+        print(bias_voltages)
+        print("capacitance", temp_capacitance.shape)
+        print(temp_capacitance)
+        print(capacitance)
+        raise
+
+    # need to manually broadcase the derivatives array if bias voltage duplicates were present.
+    # only the duplicated values are still missing.
+    if np.any(duplicate_mask):
+        duplicate_values = unique_voltage[duplicate_mask]
+        for dup_voltage in duplicate_values:
+            indices = np.nonzero(bias_voltages == dup_voltage)
+            actual_index = np.extract(unique_voltage == dup_voltage, cap_mask)[0]
+            actual_doping = derivative[actual_index]
+            derivative[indices] = actual_doping
+
+
+    n_eff = 2 / (constants.elementary_charge * constants.epsilon_0 * EPS_SILICON * (diode_area ** 2) * np.asarray(
         derivative)) * 1e6
     return n_eff
 
@@ -1379,17 +1608,23 @@ def analyze_capacitance_distribution_delegate(analysis_group: Optional[tb.Group]
 
     :param analysis_group: hdf file's group where to find the capacitance to be analysed.
     :param output_pdf: PDF object to write the created figures to for long-term saving.
+    :key use_kafe2: TODO: missing description.
+    :key fit_plot_pdf: TODO: missing description.
     :key mask_pixel: iterable of pixel positions on the grid to ignore for evaluations.
+    :key mask_lower: float, threshold to mask all pixels below this value.
+    :key mask_upper: float, threshold to mask all pixels above this value.
     :key exclude_cap_hist: boolean, whether to exclude the test capacitator row from the histograms.
     :key hist_bins: integer, number of bins to use for the histogram.
-    :key capacitance: histogram of the capacitance
-    :key: set_parasitic: boolean, whether to set the parasitic capacitance
+    :key capacitance: histogram of the capacitance to use instead of those extracted from the provided hdf files group.
+    :key set_parasitic: boolean, whether to set the parasitic capacitance for this data set.
+    :key no_plot: boolean, whether to supress (interactive) plotting of the distribution of the capacitance.
     """
     from pixcap65.plotting import CAPACITANCE_CONVERSION_FACTOR
     from pixcap65.plotting import DEFAULT_BIN_NUMBER
     from pixcap65.plotting import COUNTS_HIST_LABEL
     from pixcap65.plotting import HIST_PIX_CAP_LABEL
     from matplotlib import pyplot as plt
+    from matplotlib import rcParams
 
     # extract further arguments for the performance of the fitting
     use_kafe2 = kwargs.pop("use_kafe2", False)
@@ -1400,16 +1635,20 @@ def analyze_capacitance_distribution_delegate(analysis_group: Optional[tb.Group]
 
     # we want to fit a binned distribution; but some bins might be empty
     cap_hist = kwargs.pop("capacitance", None)
+    kargs = kwargs.copy()
+    temp_exclusion_flag = kargs.pop("exclude_cap_hist", None)
+    if temp_exclusion_flag is not None:
+        kargs["test_cap_exclusion"] = temp_exclusion_flag
+
     if cap_hist is None or not isinstance(cap_hist, np.ndarray):
         assert analysis_group is not None
         cap_hist = check_leaf_unit(analysis_group.HistCap, HIST_CAP_UNIT)
-    from matplotlib import rcParams
     cv_height, cv_width = rcParams['figure.figsize']
     fig, ax = plt.subplots(figsize=(cv_width, cv_height))
-    hist_cap_hist = evaluate_pixel_mask(cap_hist, **kwargs)
+    hist_cap_hist = evaluate_pixel_mask(cap_hist, **kargs)
     temp_hist_back_data = hist_cap_hist[~np.isnan(hist_cap_hist)].reshape(-1) * CAPACITANCE_CONVERSION_FACTOR
     hist_data, bins, _ = ax.hist(temp_hist_back_data,
-                                 bins=kwargs.get("hist_bins", DEFAULT_BIN_NUMBER), density=False, )
+                                 bins=kwargs.get("hist_bins", DEFAULT_BIN_NUMBER), density=False,)
     bin_positions = bins[:-1] + np.diff(bins)
 
     # now fit this to a gauss function
@@ -1433,7 +1672,7 @@ def analyze_capacitance_distribution_delegate(analysis_group: Optional[tb.Group]
         from iminuit import Minuit
         # noinspection PyProtectedMember
         from iminuit.cost import Model, BinnedNLL, ExtendedBinnedNLL
-        from scipy.stats.distributions import norm
+        from pixcap65.analysis_util.stats import distribution_norm as norm
         assert isinstance(gauss_model, Model)
         assert isinstance(extended_gauss_integral, Model)
         initial_estimator_2 = initial_estimator.copy()
@@ -1459,6 +1698,7 @@ def analyze_capacitance_distribution_delegate(analysis_group: Optional[tb.Group]
             handle_fitter_advanced_options(extended_fitter, False, "$C$ in \\unit{{\\femto\\farad}}", COUNTS_HIST_LABEL,
                                            "Capacitance distribution (EXTENDED)", output_pdf,
                                            "Contours for the capacitance distribution (EXTENDED)")
+        # FIXME: issue when handling the minuit.
         handle_fitter_advanced_options(fitter, True, "$C$ in \\unit{{\\femto\\farad}}", COUNTS_HIST_LABEL,
                                        "Capacitance distribution", output_pdf,
                                        "Contours for the capacitance distribution")
@@ -1631,6 +1871,58 @@ def _correct_data(correction_group: tb.Group, file_h5: tb.File, group: tb.Group,
         else:
             copy_node(value, newparent=correction_group)
 
+def get_test_capacitance_data(group: tb.Group):
+    test_cap = group.HistCap[:][:, 0]
+    test_cap_error = group.HistCapErr[:][:, 0]
+    for k, (cap, err) in enumerate(zip(test_cap, test_cap_error)):
+        eff_cap = cap * 1e15
+        eff_err = err * 1e15
+        print(k, f"{eff_cap:.3f}+-{eff_err:.3f}")
+
+    test_cap[16] = np.nan
+    test_cap_error[16] = np.nan
+    return test_cap[np.isfinite(test_cap)], test_cap_error[np.isfinite(test_cap_error)]
+
+def generate_test_summary(files, groups, sensors, summary_file):
+    with synchronized_process_open_file(summary_file, mode='a') as summary_file:
+        field_names = [name.replace(" ", "_") for name in [
+            "0 w_o bump", "1 w_o bump", "2 w_o bump", "3 w_o bump", "4 w_o bump", "5",
+            "6", "7", "8", "9", "10", "11", "12", "13", "14", "15", "17",
+            "18", "19", "20", "21", "22", "23", "24", "25", "26", "27 w_ bump",
+            "28 w_ bump", "29 w_ bump", "30 w_ bump", "31 w_ bump", "32 w_ bump", "33 w_ bump",
+            "34 w_ bump", "35 w_o bump", "36 w_o bump", "37 w_o bump", "38 w_o bump", "39 w_o bump"
+        ]]
+        table_description = [("Sensor", np.uint64),]
+        for name in field_names:
+            table_description.extend([(name, np.float64),])
+            table_description.extend([("{}_error".format(name), np.float64),])
+
+        if "TestCap" in summary_file.root:
+            summary_file.root.TestCap.remove()
+            time.sleep(10)
+
+        print(table_description)
+        table_type = np.dtype(table_description)
+        print(table_type)
+        table = summary_file.create_table(where=summary_file.root, name="TestCap", title="Test Capacitances from the different sensors", description=np.dtype(table_description))
+        for file, group_path, sensor in zip(files, groups, sensors):
+            with synchronized_process_open_file(file, mode='r') as h5_file:
+                group, _ = walk_to_node(h5_file.root, group_path, create=False, verify_create=True)
+                test_cap, test_cap_err = get_test_capacitance_data(group)
+                assert isinstance(sensor, str)
+                # result_data = [sensor]
+                result_data = [int(sensor.encode().hex())]
+                for cap, cap_err in zip(test_cap, test_cap_err):
+                    result_data.append(cap)
+                    result_data.append(cap_err)
+
+                rec_array = np.rec.array(result_data, dtype=table_type)
+                table.append([result_data, ])
+
+        table.flush()
+
+
+
 
 if __name__ == '__main__':
     # analyse_data(raw_data='/home/silab/git/pixcap65/pixcap_full_data_image1.h5')
@@ -1640,7 +1932,17 @@ if __name__ == '__main__':
 
     # analyze_data(raw_data="3D_Sensor_221_W13_X_Scan.h5", base_path="Thesis/ATLAS_ITk/X3/C_V_Characteristic", is_cv=True)
     # analyze_data(raw_data="3D_Sensor_221_W6_j_Scan.h5", base_path="Thesis/ATLAS_ITk/X5/C_V_Characteristic", is_cv=True)
-    set_params(latex=True,
+    try:
+        from subprocess import run
+
+        run_result = run(['pdflatex', '--version'], check=True, capture_output=True)
+        has_latex = True
+        logger.info("The latex compiler to use is: %s", run_result.stdout.decode("utf-8"))
+    except (FileNotFoundError, ImportError):
+        # proceed as if no latex exists
+        logger.exception("Could not verify whether latex exists.")
+        has_latex = False
+    set_params(latex=False,
                latex_extra=r"\sisetup{separate-uncertainty}\sisetup{locale = DE}\sisetup{uncertainty-descriptors="
                            r"{stat,sys}}\sisetup{uncertainty-descriptor-mode=subscript}"
                            r"\sisetup{retain-zero-uncertainty}")
@@ -1650,8 +1952,6 @@ if __name__ == '__main__':
         "bare_file": "Bare_Repeat_2_Scan.h5",
         "bare_hdf_path": "Reference/bare/unbiased_8/total_cap",
     }
-
-
 
     # noqa: S125
     # analyze_capacitance_distribution(raw_data='Bare_Repeat_2_Scan.h5', base_path="Reference/bare/unbiased_8",
@@ -1670,69 +1970,123 @@ if __name__ == '__main__':
     #              **bare_correction_args)
 
     # Second Try Bare
-    analyze_data(raw_data="packaged/Reference_Bare_renewed.h5", base_path="Reference/Bare/unbiased_31_renew", is_advanced=True, full_model=False)
+    # analyze_data(raw_data="packaged/Reference_Bare_renewed.h5", base_path="Reference/Bare/unbiased_31_renew",
+    #              is_advanced=True, full_model=False)
+    # analyze_capacitance_distribution(raw_data="packaged/Reference_Bare_renewed.h5",
+    #                                  base_path="Reference/Bare/unbiased_31_renew",
+    #                                  corrected_distribution=False,
+    #                                  exclude_test_cap=True, use_kafe2=True,
+    #                                  fit_plot_pdf_name="Bare_analysis_parasitic_kafe2_new.pdf")
+    # analyze_capacitance_distribution(raw_data="packaged/Reference_Bare_renewed.h5",
+    #                                  base_path="Reference/Bare/unbiased_31_renew",
+    #                                  corrected_distribution=False,
+    #                                  exclude_test_cap=True, use_kafe2=False,
+    #                                  fit_plot_pdf_name="Bare_analysis_parasitic_new.pdf")
 
-    # Second Try R13
-    print("Analyze R13")
-    analyze_data(raw_data="packaged/R13_2_Scan.h5", base_path="ATLAS_ITk/X2/unbiased_1_full", is_advanced=True, **bare_correction_args)
-    analyze_data(raw_data="packaged/R13_2_Scan.h5", base_path="ATLAS_ITk/X2/biased_80_V_full", is_advanced=True,
+    bare_correction_args = {
+        "apply_correction": True,
+        "bare_file": "packaged/Reference_Bare_renewed.h5",
+        "bare_hdf_path": "Reference/Bare/unbiased_31_renew/total_cap",
+    }
+
+    # FIXME: the measured inter-pix data might be an issue as there are some conversions processed which would be overriden on data retrieval.
+    # we will need to check the converter file very intensively to correct all the failures.
+
+    print("Analyze R13 Second Try")
+    r13_depletion_args = {
+        "first_boundaries": (-85, -25),
+        "second_boundaries": (-3.4, 0),
+        "distribution": True,
+        "apply_contour": True,
+        "apply_contours": True,
+        "chip_group_name": "Reference/R13/sensor",
+        "apply_doping": True,
+    }
+    r13_depletion_args.update(**bare_correction_args)
+    analyze_data(raw_data="packaged/R13_Renew_Scan.h5", base_path="Reference/R13/unbiased_1_full", is_advanced=True,
                  **bare_correction_args)
-    with PdfPages("R13_3_Scan_Combined_reference_fits.pdf") as pdf:
-        analyze_data(raw_data="packaged/R13_3_Scan.h5", base_path="Reference/R13/C_V_Characteristic_refined", is_advanced=True, full_model=False, is_cv=True, first_boundaries=(-85,-33), second_boundaries=(-4,0), distribution=True, cv_fit_plot_pdf=pdf,
-                     **bare_correction_args)
+    analyze_data(raw_data="packaged/R13_Renew_Scan.h5", base_path="Reference/R13/biased_80_V_full", is_advanced=True,
+                 **bare_correction_args)
+    with PdfPages("Fit References/R13_3_Scan_Combined_reference_fits.pdf") as pdf:
+        analyze_data(raw_data="packaged/R13_Renew_Scan.h5", base_path="Reference/R13/C_V_Characteristic_refined",
+                     is_advanced=True, full_model=False, is_cv=True, cv_fit_plot_pdf=pdf,
+                     **r13_depletion_args)
 
-    # Second Try X1
+    analyze_data(raw_data="packaged/R13_Renew_Scan.h5", base_path="Reference/R13/inter_unbiased_full",
+                 is_advanced=True, full_model=False, is_inter_pixel=True)
+    analyze_data(raw_data="packaged/R13_Renew_Scan.h5", base_path="Reference/R13/inter_biased_M_80_V_full",
+                 is_advanced=True, full_model=False, is_inter_pixel=True)
+
     print("Analyze X1")
+    x1_depletion_args = {
+        "first_boundaries": [(-60, -20), (-83, -77.5)],
+        "second_boundaries": [(-0.6, 0), (-77.5, -67.5)],
+        "distribution": False,
+        "apply_contour": False,
+        "apply_contours": False,
+        "chip_group_name": "ATLAS_ITk/X1/sensor",
+        "apply_doping": False
+    }
     # analyze_data(raw_data=X1_SCAN_2_FILE, base_path="ATLAS_ITk/X1/unbiased_61_full", is_advanced=True,
     #              **bare_correction_args)
     # analyze_data(raw_data=X1_SCAN_2_FILE, base_path="ATLAS_ITk/X1/biased_80_V_full", is_advanced=True,
     #              **bare_correction_args)
-    with PdfPages("X1_Scan_Combined_reference_fits.pdf") as pdf:
-        analyze_data(raw_data=X1_SCAN_2_FILE, base_path="ATLAS_ITk/X1/C_V_Characteristic_refined",
+    # with PdfPages("Fit References/X1_Scan_Combined_reference_fits.pdf") as pdf:
+    #     analyze_data(raw_data=X1_SCAN_2_FILE, base_path="ATLAS_ITk/X1/C_V_Characteristic_refined",
+    #                  is_advanced=True, full_model=False, is_cv=True, use_corrected=True,
+    #                  cv_fit_plot_pdf=pdf, **x1_depletion_args,
+    #                  **bare_correction_args)
+    # analyze_data(raw_data=X1_SCAN_2_FILE, base_path="Thesis/ATLAS_ITk/X1/inter_unbiased_full",
+    #              is_advanced=True, full_model=False, is_inter_pixel=True)
+    # analyze_data(raw_data=X1_SCAN_2_FILE, base_path="Thesis/ATLAS_ITk/X1/inter_biased_M_80_V_full",
+    #              is_advanced=True, full_model=False, is_inter_pixel=True)
+    x1_depletion_args["first_boundaries"][1] = (-350, -150)
+    x1_depletion_args["second_boundaries"][1] = (-120, -100)
+    x1_depletion_args = {
+        "first_boundaries": [(-60, -20), (-350, -150)],
+        "second_boundaries": [(-2.6, 0), (-120, -100)],
+        "distribution": False,
+        "apply_contour": False,
+        "apply_contours": False,
+        "chip_group_name": "ATLAS_ITk/X1/sensor",
+        "apply_doping": False
+    }
+    with PdfPages("Fit References/X1_Scan_Combined_reference_fits_Extended.pdf") as pdf:
+        analyze_data(raw_data=X1_SCAN_2_FILE, base_path="Thesis/ATLAS_ITk/X1/C_V_Characteristic_Second_Extended",
+                     is_advanced=True, full_model=False, is_inter_pixel=False, is_cv=True, use_corrected=True,
+                     cv_fit_plot_pdf=pdf, **x1_depletion_args, **bare_correction_args)
+
+
+    #
+    #
+    # print("Output the test capacitances.1")
+    # with tb.open_file("packaged/E1_Renew_Scan.h5") as h5_file:
+    #     get_test_capacitance_data(h5_file.root.Reference.E1.unbiased_full.total_cap.analysis)
+    #
+    print("Analyze X2")
+    x2_depletion_args = {
+        "first_boundaries": [(-59.5, -15), (-100, -60)],
+        "second_boundaries": [(-0.5, 0), (-75, -50)],
+        "distribution": True,
+        "apply_contour": False,
+        "apply_contours": False,
+        "chip_group_name": "ATLAS_ITk/X2/sensor",
+        "apply_doping": True
+    }
+    analyze_data(raw_data=X2_SCAN_2_FILE, base_path="ATLAS_ITk/X2/unbiased_1_full", is_advanced=True,
+                 **bare_correction_args)
+    analyze_data(raw_data=X2_SCAN_2_FILE, base_path="ATLAS_ITk/X2/biased_80_V_full", is_advanced=True,
+                 **bare_correction_args)
+    with PdfPages("Fit References/X2_SCAN_Combined_reference_fits.pdf") as pdf:
+        analyze_data(raw_data=X2_SCAN_2_FILE, base_path="ATLAS_ITk/X2/C_V_Characteristic_refined",
                      is_advanced=True, full_model=False, is_cv=True, use_corrected=True,
-                     first_boundaries=[(-60, -40), (-82, -77)], second_boundaries=[(-0.8, 0), (-73, -65)], distribution=True, cv_fit_plot_pdf=pdf,
+                     cv_fit_plot_pdf=pdf, **x2_depletion_args,
                      **bare_correction_args)
 
-    # Second Try X2
-    print("Analyze X2")
-    # analyze_data(raw_data=X2_SCAN_2_FILE, base_path="ATLAS_ITk/X2/unbiased_1_full", is_advanced=True,
-    #              **bare_correction_args)
-    # analyze_data(raw_data=X2_SCAN_2_FILE, base_path="ATLAS_ITk/X2/biased_80_V_full", is_advanced=True,
-    #              **bare_correction_args)
-    # with PdfPages("X2_SCAN_Combined_reference_fits.pdf") as pdf:
-    #     analyze_data(raw_data=X2_SCAN_2_FILE, base_path="ATLAS_ITk/X2/C_V_Characteristic_refined",
-    #                  is_advanced=True, full_model=False, is_cv=True, use_corrected=True,
-    #                  first_boundaries=[(-55, -20), (-78, -73)], second_boundaries=[(-5, 0), (-68, -60)], distribution=True, cv_fit_plot_pdf=pdf,
-    #                  **bare_correction_args)
+    summary_files = ["packaged/R13_Renew_Scan.h5", X1_SCAN_2_FILE, X2_SCAN_2_FILE]
+    summary_groups = ["Reference/R13/unbiased_1_full/total_cap/analysis",
+                      "ATLAS_ITk/X1/unbiased_61_full/total_cap/analysis", "ATLAS_ITk/X2/unbiased_1_full/total_cap/analysis"]
+    summary_sensors = ["R13", "X1", "X2"]
 
-    # remaining analysis of the E1 sample
-    print("Analyze E1")
-    # analyze_data(raw_data="Reference_Evelyn_Scan.h5", base_path="Reference/E1/unbiased_4_full", is_advanced=True,
-    #              **bare_correction_args)
-    # e1_depletion_args = {
-    #     "first_boundaries": (-100, -80),
-    #     "second_boundaries": (-10, 0),
-    # }
-    # analyze_data(raw_data="Reference_Evelyn_Scan.h5", base_path="Reference/E1/C_V_Characteristic",
-    #              is_advanced=True, full_model=False, is_cv=True, use_corrected=True, distribution=True, cv_fit_plot_pdf_name="E1_C_V_Verify.pdf", **e1_depletion_args,
-    #              **bare_correction_args)
-
-    print("Analyze Tests")
-    # analyze_data(raw_data=REFERENCE_TEST_FILE, base_path="Reference/TESTS/cv_only_simple",
-    #              is_advanced=True, is_cv=True, use_corrected=True,
-    #              **bare_correction_args)
-    # analyze_data(raw_data=REFERENCE_TEST_FILE, base_path="Reference/TESTS/cv_only_advanced",
-    #              is_advanced=True, is_cv=True, use_corrected=True,
-    #              **bare_correction_args)
-    # analyze_data(raw_data=REFERENCE_TEST_FILE, base_path="Reference/TESTS/cv_combined_simple",
-    #              is_advanced=True, is_cv=True, use_corrected=True,
-    #              **bare_correction_args)
-    # analyze_data(raw_data=REFERENCE_TEST_FILE, base_path="Reference/TESTS/cv_combined_advanced",
-    #              is_advanced=True, is_cv=True, use_corrected=True,
-    #              **bare_correction_args)
-    #
-    # analyze_data(raw_data=REFERENCE_TEST_FILE, base_path="Reference/TESTS/unbiased_30",
-    #              is_advanced=True, full_model=False, is_cv=False, use_corrected=False)
-    # analyze_data(raw_data=REFERENCE_TEST_FILE, base_path="Reference/TESTS/unbiased_31",
-    #              is_advanced=True, full_model=False, is_cv=False, use_corrected=False)
-
+    print("generate summary")
+    generate_test_summary(summary_files, summary_groups, summary_sensors, "conclude_result.h5")

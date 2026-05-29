@@ -1,6 +1,7 @@
 """
 This file contains some utilities needed for the analysis and the plotting.
 """
+import logging
 import numpy as np
 import tables as tb
 from collections.abc import Sequence
@@ -9,6 +10,8 @@ from tables.group import RootGroup
 from typing import Union, Mapping, Any
 
 from pixcap65.utility.utils_2 import walk_to_node, UNITS_ATTRIBUTE_KEY, prevent_group_mix_up
+
+logger = logging.getLogger(__name__)
 
 # some utility constants to simplify expressions for the analysis
 # region Analysis constants
@@ -283,18 +286,25 @@ def handle_minuit_advanced_options(fit_object, apply_contour, x_label, y_label, 
                 plt.plot(fit_object.values[par2], fit_object.values[par1], "+", color="k")
                 try:
                     fit_object.draw_mncontour(par2, par1, cl=cls)
+                    # contour_set = fit_object.draw_mncontour(par2, par1, cl=cls)
+                    # from matplotlib.contour import ContourSet
+                    # assert isinstance(contour_set, ContourSet)
+                    # print("Levels")
+                    # print(type(contour_set.levels))
+                    #
+                    # print("Segments")
+                    # print(type(contour_set.allsegs))
+                    # second_set = ContourSet(ax[i, j], levels=contour_set.levels, allsegs=contour_set.allsegs, allkinds=contour_set.allkinds, filled=True)
+                    # ax[i, j].clabel(second_set)
+                    # ax[i, j].colorbar(second_set)
                 except:
                     print(par1)
                     print(par2)
+                    fit_object.draw_contour(par2, par1, cl=cls)
+                    logger.error("The minos based nll profiling/contour failed.", exc_info=True)
                     raise
                 ax[j, i].set_visible(False)
 
-        fig.suptitle(contours_title)
-        pdf.savefig(fig, bbox_inches='tight')
-        plt.close(fig)
-        fig, ax = fit_object.draw_mnmatrix(cl=cls)
-
-        # fit_object.draw_mncontour()
         fig.suptitle(contours_title)
         pdf.savefig(fig, bbox_inches='tight')
         plt.close(fig)
@@ -379,9 +389,10 @@ def get_analysis_group(base_group, **kwargs):
 
     :param base_group: hdf files group where to look for the analysis groups.
     :key use_corrected: boolean, whether to use the corrected capacitance's for plotting.
+    :key apply_correction: boolean, whether to use the corrected capacitance's for plotting/extraction.
     :return: analysis group from the hdf file.
     """
-    if kwargs.get('use_corrected', False):
+    if kwargs.get('use_corrected', False) or kwargs.get('apply_correction', False):
         return base_group.analysis_correction
 
     return base_group.analysis
@@ -468,6 +479,18 @@ class DepletionData(tb.IsDescription):
     c_error = tb.Float64Col(pos=7)
     d = tb.Float64Col(pos=8)
     d_error = tb.Float64Col(pos=9)
+    Ubi_corrected = tb.Float64Col(pos=10)
+    Ubi_corrected_error = tb.Float64Col(pos=11)
+    a_corrected = tb.Float64Col(pos=12)
+    a_corrected_error = tb.Float64Col(pos=13)
+    b_corrected = tb.Float64Col(pos=14)
+    b_corrected_error = tb.Float64Col(pos=15)
+    c_corrected = tb.Float64Col(pos=16)
+    c_corrected_error = tb.Float64Col(pos=17)
+    d_corrected = tb.Float64Col(pos=18)
+    d_corrected_error = tb.Float64Col(pos=19)
+    Ubi_systematic = tb.Float64Col(pos=20)
+    Ubi_systematic_corrected = tb.Float64Col(pos=21)
 
     def __new__(cls, classname: str, bases: Sequence, classdict: dict[str, Any]):
         print("Called new!")

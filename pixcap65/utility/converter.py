@@ -1,11 +1,13 @@
 import logging
 import numpy as np
 import tables as tb
+import time
 import yaml
 
 from pixcap65.analysis_util.utility import HIST_BIAS_MEAS_UNIT, HIST_CURRENT_MEAS_UNIT, GLOBAL_FILTERS
 from pixcap65.configs.config_handler import extract_smu_voltage_error
 from pixcap65.pixcap_65_test_total_cap import BiasTable, ScanConfigurationKeys
+from pixcap65.plotting import X1_SCAN_2_FILE
 from pixcap65.utility.tables_util import set_group_attribute, group_get_file, get_groups, list_group_attributes, \
     get_group_attribute
 from pixcap65.utility.utils_2 import UNITS_ATTRIBUTE_KEY, create_carray, prevent_group_mix_up
@@ -30,7 +32,7 @@ def regenerate_i_v_errors(group):
     if "HistCurrValues" not in group and "HistCurr" in group:
         from pixcap65.configs.config_handler import extract_smu_current_error
         import yaml
-        with open("/configs/keithley_2410_range.yaml") as f:
+        with open("pixcap65/configs/keithley_2410_range.yaml") as f:
             config = yaml.safe_load(f)
             data = group.HistCurr[:]
             errors = np.where(np.isfinite(data), extract_smu_current_error(config, data, 0.000001), np.nan)
@@ -119,7 +121,6 @@ def regenerate_measurement_errors(group):
             else:
                 group.HistCurrErr[:] = errors
 
-
 def regenerate_basi_table(group):
     assert "scan_params" in group
     out_file = group_get_file(group)
@@ -177,7 +178,15 @@ def regenerate_basi_table(group):
 # FIXME: Why are there no error estimations for I-V curves?
 
 if __name__ == "__main__":
-    with tb.open_file("packaged/X1_4_Renew_Scan.h5", "a") as h5_file:
+    # with tb.open_file("packaged/3D_Sensor_H23_S24_Scan.h5", "a") as h5_file:
+    #     generate_bias_table(h5_file.root.Thesis.ATLAS_ITk.X7.I_V_Characteristic.biasing.measurements)
+    #     generate_bias_table(h5_file.root.Thesis.ATLAS_ITk.X7.C_V_Characteristic.biasing.measurements)
+    #
+    # with tb.open_file("packaged/3D_Sensor_I14_S24_Scan.h5", "a") as h5_file:
+    #     generate_bias_table(h5_file.root.Thesis.ATLAS_ITk.X6.I_V_Characteristic.biasing.measurements)
+    #     generate_bias_table(h5_file.root.Thesis.ATLAS_ITk.X6.C_V_Characteristic.biasing.measurements)
+
+    with tb.open_file(X1_SCAN_2_FILE, "a") as h5_file:
         # adjust_cap_measurement(h5_file.root.ATLAS_Itk.X2.unbiased_1.total_cap.measurements, has_values=True)
         # adjust_cap_measurement(h5_file.root.ATLAS_Itk.X2.biased_80_V.total_cap.measurements, has_values=True)
         # adjust_i_v_measurement(h5_file.root.ATLAS_Itk.X2.I_V_Characteristic.biasing.measurements)
@@ -190,7 +199,7 @@ if __name__ == "__main__":
         # regenerate_measurement_errors(h5_file.root["ATLAS ITk"].run_1.total_cap.measurements)
         # regenerate_i_v_errors(h5_file.root["ATLAS ITk"].I_V_Characteristic.biasing.measurements)
         # regenerate_c_v_errors(h5_file.root["ATLAS ITk"].C_V_Characteristic.biasing.measurements)
-        # generate_pixel_dimensions(h5_file.root.ATLAS_Itk.X2)
+        generate_pixel_dimensions(h5_file.root.ATLAS_ITk.X1)
 
         # group = h5_file.root.ATLAS_Itk.X2.unbiased_1.measurements
         # group.HistCurr.attrs["Units"] = "A"
@@ -215,4 +224,40 @@ if __name__ == "__main__":
         #         subgroup.HistCurr.attrs["Units"] = "A"
         #         subgroup.HistCurrErr.attrs["Units"] = "A"
         #         # subgroup.HistCurrValues.attrs["Units"] = "A"
-        regenerate_basi_table(h5_file.root.ATLAS_ITk.X1.I_V_Characteristic.biasing.measurements)
+        # regenerate_basi_table(h5_file.root.ATLAS_ITk.X1.I_V_Characteristic.biasing.measurements)
+        generate_bias_table(h5_file.root.ATLAS_ITk.X1.I_V_Characteristic.biasing.measurements, transform_api=True)
+        regenerate_c_v_errors(h5_file.root.ATLAS_ITk.X1.C_V_Characteristic_refined.biasing.measurements)
+        regenerate_inter_pix_errors(h5_file.root.Thesis.ATLAS_ITk.X1.inter_unbiased_full.inter_cap.measurements)
+        regenerate_inter_pix_errors(h5_file.root.Thesis.ATLAS_ITk.X1.inter_biased_M_80_V_full.inter_cap.measurements)
+
+    with tb.open_file("packaged/X2_2_Scan.h5", "a") as h5_file:
+        # generate_bias_table(h5_file.root.ATLAS_ITk.X2.I_V_Characteristic.biasing.measurements)
+        generate_bias_table(h5_file.root.ATLAS_ITk.X2.C_V_Characteristic_refined.biasing.measurements)
+        regenerate_c_v_errors(h5_file.root.ATLAS_ITk.X2.C_V_Characteristic_refined.biasing.measurements)
+        generate_pixel_dimensions(h5_file.root.ATLAS_ITk.X2)
+        h5_file.root.ATLAS_ITk.X2.C_V_Characteristic_refined.biasing.measurements.BiasVoltageHist.attrs["Units"] = "V"
+
+    # with tb.open_file("packaged/R13_2_Scan.h5", "a") as h5_file:
+    #     h5_file.copy_children(h5_file.root.ATLAS_ITk.X2, h5_file.root.Reference.R13, recursive=True, overwrite=True)
+    #     h5_file.flush()
+    #     with tb.open_file("packaged/R13_Renew_Scan.h5", "a") as second_file:
+    #         h5_file.copy_children(h5_file.root, second_file.root, recursive=True, overwrite=True)
+    #
+    # with tb.open_file("packaged/R13_3_Scan.h5", "a") as h5_file:
+    #     with tb.open_file("packaged/R13_Renew_Scan.h5", "a") as second_file:
+    #         h5_file.copy_children(h5_file.root.Reference.R13, second_file.root.Reference.R13, recursive=True, overwrite=True)
+    #
+    # with tb.open_file("packaged/R13_Renew_Scan.h5", 'a') as h5_file:
+    #     generate_pixel_dimensions(h5_file.root.Reference.R13)
+    #     generate_bias_table(h5_file.root.Reference.R13.C_V_Characteristic_refined.biasing.measurements)
+    #     regenerate_c_v_errors(h5_file.root.Reference.R13.C_V_Characteristic_refined.biasing.measurements)
+    #     regenerate_inter_pix_errors(h5_file.root.Reference.R13.inter_unbiased_full.inter_cap.measurements)
+    #     regenerate_inter_pix_errors(h5_file.root.Reference.R13.inter_biased_M_80_V_full.inter_cap.measurements)
+
+
+
+
+
+    # When have I repaired all the implementations.
+    # All the first try measurement series needs to consolidated and their entries needs to be adjusted for the new formats
+
