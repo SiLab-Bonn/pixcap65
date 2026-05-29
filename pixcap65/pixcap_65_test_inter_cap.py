@@ -8,12 +8,12 @@ import tables as tb
 import time
 from tqdm import tqdm
 
+from pixcap65.analysis_util import GENERAL_PIXCAP_SHAPE
 from pixcap65.analysis_util.utility import HIST_CURRENT_MEAS_UNIT
 from pixcap65.pixcap_65_test_total_cap import PixCap65Measurement, MEASURING_PIXEL_TEXT, \
-    _store_scan_par_values
+    _store_scan_par_values, ScanConfigurationKeys
 from pixcap65.utility import pixcap65_constants as c
 from pixcap65.utility.tables_util import set_group_attribute
-from pixcap65.utility.tqdm_logging_utils import logging_redirect_tqdm
 from pixcap65.utility.tqdm_logging_utils import advanced_tqdm_iterator
 
 logging.getLogger().setLevel(logging.INFO)
@@ -53,8 +53,19 @@ class InterCap(tb.IsDescription):
 
 class Pixcap65InterCap(PixCap65Measurement):
     def pre_scan_handler(self, unit):
-        # here is nothing 'to do' as averaging measurements are not used here.
-        pass
+        if self.averaging:
+            self.n_measurements = self.scan_config[ScanConfigurationKeys.AVERAGE_MEASUREMENTS]
+            individual_currents_shape = (*GENERAL_PIXCAP_SHAPE, self.n_frequencies, self.n_measurements)
+            if self.total_hist_individual_currents.shape != individual_currents_shape:
+                self.total_hist_individual_currents = np.full(shape=individual_currents_shape, fill_value=np.nan)
+                self.inter_hist_individual_currents_2 = np.full(shape=individual_currents_shape, fill_value=np.nan)
+                self.inter_hist_individual_currents_1 = np.full(shape=individual_currents_shape, fill_value=np.nan)
+
+            self.mode_logging_text = "Average over multiple measurements!"
+            self.handle_measurement = self._handle_averaged_measurement
+        else:
+            self.mode_logging_text = 'Scan pixel by single measurements.'
+            self.handle_measurement = self._handle_single_measurement
 
     def __init__(self, scan_config, out_file, **kwargs):
         # FIXME: Issue with the naming convention for the output file!
@@ -80,8 +91,14 @@ class Pixcap65InterCap(PixCap65Measurement):
         self.total_hist_current_error = np.full(shape=(40, 40, self.n_frequencies),
                                                 fill_value=np.nan)
 
+        self.inter_hist_individual_currents_1 = np.full(shape=(40,40,self.n_frequencies, 1), fill_value=np.nan)
+        self.inter_hist_individual_currents_2 = np.full(shape=(40, 40, self.n_frequencies, 1), fill_value=np.nan)
+        self.total_hist_individual_currents = np.full(shape=(40, 40, self.n_frequencies, 1), fill_value=np.nan)
+
+
         # this kind of setup is somewhat misplaced.
         self.pixcap.seq_size = 4
+        self.handle_measurement = self._handle_single_measurement
 
     def configure(self):
         # already done by super-class
@@ -92,6 +109,10 @@ class Pixcap65InterCap(PixCap65Measurement):
         # self.pixcap.seq_init(clk_0='0100', clk_1='0100', clk_2='0001', clk_3='0001')
         # simplify switch the order of the clocks for once.
         self.pixcap.seq_init(clk_0='0100', clk_1='0001', clk_2='0001', clk_3='0100')
+
+        self.inter_hist_individual_currents_1 = np.full(shape=(40, 40, self.n_frequencies, self.n_measurements), fill_value=np.nan)
+        self.inter_hist_individual_currents_2 = np.full(shape=(40, 40, self.n_frequencies, self.n_measurements), fill_value=np.nan)
+        self.total_hist_individual_currents = np.full(shape=(40, 40, self.n_frequencies, self.n_measurements), fill_value=np.nan)
 
         self.pixcap.vm3_on()
         self.pixcap.vm2_on()
@@ -204,6 +225,21 @@ class Pixcap65InterCap(PixCap65Measurement):
                                                                                  self.inter_hist_current_2)
         self.total_hist_current_error = self.determine_measurement_uncertainty(self.pixcap.vm2_smu_key,
                                                                                self.total_hist_current)
+
+    def _handle_single_measurement(self, col, row, k):
+        self.inter_hist_current_1[col, row, k] = self.pixcap.vm3_measure_current()
+        self.total_hist_current[col, row, k] = self.pixcap.vm2_measure_current()
+        self.inter_hist_current_2[col, row, k] = self.pixcap.vm1_measure_current()
+
+    def _handle_averaged_measurement(self, col, row, k):
+        self.pixcap.vm3_initiate_multiple_current(self.n_measurements)
+        self.pixcap.vm2_initiate_multiple_current(self.n_measurements)
+        self.pixcap.vm1_initiate_multiple_current(self.n_measurements)
+
+        self.inter_hist_individual_currents_1[col, row, k, :] = self.pixcap.vm3_read_multiple_current(self.n_measurements)
+        self.inter_hist_individual_currents_2[col, row, k, :] = self.pixcap.vm1_read_multiple_current(self.n_measurements)
+        self.total_hist_individual_currents[col, row, k, :] = self.pixcap.vm2_read_multiple_current(self.n_measurements)
+
 
     def analyze(self):
         pass
