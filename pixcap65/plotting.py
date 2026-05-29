@@ -6,6 +6,8 @@ Plotting of Pixcap65 data.
 #  SiLab, Institute of Physics, University of Bonn
 # ----------------------------------------------------------
 
+# TODO: update the documentation of the implementations
+
 import os.path
 
 import logging
@@ -395,10 +397,19 @@ def _bias_voltage_plotter(ax, tabular: tb.Table, label, norm=1):
     # currently we could not use the correct voltage range, but we assume the errors to be within
     ax.errorbar(voltage_data, current_data * CURRENT_CONVERSION_FACTOR / norm, xerr=voltage_error,
                 yerr=current_errors / norm, fmt='o', label=label)
+    if not np.isclose(norm, 1.0):
+        ax.set_yscale('log')
 
 
 SENSOR_ITERABLE = Union[List[tb.Group], Tuple[tb.Group, ...], np.ndarray[tb.Group]]
 
+
+def __process_voltage_set(group: tb.Group):
+    temp_hist = check_leaf_unit(group.BiasVoltageHist, HIST_BIAS_MEAS_UNIT)
+    if len(temp_hist.shape) > 1:
+        return temp_hist[:, 0]
+    else:
+        return temp_hist
 
 def plot_cv_data_delegate(data_group: Union[tb.Group, SENSOR_ITERABLE],
                           analysis_group: Union[tb.Group, SENSOR_ITERABLE], output_pdf,
@@ -422,7 +433,7 @@ def plot_cv_data_delegate(data_group: Union[tb.Group, SENSOR_ITERABLE],
         should be investigated.
     """
     # extract the bias data
-    voltage_data_sets = np.asarray([check_leaf_unit(data_group.BiasVoltageHist, HIST_BIAS_MEAS_UNIT)] if isinstance(data_group, tb.Node) else [check_leaf_unit(data_set.BiasVoltageHist, HIST_BIAS_MEAS_UNIT) for data_set in data_group])
+    voltage_data_sets = [__process_voltage_set(data_group)] if isinstance(data_group, tb.Node) else [__process_voltage_set(data_set) for data_set in data_group]
     approx_depletion = isinstance(data_group, tb.Node)
 
     labels = kwargs.pop('labels', [])
@@ -433,7 +444,7 @@ def plot_cv_data_delegate(data_group: Union[tb.Group, SENSOR_ITERABLE],
         # will not only generate the title string of the figure but also the figure with the depletion fits.
         title_str = __plot_depletion_estimation(analysis_group, approx_depletion, ax, ii, jj, voltage_data_sets[0])
 
-        if not _cv_plotter(data_group, analysis_group, ii, jj, ax, voltage_data_sets, labels):
+        if not _cv_plotter(analysis_group, jj, ii, ax, voltage_data_sets, labels):
             plt.close(fig)
             continue
 
@@ -561,8 +572,6 @@ def _plot_cv_distribution(group: tb.Group, ax, x_limits=None, y_limits=None, **k
     return x_limits, y_limits, title_str
 
 
-
-
 def __plot_depletion_estimation(analysis_group: Union[tb.Group, SENSOR_ITERABLE],
                                 approx_depletion: bool, ax, ii, jj, voltage_data: np.ndarray) -> str:
     if not isinstance(analysis_group, tb.Group):
@@ -595,19 +604,23 @@ def __plot_depletion_estimation(analysis_group: Union[tb.Group, SENSOR_ITERABLE]
             title_str += "U = {} V\n".format(dep_voltage_2)
     return title_str
 
-def _cv_plotter(data, analysis, row, col, ax, voltage_data_sets, labels):
+def _cv_plotter(analysis, row, col, ax, voltage_data_sets, labels, **kwargs):
     title_format = "pixel ({col},{row})".format(col=col, row=row)
     # it should be quite simply to combine this two implementation branches into just a single one!
     # first get data iterators from the group iterators!
     if len(labels) == 0:
         labels = ["Bias Data"]
 
-    if isinstance(data, tb.Group):
-        data = [data]
+    if isinstance(analysis, tb.Group):
         analysis = [analysis]
 
-    cap_data_sets = [check_leaf_unit(item.UCHist, HIST_CAP_UNIT)[col, row, :] for item in analysis]
-    cap_data_errors_sets = [check_leaf_unit(item.UCErrHist, HIST_CAP_UNIT)[col, row, :] for item in analysis]
+    is_distribution_plot = kwargs.pop("is_distribution_plot", False)
+    if is_distribution_plot and False:
+        pass
+    else:
+        cap_data_sets = [check_leaf_unit(item.UCHist, HIST_CAP_UNIT)[col, row, :] for item in analysis]
+        cap_data_errors_sets = [check_leaf_unit(item.UCErrHist, HIST_CAP_UNIT)[col, row, :] for item in analysis]
+
 
     eff_cap_data = None
     y_limits = None
@@ -620,20 +633,8 @@ def _cv_plotter(data, analysis, row, col, ax, voltage_data_sets, labels):
             continue
 
         # begin of the common part
-        effective_capacitance_error_data = np.reciprocal(cap_data * CAPACITANCE_CONVERSION_FACTOR) ** 3 * cap_data_errors if np.all(np.isfinite(cap_data_errors)) else None
-        eff_cap_errors = cap_data_errors if np.all(np.isfinite(cap_data_errors)) else None
-        ax[0].set(title="Bias data from the \nmeasurement for {}".format(title_format), xlabel=BIAS_CURVE_X_LABEL,
-                  ylabel=CAPACITANCE_LABEL)
-        ax[0].errorbar(voltage_data, cap_data * CAPACITANCE_CONVERSION_FACTOR, yerr=eff_cap_errors,
-                       fmt='o', label=label)
-        ax[1].set(title="Suited Bias data from the \nmeasurement for {}".format(title_format),
-                  xlabel=BIAS_CURVE_X_LABEL, ylabel="$1/ C^2$ in $1/(fF)^2$")
-        ax[1].errorbar(voltage_data, 1 / (cap_data * CAPACITANCE_CONVERSION_FACTOR) ** 2,
-                       yerr=effective_capacitance_error_data, fmt='o', label=label, alpha=0.5)
-
-        # end of the common part
-        x_limits = get_x_limits(voltage_data, x_limits)
-        y_limits = __get_y_limits(cap_data, y_limits)
+        x_limits, y_limits = __cv_plot_instance(ax, voltage_data, cap_data, cap_data_errors, label, title_format,
+                                                x_limits, y_limits)
 
     if eff_cap_data is None or isinstance(x_limits, NoneType) or isinstance(y_limits, NoneType):
         return False
@@ -642,79 +643,23 @@ def _cv_plotter(data, analysis, row, col, ax, voltage_data_sets, labels):
     ax[1].set_ylim(*y_limits)
     return True
 
-    # TODO: make this here usable from distribution code.
-    if isinstance(data, tb.Group):
-        cap_data_set = check_leaf_unit(analysis.UCHist, HIST_CAP_UNIT)
-        cap_errors = check_leaf_unit(analysis.UCErrHist, HIST_CAP_UNIT)
-        cap_data = cap_data_set[row, col, :]
-        cap_data_errors = cap_errors[col, row, :]
-        voltage_data = voltage_data_sets[0]
-        label = "Bias Data"
-
-        # Could this be made common?
-        if np.any(np.isnan(cap_data)):
-            return False
-
-        # Begin the duplicate section except that the arrays are only sliced here and not upfront
-        # Begin of the common part
-        effective_capacitance_error_data = np.reciprocal(cap_data * CAPACITANCE_CONVERSION_FACTOR) ** 3 * cap_data_errors if np.all(np.isfinite(cap_data_errors)) else None
-        eff_cap_errors = cap_data_errors if np.all(np.isfinite(cap_data_errors)) else None
-        ax[0].set(title="Bias data from the \nmeasurement for {}".format(title_format), xlabel=BIAS_CURVE_X_LABEL, ylabel=CAPACITANCE_LABEL)
-        ax[0].errorbar(voltage_data, cap_data * CAPACITANCE_CONVERSION_FACTOR, yerr=eff_cap_errors, fmt='o', label=label)
-        ax[1].set(title="Suited Bias data from the \nmeasurement for {}".format(title_format), xlabel=BIAS_CURVE_X_LABEL, ylabel="$1/ C^2$ in $1/(fF)^2$")
-        ax[1].errorbar(voltage_data, 1 / (cap_data * CAPACITANCE_CONVERSION_FACTOR) ** 2, yerr=effective_capacitance_error_data, fmt='o', label=label, alpha=0.5)
-
-        # end of the common part
-        ax[1].set_xlim(np.min(voltage_data) - 10, 5 + np.max(voltage_data))
-        ax[1].set_ylim(np.min(1 / (cap_data * CAPACITANCE_CONVERSION_FACTOR) ** 2),
-                       np.max(1 / (cap_data * CAPACITANCE_CONVERSION_FACTOR) ** 2))
-        return True
-    cap_data_set = None
-    y_limits = None
-    x_limits = None
-
-    # d_group is iterated but never used in the loop
-    # agroup is iterated and used only under the first try
-    # voltage_data is iterated and used for limits
-    # label is used for the plot labels.
 
 
-    for d_group, a_group, voltage_data, label in zip(data, analysis, voltage_data_sets, labels):
-        try:
-            cap_data_set = check_leaf_unit(a_group.UCHist, HIST_CAP_UNIT)
-            cap_errors = check_leaf_unit(a_group.UCErrHist, HIST_CAP_UNIT)
-            cap_data = cap_data_set[row, col, :]
-            cap_data_errors = cap_errors[col, row, :]
-        except AssertionError:
-            print("react to assertion for", row, col)
-            continue
-
-        # could this be made common?
-        if np.any(np.isnan(cap_data)):
-            cap_data_set = None
-            continue
-
-        # begin of the common part
-        effective_capacitance_error_data = np.reciprocal(cap_data * CAPACITANCE_CONVERSION_FACTOR) ** 3 * cap_data_errors if np.all(np.isfinite(cap_data_errors)) else None
-        eff_cap_errors = cap_data_errors if np.all(np.isfinite(cap_data_errors)) else None
-        ax[0].set(title="Bias data from the \nmeasurement for {}".format(title_format), xlabel=BIAS_CURVE_X_LABEL, ylabel=CAPACITANCE_LABEL)
-        ax[0].errorbar(voltage_data, cap_data * CAPACITANCE_CONVERSION_FACTOR, yerr=eff_cap_errors,
-                       fmt='o', label=label)
-        ax[1].set(title="Suited Bias data from the \nmeasurement for {}".format(title_format), xlabel=BIAS_CURVE_X_LABEL, ylabel="$1/ C^2$ in $1/(fF)^2$")
-        ax[1].errorbar(voltage_data, 1 / (cap_data * CAPACITANCE_CONVERSION_FACTOR) ** 2,
-                       yerr=effective_capacitance_error_data, fmt='o', label=label, alpha=0.5)
-
-
-        # end of the common part
-        x_limits = get_x_limits(voltage_data, x_limits)
-        y_limits = __get_y_limits(cap_data_set, y_limits, col, row)
-
-    if cap_data_set is None or isinstance(x_limits, NoneType) or isinstance(y_limits, NoneType):
-        return False
-
-    ax[1].set_xlim(*x_limits)
-    ax[1].set_ylim(*y_limits)
-    return True
+def __cv_plot_instance(ax, voltage_data: np.ndarray, cap_data: np.ndarray, cap_data_errors: np.ndarray, label: str,
+                       title_format, x_limits, y_limits) -> tuple[Iterable, Iterable]:
+    effective_capacitance_error_data = np.reciprocal(cap_data * CAPACITANCE_CONVERSION_FACTOR) ** 3 * cap_data_errors * CAPACITANCE_CONVERSION_FACTOR if np.all(np.isfinite(cap_data_errors)) else None
+    eff_cap_errors = cap_data_errors * CAPACITANCE_CONVERSION_FACTOR if np.all(np.isfinite(cap_data_errors)) else None
+    ax[0].set(title="Bias data from the \nmeasurement for {}".format(title_format), xlabel=BIAS_CURVE_X_LABEL,
+              ylabel=CAPACITANCE_LABEL)
+    ax[0].errorbar(voltage_data, cap_data * CAPACITANCE_CONVERSION_FACTOR, yerr=eff_cap_errors,
+                   fmt='o', label=label)
+    ax[1].set(title="Suited Bias data from the \nmeasurement for {}".format(title_format),
+              xlabel=BIAS_CURVE_X_LABEL, ylabel="$1/ C^2$ in $1/(fF)^2$")
+    ax[1].errorbar(voltage_data, 1 / (cap_data * CAPACITANCE_CONVERSION_FACTOR) ** 2,
+                   yerr=effective_capacitance_error_data, fmt='o', label=label, alpha=0.5)
+    x_limits = get_x_limits(voltage_data, x_limits)
+    y_limits = __get_y_limits(cap_data, y_limits)
+    return x_limits, y_limits
 
 
 def __get_y_limits(cap_data: np.ndarray, y_limits: Optional[Iterable], col=None, row=None) -> Iterable:
@@ -1340,26 +1285,26 @@ if __name__ == '__main__':
 
     print("Plot X1 Second Try.")
     x1_second_pixel_mask = [[39, 39], [38, 39]]
-    plot_data(interpreted_data=X1_SCAN_2_FILE, base_path="ATLAS_ITk/X1/unbiased_61_full", use_group=True,
-              exclude_test_cap=True, mask_pixel=x1_second_pixel_mask, distribution=True)
-    plot_data(interpreted_data=X1_SCAN_2_FILE, base_path="ATLAS_ITk/X1/unbiased_61_full", use_group=True,
-              exclude_test_cap=True, use_corrected=True, mask_pixel=x1_second_pixel_mask, distribution=True)
-    plot_data(interpreted_data=X1_SCAN_2_FILE, base_path="ATLAS_ITk/X1/biased_80_V_full", use_group=True,
-              exclude_test_cap=True, mask_pixel=x1_second_pixel_mask, distribution=True)
-    plot_data(interpreted_data=X1_SCAN_2_FILE, base_path="ATLAS_ITk/X1/biased_80_V_full", use_group=True,
-              exclude_test_cap=True, use_corrected=True, mask_pixel=x1_second_pixel_mask, distribution=True)
-    plot_bias_data(interpreted_data=X1_SCAN_2_FILE, base_path="ATLAS_ITk/X1/I_V_Characteristic", use_group=True, )
+    # plot_data(interpreted_data=X1_SCAN_2_FILE, base_path="ATLAS_ITk/X1/unbiased_61_full", use_group=True,
+    #           exclude_test_cap=True, mask_pixel=x1_second_pixel_mask, distribution=True)
+    # plot_data(interpreted_data=X1_SCAN_2_FILE, base_path="ATLAS_ITk/X1/unbiased_61_full", use_group=True,
+    #           exclude_test_cap=True, use_corrected=True, mask_pixel=x1_second_pixel_mask, distribution=True)
+    # plot_data(interpreted_data=X1_SCAN_2_FILE, base_path="ATLAS_ITk/X1/biased_80_V_full", use_group=True,
+    #           exclude_test_cap=True, mask_pixel=x1_second_pixel_mask, distribution=True)
+    # plot_data(interpreted_data=X1_SCAN_2_FILE, base_path="ATLAS_ITk/X1/biased_80_V_full", use_group=True,
+    #           exclude_test_cap=True, use_corrected=True, mask_pixel=x1_second_pixel_mask, distribution=True)
+    # plot_bias_data(interpreted_data=X1_SCAN_2_FILE, base_path="ATLAS_ITk/X1/I_V_Characteristic", use_group=True, )
     plot_combined_data(interpreted_data=X1_SCAN_2_FILE, base_path="ATLAS_ITk/X1/C_V_Characteristic_refined",
                        use_group=True, mask_pixel=x1_second_pixel_mask, distribution=True)
     plot_combined_data(interpreted_data=X1_SCAN_2_FILE, base_path="ATLAS_ITk/X1/C_V_Characteristic_refined",
                        use_group=True, use_corrected=True,
                        apply_doping=False, distribution=True, mask_pixel=x1_second_pixel_mask)
-    plot_inter_pix_data(interpreted_data=X1_SCAN_2_FILE, base_path="Thesis/ATLAS_ITk/X1/inter_unbiased_full",
-                        use_group=True, exclude_test_cap=True, distribution=True,
-                        total_data=X1_SCAN_2_FILE, total_path="ATLAS_ITk/X1/unbiased_61_full")
-    plot_inter_pix_data(interpreted_data=X1_SCAN_2_FILE, base_path="Thesis/ATLAS_ITk/X1/inter_biased_M_80_V_full",
-                        use_group=True, exclude_test_cap=True, distribution=True,
-                        total_data=X1_SCAN_2_FILE, total_path="ATLAS_ITk/X1/unbiased_61_full")
+    # plot_inter_pix_data(interpreted_data=X1_SCAN_2_FILE, base_path="Thesis/ATLAS_ITk/X1/inter_unbiased_full",
+    #                     use_group=True, exclude_test_cap=True, distribution=True,
+    #                     total_data=X1_SCAN_2_FILE, total_path="ATLAS_ITk/X1/unbiased_61_full")
+    # plot_inter_pix_data(interpreted_data=X1_SCAN_2_FILE, base_path="Thesis/ATLAS_ITk/X1/inter_biased_M_80_V_full",
+    #                     use_group=True, exclude_test_cap=True, distribution=True,
+    #                     total_data=X1_SCAN_2_FILE, total_path="ATLAS_ITk/X1/unbiased_61_full")
 
     plot_combined_data(interpreted_data=X1_SCAN_2_FILE, base_path="Thesis/ATLAS_ITk/X1/C_V_Characteristic_Second_Extended",
                        use_group=True, mask_pixel=x1_second_pixel_mask, distribution=True)
@@ -1369,42 +1314,42 @@ if __name__ == '__main__':
 
     # REMARK: This is not written back by now to the full analysis script.
     # E1 first run
-    print("Plot E1")
-    e1_pixel_mask = [[39, 1]]
-    plot_data(interpreted_data=E1_SCAN_FILE, base_path="Reference/E1/unbiased_4_full", use_group=True,
-              exclude_test_cap=True, mask_pixel=e1_pixel_mask, )
-    plot_data(interpreted_data=E1_SCAN_FILE, base_path="Reference/E1/unbiased_4_full", use_group=True,
-              use_corrected=True, distribution=True, exclude_test_cap=True, mask_pixel=e1_pixel_mask, )
-    plot_bias_data(interpreted_data=E1_SCAN_FILE, base_path="Reference/E1/I_V_Characteristic",
-                   use_group=True)
-    plot_combined_data(interpreted_data=E1_SCAN_FILE, base_path="Reference/E1/C_V_Characteristic",
-                       use_group=True, distribution=True)
-    plot_combined_data(interpreted_data=E1_SCAN_FILE, base_path="Reference/E1/C_V_Characteristic",
-                       use_group=True,
-                       use_corrected=True,
-                       apply_doping=False, distribution=False)
-    plot_data(interpreted_data="packaged/E1_Renew_Scan.h5", use_group=True, base_path="Reference/E1/unbiased_full",
-              exclude_test_cap=True,
-              mask_pixel=e1_pixel_mask,)
-    plot_data(interpreted_data="packaged/E1_Renew_Scan.h5", use_group=True, base_path="Reference/E1/unbiased_full",
-              exclude_test_cap=True,
-              mask_pixel=e1_pixel_mask, use_corrected=True)
-    plot_data(interpreted_data="packaged/E1_Renew_Scan.h5", use_group=True, base_path="Reference/E1/biased_80_V_full",
-              mask_pixel=e1_pixel_mask, exclude_test_cap=True)
-    plot_data(interpreted_data="packaged/E1_Renew_Scan.h5", use_group=True, base_path="Reference/E1/biased_80_V_full",
-              mask_pixel=e1_pixel_mask, use_corrected=True, exclude_test_cap=True)
-    plot_combined_data(interpreted_data="packaged/E1_Renew_Scan.h5",
-                       base_path="Reference/E1/C_V_Characteristic_refined",
-                       use_group=True, distribution=True, mask_pixel=e1_pixel_mask,)
-    plot_combined_data(interpreted_data="packaged/E1_Renew_Scan.h5",
-                       base_path="Reference/E1/C_V_Characteristic_refined",
-                       use_group=True, distribution=True, mask_pixel=e1_pixel_mask, use_corrected=True)
-    plot_bias_data(interpreted_data="packaged/E1_Renew_Scan.h5", base_path="Reference/E1/I_V_Characteristic",
-                   use_group=True)
-    plot_inter_pix_data(interpreted_data="packaged/E1_Renew_Scan.h5", base_path="Reference/E1/inter_unbiased_full",
-                        use_group=True, total_data="packaged/E1_Renew_Scan.h5", total_path="Reference/E1/unbiased_full")
-    plot_inter_pix_data(interpreted_data="packaged/E1_Renew_Scan.h5", base_path="Reference/E1/inter_biased_M_80_V_full",
-                        use_group=True, total_data="packaged/E1_Renew_Scan.h5", total_path="Reference/E1/biased_80_V_full")
+    # print("Plot E1")
+    # e1_pixel_mask = [[39, 1]]
+    # plot_data(interpreted_data=E1_SCAN_FILE, base_path="Reference/E1/unbiased_4_full", use_group=True,
+    #           exclude_test_cap=True, mask_pixel=e1_pixel_mask, )
+    # plot_data(interpreted_data=E1_SCAN_FILE, base_path="Reference/E1/unbiased_4_full", use_group=True,
+    #           use_corrected=True, distribution=True, exclude_test_cap=True, mask_pixel=e1_pixel_mask, )
+    # plot_bias_data(interpreted_data=E1_SCAN_FILE, base_path="Reference/E1/I_V_Characteristic",
+    #                use_group=True)
+    # plot_combined_data(interpreted_data=E1_SCAN_FILE, base_path="Reference/E1/C_V_Characteristic",
+    #                    use_group=True, distribution=True)
+    # plot_combined_data(interpreted_data=E1_SCAN_FILE, base_path="Reference/E1/C_V_Characteristic",
+    #                    use_group=True,
+    #                    use_corrected=True,
+    #                    apply_doping=False, distribution=False)
+    # plot_data(interpreted_data="packaged/E1_Renew_Scan.h5", use_group=True, base_path="Reference/E1/unbiased_full",
+    #           exclude_test_cap=True,
+    #           mask_pixel=e1_pixel_mask,)
+    # plot_data(interpreted_data="packaged/E1_Renew_Scan.h5", use_group=True, base_path="Reference/E1/unbiased_full",
+    #           exclude_test_cap=True,
+    #           mask_pixel=e1_pixel_mask, use_corrected=True)
+    # plot_data(interpreted_data="packaged/E1_Renew_Scan.h5", use_group=True, base_path="Reference/E1/biased_80_V_full",
+    #           mask_pixel=e1_pixel_mask, exclude_test_cap=True)
+    # plot_data(interpreted_data="packaged/E1_Renew_Scan.h5", use_group=True, base_path="Reference/E1/biased_80_V_full",
+    #           mask_pixel=e1_pixel_mask, use_corrected=True, exclude_test_cap=True)
+    # plot_combined_data(interpreted_data="packaged/E1_Renew_Scan.h5",
+    #                    base_path="Reference/E1/C_V_Characteristic_refined",
+    #                    use_group=True, distribution=True, mask_pixel=e1_pixel_mask,)
+    # plot_combined_data(interpreted_data="packaged/E1_Renew_Scan.h5",
+    #                    base_path="Reference/E1/C_V_Characteristic_refined",
+    #                    use_group=True, distribution=True, mask_pixel=e1_pixel_mask, use_corrected=True)
+    # plot_bias_data(interpreted_data="packaged/E1_Renew_Scan.h5", base_path="Reference/E1/I_V_Characteristic",
+    #                use_group=True)
+    # plot_inter_pix_data(interpreted_data="packaged/E1_Renew_Scan.h5", base_path="Reference/E1/inter_unbiased_full",
+    #                     use_group=True, total_data="packaged/E1_Renew_Scan.h5", total_path="Reference/E1/unbiased_full")
+    # plot_inter_pix_data(interpreted_data="packaged/E1_Renew_Scan.h5", base_path="Reference/E1/inter_biased_M_80_V_full",
+    #                     use_group=True, total_data="packaged/E1_Renew_Scan.h5", total_path="Reference/E1/biased_80_V_full")
 
 
 
@@ -1421,23 +1366,89 @@ if __name__ == '__main__':
     # plot_combined_data(interpreted_data='Data/r13-measurement/R13_BIAS_CV_COMBI_6.h5', first_lower=-100,first_upper=-40, second_lower=-10, second_upper=0)
 
     # collect all our IV groups
-    iv_file_names = ['pixcap65/Data/r13-measurement/R13_BIAS_2.h5', 'pixcap65/Data/New_1_Initial_6_Scan.h5',
-                     X2_SCAN_FILE, X1_SCAN_2_FILE]
-    iv_group_names = [None, "ATLAS ITk/I_V_Characteristic", "ATLAS_Itk/X2/I_V_Characteristic", "ATLAS_ITk/X1/I_V_Characteristic",]
-    iv_labels = ['R13', "(HPK) X1", "(HPK) X2", "X1 (second)"]
+    iv_file_names = [
+        'pixcap65/Data/r13-measurement/R13_BIAS_2.h5',
+        'pixcap65/Data/New_1_Initial_6_Scan.h5',
+        X2_SCAN_FILE,
+        X1_SCAN_2_FILE,
+        "packaged/E1_Renew_Scan.h5",
+        X2_SCAN_2_FILE,
+        X2_SCAN_2_FILE,
+        X1_SCAN_2_FILE,
+        "packaged/R13_Renew_Scan.h5",
+        X2_SCAN_FILE,
+        X2_SCAN_FILE,
+        'pixcap65/Data/New_1_Initial_6_Scan.h5',
+    ]
+    iv_group_names = [
+        None,
+        "ATLAS ITk/I_V_Characteristic",
+        "ATLAS_Itk/X2/I_V_Characteristic",
+        "ATLAS_ITk/X1/I_V_Characteristic",
+        "Reference/E1/C_V_Characteristic_refined",
+        "Thesis/ATLAS_ITk/X2/I_V_Characteristic_2",
+        "ATLAS_ITk/X2/C_V_Characteristic_refined",
+        "ATLAS_ITk/X1/C_V_Characteristic_refined",
+        "Reference/R13/C_V_Characteristic_refined",
+        "ATLAS_Itk/X2/C_V_Characteristic",
+        "ATLAS_Itk/X2/C_V_Characteristic_refined",
+        "ATLAS ITk/C_V_Characteristic",
+    ]
+    iv_labels = [
+        'R13',
+        "(HPK) X1",
+        "(HPK) X2",
+        "X1 (second)",
+        "E1 (second, CV)",
+        "X2 (third?)",
+        "X2 (second, CV)",
+        "X1 (second, CV)",
+        "R13 (second, CV)",
+        "X2 (CV)",
+        "X2 (CV, refined)",
+        "X1 (CV)",
+    ]
     normalisation = [64*64, 384*400, 384*400, 384*400] * 30 * 30
     plot_bias_data(iv_file_names, iv_group_names, pdf_name="I-V Combination.pdf",
                    labels=["Bias Data for {}".format(item) for item in iv_labels])
     plot_bias_data(iv_file_names, iv_group_names, pdf_name="I-V Combination-2.pdf",
                    labels=["Bias Data for {}".format(item) for item in iv_labels], area_normalisation=normalisation)
     print("CV Combination")
-    cv_file_names = [X2_SCAN_FILE, X2_SCAN_FILE, X2_SCAN_2_FILE, X1_SCAN_2_FILE, "packaged/R13_Renew_Scan.h5", X1_SCAN_2_FILE]
-    cv_groups = ["ATLAS_Itk/X2/C_V_Characteristic", "ATLAS_Itk/X2/C_V_Characteristic_refined",
-                 "ATLAS_ITk/X2/C_V_Characteristic_refined",
-                 "ATLAS_ITk/X1/C_V_Characteristic_refined", "Reference/R13/C_V_Characteristic_refined",
-                 "Thesis/ATLAS_ITk/X1/C_V_Characteristic_Second_Extended", ]
+    cv_file_names = [
+        X2_SCAN_FILE,
+        X2_SCAN_FILE,
+        X2_SCAN_2_FILE,
+        X1_SCAN_2_FILE,
+        "packaged/R13_Renew_Scan.h5",
+        X1_SCAN_2_FILE,
+        "packaged/E1_Renew_Scan.h5",
+        E1_SCAN_FILE,
+        'pixcap65/Data/New_1_Initial_6_Scan.h5',
+    ]
+    cv_groups = [
+        "ATLAS_Itk/X2/C_V_Characteristic",
+        "ATLAS_Itk/X2/C_V_Characteristic_refined",
+        "ATLAS_ITk/X2/C_V_Characteristic_refined",
+        "ATLAS_ITk/X1/C_V_Characteristic_refined",
+        "Reference/R13/C_V_Characteristic_refined",
+        "Thesis/ATLAS_ITk/X1/C_V_Characteristic_Second_Extended",
+        "Reference/E1/C_V_Characteristic_refined",
+        "Reference/E1/C_V_Characteristic",
+        "ATLAS ITk/C_V_Characteristic",
+    ]
+    cv_labels = [
+        'X2_1_1',
+        "X2_1_2",
+        "X2_2",
+        "X1 (second)",
+        "R13 (second)",
+        "X1 (second, extended)",
+        "E1 (second)",
+        "E1",
+        "X1",
+    ]
     plot_cv_data(cv_file_names, cv_groups,
-                 pdf_name="C-V Combination.pdf", labels=[CV_DATA_FOR_.format(item) for item in ['X2_1_1', "X2_1_2", "X2_2", "X1", "R13 (second)", "X1 (extended)"]],
+                 pdf_name="C-V Combination.pdf", labels=[CV_DATA_FOR_.format(item) for item in cv_labels],
                  use_corrected=True)
     # print("CV Combination R13 only")
     # plot_cv_data([REFERENCE_TEST_FILE, REFERENCE_TEST_FILE],

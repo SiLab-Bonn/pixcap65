@@ -387,6 +387,7 @@ if __name__ == '__main__':
 
     print("Plot R13 Second Try.")
     # these group paths will need to be updated in the end.
+    # missing an I-V measurement here?
     plot_data(interpreted_data="packaged/R13_Renew_Scan.h5", base_path="Reference/R13/unbiased_1_full", use_group=True,
               exclude_test_cap=True, distribution=True)
     plot_data(interpreted_data="packaged/R13_Renew_Scan.h5", base_path="Reference/R13/unbiased_1_full", use_group=True,
