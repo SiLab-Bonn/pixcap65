@@ -1298,6 +1298,7 @@ class PixCap65Measurement(Pixcap65BaseMeasurement, metaclass=ABCMeta):
             post_hook = default_callback
 
         continue_error = None
+        voltage_reference_data = np.full((40, 40), fill_value=np.nan, dtype=np.float64)
         try:
             row_range = self.col_range if reversed_order else self.row_range
             col_range = self.row_range if reversed_order else self.col_range
@@ -1316,6 +1317,11 @@ class PixCap65Measurement(Pixcap65BaseMeasurement, metaclass=ABCMeta):
                         else:
                             yield i_col, i_row
 
+                        # last measure the voltage at the providing SMU
+                        voltage_reference_data[i_col, i_row] = self.pixcap.vm3_measure_volts()
+
+
+
         except KeyboardInterrupt as e:
             logger.info("Caught KeyboardInterrupt. Will terminate the program softly.")
             continue_error = e
@@ -1324,6 +1330,7 @@ class PixCap65Measurement(Pixcap65BaseMeasurement, metaclass=ABCMeta):
             continue_saving_operation = True
 
         if continue_saving_operation:
+            self.create_carray(data_group, "SMUVoltageHist", unit="V", obj=voltage_reference_data)
             self.post_scan_handler(data_group, sequence_call, group=data_group)
 
         post_hook(data_group)
