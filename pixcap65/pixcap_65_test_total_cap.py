@@ -1426,6 +1426,14 @@ class PixCap65Measurement(Pixcap65BaseMeasurement, metaclass=ABCMeta):
             base_group, _ = walk_to_node(self.base_group, data_group_spec, create=False, verify_create=True)
             plot_bias_delegate(base_group.biasing.measurements, output_pdf)
 
+    @abstractmethod
+    def _handle_single_measurement(self, col, row, k):
+        pass
+
+    @abstractmethod
+    def _handle_averaged_measurement(self, col, row, k):
+        pass
+
 
 class PixCap65TotalCap(PixCap65Measurement):
     # instantiation
@@ -1761,8 +1769,8 @@ class PixCap65TotalCap(PixCap65Measurement):
             hist_parameters = data_group.BiasVoltageHist[:]
             if np.any(np.isfinite(hist_parameters)):
                 if len(hist_parameters) > 1:
-                    voltages = hist_parameters[1]
-                    voltage_errors = hist_parameters[2]
+                    voltages = hist_parameters[:, 1]
+                    voltage_errors = hist_parameters[:, 2]
                 else:
                     voltages = hist_parameters
                     voltage_errors = np.full_like(voltages, np.nan)
