@@ -7,7 +7,8 @@ from matplotlib.backends.backend_pdf import PdfPages
 
 from pixcap65.analysis import analyze_data, analyze_capacitance_distribution
 from pixcap65.analysis_util.utility import get_base_group
-from pixcap65.plotting import plot_data, plot_combined_data, plot_bias_data, plot_inter_pix_data
+from pixcap65.plotting import plot_data, plot_combined_data, plot_bias_data, plot_inter_pix_data, X1_SCAN_2_FILE, \
+    X2_SCAN_2_FILE, E1_SCAN_FILE
 from pixcap65.utility.homogenize_plots import set_params
 from pixcap65.utility.tables_util import get_group_attribute
 
@@ -140,6 +141,115 @@ if __name__ == '__main__':
                      chip_group_name="ATLAS_Itk/X2/sensor", distribution=True, set_parasitic=False,
                      distribution_output_pdf=pdf, **bare_correction_args)
 
+    # Second Try R13
+    bare_correction_args = {
+        "apply_correction": True,
+        "bare_file": "packaged/Reference_Bare_renewed.h5",
+        "bare_hdf_path": "Reference/Bare/unbiased_31_renew/total_cap",
+    }
+    print("Analyze R13 Second Try")
+    r13_depletion_args = {
+        "first_boundaries": (-85, -25),
+        "second_boundaries": (-3.4, 0),
+        "distribution": True,
+        "apply_contour": True,
+        "apply_contours": True,
+        "chip_group_name": "Reference/R13/sensor",
+    }
+    r13_depletion_args.update(**bare_correction_args)
+    analyze_data(raw_data="packaged/R13_Renew_Scan.h5", base_path="Reference/R13/unbiased_1_full", is_advanced=True,
+                 **bare_correction_args)
+    analyze_data(raw_data="packaged/R13_Renew_Scan.h5", base_path="Reference/R13/biased_80_V_full", is_advanced=True,
+                 **bare_correction_args)
+    with PdfPages("Fit References/R13_3_Scan_Combined_reference_fits.pdf") as pdf:
+        analyze_data(raw_data="packaged/R13_Renew_Scan.h5", base_path="Reference/R13/C_V_Characteristic_refined",
+                     is_advanced=True, full_model=False, is_cv=True, cv_fit_plot_pdf=pdf,
+                     **r13_depletion_args)
+
+    analyze_data(raw_data="packaged/R13_Renew_Scan.h5", base_path="Reference/R13/inter_unbiased_full",
+                 is_advanced=True, full_model=False, is_inter_pixel=True)
+    analyze_data(raw_data="packaged/R13_Renew_Scan.h5", base_path="Reference/R13/inter_biased_M_80_V_full",
+                 is_advanced=True, full_model=False, is_inter_pixel=True)
+
+    print("Analyze X1")
+    x1_depletion_args = {
+        "first_boundaries": [(-60, -20), (-83, -77.5)],
+        "second_boundaries": [(-0.6, 0), (-77.5, -67.5)],
+        "distribution": True,
+        "apply_contour": False,
+        "apply_contours": False,
+        "chip_group_name": "ATLAS_ITk/X1/sensor",
+    }
+    analyze_data(raw_data=X1_SCAN_2_FILE, base_path="ATLAS_ITk/X1/unbiased_61_full", is_advanced=True,
+                 **bare_correction_args)
+    analyze_data(raw_data=X1_SCAN_2_FILE, base_path="ATLAS_ITk/X1/biased_80_V_full", is_advanced=True,
+                 **bare_correction_args)
+    with PdfPages("Fit References/X1_Scan_Combined_reference_fits.pdf") as pdf:
+        analyze_data(raw_data=X1_SCAN_2_FILE, base_path="ATLAS_ITk/X1/C_V_Characteristic_refined",
+                     is_advanced=True, full_model=False, is_cv=True, use_corrected=True,
+                     cv_fit_plot_pdf=pdf, **x1_depletion_args,
+                     **bare_correction_args)
+    analyze_data(raw_data=X1_SCAN_2_FILE, base_path="Thesis/ATLAS_ITk/X1/inter_unbiased_full",
+                 is_advanced=True, full_model=False, is_inter_pixel=True)
+    analyze_data(raw_data=X1_SCAN_2_FILE, base_path="Thesis/ATLAS_ITk/X1/inter_biased_M_80_V_full",
+                 is_advanced=True, full_model=False, is_inter_pixel=True)
+
+    # Second Try X2
+    # I do not think that we could use this data set properly as the C-V-curve ends to soon! will need to perform a new measurement for higher voltages.
+    print("Analyze X2")
+    x2_depletion_args = {
+        "first_boundaries": [(-59.5, -15), (-100, -60)],
+        "second_boundaries": [(-0.5, 0), (-75, -50)],
+        "distribution": True,
+        "apply_contour": False,
+        "apply_contours": False,
+        "chip_group_name": "ATLAS_ITk/X2/sensor",
+    }
+    analyze_data(raw_data=X2_SCAN_2_FILE, base_path="ATLAS_ITk/X2/unbiased_1_full", is_advanced=True,
+                 **bare_correction_args)
+    analyze_data(raw_data=X2_SCAN_2_FILE, base_path="ATLAS_ITk/X2/biased_80_V_full", is_advanced=True,
+                 **bare_correction_args)
+    with PdfPages("Fit References/X2_SCAN_Combined_reference_fits.pdf") as pdf:
+        # are both arguments available use_corrected and apply_correction!
+        analyze_data(raw_data=X2_SCAN_2_FILE, base_path="ATLAS_ITk/X2/C_V_Characteristic_refined",
+                     is_advanced=True, full_model=False, is_cv=True, use_corrected=True,
+                     cv_fit_plot_pdf=pdf, **x2_depletion_args,
+                     **bare_correction_args)
+
+        # remaining analysis of the E1 sample
+        print("Analyze E1")
+        analyze_data(raw_data="Reference_Evelyn_Scan.h5", base_path="Reference/E1/unbiased_4_full", is_advanced=True,
+                     **bare_correction_args)
+        e1_depletion_args = {
+            "first_boundaries": (-100, -35),
+            "second_boundaries": (-5, 0),
+            "distribution": False,
+            "apply_contour": False,
+            "apply_contours": False,
+            "pixel_mask": [[39, 1]]
+        }
+        with PdfPages("Fit References/E1_C_V_Verify.pdf") as pdf:
+            analyze_data(raw_data="Reference_Evelyn_Scan.h5", base_path="Reference/E1/C_V_Characteristic",
+                         is_advanced=True, full_model=False, is_cv=True, use_corrected=True, cv_fit_plot_pdf=pdf,
+                         **e1_depletion_args,
+                         **bare_correction_args)
+
+        print("Analyze E1 Second Try.")
+        analyze_data(raw_data="packaged/E1_Renew_Scan.h5", base_path="Reference/E1/unbiased_full", is_advanced=True,
+                     **bare_correction_args)
+        analyze_data(raw_data="packaged/E1_Renew_Scan.h5", base_path="Reference/E1/biased_80_V_full", is_advanced=True,
+                     **bare_correction_args)
+        with PdfPages("Fit References/E1_Renew_C_V_Verify.pdf") as pdf:
+            analyze_data(raw_data="packaged/E1_Renew_Scan.h5", base_path="Reference/E1/C_V_Characteristic_refined",
+                         is_advanced=True, full_model=False, is_cv=True, use_corrected=True, cv_fit_plot_pdf=pdf,
+                         **e1_depletion_args,
+                         **bare_correction_args)
+
+        analyze_data(raw_data="packaged/E1_Renew_Scan.h5", base_path="Reference/E1/inter_unbiased_full",
+                     is_advanced=True, full_model=False, is_inter_pixel=True)
+        analyze_data(raw_data="packaged/E1_Renew_Scan.h5", base_path="Reference/E1/inter_biased_M_80_V_full",
+                     is_advanced=True, full_model=False, is_inter_pixel=True)
+
     # plotting section
     print("Plots for the reference sample BARE 5 BUMPS")
     plot_data(interpreted_data='pixcap65/Data/bare-measurement/TEST.h5', suffix="general_bare_data_1-1",
@@ -269,3 +379,104 @@ if __name__ == '__main__':
               use_group=True, exclude_test_cap=True)
     plot_data(interpreted_data='New_2_Scan.h5', base_path="ATLAS_Itk/X2/biased_80_V", suffix="general_data_80V",
               use_group=True, use_corrected=True, apply_doping=True, exclude_test_cap=True)
+
+    # second try Bare
+    print("Plot Bare Second Try")
+    plot_data(interpreted_data="packaged/Reference_Bare_renewed.h5", base_path="Reference/Bare/unbiased_31_renew",
+              suffix="general_data_bare-2", use_group=True, exclude_test_cap=True, distribution=True)
+
+    print("Plot R13 Second Try.")
+    # these group paths will need to be updated in the end.
+    plot_data(interpreted_data="packaged/R13_Renew_Scan.h5", base_path="Reference/R13/unbiased_1_full", use_group=True,
+              exclude_test_cap=True, distribution=True)
+    plot_data(interpreted_data="packaged/R13_Renew_Scan.h5", base_path="Reference/R13/unbiased_1_full", use_group=True,
+              exclude_test_cap=True, distribution=True, use_corrected=True)
+    # noqa: S1192
+    plot_data(interpreted_data="packaged/R13_Renew_Scan.h5", base_path="Reference/R13/biased_80_V_full", use_group=True,
+              distribution=True)
+    plot_data(interpreted_data="packaged/R13_Renew_Scan.h5", base_path="Reference/R13/biased_80_V_full", use_group=True,
+              distribution=True, use_corrected=True)
+    # the uncertainties of the capacitance estimators looks quite large.
+    plot_combined_data(interpreted_data="packaged/R13_Renew_Scan.h5",
+                       base_path="Reference/R13/C_V_Characteristic_refined",
+                       use_group=True, exclude_test_cap=True, distribution=True)
+    plot_combined_data(interpreted_data="packaged/R13_Renew_Scan.h5",
+                       base_path="Reference/R13/C_V_Characteristic_refined",
+                       use_group=True, exclude_test_cap=True, distribution=True, use_corrected=True)
+
+    plot_inter_pix_data(interpreted_data="packaged/R13_Renew_Scan.h5", base_path="Reference/R13/inter_unbiased_full",
+                        use_group=True, exclude_test_cap=True, distribution=True,
+                        total_data="packaged/R13_Renew_Scan.h5",
+                        total_path="Reference/R13/unbiased_1_full")
+    plot_inter_pix_data(interpreted_data="packaged/R13_Renew_Scan.h5",
+                        base_path="Reference/R13/inter_biased_M_80_V_full",
+                        use_group=True, exclude_test_cap=True, distribution=True,
+                        total_data="packaged/R13_Renew_Scan.h5",
+                        total_path="Reference/R13/biased_80_V_full")
+
+    # second try X1
+    print("Plot X1 Second Try.")
+    x1_second_pixel_mask = [[39, 39], [38, 39]]
+    plot_data(interpreted_data=X1_SCAN_2_FILE, base_path="ATLAS_ITk/X1/unbiased_61_full", use_group=True,
+              exclude_test_cap=True, mask_pixel=x1_second_pixel_mask, distribution=True)
+    plot_data(interpreted_data=X1_SCAN_2_FILE, base_path="ATLAS_ITk/X1/unbiased_61_full", use_group=True,
+              exclude_test_cap=True, use_corrected=True, mask_pixel=x1_second_pixel_mask, distribution=True)
+    plot_data(interpreted_data=X1_SCAN_2_FILE, base_path="ATLAS_ITk/X1/biased_80_V_full", use_group=True,
+              exclude_test_cap=True, mask_pixel=x1_second_pixel_mask, distribution=True)
+    plot_data(interpreted_data=X1_SCAN_2_FILE, base_path="ATLAS_ITk/X1/biased_80_V_full", use_group=True,
+              exclude_test_cap=True, use_corrected=True, mask_pixel=x1_second_pixel_mask, distribution=True)
+    plot_bias_data(interpreted_data=X1_SCAN_2_FILE, base_path="ATLAS_ITk/X1/I_V_Characteristic", use_group=True, )
+    plot_combined_data(interpreted_data=X1_SCAN_2_FILE, base_path="ATLAS_ITk/X1/C_V_Characteristic_refined",
+                       use_group=True, mask_pixel=x1_second_pixel_mask, distribution=True)
+    plot_combined_data(interpreted_data=X1_SCAN_2_FILE, base_path="ATLAS_ITk/X1/C_V_Characteristic_refined",
+                       use_group=True, use_corrected=True,
+                       apply_doping=False, distribution=True, mask_pixel=x1_second_pixel_mask)
+    plot_inter_pix_data(interpreted_data=X1_SCAN_2_FILE, base_path="Thesis/ATLAS_ITk/X1/inter_unbiased_full",
+                        use_group=True, exclude_test_cap=True, distribution=True,
+                        total_data=X1_SCAN_2_FILE, total_path="ATLAS_ITk/X1/unbiased_61_full")
+    plot_inter_pix_data(interpreted_data=X1_SCAN_2_FILE, base_path="Thesis/ATLAS_ITk/X1/inter_biased_M_80_V_full",
+                        use_group=True, exclude_test_cap=True, distribution=True,
+                        total_data=X1_SCAN_2_FILE, total_path="ATLAS_ITk/X1/unbiased_61_full")
+
+    # second Try X2
+    # second Try X2
+    print("Plot X2")
+    plot_data(interpreted_data=X2_SCAN_2_FILE, base_path="ATLAS_ITk/X2/unbiased_1_full", use_group=True,
+              exclude_test_cap=True, distribution=True)
+    plot_data(interpreted_data=X2_SCAN_2_FILE, base_path="ATLAS_ITk/X2/unbiased_1_full", use_group=True,
+              exclude_test_cap=True, use_corrected=True, distribution=True)
+    plot_data(interpreted_data=X2_SCAN_2_FILE, base_path="ATLAS_ITk/X2/biased_80_V_full", use_group=True,
+              exclude_test_cap=True, distribution=True)
+    plot_data(interpreted_data=X2_SCAN_2_FILE, base_path="ATLAS_ITk/X2/biased_80_V_full", use_group=True,
+              exclude_test_cap=True, use_corrected=True, distribution=True)
+    plot_combined_data(interpreted_data=X2_SCAN_2_FILE, base_path="ATLAS_ITk/X2/C_V_Characteristic_refined",
+                       use_group=True)
+    plot_combined_data(interpreted_data=X2_SCAN_2_FILE, base_path="ATLAS_ITk/X2/C_V_Characteristic_refined",
+                       use_group=True, use_corrected=True,
+                       apply_doping=False, distribution=False)
+    plot_bias_data(interpreted_data=X2_SCAN_2_FILE, base_path="Thesis/ATLAS_ITk/X2/I_V_Characteristic_2",
+                   use_group=True)
+
+    # E1 first run
+    print("Plot E1")
+    e1_pixel_mask = [[39, 1]]
+    plot_data(interpreted_data=E1_SCAN_FILE, base_path="Reference/E1/unbiased_4_full", use_group=True,
+              exclude_test_cap=True, mask_pixel=e1_pixel_mask, )
+    plot_data(interpreted_data=E1_SCAN_FILE, base_path="Reference/E1/unbiased_4_full", use_group=True,
+              use_corrected=True, distribution=True, exclude_test_cap=True, mask_pixel=e1_pixel_mask, )
+    plot_bias_data(interpreted_data=E1_SCAN_FILE, base_path="Reference/E1/I_V_Characteristic",
+                   use_group=True)
+    plot_combined_data(interpreted_data=E1_SCAN_FILE, base_path="Reference/E1/C_V_Characteristic",
+                       use_group=True, distribution=True)
+    plot_combined_data(interpreted_data=E1_SCAN_FILE, base_path="Reference/E1/C_V_Characteristic",
+                       use_group=True,
+                       use_corrected=True,
+                       apply_doping=False, distribution=False)
+    plot_data(interpreted_data="packaged/E1_Renew_Scan.h5", use_group=True, base_path="Reference/E1/unbiased_full",
+              exclude_test_cap=True,
+              mask_pixel=e1_pixel_mask, )
+    plot_data(interpreted_data="packaged/E1_Renew_Scan.h5", use_group=True, base_path="Reference/E1/biased_80_V_full",
+              mask_pixel=e1_pixel_mask, )
+    plot_combined_data(interpreted_data="packaged/E1_Renew_Scan.h5",
+                       base_path="Reference/E1/C_V_Characteristic_refined",
+                       use_group=True, distribution=True, mask_pixel=e1_pixel_mask, )

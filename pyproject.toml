@@ -64,6 +64,8 @@ advanced = [
     "scipy ; python_version < '3.10'",
     "jacobi ; python_version >= '3.6'",
     "findiff",
+    "numba_stats ; python_version >= '3.6'",
+    "numba ; python_version > '3.9'"
 ]
 visualization = [
     "pyqt5",
