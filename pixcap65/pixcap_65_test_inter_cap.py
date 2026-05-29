@@ -6,7 +6,6 @@ import logging
 import numpy as np
 import tables as tb
 import time
-from tqdm import tqdm
 
 from pixcap65.analysis_util import GENERAL_PIXCAP_SHAPE
 from pixcap65.analysis_util.utility import HIST_CURRENT_MEAS_UNIT
@@ -145,49 +144,46 @@ class Pixcap65InterCap(PixCap65Measurement):
         data_group = self.get_data_group(data_group_spec, "inter_cap")
         set_group_attribute(data_group, "frequencies", self.n_frequencies)
 
-        # TODO: perhaps also this iterators should be absorbed into the procedure handler?
-        with self.measurement_procedure(data_group, False):
-            for i_row in advanced_tqdm_iterator(self.row_range, tqdm_class=tqdm, desc="Grid row Loop", logger=logger, leave=not sequence_call, colour='green'):
-                for i_col in advanced_tqdm_iterator(self.col_range, tqdm_class=tqdm, desc="Grid column Loop", leave=False, logger=logger, colour='blue'):
-                    logging.info(MEASURING_PIXEL_TEXT % (i_col, i_row))
-                    logger.info(MEASURING_PIXEL_TEXT % (i_col, i_row))
+        for i_col, i_row in self.measurement_procedure(data_group, False):
+            logging.info(MEASURING_PIXEL_TEXT % (i_col, i_row))
+            logger.info(MEASURING_PIXEL_TEXT % (i_col, i_row))
 
-                    self.pixcap.disable_all_pixels()
-                    self.pixcap.disable_all_columns()
+            self.pixcap.disable_all_pixels()
+            self.pixcap.disable_all_columns()
 
-                    # enable columns of pixel under test and surrounding pixels
-                    self.pixcap.enable_column(i_col, c.EN_EOC_1 | c.EN_EOC_2 | c.EN_EOC_3)
-                    self.pixcap.enable_column(i_col + 1, c.EN_EOC_1 | c.EN_EOC_3)
-                    self.pixcap.enable_column(i_col - 1, c.EN_EOC_1 | c.EN_EOC_3)
+            # enable columns of pixel under test and surrounding pixels
+            self.pixcap.enable_column(i_col, c.EN_EOC_1 | c.EN_EOC_2 | c.EN_EOC_3)
+            self.pixcap.enable_column(i_col + 1, c.EN_EOC_1 | c.EN_EOC_3)
+            self.pixcap.enable_column(i_col - 1, c.EN_EOC_1 | c.EN_EOC_3)
 
-                    # enable pixel under test
-                    self.pixcap.enable_pixel_clk(i_col, i_row, c.EN_CLK_2 | c.EN_CLK_0)
+            # enable pixel under test
+            self.pixcap.enable_pixel_clk(i_col, i_row, c.EN_CLK_2 | c.EN_CLK_0)
 
-                    # enable pixels surrounding pixel under test
-                    self.pixcap.enable_pixel_clk(i_col, i_row + 1, c.EN_CLK_1 | c.EN_CLK_3)
-                    self.pixcap.enable_pixel_clk(i_col + 1, i_row + 1, c.EN_CLK_1 | c.EN_CLK_3)
-                    self.pixcap.enable_pixel_clk(i_col + 1, i_row, c.EN_CLK_1 | c.EN_CLK_3)
-                    self.pixcap.enable_pixel_clk(i_col + 1, i_row - 1, c.EN_CLK_1 | c.EN_CLK_3)
-                    self.pixcap.enable_pixel_clk(i_col, i_row - 1, c.EN_CLK_1 | c.EN_CLK_3)
-                    self.pixcap.enable_pixel_clk(i_col - 1, i_row - 1, c.EN_CLK_1 | c.EN_CLK_3)
-                    self.pixcap.enable_pixel_clk(i_col - 1, i_row, c.EN_CLK_1 | c.EN_CLK_3)
-                    self.pixcap.enable_pixel_clk(i_col - 1, i_row + 1, c.EN_CLK_1 | c.EN_CLK_3)
+            # enable pixels surrounding pixel under test
+            self.pixcap.enable_pixel_clk(i_col, i_row + 1, c.EN_CLK_1 | c.EN_CLK_3)
+            self.pixcap.enable_pixel_clk(i_col + 1, i_row + 1, c.EN_CLK_1 | c.EN_CLK_3)
+            self.pixcap.enable_pixel_clk(i_col + 1, i_row, c.EN_CLK_1 | c.EN_CLK_3)
+            self.pixcap.enable_pixel_clk(i_col + 1, i_row - 1, c.EN_CLK_1 | c.EN_CLK_3)
+            self.pixcap.enable_pixel_clk(i_col, i_row - 1, c.EN_CLK_1 | c.EN_CLK_3)
+            self.pixcap.enable_pixel_clk(i_col - 1, i_row - 1, c.EN_CLK_1 | c.EN_CLK_3)
+            self.pixcap.enable_pixel_clk(i_col - 1, i_row, c.EN_CLK_1 | c.EN_CLK_3)
+            self.pixcap.enable_pixel_clk(i_col - 1, i_row + 1, c.EN_CLK_1 | c.EN_CLK_3)
 
-                    # Which SMU takes which role here?
-                    for k, freq in enumerate(self.frequency_range):
-                        self.pixcap.cvm_frequency = freq
-                        self.verify_stable_current(self.pixcap.vm2_smu_key)
+            # Which SMU takes which role here?
+            for k, freq in enumerate(self.frequency_range):
+                self.pixcap.cvm_frequency = freq
+                self.verify_stable_current(self.pixcap.vm2_smu_key)
 
-                        # TODO: Absorb this into a measurement handler
-                        self.inter_hist_current_1[i_col, i_row, k] = self.pixcap.vm3_measure_current()
+                # TODO: Absorb this into a measurement handler
+                self.inter_hist_current_1[i_col, i_row, k] = self.pixcap.vm3_measure_current()
 
-                        # perhaps the wrong capacitance!
-                        self.total_hist_current[i_col, i_row, k] = self.pixcap.vm2_measure_current()
+                # perhaps the wrong capacitance!
+                self.total_hist_current[i_col, i_row, k] = self.pixcap.vm2_measure_current()
 
-                        # extract the inter pix current
-                        self.inter_hist_current_2[i_col, i_row, k] = self.pixcap.vm1_measure_current()
+                # extract the inter pix current
+                self.inter_hist_current_2[i_col, i_row, k] = self.pixcap.vm1_measure_current()
 
-                        self.store_iteration_parameters(freq, k)
+                self.store_iteration_parameters(freq, k)
 
     def store_measurement_data(self, data_group: tb.Group, sequence_call: bool, unit=None):
         # TODO 2026-05-14 dominikfischer: this make multiple measurements for the inter-pix capacitance measurement impossible
@@ -270,6 +266,7 @@ class Pixcap65InterCap(PixCap65Measurement):
     @property
     def current_sense_range(self):
         return 0.000010
+    # endregion
 
 
 if __name__ == "__main__":

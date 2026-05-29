@@ -1277,8 +1277,7 @@ class PixCap65Measurement(Pixcap65BaseMeasurement, metaclass=ABCMeta):
     def row_range(self):
         raise NotImplementedError("`row_range` is abstract and therefore not implemented.")
 
-    @contextmanager
-    def measurement_procedure(self, data_group, sequence_call, post_hook: Callable[tb.Group] = None):
+    def measurement_procedure(self, data_group, sequence_call, post_hook: Callable[tb.Group] = None, reversed_order=False, internal_logger=logger):
         """
         measurement_procedure
 
@@ -1300,9 +1299,23 @@ class PixCap65Measurement(Pixcap65BaseMeasurement, metaclass=ABCMeta):
 
         continue_error = None
         try:
+            row_range = self.col_range if reversed_order else self.row_range
+            col_range = self.row_range if reversed_order else self.col_range
+            row_desc = "Grid column Loop" if reversed_order else "Grid row Loop"
+            col_desc = "Grid row Loop" if reversed_order else "Grid column Loop"
+            row_unit = "row" if reversed_order else "column"
             self.set_bias_measurement(data_group, sequence_call)
             with logging_redirect_tqdm():
-                yield
+                for i_row in advanced_tqdm_iterator(row_range, tqdm_class=tqdm, desc=row_desc,
+                                                    leave=not sequence_call, unit=row_unit, logger=internal_logger,
+                                                    colour='green'):
+                    for i_col in advanced_tqdm_iterator(col_range, tqdm_class=tqdm, desc=col_desc,
+                                                        leave=False, unit="pixel", logger=internal_logger, colour='blue'):
+                        if reversed_order:
+                            yield i_row, i_col
+                        else:
+                            yield i_col, i_row
+
         except KeyboardInterrupt as e:
             logger.info("Caught KeyboardInterrupt. Will terminate the program softly.")
             continue_error = e
@@ -1489,22 +1502,20 @@ class PixCap65TotalCap(PixCap65Measurement):
         self.pre_scan_handler()
         logging.info(self.mode_logging_text)
         logger.info(self.mode_logging_text)
-        with self.measurement_procedure(data_group, sequence_call):
-            for i_row in advanced_tqdm_iterator(self.row_range, tqdm_class=tqdm, desc="Grid row Loop", leave=not sequence_call, unit="column", logger=logger, colour='green'):
-                for i_col in advanced_tqdm_iterator(self.col_range, tqdm_class=tqdm, desc="Grid column Loop", leave=False, unit="pixel", logger=logger, colour='blue'):
-                    logging.info(MEASURING_PIXEL_TEXT % (i_col, i_row))
-                    logger.info(MEASURING_PIXEL_TEXT % (i_col, i_row))
-                    self.dut.disable_all_pixels()
-                    self.dut.disable_all_columns()
+        for i_col, i_row in self.measurement_procedure(data_group, sequence_call):
+            logging.info(MEASURING_PIXEL_TEXT % (i_col, i_row))
+            logger.info(MEASURING_PIXEL_TEXT % (i_col, i_row))
+            self.dut.disable_all_pixels()
+            self.dut.disable_all_columns()
 
-                    self.dut.enable_column(i_col, c.EN_EOC_3)
-                    self.dut.enable_pixel_clk(i_col, i_row, c.EN_CLK_0 | c.EN_CLK_3)
+            self.dut.enable_column(i_col, c.EN_EOC_3)
+            self.dut.enable_pixel_clk(i_col, i_row, c.EN_CLK_0 | c.EN_CLK_3)
 
-                    for k, freq in enumerate(frequency_range):
-                        self.pixcap.cvm_frequency = freq
-                        self.verify_stable_current(self.pixcap.primary_smu_key)
-                        self.handle_measurement(i_col, i_row, k)
-                        self.store_iteration_parameters(freq, k)
+            for k, freq in enumerate(frequency_range):
+                self.pixcap.cvm_frequency = freq
+                self.verify_stable_current(self.pixcap.primary_smu_key)
+                self.handle_measurement(i_col, i_row, k)
+                self.store_iteration_parameters(freq, k)
 
     def bias_cv_scan(self, data_group_spec=None):
         """
