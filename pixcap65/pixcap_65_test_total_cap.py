@@ -394,6 +394,24 @@ class PixCap65Measurement(Pixcap65BaseMeasurement, metaclass=ABCMeta):
         """
         raise NotImplementedError("`scan` is abstract and therefore not implemented.")
 
+    @property
+    def buffered_bias_voltage(self):
+        if self.has_bias_supply:
+            return self.pixcap.get_smu_source_voltage(self.pixcap.bias_smu_key)
+        return np.nan
+
+    @buffered_bias_voltage.setter
+    def buffered_bias_voltage(self, value):
+        cached_voltage = self.buffered_bias_voltage
+        while np.abs(cached_voltage - value) > 10:
+            if cached_voltage > value:
+                self.pixcap.bias_voltage = cached_voltage - 10
+            else:
+                self.pixcap.bias_voltage = self.buffered_bias_voltage + 10
+            cached_voltage = self.buffered_bias_voltage
+
+        self.pixcap.bias_voltage = value
+
     def perform_bias_scan(self, bias_voltages: np.ndarray, post_handler: Callable, parameters, data_group_spec, handle_unit,
                           **kwargs):
         """
@@ -451,7 +469,7 @@ class PixCap65Measurement(Pixcap65BaseMeasurement, metaclass=ABCMeta):
 
         try:
             for k, bias_voltage in _get_enumerate(bias_voltages, **kwargs):
-                self.pixcap.bias_voltage = bias_voltage
+                self.buffered_bias_voltage = bias_voltage
                 # check for the SMU's settling here
                 with self.bias_without_averaging() as hv_less:
                     current_measurement = self.verify_stable_hv(hv_less)
@@ -805,7 +823,7 @@ class PixCap65Measurement(Pixcap65BaseMeasurement, metaclass=ABCMeta):
         else:
             store_scan_par_values(scan_parameters=self.scan_parameters, scan_param_id=k, frequency=freq)
 
-    def determine_measurement_uncertainty(self, smu: str, temp_data: ndarray,):
+    def determine_measurement_uncertainty(self, smu: str, temp_data: ndarray, sense_range=None):
         """
         determine_measurement_uncertainty
 
@@ -818,7 +836,8 @@ class PixCap65Measurement(Pixcap65BaseMeasurement, metaclass=ABCMeta):
         :param temp_data: data/data array for which the uncertainty should be determined.
         :return: measurement uncertainties.
         """
-        sense_range = self.bias_sense_range if smu == self.pixcap.bias_smu_key else self.current_sense_range
+        if sense_range is None:
+            sense_range = self.bias_sense_range if smu == self.pixcap.bias_smu_key else self.current_sense_range
         if np.any(np.isfinite(temp_data)):
             try:
                 return np.where(np.isfinite(temp_data), extract_smu_current_error(
@@ -1381,15 +1400,16 @@ class PixCap65Measurement(Pixcap65BaseMeasurement, metaclass=ABCMeta):
                 back_nlpc = float(smu_less[smu].get_current_nlpc())
                 smu_less[smu].set_current_nlpc(1)
                 previous_measurement = smu_less.smu_measure_current(smu)
+                # logger.info("The stabilized first current is %f", previous_measurement * 1e9)
                 time.sleep(1e-3)
-                current_measurement = smu_less.smu_measure_current(smu)
                 for i in range(100):
+                    current_measurement = smu_less.smu_measure_current(smu)
+                    # logger.info("The current %i measured for stabilization is %f.", i, current_measurement * 1e9)
                     if np.abs(
-                            current_measurement - previous_measurement) < 0.01 * np.abs(
+                            current_measurement - previous_measurement) < 0.005 * np.abs(
                         current_measurement):
                         break
                     previous_measurement = current_measurement
-                    current_measurement = smu_less.smu_measure_current(smu)
                 else:
                     logger.warning("Could not stabilize the current.")
             finally:
@@ -1900,7 +1920,7 @@ class PixCap65TotalCap(PixCap65Measurement):
 
 
 if __name__ == '__main__':
-    output_file_2 = "../Reference_Demo.h5"
+    output_file_2 = "../data/Reference_Demo.h5"
     from pixcap65.utils import PixCapSetup, PixcapMeasurements
 
     # initial measurement sample

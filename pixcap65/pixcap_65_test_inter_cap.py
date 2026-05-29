@@ -103,7 +103,7 @@ class Pixcap65InterCap(PixCap65Measurement):
     def configure(self):
         # already done by super-class
         super(Pixcap65InterCap, self).configure()
-        self.init_smu(smu=self.pixcap.vm2_smu_key, current_range=0.000001)
+        self.init_smu(smu=self.pixcap.vm2_smu_key, current_range=self.total_current_sense_range)
         self.init_smu(smu=self.pixcap.vm1_smu_key)
 
         # self.pixcap.seq_init(clk_0='0100', clk_1='0100', clk_2='0001', clk_3='0001')
@@ -244,11 +244,15 @@ class Pixcap65InterCap(PixCap65Measurement):
         else:
             # make sure the measurement points will have uncertainties.
             self.inter_hist_current_1_error = self.determine_measurement_uncertainty(self.pixcap.vm3_smu_key,
-                                                                                     self.inter_hist_current_1)
+                                                                                     self.inter_hist_current_1,
+                                                                                     sense_range=self.current_sense_range)
             self.inter_hist_current_2_error = self.determine_measurement_uncertainty(self.pixcap.vm1_smu_key,
-                                                                                     self.inter_hist_current_2)
+                                                                                     self.inter_hist_current_2,
+                                                                                     sense_range=self.total_current_sense_range)
             self.total_hist_current_error = self.determine_measurement_uncertainty(self.pixcap.vm2_smu_key,
-                                                                                   self.total_hist_current)
+                                                                                   self.total_hist_current,
+                                                                                   sense_range=self.total_current_sense_range)
+            self.total_hist_current)
 
     def _handle_single_measurement(self, col, row, k):
         self.inter_hist_current_1[col, row, k] = self.pixcap.vm3_measure_current()
@@ -339,6 +343,10 @@ class Pixcap65InterCap(PixCap65Measurement):
     def current_sense_range(self):
         return 0.000010
     # endregion
+
+    @property
+    def total_current_sense_range(self):
+        return 0.000001
 
 
 if __name__ == "__main__":
