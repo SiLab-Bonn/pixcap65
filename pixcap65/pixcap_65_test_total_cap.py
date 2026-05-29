@@ -42,11 +42,6 @@ from tqdm.contrib import DummyTqdmFile
 from typing import Iterable, Mapping, Any, Optional
 from warnings import warn, deprecated
 
-
-
-
-
-
 from pixcap65.analysis import analysis_data_handle
 from pixcap65.analysis_util.utility import HIST_CURRENT_MEAS_UNIT, HIST_BIAS_MEAS_UNIT, handle_analysis_mix_up
 from pixcap65.configs.config_handler import extract_smu_current_error, extract_smu_voltage_error
@@ -935,7 +930,7 @@ class PixCap65Measurement(Pixcap65BaseMeasurement, metaclass=ABCMeta):
             self.pixcap.binary_active = True
             self._smu_setup(self.pixcap.primary_smu_key).binary_format()
             if self.n_measurements > 5:
-                self.pixcap[self.pixcap.primary_smu_key].set_current_nlpc(1)
+                self.pixcap[self.pixcap.primary_smu_key].set_current_nlpc(2)
             yield self
         finally:
             self.pixcap[self.pixcap.primary_smu_key].set_current_nlpc(10)
@@ -1282,8 +1277,7 @@ class PixCap65Measurement(Pixcap65BaseMeasurement, metaclass=ABCMeta):
     def row_range(self):
         raise NotImplementedError("`row_range` is abstract and therefore not implemented.")
 
-    @contextmanager
-    def measurement_procedure(self, data_group, sequence_call, post_hook: Callable[tb.Group] = None):
+    def measurement_procedure(self, data_group, sequence_call, post_hook: Callable[tb.Group] = None, reversed_order=False, internal_logger=logger):
         """
         measurement_procedure
 
@@ -1305,9 +1299,23 @@ class PixCap65Measurement(Pixcap65BaseMeasurement, metaclass=ABCMeta):
 
         continue_error = None
         try:
+            row_range = self.col_range if reversed_order else self.row_range
+            col_range = self.row_range if reversed_order else self.col_range
+            row_desc = "Grid column Loop" if reversed_order else "Grid row Loop"
+            col_desc = "Grid row Loop" if reversed_order else "Grid column Loop"
+            row_unit = "row" if reversed_order else "column"
             self.set_bias_measurement(data_group, sequence_call)
             with logging_redirect_tqdm():
-                yield
+                for i_row in advanced_tqdm_iterator(row_range, tqdm_class=tqdm, desc=row_desc,
+                                                    leave=not sequence_call, unit=row_unit, logger=internal_logger,
+                                                    colour='green'):
+                    for i_col in advanced_tqdm_iterator(col_range, tqdm_class=tqdm, desc=col_desc,
+                                                        leave=False, unit="pixel", logger=internal_logger, colour='blue'):
+                        if reversed_order:
+                            yield i_row, i_col
+                        else:
+                            yield i_col, i_row
+
         except KeyboardInterrupt as e:
             logger.info("Caught KeyboardInterrupt. Will terminate the program softly.")
             continue_error = e
@@ -1494,81 +1502,20 @@ class PixCap65TotalCap(PixCap65Measurement):
         self.pre_scan_handler()
         logging.info(self.mode_logging_text)
         logger.info(self.mode_logging_text)
-        continue_error = None
-        try:
-            self.set_bias_measurement(data_group, sequence_call)
-            with logging_redirect_tqdm():
-                for i_row in tqdm(self.row_range, desc="Grid row Loop", leave=not sequence_call, unit="column"):
-                    for i_col in tqdm(self.col_range, desc="Grid column Loop", leave=False, unit="pixel"):
-                        logging.info(MEASURING_PIXEL_TEXT % (i_col, i_row))
-                        logger.info(MEASURING_PIXEL_TEXT % (i_col, i_row))
-                        self.dut.disable_all_pixels()
-                        self.dut.disable_all_columns()
+        for i_col, i_row in self.measurement_procedure(data_group, sequence_call):
+            logging.info(MEASURING_PIXEL_TEXT % (i_col, i_row))
+            logger.info(MEASURING_PIXEL_TEXT % (i_col, i_row))
+            self.dut.disable_all_pixels()
+            self.dut.disable_all_columns()
 
-                        self.dut.enable_column(i_col, c.EN_EOC_3)
-                        self.dut.enable_pixel_clk(i_col, i_row, c.EN_CLK_0 | c.EN_CLK_3)
+            self.dut.enable_column(i_col, c.EN_EOC_3)
+            self.dut.enable_pixel_clk(i_col, i_row, c.EN_CLK_0 | c.EN_CLK_3)
 
-                        for k, freq in enumerate(frequency_range):
-                            self.pixcap.cvm_frequency = freq
-                            self.verify_stable_current(self.pixcap.primary_smu_key)
-                            self.handle_measurement(i_col, i_row, k)
-                            self.store_iteration_parameters(freq, k)
-        except KeyboardInterrupt as e:
-            logger.info("Caught KeyboardInterrupt. Will terminate the program softly.")
-            continue_error = e
-            continue_saving_operation = True
-        else:
-            continue_saving_operation = True
-        if continue_saving_operation:
-            self.post_scan_handler(data_group, sequence_call, group=data_group)
-
-        if continue_error is not None:
-            self.out_file_h5.flush()
-            raise continue_error
-        logging.info('Done')
-        logger.info('Done')
-
-    def second_scan(self, data_group_spec=None, sequence_call=False):
-        """
-        scan
-
-        Performs the scan over the pixels on the sensor and measures the requested quantities in dependence on some
-        other quantities. Will scan the specified frequency range for each pixel specified by the scan configuration
-        and measure the current to determine the total pixel capacitance.
-
-        :param data_group_spec: specifier of the data group in hdf file where the measurements are stored.
-        :param sequence_call: boolean, indicating whether the pixel-frequency scan is started from another measurement
-            procedure.
-        """
-        # select the group to write the analysis results to
-        data_group = self.get_data_group(data_group_spec, "total_cap")
-        set_group_attribute(data_group, "frequencies", self.n_frequencies)
-
-        # perform also a down sweep in frequency
-        if "double_sweep" in self.scan_config and self.scan_config["double_sweep"]:
-            frequency_range = np.concatenate((self.frequency_range, np.flip(self.frequency_range)))
-        else:
-            frequency_range = self.frequency_range
-
-        self.pre_scan_handler()
-        logging.info(self.mode_logging_text)
-        logger.info(self.mode_logging_text)
-        with self.measurement_procedure(data_group, sequence_call):
-            for i_row in advanced_tqdm_iterator(self.row_range, tqdm_class=tqdm, desc="Grid row Loop", leave=not sequence_call, unit="column", logger=logger, colour='green'):
-                for i_col in advanced_tqdm_iterator(self.col_range, tqdm_class=tqdm, desc="Grid column Loop", leave=False, unit="pixel", logger=logger, colour='blue'):
-                    logging.info(MEASURING_PIXEL_TEXT % (i_col, i_row))
-                    logger.info(MEASURING_PIXEL_TEXT % (i_col, i_row))
-                    self.dut.disable_all_pixels()
-                    self.dut.disable_all_columns()
-
-                    self.dut.enable_column(i_col, c.EN_EOC_3)
-                    self.dut.enable_pixel_clk(i_col, i_row, c.EN_CLK_0 | c.EN_CLK_3)
-
-                    for k, freq in enumerate(frequency_range):
-                        self.pixcap.cvm_frequency = freq
-                        self.verify_stable_current(self.pixcap.primary_smu_key)
-                        self.handle_measurement(i_col, i_row, k)
-                        self.store_iteration_parameters(freq, k)
+            for k, freq in enumerate(frequency_range):
+                self.pixcap.cvm_frequency = freq
+                self.verify_stable_current(self.pixcap.primary_smu_key)
+                self.handle_measurement(i_col, i_row, k)
+                self.store_iteration_parameters(freq, k)
 
     def bias_cv_scan(self, data_group_spec=None):
         """
@@ -1921,14 +1868,13 @@ class PixCap65TotalCap(PixCap65Measurement):
 
 
 if __name__ == '__main__':
-    output_file_2 = "../Reference_Bare_renewed.h5"
+    output_file_2 = "../Reference_Demo.h5"
     from pixcap65.utils import PixCapSetup, PixcapMeasurements
-    # logging.basicConfig()
+
     # initial measurement sample
     with PixCapSetup(scan_configuration, output_file_2, measurement=PixcapMeasurements.TOTAL_CAPACITANCE) as pix:
         # for larger averages
-        with pix.binary_readout_mode() as binary_pix:
-            binary_pix.second_scan(data_group_spec="unbiased_31_renew")
+        pix.scan(data_group_spec="unbiased_4_full")
 
     # with PixCap65TotalCap(scan_configuration, output_file_2) as pix:
     #     try:
