@@ -29,6 +29,7 @@ import os
 import sys
 import tables as tb
 import time
+import warnings
 import yaml
 from abc import abstractmethod, ABCMeta
 from collections.abc import Callable
@@ -1300,12 +1301,22 @@ class PixCap65Measurement(Pixcap65BaseMeasurement, metaclass=ABCMeta):
         continue_error = None
         voltage_reference_data = np.full((40, 40), fill_value=np.nan, dtype=np.float64)
         try:
-            row_range = self.col_range if reversed_order else self.row_range
-            col_range = self.row_range if reversed_order else self.col_range
-            row_desc = "Grid column Loop" if reversed_order else "Grid row Loop"
-            col_desc = "Grid row Loop" if reversed_order else "Grid column Loop"
-            row_unit = "row" if reversed_order else "column"
+            if reversed_order:
+                row_range = self.col_range
+                col_range = self.row_range
+                row_desc = "Grid column Loop"
+                col_desc = "Grid row Loop"
+                row_unit = "row"
+            else:
+                row_range = self.row_range
+                col_range = self.col_range
+                row_desc = "Grid row Loop"
+                col_desc = "Grid column Loop"
+                row_unit = "column"
             self.set_bias_measurement(data_group, sequence_call)
+            self.pre_scan_handler()
+            logging.info(self.mode_logging_text)
+            logger.info(self.mode_logging_text)
             with logging_redirect_tqdm():
                 for i_row in advanced_tqdm_iterator(row_range, tqdm_class=tqdm, desc=row_desc,
                                                     leave=not sequence_call, unit=row_unit, logger=internal_logger,
@@ -1388,7 +1399,7 @@ class PixCap65Measurement(Pixcap65BaseMeasurement, metaclass=ABCMeta):
                 logger.debug("Stabilized the measurement current and set the plc to %f after %i iterations.", back_nlpc, i)
 
     @abstractmethod
-    def pre_scan_handler(self, unit):
+    def pre_scan_handler(self, unit=None):
         """
         pre_scan_handler
 
@@ -1646,7 +1657,12 @@ class PixCap65TotalCap(PixCap65Measurement):
                                output_pdf, **kwargs)
 
     def analyze(self, data_group_spec=None, **kwargs):
-
+        # handle deprecated keyword arguments.
+        correction_key_value = kwargs.pop("use_corrected", None)
+        if correction_key_value is not None:
+            msg = "keyword argument `use_corrected` is deprecated, use `apply_correction` instead. If `apply_correction` is also present this value will take precedence, otherwise the provided value will be used. This keyword argument will be removed in the future."
+            warnings.warn(msg, DeprecationWarning, stacklevel=2)
+            kwargs.setdefault("apply_correction", correction_key_value)
         # handle the additional PDF file in case of plotting enabled
         fit_plot_pdf_name = kwargs.pop('fit_plot_pdf_name', None)
         if "plot" in kwargs and kwargs["plot"] and fit_plot_pdf_name is not None:

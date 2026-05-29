@@ -1,19 +1,20 @@
 """
 Script for measuring Inter Pixel Capacitance 
 """
-
 import logging
 import numpy as np
 import tables as tb
 import time
+import warnings
 
+from pixcap65.analysis import analysis_data_handle
 from pixcap65.analysis_util import GENERAL_PIXCAP_SHAPE
-from pixcap65.analysis_util.utility import HIST_CURRENT_MEAS_UNIT
+from pixcap65.analysis_util.utility import HIST_CURRENT_MEAS_UNIT, handle_analysis_mix_up
 from pixcap65.pixcap_65_test_total_cap import PixCap65Measurement, MEASURING_PIXEL_TEXT, \
     _store_scan_par_values, ScanConfigurationKeys
 from pixcap65.utility import pixcap65_constants as c
 from pixcap65.utility.tables_util import set_group_attribute
-from pixcap65.utility.tqdm_logging_utils import advanced_tqdm_iterator
+from pixcap65.utility.utils_2 import walk_to_node
 
 logging.getLogger().setLevel(logging.INFO)
 logger = logging.getLogger(__name__)
@@ -174,53 +175,80 @@ class Pixcap65InterCap(PixCap65Measurement):
                 self.pixcap.cvm_frequency = freq
                 self.verify_stable_current(self.pixcap.vm2_smu_key)
 
-                # TODO: Absorb this into a measurement handler
-                self.inter_hist_current_1[i_col, i_row, k] = self.pixcap.vm3_measure_current()
-
-                # perhaps the wrong capacitance!
-                self.total_hist_current[i_col, i_row, k] = self.pixcap.vm2_measure_current()
-
-                # extract the inter pix current
-                self.inter_hist_current_2[i_col, i_row, k] = self.pixcap.vm1_measure_current()
+                self.handle_measurement(i_col, i_row, k)
 
                 self.store_iteration_parameters(freq, k)
 
     def store_measurement_data(self, data_group: tb.Group, sequence_call: bool, unit=None):
-        # TODO 2026-05-14 dominikfischer: this make multiple measurements for the inter-pix capacitance measurement impossible
-        if unit == "regular":
-            _store_scan_par_values(h5_file=self.out_file_h5, scan_parameters=self.scan_parameters, group=data_group)
-            self.create_carray(data_group, name='TotalHistCurr',
-                               title='Current Histogram for the total capacitance measurement', obj=self.total_hist_current,
-                               filters=self.filters, unit=HIST_CURRENT_MEAS_UNIT, input="VM2")
-            self.create_carray(data_group, name='TotalHistCurrErr',
-                               title='Error Histogram of the current for the total capacitance measurement',
-                               obj=self.total_hist_current_error, filters=self.filters, unit=HIST_CURRENT_MEAS_UNIT,
-                               input="VM2")
-            self.create_carray(data_group, name='InterHistCurrA',
-                               title='Current Histogram for the inter capacitance measurement',
-                               obj=self.inter_hist_current_1, filters=self.filters, unit=HIST_CURRENT_MEAS_UNIT,
-                               input="VM3")
-            self.create_carray(data_group, name='InterHistCurrErrA',
-                               title='Error Histogram of inter current A for the inter capacitance measurement',
-                               obj=self.inter_hist_current_1_error, filters=self.filters, unit=HIST_CURRENT_MEAS_UNIT,
-                               input="VM3")
-            self.create_carray(data_group, name='InterHistCurrB',
-                               title='Current Histogram for the inter capacitance measurement',
-                               obj=self.inter_hist_current_2, filters=self.filters, unit=HIST_CURRENT_MEAS_UNIT,
-                               input="VM1")
-            self.create_carray(data_group, name='InterHistCurrErrB',
-                               title='Error Histogram of inter current B for the inter capacitance measurement',
-                               obj=self.inter_hist_current_2_error, filters=self.filters, unit=HIST_CURRENT_MEAS_UNIT,
-                               input="VM1")
+        try:
+            if unit == "regular":
+                self.create_carray(data_group, name='TotalHistCurr',
+                                   title='Current Histogram for the total capacitance measurement',
+                                   obj=self.total_hist_current,
+                                   filters=self.filters, unit=HIST_CURRENT_MEAS_UNIT, input="VM2")
+                self.create_carray(data_group, name='TotalHistCurrErr',
+                                   title='Error Histogram of the current for the total capacitance measurement',
+                                   obj=self.total_hist_current_error, filters=self.filters, unit=HIST_CURRENT_MEAS_UNIT,
+                                   input="VM2")
+                self.create_carray(data_group, name='InterHistCurrA',
+                                   title='Current Histogram for the inter capacitance measurement',
+                                   obj=self.inter_hist_current_1, filters=self.filters, unit=HIST_CURRENT_MEAS_UNIT,
+                                   input="VM3")
+                self.create_carray(data_group, name='InterHistCurrErrA',
+                                   title='Error Histogram of inter current A for the inter capacitance measurement',
+                                   obj=self.inter_hist_current_1_error, filters=self.filters,
+                                   unit=HIST_CURRENT_MEAS_UNIT,
+                                   input="VM3")
+                self.create_carray(data_group, name='InterHistCurrB',
+                                   title='Current Histogram for the inter capacitance measurement',
+                                   obj=self.inter_hist_current_2, filters=self.filters, unit=HIST_CURRENT_MEAS_UNIT,
+                                   input="VM1")
+                self.create_carray(data_group, name='InterHistCurrErrB',
+                                   title='Error Histogram of inter current B for the inter capacitance measurement',
+                                   obj=self.inter_hist_current_2_error, filters=self.filters,
+                                   unit=HIST_CURRENT_MEAS_UNIT,
+                                   input="VM1")
+                if self.is_unit_averaging(unit):
+                    self.create_carray(data_group, name="TotalHistCurrValues",
+                                       title='Multiple current histogram for the total capacitance measurement',
+                                       obj=self.total_hist_individual_currents, filters=self.filters,
+                                       unit=HIST_CURRENT_MEAS_UNIT, input="VM2")
+                    self.create_carray(data_group, name="InterHistCurrValuesA",
+                                       title='Multiple current histogram for the inter capacitance measurement A',
+                                       obj=self.inter_hist_individual_currents_1, filters=self.filters,
+                                       unit=HIST_CURRENT_MEAS_UNIT, input="VM3")
+                    self.create_carray(data_group, name="InterHistCurrValuesA",
+                                       title='Multiple current histogram for the inter capacitance measurement B',
+                                       obj=self.inter_hist_individual_currents_2, filters=self.filters,
+                                       unit=HIST_CURRENT_MEAS_UNIT, input="VM1")
+        finally:
+            assert isinstance(data_group, tb.Group)
+            if unit == "regular":
+                _store_scan_par_values(h5_file=self.out_file_h5, scan_parameters=self.scan_parameters, group=data_group)
 
     def handle_measurement_errors(self, unit=None):
-        # make sure the measurement points will have uncertainties.
-        self.inter_hist_current_1_error = self.determine_measurement_uncertainty(self.pixcap.vm3_smu_key,
-                                                                                 self.inter_hist_current_1)
-        self.inter_hist_current_2_error = self.determine_measurement_uncertainty(self.pixcap.vm1_smu_key,
-                                                                                 self.inter_hist_current_2)
-        self.total_hist_current_error = self.determine_measurement_uncertainty(self.pixcap.vm2_smu_key,
-                                                                               self.total_hist_current)
+        if self.averaging:
+            inter_average_currents_1 = np.nanmean(self.inter_hist_individual_currents_1, axis=3, keepdims=True)
+            self.inter_hist_current_1 = inter_average_currents_1[:, :, :, 0]
+            self.inter_hist_current_1_error = np.nanstd(self.inter_hist_individual_currents_1, axis=3,
+                                                        mean=inter_average_currents_1)
+            inter_average_currents_2 = np.nanmean(self.inter_hist_individual_currents_2, axis=3, keepdims=True)
+            self.inter_hist_current_2 = inter_average_currents_2[:, :, :, 0]
+            self.inter_hist_current_2_error = np.nanstd(self.inter_hist_individual_currents_2, axis=3,
+                                                        mean=inter_average_currents_2)
+            total_average_currents = np.nanmean(self.total_hist_individual_currents, axis=3, keepdims=True)
+            self.total_hist_current = total_average_currents[:, :, :, 0]
+            self.total_hist_current_error = np.nanstd(self.total_hist_individual_currents, axis=3,
+                                                        mean=total_average_currents)
+
+        else:
+            # make sure the measurement points will have uncertainties.
+            self.inter_hist_current_1_error = self.determine_measurement_uncertainty(self.pixcap.vm3_smu_key,
+                                                                                     self.inter_hist_current_1)
+            self.inter_hist_current_2_error = self.determine_measurement_uncertainty(self.pixcap.vm1_smu_key,
+                                                                                     self.inter_hist_current_2)
+            self.total_hist_current_error = self.determine_measurement_uncertainty(self.pixcap.vm2_smu_key,
+                                                                                   self.total_hist_current)
 
     def _handle_single_measurement(self, col, row, k):
         self.inter_hist_current_1[col, row, k] = self.pixcap.vm3_measure_current()
@@ -236,12 +264,58 @@ class Pixcap65InterCap(PixCap65Measurement):
         self.inter_hist_individual_currents_2[col, row, k, :] = self.pixcap.vm1_read_multiple_current(self.n_measurements)
         self.total_hist_individual_currents[col, row, k, :] = self.pixcap.vm2_read_multiple_current(self.n_measurements)
 
+    def analyze(self, data_group_spec=None, **kwargs):
+        # handle deprecated keyword arguments.
+        correction_key_value = kwargs.pop("use_corrected", None)
+        if correction_key_value is not None:
+            msg = "keyword argument `use_corrected` is deprecated, use `apply_correction` instead. If `apply_correction` is also present this value will take precedence, otherwise the provided value will be used. This keyword argument will be removed in the future."
+            warnings.warn(msg, DeprecationWarning, stacklevel=2)
+            kwargs.setdefault("apply_correction", correction_key_value)
 
-    def analyze(self):
-        pass
+        # handle the additional PDF file in case of plotting enabled
+        fit_plot_pdf_name = kwargs.pop('fit_plot_pdf_name', None)
+        if "plot" in kwargs and kwargs["plot"] and fit_plot_pdf_name is not None:
+            from matplotlib.backends.backend_pdf import PdfPages
+            assert "fit_plot_pdf_name" not in kwargs
+            with PdfPages(fit_plot_pdf_name) as pdf:
+                kwargs['fit_plot_pdf'] = pdf
+                self.analyze(data_group_spec=data_group_spec, **kwargs)
+                return
 
-    def plot(self):
-        pass
+        kargs = kwargs.copy()
+        kargs.pop("plot", None)
+        kargs.pop("fit_plot_pdf", None)
+        kargs.pop("use_kafe2", None)
+        kargs.pop("output_pdf", None)
+        kargs['no_plot'] = True
+
+        # extract the hdf file groups to perform the analysis on.
+        base_group, _ = walk_to_node(self.base_group, data_group_spec, create=False, verify_create=True)
+
+        # special handling for C-V characterization.
+        reference_group = base_group.inter_cap
+
+        handle_analysis_mix_up(reference_group)
+        ana_group, _ = walk_to_node(reference_group, "analysis", create=True, verify_create=True)
+        assert isinstance(ana_group, tb.Group)
+        analysis_data_handle(self.out_file_h5, reference_group.measurements, ana_group, is_inter_pixel=True, **kwargs)
+
+    def plot(self, data_group_spec=None, **kwargs):
+        from matplotlib.backends.backend_pdf import PdfPages
+        from pixcap65.plotting import get_pdf_name, get_analysis_group, plot_inter_pix_data_delegate
+
+        suffix = kwargs.pop("suffix", "general_data_intern")
+        if kwargs.get("use_corrected", False):
+            suffix = "{}_corrected".format(suffix)
+        use_group = kwargs.pop("use_group", False)
+
+        # determine the pdf file
+        pdf_name = get_pdf_name(data_group_spec, self.output_file, suffix, use_group)
+        with PdfPages(pdf_name) as output_pdf:
+            plot_group, _ = walk_to_node(self.base_group, data_group_spec, create=False, verify_create=True)
+            plot_inter_pix_data_delegate(plot_group.inter_cap.measurements,
+                               get_analysis_group(plot_group.inter_cap, **kwargs),
+                               output_pdf, **kwargs)
 
     def close(self):
         self.pixcap.vm1_off()
@@ -260,8 +334,6 @@ class Pixcap65InterCap(PixCap65Measurement):
     def row_range(self):
         """Get the range of rows to scan the pixels for. (specialized for inter-pix)"""
         return range(self.row_stop, self.row_start - 1, -1)
-
-    # endregion
 
     @property
     def current_sense_range(self):
