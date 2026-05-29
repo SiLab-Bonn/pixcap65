@@ -12,6 +12,8 @@ from pixcap65.analysis_util.data_store import DepletionDataStore, DepletionTable
     DopingArrayStore
 from pixcap65.utility import synchronized_process_open_file
 
+# TODO: update the documentation of these implementations
+
 try:
     # noinspection PyCompatibility
     from collections.abc import Sized, Iterable
@@ -1992,30 +1994,30 @@ if __name__ == '__main__':
     # FIXME: the measured inter-pix data might be an issue as there are some conversions processed which would be overriden on data retrieval.
     # we will need to check the converter file very intensively to correct all the failures.
 
-    print("Analyze R13 Second Try")
-    r13_depletion_args = {
-        "first_boundaries": (-85, -25),
-        "second_boundaries": (-3.4, 0),
-        "distribution": True,
-        "apply_contour": True,
-        "apply_contours": True,
-        "chip_group_name": "Reference/R13/sensor",
-        "apply_doping": True,
-    }
-    r13_depletion_args.update(**bare_correction_args)
-    analyze_data(raw_data="packaged/R13_Renew_Scan.h5", base_path="Reference/R13/unbiased_1_full", is_advanced=True,
-                 **bare_correction_args)
-    analyze_data(raw_data="packaged/R13_Renew_Scan.h5", base_path="Reference/R13/biased_80_V_full", is_advanced=True,
-                 **bare_correction_args)
-    with PdfPages("Fit References/R13_3_Scan_Combined_reference_fits.pdf") as pdf:
-        analyze_data(raw_data="packaged/R13_Renew_Scan.h5", base_path="Reference/R13/C_V_Characteristic_refined",
-                     is_advanced=True, full_model=False, is_cv=True, cv_fit_plot_pdf=pdf,
-                     **r13_depletion_args)
-
-    analyze_data(raw_data="packaged/R13_Renew_Scan.h5", base_path="Reference/R13/inter_unbiased_full",
-                 is_advanced=True, full_model=False, is_inter_pixel=True)
-    analyze_data(raw_data="packaged/R13_Renew_Scan.h5", base_path="Reference/R13/inter_biased_M_80_V_full",
-                 is_advanced=True, full_model=False, is_inter_pixel=True)
+    # print("Analyze R13 Second Try")
+    # r13_depletion_args = {
+    #     "first_boundaries": (-85, -25),
+    #     "second_boundaries": (-3.4, 0),
+    #     "distribution": True,
+    #     "apply_contour": True,
+    #     "apply_contours": True,
+    #     "chip_group_name": "Reference/R13/sensor",
+    #     "apply_doping": True,
+    # }
+    # r13_depletion_args.update(**bare_correction_args)
+    # analyze_data(raw_data="packaged/R13_Renew_Scan.h5", base_path="Reference/R13/unbiased_1_full", is_advanced=True,
+    #              **bare_correction_args)
+    # analyze_data(raw_data="packaged/R13_Renew_Scan.h5", base_path="Reference/R13/biased_80_V_full", is_advanced=True,
+    #              **bare_correction_args)
+    # with PdfPages("Fit References/R13_3_Scan_Combined_reference_fits.pdf") as pdf:
+    #     analyze_data(raw_data="packaged/R13_Renew_Scan.h5", base_path="Reference/R13/C_V_Characteristic_refined",
+    #                  is_advanced=True, full_model=False, is_cv=True, cv_fit_plot_pdf=pdf,
+    #                  **r13_depletion_args)
+    #
+    # analyze_data(raw_data="packaged/R13_Renew_Scan.h5", base_path="Reference/R13/inter_unbiased_full",
+    #              is_advanced=True, full_model=False, is_inter_pixel=True)
+    # analyze_data(raw_data="packaged/R13_Renew_Scan.h5", base_path="Reference/R13/inter_biased_M_80_V_full",
+    #              is_advanced=True, full_model=False, is_inter_pixel=True)
 
     print("Analyze X1")
     x1_depletion_args = {
@@ -2041,10 +2043,10 @@ if __name__ == '__main__':
     # analyze_data(raw_data=X1_SCAN_2_FILE, base_path="Thesis/ATLAS_ITk/X1/inter_biased_M_80_V_full",
     #              is_advanced=True, full_model=False, is_inter_pixel=True)
     x1_depletion_args["first_boundaries"][1] = (-350, -150)
-    x1_depletion_args["second_boundaries"][1] = (-120, -100)
+    x1_depletion_args["second_boundaries"][1] = (-100, -50)
     x1_depletion_args = {
         "first_boundaries": [(-60, -20), (-350, -150)],
-        "second_boundaries": [(-2.6, 0), (-120, -100)],
+        "second_boundaries": [(-2.6, 0), (-72, -62)],
         "distribution": False,
         "apply_contour": False,
         "apply_contours": False,
@@ -2063,26 +2065,26 @@ if __name__ == '__main__':
     # with tb.open_file("packaged/E1_Renew_Scan.h5") as h5_file:
     #     get_test_capacitance_data(h5_file.root.Reference.E1.unbiased_full.total_cap.analysis)
     #
-    print("Analyze X2")
-    x2_depletion_args = {
-        "first_boundaries": [(-59.5, -15), (-100, -60)],
-        "second_boundaries": [(-0.5, 0), (-75, -50)],
-        "distribution": True,
-        "apply_contour": False,
-        "apply_contours": False,
-        "chip_group_name": "ATLAS_ITk/X2/sensor",
-        "apply_doping": True
-    }
-    analyze_data(raw_data=X2_SCAN_2_FILE, base_path="ATLAS_ITk/X2/unbiased_1_full", is_advanced=True,
-                 **bare_correction_args)
-    analyze_data(raw_data=X2_SCAN_2_FILE, base_path="ATLAS_ITk/X2/biased_80_V_full", is_advanced=True,
-                 **bare_correction_args)
-    with PdfPages("Fit References/X2_SCAN_Combined_reference_fits.pdf") as pdf:
-        analyze_data(raw_data=X2_SCAN_2_FILE, base_path="ATLAS_ITk/X2/C_V_Characteristic_refined",
-                     is_advanced=True, full_model=False, is_cv=True, use_corrected=True,
-                     cv_fit_plot_pdf=pdf, **x2_depletion_args,
-                     **bare_correction_args)
-
+    # print("Analyze X2")
+    # x2_depletion_args = {
+    #     "first_boundaries": [(-59.5, -15), (-100, -60)],
+    #     "second_boundaries": [(-0.5, 0), (-75, -50)],
+    #     "distribution": True,
+    #     "apply_contour": False,
+    #     "apply_contours": False,
+    #     "chip_group_name": "ATLAS_ITk/X2/sensor",
+    #     "apply_doping": True
+    # }
+    # analyze_data(raw_data=X2_SCAN_2_FILE, base_path="ATLAS_ITk/X2/unbiased_1_full", is_advanced=True,
+    #              **bare_correction_args)
+    # analyze_data(raw_data=X2_SCAN_2_FILE, base_path="ATLAS_ITk/X2/biased_80_V_full", is_advanced=True,
+    #              **bare_correction_args)
+    # with PdfPages("Fit References/X2_SCAN_Combined_reference_fits.pdf") as pdf:
+    #     analyze_data(raw_data=X2_SCAN_2_FILE, base_path="ATLAS_ITk/X2/C_V_Characteristic_refined",
+    #                  is_advanced=True, full_model=False, is_cv=True, use_corrected=True,
+    #                  cv_fit_plot_pdf=pdf, **x2_depletion_args,
+    #                  **bare_correction_args)
+    #
     summary_files = ["packaged/R13_Renew_Scan.h5", X1_SCAN_2_FILE, X2_SCAN_2_FILE]
     summary_groups = ["Reference/R13/unbiased_1_full/total_cap/analysis",
                       "ATLAS_ITk/X1/unbiased_61_full/total_cap/analysis", "ATLAS_ITk/X2/unbiased_1_full/total_cap/analysis"]
