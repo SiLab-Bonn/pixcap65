@@ -15,10 +15,25 @@ PresentationNotes.MD
 /out
 /dist
 /dist-uv
+
+# exclude the measurement data from commiting
 /pixcap65/Data
 /pixcap65/Data/**
 /pixcap65/Data.backup-2026-04-26
 !pixcap65/device
+*.h5
+results/*.yml
+results/*.yaml
+results/*.png
+results/*.txt
+data*
+
+# further configurations which should not be commited
+keithley_2602a*.yaml
+!keithley_2602a_range.yaml
+!keithley_2410_range.yaml
+!keithley_2602a_template.yaml
+*.log
 
 # environment manager
 uv.lock
