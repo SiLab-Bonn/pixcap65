@@ -28,6 +28,7 @@ uv.lock
 doc/docs/_build
 !doc
 !doc/*.pdf
+!/doc/docs/conf.py
 
 
 
