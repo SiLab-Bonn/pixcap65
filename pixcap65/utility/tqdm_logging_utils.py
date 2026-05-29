@@ -153,14 +153,15 @@ def logging_redirect_tqdm(
         for logger in loggers:
             tqdm_handler = _TqdmLoggingHandler(tqdm_class)
             if dummy_file is not None:
-                print("compare the process wrappers")
-                print(dummy_file.progress, tqdm_handler.tqdm_class)
+                pass
+                # print("compare the process wrappers")
+                # print(dummy_file.progress, tqdm_handler.tqdm_class)
             orig_handler = _get_first_found_console_logging_handler(logger.handlers)
             if orig_handler is not None and isinstance(orig_handler, logging.StreamHandler):
                 assert hasattr(orig_handler, 'stream')
                 assert hasattr(tqdm_handler, 'stream')
-                print("TYPE STREAM: ", type(orig_handler), orig_handler.stream)
-                print(f"Redirect the logging for logger: {logger.name}")
+                # print("TYPE STREAM: ", type(orig_handler), orig_handler.stream)
+                # print(f"Redirect the logging for logger: {logger.name}")
                 tqdm_handler.setFormatter(orig_handler.formatter)
                 # tqdm_handler.stream = orig_handler.stream
                 tqdm_handler.stream = sys.stderr
@@ -270,7 +271,9 @@ def advanced_tqdm_iterator(*args, tqdm_class=tqdm, logger: Optional[logging.Logg
                 post_iteration_hook(pbar)
             if logger is not None:
                 try:
-                    logger.info(str(pbar))
+                    stats = pbar.format_dict
+                    rate = stats["total"] / stats["elapsed"] if tqdm_kwargs.get("leave", True) else stats["rate"]
+                    logger.info("[%s]: The elapsed time is %f s with a rate of %f Hz and %f s/it.;", tqdm_kwargs.get("desc", "DEFAULT"), stats["elapsed"], rate, 1 / rate)
                     pbar.colour = 'red'
                 except:
                     logger.exception("Could not log the progress bar final state")
