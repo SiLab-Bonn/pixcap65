@@ -272,29 +272,29 @@ def advanced_analysis_data_handle(file: tb.File, data_group: GroupType, result_g
 def advanced_analysis_delegate(file: tb.File, group: tb.Group, current_hist: TABLES_ARRAY_TYPE,
                                scan_parameters: TABLES_TABLE_TYPE, **kwargs):
     """
-        advanced_analysis_delegate
+    advanced_analysis_delegate
 
-        Implementation of the advanced analysis strategy for the capacitance measurement of a pixel sensor.
-        For determination of the capacitance values non-linear fit algorithms are used.
-        Depending on the choice of parameters either kafe2 or iminuit is used for least squares minimization.
-        If requested the fit results will also be plotted to verify the convergence of the fit.
-        If this mode is activated, additional keyword arguments must be present to specify the output of the plots.
+    Implementation of the advanced analysis strategy for the capacitance measurement of a pixel sensor.
+    For determination of the capacitance values non-linear fit algorithms are used.
+    Depending on the choice of parameters either kafe2 or iminuit is used for least squares minimization.
+    If requested the fit results will also be plotted to verify the convergence of the fit.
+    If this mode is activated, additional keyword arguments must be present to specify the output of the plots.
 
-        :param file: h5 file object containing the data to be analysed.
-        :param group: hierarchy group of the opened hdf file to write the analysis results to.
-        :param current_hist: 2D-Array for the current data to fit the model to.
-        :param scan_parameters: table of the scan parameters used for each measurement point within the frequency and/or
-            voltage scan.
-        :key full_model: boolean, True, indicates whether the full model for extended frequency range is to be used.
-            Otherwise, the linear model is used.
-        :key current_error_hist: 2D-Array for the errors of the current data. This keyword argument must be present
-            for the advanced analysis strategy.
-        :key use_kafe2: boolean, indicates whether kafe2 is used for the fit.
-        :key plot: boolean, indicates whether to plot the data. AN output PDF object could be submitted here
-             instead of an explicitly created one.
-        :key apply_contour: boolean, indicates whether to determine the contours and try to plot them.
-        :key fit_plot_pdf: PdfPages object, to save the fit plot figures to (will override the plot object if provided)
-        """
+    :param file: h5 file object containing the data to be analysed.
+    :param group: hierarchy group of the opened hdf file to write the analysis results to.
+    :param current_hist: 2D-Array for the current data to fit the model to.
+    :param scan_parameters: table of the scan parameters used for each measurement point within the frequency and/or
+        voltage scan.
+    :key full_model: boolean, True, indicates whether the full model for extended frequency range is to be used.
+        Otherwise, the linear model is used.
+    :key current_error_hist: 2D-Array for the errors of the current data. This keyword argument must be present
+        for the advanced analysis strategy.
+    :key use_kafe2: boolean, indicates whether kafe2 is used for the fit.
+    :key plot: boolean, indicates whether to plot the data. AN output PDF object could be submitted here
+         instead of an explicitly created one.
+    :key apply_contour: boolean, indicates whether to determine the contours and try to plot them.
+    :key fit_plot_pdf: PdfPages object, to save the fit plot figures to (will override the plot object if provided)
+    """
     plot = kwargs.pop("plot", False)
     plot_fit = HandleFitterStubClass()
     if plot:
