@@ -38,7 +38,7 @@ from mpl_toolkits.axes_grid1 import make_axes_locatable
 from pixcap65.analysis_util.utility import check_leaf_unit, GENERAL_PIXCAP_SHAPE, HIST_BIAS_MEAS_UNIT, \
     HIST_LEAK_CURRENT_UNIT, \
     HIST_CAP_UNIT, HIST_CURRENT_MEAS_UNIT, extract_parasitic_capacitance, CURRENT_CONVERSION_FACTOR, get_base_group, \
-    get_analysis_group, TABLES_LEAF_COMPAT_TYPE
+    get_analysis_group, TABLES_LEAF_COMPAT_TYPE, CVDistributionData
 from pixcap65.utility.utils_2 import GroupType
 
 HISTOGRAM_SHAPE_FORMAT = "The histograms shape is {}"
@@ -690,6 +690,25 @@ def get_x_limits(voltage_data, x_limits: Optional[Iterable]) -> Iterable:
             x_limits[1] = actual_upper_limit
     return x_limits
 
+def plot_1d_distribution(data: np.ndarray, label: str, bias_code: int, table: Optional[tb.Table], pdf, group: tb.Group, **kwargs):
+    with interactive_lock:
+        fig = Figure()
+        _ = FigureCanvas(fig)
+        ax = fig.add_subplot(111)
+    hist_cap_hist = evaluate_pixel_mask(data, **kwargs)
+    ax.hist(hist_cap_hist[~np.isnan(hist_cap_hist)].reshape(-1) * CAPACITANCE_CONVERSION_FACTOR,
+            bins=kwargs.get("hist_bins", DEFAULT_BIN_NUMBER))
+    ax.set_ylabel(COUNTS_HIST_LABEL)
+    ax.set_xlabel(HIST_PIX_CAP_LABEL)
+    ax.set_title(__get_1d_hist_label(bias_code, label, table))
+    ax.grid()
+    pdf.savefig(fig, bbox_inches='tight')
+    with interactive_lock:
+        plt.close(fig)
+    if kwargs.pop("distribution", False):
+        from pixcap65.analysis import analyze_capacitance_distribution_delegate
+
+        analyze_capacitance_distribution_delegate(group, pdf, set_parasitic=False, **kwargs)
 
 def plot_data_delegate(data_group: tb.Group, analysis_group: tb.Group, output_pdf: PdfPages, **kwargs):
     """
@@ -720,58 +739,45 @@ def plot_data_delegate(data_group: tb.Group, analysis_group: tb.Group, output_pd
     scan_parameters = data_group.scan_params[:]
 
     # 2D Pixel Capacitance Hist
-    with interactive_lock:
-        fig = Figure()
-        _ = FigureCanvas(fig)
-        ax = fig.add_subplot(111)
-        im = ax.imshow(cap_hist * CAPACITANCE_CONVERSION_FACTOR)
-        divider = make_axes_locatable(ax)
-        cax = divider.append_axes('right', size='5%', pad=0.05)
-    fig.colorbar(im, cax=cax, label=HIST_PIX_CAP_LABEL)
-    ax.set_ylabel(COLUMN_LABEL)
-    ax.set_xlabel(ROW_LABEL)
-    output_pdf.savefig(fig, bbox_inches='tight')
-    with interactive_lock:
-        plt.close(fig)
+    plot_2d_capacitance(cap_hist, "Capacitance Distribution", output_pdf)
+    # with interactive_lock:
+    #     fig = Figure()
+    #     _ = FigureCanvas(fig)
+    #     ax = fig.add_subplot(111)
+    # im = ax.imshow(cap_hist * CAPACITANCE_CONVERSION_FACTOR)
+    # divider = make_axes_locatable(ax)
+    # cax = divider.append_axes('right', size='5%', pad=0.05)
+    # fig.colorbar(im, cax=cax, label=HIST_PIX_CAP_LABEL)
+    # ax.set_ylabel(COLUMN_LABEL)
+    # ax.set_xlabel(ROW_LABEL)
+    # output_pdf.savefig(fig, bbox_inches='tight')
+    # with interactive_lock:
+    #     plt.close(fig)
 
     if kwargs.get("exclude_test_cap", False):
         # another heat map which do not consider masked or boundary caps
         assert isinstance(cap_hist, np.ndarray)
         masked_cap_hist = cap_hist.copy()
         masked_cap_hist = evaluate_pixel_mask(masked_cap_hist, **kwargs)
-        with interactive_lock:
-            fig, ax = plt.subplots()
-            im = ax.imshow(masked_cap_hist * CAPACITANCE_CONVERSION_FACTOR)
-            divider = make_axes_locatable(ax)
-            cax = divider.append_axes('right', size='5%', pad=0.05)
-        fig.colorbar(im, cax=cax, label=HIST_PIX_CAP_LABEL)
-        ax.set_ylabel(COLUMN_LABEL)
-        ax.set_xlabel(ROW_LABEL)
-        ax.set_title("Masked Pixel Capacitance distribution")
-        output_pdf.savefig(fig, bbox_inches='tight')
-        plt.close(fig)
+        plot_2d_capacitance(masked_cap_hist, "Masked Pixel Capacitance distribution", output_pdf)
+        # with interactive_lock:
+        #     fig, ax = plt.subplots()
+        #     im = ax.imshow(masked_cap_hist * CAPACITANCE_CONVERSION_FACTOR)
+        #     divider = make_axes_locatable(ax)
+        #     cax = divider.append_axes('right', size='5%', pad=0.05)
+        # fig.colorbar(im, cax=cax, label=HIST_PIX_CAP_LABEL)
+        # ax.set_ylabel(COLUMN_LABEL)
+        # ax.set_xlabel(ROW_LABEL)
+        # ax.set_title("Masked Pixel Capacitance distribution")
+        # output_pdf.savefig(fig, bbox_inches='tight')
+        # plt.close(fig)
 
     # 1D Pixel Capacitance Hist
-    with interactive_lock:
-        fig = Figure()
-        _ = FigureCanvas(fig)
-        ax = fig.add_subplot(111)
-    hist_cap_hist = evaluate_pixel_mask(cap_hist, **kwargs)
-    ax.hist(hist_cap_hist[~np.isnan(hist_cap_hist)].reshape(-1) * CAPACITANCE_CONVERSION_FACTOR,
-            bins=kwargs.get("hist_bins", DEFAULT_BIN_NUMBER))
-    ax.set_ylabel(COUNTS_HIST_LABEL)
-    ax.set_xlabel(HIST_PIX_CAP_LABEL)
-    ax.grid()
-    output_pdf.savefig(fig, bbox_inches='tight')
-    with interactive_lock:
-        plt.close(fig)
-    if kwargs.pop("distribution", False):
-        from pixcap65.analysis import analyze_capacitance_distribution_delegate
+    distribution_table = analysis_group.DistResult if "DistResult" in analysis_group else None
 
-        analyze_capacitance_distribution_delegate(analysis_group, output_pdf, set_parasitic=False, **kwargs)
+    plot_1d_distribution(cap_hist, "Total Cap Distribution", 20000, distribution_table, output_pdf, analysis_group, **kwargs)
 
     # Current vs. frequency
-    print(HISTOGRAM_SHAPE_FORMAT.format(current_hist.shape))
     verify_pixel_mask = "mask_pixel" in kwargs and isinstance(kwargs["mask_pixel"], Iterable) and len(
         kwargs["mask_pixel"]) > 0
     for col, row in np.ndindex(current_hist.shape[:2]):
@@ -795,6 +801,41 @@ def plot_data_delegate(data_group: tb.Group, analysis_group: tb.Group, output_pd
             output_pdf.savefig(fig, bbox_inches='tight')
             with interactive_lock:
                 plt.close(fig)
+
+def __get_1d_hist_label(bias_code: int, label: str, table: Optional[tb.Table]):
+    if table is not None:
+        temp_rec_result = [row[:] for row in
+                           table.where("""(bias == {})""".format(bias_code))]
+        data_rec_result = np.rec.array(temp_rec_result,
+                                       dtype=tb.dtype_from_descr(CVDistributionData(), ))
+        uncorrected_label = "\nC=({}+-{}+-{}+-{}) F".format(data_rec_result.capacitance[0],
+                                                            data_rec_result.cap_std[0],
+                                                            data_rec_result.cap_systematic_error[0],
+                                                            data_rec_result.cap_systematic_dispersion[0])
+        corrected_label = "\nC_corr=({}+-{}+-{}+-{}) F".format(data_rec_result.cap_corrected[0],
+                                                               data_rec_result.cap_corrected_err[0],
+                                                               data_rec_result.cap_systematic_error[0],
+                                                               data_rec_result.cap_systematic_dispersion[0])
+    else:
+        uncorrected_label = ""
+        corrected_label = ""
+    return "{}{}{}".format(label, uncorrected_label, corrected_label)
+
+def plot_2d_capacitance(data, label, pdf):
+    with interactive_lock:
+        fig = Figure()
+        _ = FigureCanvas(fig)
+        ax = fig.add_subplot(111)
+    im = ax.imshow(data * CAPACITANCE_CONVERSION_FACTOR)
+    divider = make_axes_locatable(ax)
+    cax = divider.append_axes('right', size='5%', pad=0.05)
+    fig.colorbar(im, cax=cax, label=HIST_PIX_CAP_LABEL)
+    ax.set_ylabel(COLUMN_LABEL)
+    ax.set_xlabel(ROW_LABEL)
+    ax.set_title(label)
+    pdf.savefig(fig, bbox_inches='tight')
+    with interactive_lock:
+        plt.close(fig)
 
 
 def plot_inter_pix_data_delegate(data_group: tb.Group, analysis_group: tb.Group, output_pdf: PdfPages, total_group=None,
@@ -844,67 +885,14 @@ def plot_inter_pix_data_delegate(data_group: tb.Group, analysis_group: tb.Group,
     scan_parameters = data_group.scan_params[:]
 
     # 2D Pixel Capacitance Hist
-    with interactive_lock:
-        fig = Figure()
-        _ = FigureCanvas(fig)
-        ax = fig.add_subplot(111)
-        im = ax.imshow(total_cap_hist * CAPACITANCE_CONVERSION_FACTOR)
-    divider = make_axes_locatable(ax)
-    cax = divider.append_axes('right', size='5%', pad=0.05)
-    fig.colorbar(im, cax=cax, label=HIST_PIX_CAP_LABEL)
-    ax.set_ylabel(COLUMN_LABEL)
-    ax.set_xlabel(ROW_LABEL)
-    ax.set_title("Total Pixel Capacitance")
-    output_pdf.savefig(fig, bbox_inches='tight')
-    with interactive_lock:
-        plt.close(fig)
+    plot_2d_capacitance(total_cap_hist, "Total Pixel Capacitance", output_pdf)
     if total_ref_cap_hist is not None:
-        with interactive_lock:
-            fig = Figure()
-            _ = FigureCanvas(fig)
-            ax = fig.add_subplot(111)
-            im = ax.imshow((total_ref_cap_hist - total_cap_hist) * CAPACITANCE_CONVERSION_FACTOR)
-        divider = make_axes_locatable(ax)
-        cax = divider.append_axes('right', size='5%', pad=0.05)
-        fig.colorbar(im, cax=cax, label=HIST_PIX_CAP_LABEL)
-        ax.set_ylabel(COLUMN_LABEL)
-        ax.set_xlabel(ROW_LABEL)
-        ax.set_title("Inter Pixel capacitance from In-Pix C")
-        output_pdf.savefig(fig, bbox_inches='tight')
-        with interactive_lock:
-            plt.close(fig)
-
-    with interactive_lock:
-        fig = Figure()
-        _ = FigureCanvas(fig)
-        ax = fig.add_subplot(111)
-        im = ax.imshow(inter_a_cap_hist * CAPACITANCE_CONVERSION_FACTOR)
-        divider = make_axes_locatable(ax)
-    cax = divider.append_axes('right', size='5%', pad=0.05)
-    fig.colorbar(im, cax=cax, label=HIST_PIX_CAP_LABEL)
-    ax.set_ylabel(COLUMN_LABEL)
-    ax.set_xlabel(ROW_LABEL)
-    ax.set_title("Inter-Pixel Capacitance A")
-    output_pdf.savefig(fig, bbox_inches='tight')
-    with interactive_lock:
-        plt.close(fig)
-
-    with interactive_lock:
-        fig = Figure()
-        _ = FigureCanvas(fig)
-        ax = fig.add_subplot(111)
-    im = ax.imshow(inter_b_cap_hist * CAPACITANCE_CONVERSION_FACTOR)
-    divider = make_axes_locatable(ax)
-    cax = divider.append_axes('right', size='5%', pad=0.05)
-    fig.colorbar(im, cax=cax, label=HIST_PIX_CAP_LABEL)
-    ax.set_ylabel(COLUMN_LABEL)
-    ax.set_xlabel(ROW_LABEL)
-    ax.set_title("Inter-Pixel Capacitance B")
-    output_pdf.savefig(fig, bbox_inches='tight')
-    with interactive_lock:
-        plt.close(fig)
+        plot_2d_capacitance(total_ref_cap_hist, "Inter Pixel Capacitance from In-Pix C", output_pdf)
+    plot_2d_capacitance(inter_a_cap_hist, "Inter-Pixel Capacitance A", output_pdf)
+    plot_2d_capacitance(inter_b_cap_hist, "Inter-Pixel Capacitance B", output_pdf)
 
     # 1D Pixel Capacitance Hist
+    distribution_result_data = analysis_group.DistResult if "DistResult" in analysis_group else None
     n_bins = kwargs.get("hist_bins", DEFAULT_BIN_NUMBER)
     if np.count_nonzero(np.isfinite(total_cap_hist)) > 2:
         with interactive_lock:
@@ -916,7 +904,8 @@ def plot_inter_pix_data_delegate(data_group: tb.Group, analysis_group: tb.Group,
                 bins=n_bins)
         ax.set_ylabel(COUNTS_HIST_LABEL)
         ax.set_xlabel(HIST_PIX_CAP_LABEL)
-        ax.set_title("Pixel Total Capacitance Distribution")
+        title_str = "Pixel Total Capacitance Distribution"
+        ax.set_title(__get_1d_hist_label(10000, title_str, distribution_result_data))
         ax.grid()
         output_pdf.savefig(fig, bbox_inches='tight')
         with interactive_lock:
@@ -937,7 +926,7 @@ def plot_inter_pix_data_delegate(data_group: tb.Group, analysis_group: tb.Group,
                     bins=n_bins)
             ax.set_ylabel(COUNTS_HIST_LABEL)
             ax.set_xlabel(HIST_PIX_CAP_LABEL)
-            ax.set_title("Pixel Inter Capacitance Distribution")
+            ax.set_title(__get_1d_hist_label(13000, "Pixel Inter Capacitance Distribution", distribution_result_data))
             ax.grid()
             output_pdf.savefig(fig, bbox_inches='tight')
             with interactive_lock:
@@ -958,7 +947,7 @@ def plot_inter_pix_data_delegate(data_group: tb.Group, analysis_group: tb.Group,
                 bins=n_bins)
         ax.set_ylabel(COUNTS_HIST_LABEL)
         ax.set_xlabel(HIST_PIX_CAP_LABEL)
-        ax.set_title("Inter-Pixel A Capacitance Distribution")
+        ax.set_title(__get_1d_hist_label(11000, "Inter-Pixel A Capacitance Distribution", distribution_result_data))
         ax.grid()
         output_pdf.savefig(fig, bbox_inches='tight')
         with interactive_lock:
@@ -978,7 +967,7 @@ def plot_inter_pix_data_delegate(data_group: tb.Group, analysis_group: tb.Group,
                 bins=n_bins)
         ax.set_ylabel(COUNTS_HIST_LABEL)
         ax.set_xlabel(HIST_PIX_CAP_LABEL)
-        ax.set_title("Inter-Pixel B Capacitance Distribution")
+        ax.set_title(__get_1d_hist_label(12000, "Inter-Pixel B Capacitance Distribution", distribution_result_data))
         ax.grid()
         output_pdf.savefig(fig, bbox_inches='tight')
         with interactive_lock:
@@ -990,7 +979,6 @@ def plot_inter_pix_data_delegate(data_group: tb.Group, analysis_group: tb.Group,
                                                       **kwargs)
 
     # Current vs. frequency (Will try to plot all into just one coordinate system)
-    print(HISTOGRAM_SHAPE_FORMAT.format(total_current_hist.shape))
     verify_mask_pixel = "mask_pixel" in kwargs and isinstance(kwargs["mask_pixel"], Iterable)
     for col, row in np.ndindex(total_current_hist.shape[:2]):
         if verify_mask_pixel and (col, row) in kwargs["mask_pixel"]:
@@ -1285,26 +1273,26 @@ if __name__ == '__main__':
 
     print("Plot X1 Second Try.")
     x1_second_pixel_mask = [[39, 39], [38, 39]]
-    # plot_data(interpreted_data=X1_SCAN_2_FILE, base_path="ATLAS_ITk/X1/unbiased_61_full", use_group=True,
-    #           exclude_test_cap=True, mask_pixel=x1_second_pixel_mask, distribution=True)
-    # plot_data(interpreted_data=X1_SCAN_2_FILE, base_path="ATLAS_ITk/X1/unbiased_61_full", use_group=True,
-    #           exclude_test_cap=True, use_corrected=True, mask_pixel=x1_second_pixel_mask, distribution=True)
-    # plot_data(interpreted_data=X1_SCAN_2_FILE, base_path="ATLAS_ITk/X1/biased_80_V_full", use_group=True,
-    #           exclude_test_cap=True, mask_pixel=x1_second_pixel_mask, distribution=True)
-    # plot_data(interpreted_data=X1_SCAN_2_FILE, base_path="ATLAS_ITk/X1/biased_80_V_full", use_group=True,
-    #           exclude_test_cap=True, use_corrected=True, mask_pixel=x1_second_pixel_mask, distribution=True)
-    # plot_bias_data(interpreted_data=X1_SCAN_2_FILE, base_path="ATLAS_ITk/X1/I_V_Characteristic", use_group=True, )
+    plot_data(interpreted_data=X1_SCAN_2_FILE, base_path="ATLAS_ITk/X1/unbiased_61_full", use_group=True,
+              exclude_test_cap=True, mask_pixel=x1_second_pixel_mask, distribution=True)
+    plot_data(interpreted_data=X1_SCAN_2_FILE, base_path="ATLAS_ITk/X1/unbiased_61_full", use_group=True,
+              exclude_test_cap=True, use_corrected=True, mask_pixel=x1_second_pixel_mask, distribution=True)
+    plot_data(interpreted_data=X1_SCAN_2_FILE, base_path="ATLAS_ITk/X1/biased_80_V_full", use_group=True,
+              exclude_test_cap=True, mask_pixel=x1_second_pixel_mask, distribution=True)
+    plot_data(interpreted_data=X1_SCAN_2_FILE, base_path="ATLAS_ITk/X1/biased_80_V_full", use_group=True,
+              exclude_test_cap=True, use_corrected=True, mask_pixel=x1_second_pixel_mask, distribution=True)
+    plot_bias_data(interpreted_data=X1_SCAN_2_FILE, base_path="ATLAS_ITk/X1/I_V_Characteristic", use_group=True, )
     plot_combined_data(interpreted_data=X1_SCAN_2_FILE, base_path="ATLAS_ITk/X1/C_V_Characteristic_refined",
                        use_group=True, mask_pixel=x1_second_pixel_mask, distribution=True)
     plot_combined_data(interpreted_data=X1_SCAN_2_FILE, base_path="ATLAS_ITk/X1/C_V_Characteristic_refined",
                        use_group=True, use_corrected=True,
                        apply_doping=False, distribution=True, mask_pixel=x1_second_pixel_mask)
-    # plot_inter_pix_data(interpreted_data=X1_SCAN_2_FILE, base_path="Thesis/ATLAS_ITk/X1/inter_unbiased_full",
-    #                     use_group=True, exclude_test_cap=True, distribution=True,
-    #                     total_data=X1_SCAN_2_FILE, total_path="ATLAS_ITk/X1/unbiased_61_full")
-    # plot_inter_pix_data(interpreted_data=X1_SCAN_2_FILE, base_path="Thesis/ATLAS_ITk/X1/inter_biased_M_80_V_full",
-    #                     use_group=True, exclude_test_cap=True, distribution=True,
-    #                     total_data=X1_SCAN_2_FILE, total_path="ATLAS_ITk/X1/unbiased_61_full")
+    plot_inter_pix_data(interpreted_data=X1_SCAN_2_FILE, base_path="Thesis/ATLAS_ITk/X1/inter_unbiased_full",
+                        use_group=True, exclude_test_cap=True, distribution=True,
+                        total_data=X1_SCAN_2_FILE, total_path="ATLAS_ITk/X1/unbiased_61_full")
+    plot_inter_pix_data(interpreted_data=X1_SCAN_2_FILE, base_path="Thesis/ATLAS_ITk/X1/inter_biased_M_80_V_full",
+                        use_group=True, exclude_test_cap=True, distribution=True,
+                        total_data=X1_SCAN_2_FILE, total_path="ATLAS_ITk/X1/unbiased_61_full")
 
     plot_combined_data(interpreted_data=X1_SCAN_2_FILE, base_path="Thesis/ATLAS_ITk/X1/C_V_Characteristic_Second_Extended",
                        use_group=True, mask_pixel=x1_second_pixel_mask, distribution=True)

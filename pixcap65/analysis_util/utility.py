@@ -451,6 +451,20 @@ class DepletionWidthData(tb.IsDescription):
     sat = tb.Float32Col(pos=5)
 
 
+class CVDistributionSimpleData(tb.IsDescription):
+    bias = tb.Float64Col(pos=0)
+    n_pixel = tb.Int64Col(pos=1)
+    capacitance = tb.Float64Col(pos=2)
+    cap_err = tb.Float64Col(pos=3)
+    cap_std = tb.Float64Col(pos=4)
+    cap_std_err = tb.Float64Col(pos=5)
+    r_on = tb.Float64Col(pos=6)
+    r_on_err = tb.Float64Col(pos=7)
+    r_on_std = tb.Float64Col(pos=8)
+    r_on_std_err = tb.Float64Col(pos=9)
+    cap_systematic_general = tb.Float64Col(pos=10)
+    cap_systematic_dispersion = tb.Float64Col(pos=11)
+
 class CVDistributionData(tb.IsDescription):
     bias = tb.Float64Col(pos=0)
     n_pixel = tb.Int64Col(pos=1)
@@ -466,7 +480,48 @@ class CVDistributionData(tb.IsDescription):
     cap_corrected_err = tb.Float64Col(pos=11)
     cap_parasitic = tb.Float64Col(pos=12)
     cap_systematic_error = tb.Float64Col(pos=13)
+    cap_corrected_est_error = tb.Float64Col(pos=14)
+    cap_corrected_std_error = tb.Float64Col(pos=15)
+    cap_systematic_dispersion = tb.Float64Col(pos=16)
 
+depletion_atomic_type = np.dtype([
+    ("Ubi", np.float64),
+    ("Ubi_error", np.float64),
+    ("a", np.float64),
+    ("a_error", np.float64),
+    ("b", np.float64),
+    ("b_error", np.float64),
+    ("c", np.float64),
+    ("c_error", np.float64),
+    ("d", np.float64),
+    ("d_error", np.float64),
+])
+
+class DepletionAtomicData(tb.IsDescription):
+    Ubi = tb.Float64Col(pos=0)
+    Ubi_error = tb.Float64Col(pos=1)
+    a = tb.Float64Col(pos=2)
+    a_error = tb.Float64Col(pos=3)
+    b = tb.Float64Col(pos=4)
+    b_error = tb.Float64Col(pos=5)
+    c = tb.Float64Col(pos=6)
+    c_error = tb.Float64Col(pos=7)
+    d = tb.Float64Col(pos=8)
+    d_error = tb.Float64Col(pos=9)
+
+class DepletionSimpleData(tb.IsDescription):
+    Ubi = tb.Float64Col(pos=0)
+    Ubi_error = tb.Float64Col(pos=1)
+    a = tb.Float64Col(pos=2)
+    a_error = tb.Float64Col(pos=3)
+    b = tb.Float64Col(pos=4)
+    b_error = tb.Float64Col(pos=5)
+    c = tb.Float64Col(pos=6)
+    c_error = tb.Float64Col(pos=7)
+    d = tb.Float64Col(pos=8)
+    d_error = tb.Float64Col(pos=9)
+    Ubi_systematic = tb.Float64Col(pos=10)
+    Ubi_dispersion = tb.Float64Col(pos=11)
 
 class DepletionData(tb.IsDescription):
     Ubi = tb.Float64Col(pos=0)
@@ -491,6 +546,8 @@ class DepletionData(tb.IsDescription):
     d_corrected_error = tb.Float64Col(pos=19)
     Ubi_systematic = tb.Float64Col(pos=20)
     Ubi_systematic_corrected = tb.Float64Col(pos=21)
+    Ubi_systematic_dispersion = tb.Float64Col(pos=22)
+    Ubi_systematic_dispersion_corrected_error = tb.Float64Col(pos=23)
 
     def __new__(cls, classname: str, bases: Sequence, classdict: dict[str, Any]):
         print("Called new!")

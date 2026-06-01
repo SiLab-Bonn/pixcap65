@@ -1,5 +1,6 @@
 import numpy as np
 import tables as tb
+import threading
 
 from pixcap65.analysis_util import GENERAL_PIXCAP_SHAPE
 
@@ -28,7 +29,51 @@ class DepletionTableStore(DepletionDataStore):
         self.table = table
         self.entry = self.table.row
         self.depletion_reg = None
-        self.n_values = n_depletions
+
+    remap = [0, 1, 3.0, 2.0, 3.1, 2.1, 5.0, 4.0, 5.1, 4.1]
+    match_fields = ("depletion",
+                    "depletion_error",
+                    "fit_result_first:0",
+                    "fit_error_first:0",
+                    "fit_result_first:1",
+                    "fit_error_first:1",
+                    "fit_result_second:0",
+                    "fit_error_second:0",
+                    "fit_result_second:1",
+                    "fit_error_second:1",)
+
+    def store_data(self, key, data):
+        match key:
+            case "depletion":
+                self.entry["Ubi"] = data
+            case "depletion_error":
+                self.entry["Ubi_error"] = data
+            case "fit_result_first":
+                self.entry["a"] = data[0]
+                self.entry["b"] = data[1]
+            case "fit_error_first":
+                self.entry["a_error"] = data[0]
+                self.entry["b_error"] = data[1]
+            case "fit_result_second":
+                self.entry["c"] = data[0]
+                self.entry["d"] = data[1]
+            case "fit_error_second":
+                self.entry["c_error"] = data[0]
+                self.entry["d_error"] = data[1]
+            case _:
+                raise ValueError(f"The provided storage key is unknown: {key}")
+
+    def flush_data(self):
+        self.entry.append()
+
+class DepletionNumpyStore(DepletionDataStore):
+    def __init__(self, dtp: np.dtype):
+        self.entry = {}
+        self.depletion_reg = None
+        self.data_temp = []
+        self.dtype = dtp
+        self.fields = dtp.names
+
 
     def store_data(self, key, data):
         match key:
@@ -56,7 +101,13 @@ class DepletionTableStore(DepletionDataStore):
         self.depletion_reg = i
 
     def flush_data(self):
-        self.entry.append()
+        entries = tuple(self.entry.pop(name, np.nan) for name in self.fields)
+        self.data_temp.extend([entries, ])
+        self.entry.clear()
+
+    @property
+    def table(self):
+        return np.rec.array(self.data_temp, dtype=self.dtype)
 
 
 class DepletionArrayStore(DepletionDataStore):
@@ -68,16 +119,71 @@ class DepletionArrayStore(DepletionDataStore):
         self.depletion_error = np.full(shape=general_shape, fill_value=np.nan)
         self.fit_parameter_estimators = np.full(shape=parameter_shape, fill_value=np.nan)
         self.fit_parameter_errors = np.full(shape=parameter_shape, fill_value=np.nan)
-        self.pixel_row = 1
-        self.pixel_col = 1
-        self.depletion_reg = None
+        self.lock = threading.RLock()
+        self._pixel_row = {}
+        self._pixel_col = {}
+        # could use the thread id to identify
+        self._depletion_reg = {}
+        self.systematic_errors = np.full(shape=general_shape, fill_value=np.nan)
+        self.systematic_dispersion = np.full(shape=general_shape, fill_value=np.nan)
+
+    @property
+    def pixel_row(self):
+        with self.lock:
+            return self._pixel_row.get(threading.get_native_id(), 1)
+
+    @property
+    def pixel_col(self):
+        with self.lock:
+            return self._pixel_col.get(threading.get_native_id(), 1)
+
+    @property
+    def depletion_reg(self):
+        with self.lock:
+            return self._depletion_reg.get(threading.get_native_id(), None)
+
+    @pixel_row.setter
+    def pixel_row(self, i):
+        with self.lock:
+            self._pixel_row[threading.get_native_id()] = i
+
+    @pixel_col.setter
+    def pixel_col(self, j):
+        with self.lock:
+            self._pixel_col[threading.get_native_id()] = j
+
+
+    @depletion_reg.setter
+    def depletion_reg(self, i):
+        with self.lock:
+            self._depletion_reg[threading.get_native_id()] = i
+
+    @pixel_row.deleter
+    def pixel_row(self):
+        with self.lock:
+            if threading.get_native_id() in self._pixel_row:
+                del self._pixel_row[threading.get_native_id()]
+
+    @pixel_col.deleter
+    def pixel_col(self):
+        with self.lock:
+            if threading.get_native_id() in self._pixel_col:
+                del self._pixel_col[threading.get_native_id()]
+
+    @depletion_reg.deleter
+    def depletion_reg(self):
+        with self.lock:
+            if threading.get_native_id() in self._depletion_reg:
+                del self._depletion_reg[threading.get_native_id()]
 
     def set_pixel(self, i_row, i_col):
-        self.pixel_row = i_row
-        self.pixel_col = i_col
+        with self.lock:
+            self.pixel_row = i_row
+            self.pixel_col = i_col
 
     def set_depletion_region(self, i):
-        self.depletion_reg = i
+        with self.lock:
+            self.depletion_reg = i
 
     def store_data(self, key, data):
         if self.depletion_reg is None:
@@ -94,6 +200,10 @@ class DepletionArrayStore(DepletionDataStore):
                     self.fit_parameter_estimators[self.pixel_col, self.pixel_row, 2:] = data
                 case "fit_error_second":
                     self.fit_parameter_errors[self.pixel_col, self.pixel_row, 2:] = data
+                case "systematic":
+                    self.systematic_errors[self.pixel_col, self.pixel_row] = data
+                case "dispersion":
+                    self.systematic_dispersion[self.pixel_col, self.pixel_row] = data
                 case _:
                     raise ValueError(f"The provided storage key is unknown: {key}")
         else:
@@ -110,6 +220,10 @@ class DepletionArrayStore(DepletionDataStore):
                     self.fit_parameter_estimators[self.pixel_col, self.pixel_row, self.depletion_reg, 2:] = data
                 case "fit_error_second":
                     self.fit_parameter_errors[self.pixel_col, self.pixel_row, self.depletion_reg, 2:] = data
+                case "systematic":
+                    self.systematic_errors[self.pixel_col, self.pixel_row, self.depletion_reg] = data
+                case "dispersion":
+                    self.systematic_dispersion[self.pixel_col, self.pixel_row, self.depletion_reg] = data
                 case _:
                     raise ValueError(f"The provided storage key is unknown: {key}")
 
@@ -145,3 +259,8 @@ class DopingArrayStore(DepletionDataStore):
                 self.effective_doping_table[self.pixel_col, self.pixel_row] = data
             case _:
                 raise ValueError(f"Unknown data storage key {key}")
+
+class SummaryTable(tb.IsDescription):
+    sensor = tb.StringCol(10, pos=0)
+    inj_cap = tb.Float64Col(pos=1)
+    inj_cap_2 = tb.Float64Col(pos=2)

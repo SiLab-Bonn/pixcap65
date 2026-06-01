@@ -8,13 +8,33 @@ from pixcap65.analysis_util.utility import TABLES_ARRAY_TYPE, TABLES_TABLE_TYPE,
 
 def analyze_data_delegate(file: tb.File, group: tb.Group, current_hist: TABLES_ARRAY_TYPE,
                           scan_parameters: TABLES_TABLE_TYPE, **kwargs):
-    # TODO: doc string is still missing
+    """
+    analyze_data_delegate
+
+    Implementation of the simple analysis strategy for the capacitance measurement of a pixel sensor.
+    For determination of the capacitance values a simplified linear least-squares fit is used.
+    The covariance information from the simplified fit is not trust worthy, as the even when the uncertainties/weights
+    of the data are trust-worthy the covariance matrix from the fit is rescaled such that the Chi^2 / d.o.f. is 1.
+    Therefore, the covariance matrix of these fits is not suitable to estimate the uncertainties of the capacitances.
+
+    :param file: h5 file object containing the data to be analysed.
+    :param group: hierarchy group of the opened hdf file to write the analysis results to.
+    :param current_hist: 2D-Array for the current data to fit the model to.
+    :param scan_parameters: table of the scan parameters used for each measurement point within the frequency and/or
+        voltage scan.
+    :key current_error_hist: 2D-Array for the errors of the current data. This keyword argument must be present
+        for the advanced analysis strategy. (This argument has no effect by the current implementation).
+    """
     # create array like objects to temporarily save the analysis results
     cap_hist = np.full(shape=GENERAL_PIXCAP_SHAPE, fill_value=np.nan)  # capacitance for each pixel
     cap_error_hist = np.full(shape=GENERAL_PIXCAP_SHAPE, fill_value=np.nan)
     leak_hist = np.full(shape=GENERAL_PIXCAP_SHAPE, fill_value=np.nan)
     leak_error_hist = np.full(shape=GENERAL_PIXCAP_SHAPE, fill_value=np.nan)
     fit_cov = np.full(shape=(40, 40, 2, 2), fill_value=np.nan)
+
+    weights = kwargs.pop("current_error_hist", None)
+    if weights is not None:
+        weights = np.reciprocal(np.asarray(weights) ** 2)
 
     # Fit pixel data in order to extract capacitance for each pixel
     for col in range(current_hist.shape[0]):
