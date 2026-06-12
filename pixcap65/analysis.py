@@ -2034,5 +2034,6 @@ if __name__ == '__main__':
     # # analyze_data(raw_data=REFERENCE_TEST_FILE, base_path="Reference/TESTS/unbiased_31",
     # #              is_advanced=True, full_model=False, is_cv=False, use_corrected=False)
 
-    print("generate summary")
-    generate_test_summary(summary_files, summary_groups, summary_sensors, "conclude_result.h5")
+
+    # print("generate summary")
+    # generate_test_summary(summary_files, summary_groups, summary_sensors, "conclude_result.h5")

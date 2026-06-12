@@ -342,6 +342,7 @@ class PixCap65Measurement(Pixcap65BaseMeasurement, metaclass=ABCMeta):
             self.has_bias_supply = False
 
         # init the primary smu or VM3
+        # self._smu_setup(self.pixcap.primary_smu_key).reset()
         self.init_smu()
         self._smu_setup(self.pixcap.primary_smu_key).drain_error_queue()
         logger.info("fetch some configurations from the smu!")
@@ -1349,7 +1350,7 @@ class PixCap65Measurement(Pixcap65BaseMeasurement, metaclass=ABCMeta):
                             yield i_col, i_row
 
                         # last measure the voltage at the providing SMU
-                        voltage_reference_data[i_col, i_row] = self.pixcap.vm3_measure_volts()
+                        # voltage_reference_data[i_col, i_row] = self.pixcap.vm3_measure_volts()
 
 
 
