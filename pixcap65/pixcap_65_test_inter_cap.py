@@ -52,7 +52,7 @@ class InterCap(tb.IsDescription):
 
 
 class Pixcap65InterCap(PixCap65Measurement):
-    def pre_scan_handler(self, unit):
+    def pre_scan_handler(self, unit=None):
         if self.averaging:
             self.n_measurements = self.scan_config[ScanConfigurationKeys.AVERAGE_MEASUREMENTS]
             individual_currents_shape = (*GENERAL_PIXCAP_SHAPE, self.n_frequencies, self.n_measurements)
@@ -252,7 +252,6 @@ class Pixcap65InterCap(PixCap65Measurement):
             self.total_hist_current_error = self.determine_measurement_uncertainty(self.pixcap.vm2_smu_key,
                                                                                    self.total_hist_current,
                                                                                    sense_range=self.total_current_sense_range)
-            self.total_hist_current)
 
     def _handle_single_measurement(self, col, row, k):
         self.inter_hist_current_1[col, row, k] = self.pixcap.vm3_measure_current()

@@ -9,8 +9,8 @@ from pixcap65.utils import PixCapSetup, PixcapMeasurements
 
 MAXIMUM_CV_FREQ = 4.1
 CV_FREQ_STEP = 1
-HV_STEP = 0.25
-MAXIMUM_HV_VOLTAGE = 100
+HV_STEP = 0.3
+MAXIMUM_HV_VOLTAGE = 60
 MAXIMUM_FULL_SCAN_FREQ = 10.1
 FULL_SCAN_FREQ_STEP = 0.75
 MAXIMUM_INTER_PIX_FREQ = 6.1
@@ -29,17 +29,17 @@ scan_configuration = {
     'frequency_range': np.arange(1, 6.1, 0.5),  # frequency sweep in MHz
     # 'bias_range': -1 * np.geomspace(1, 80, 25),
     # 'bias': -80.0,   # bias voltage to apply in V
-    'bias_limit': 0.0000005,
-    'bias_sense_range': 0.000001,
-    'bias_hv_limit': 0.0000005,
+    'bias_limit': 0.000008,
+    'bias_sense_range': 0.00001,
+    'bias_hv_limit': 0.000008,
 
-    'data_path': "Thesis/ATLAS_ITk/X4",
+    'data_path': "Thesis/ATLAS_ITk/X7",
     "out_file_mode": "append",
 }
 
 
 def perform_initial_total_measurement(cli_args):
-    global scan_configuration, pix
+    global scan_configuration
     with lock:
         scan_configuration[ScanConfigurationKeys.AVERAGE_MEASUREMENTS] = 30
         scan_configuration[ScanConfigurationKeys.FREQUENCY_RANGE] = np.arange(1, MAXIMUM_FULL_SCAN_FREQ, FULL_SCAN_FREQ_STEP)
@@ -62,7 +62,7 @@ def perform_initial_total_measurement(cli_args):
 
 
 def perform_iv_measurement(cli_args):
-    global scan_configuration, pix
+    global scan_configuration
     with lock:
         scan_configuration[ScanConfigurationKeys.BIAS_VOLTAGE_RANGE] = -1 * np.arange(0, MAXIMUM_HV_VOLTAGE, HV_STEP)
         scan_configuration[ScanConfigurationKeys.BIAS_AVERAGE_MEASUREMENTS] = 10
@@ -83,7 +83,7 @@ def perform_iv_measurement(cli_args):
 
 
 def perform_coarse_cv_scan(cli_args, hv_range):
-    global scan_configuration, pix
+    global scan_configuration
 
     with lock:
         assert np.all(scan_configuration[ScanConfigurationKeys.BIAS_VOLTAGE_RANGE] < 0)
@@ -91,7 +91,7 @@ def perform_coarse_cv_scan(cli_args, hv_range):
     if cli_args.cv_general_flag and cli_args.cv_coarse_flag:
         print("Perform the coarse bias scan")
         with PixCapSetup(scan_configuration, output_file, measurement=PixcapMeasurements.TOTAL_CAPACITANCE) as pix:
-            pix.combined_bias_cv_scan(data_group_spec="C_V_Characteristic_3")
+            pix.combined_bias_cv_scan(data_group_spec="C_V_Characteristic")
 
     with lock:
         try:
@@ -103,7 +103,7 @@ def perform_coarse_cv_scan(cli_args, hv_range):
 
 
 def perform_fine_cv_scan(cli_args, hv_range):
-    global scan_configuration, pix
+    global scan_configuration
 
     with lock:
         scan_configuration[ScanConfigurationKeys.BIAS_VOLTAGE_RANGE] = hv_range
@@ -127,8 +127,7 @@ def perform_fine_cv_scan(cli_args, hv_range):
 
 
 def perform_biased_total_cap(cli_args):
-    global scan_configuration, pix
-
+    global scan_configuration
     with lock:
         if ScanConfigurationKeys.BIAS_VOLTAGE_RANGE in scan_configuration:
             del scan_configuration[ScanConfigurationKeys.BIAS_VOLTAGE_RANGE]
@@ -157,7 +156,7 @@ def perform_biased_total_cap(cli_args):
 
 
 def perform_inter_pix_scan(cli_args):
-    global scan_configuration, pix
+    global scan_configuration
 
     with lock:
         scan_configuration[ScanConfigurationKeys.FREQUENCY_RANGE] = np.arange(1, MAXIMUM_INTER_PIX_FREQ, INTER_PIX_FREQ_STEP)
@@ -199,7 +198,7 @@ if __name__ == "__main__":
     import shutil
     import argparse
     # one setup trial per measurement
-    output_file = "data/3D_Sensor_221_W5_S_Scan.h5"
+    output_file = "data/3D_Sensor_H23_S24_Full_Scan.h5"
 
     argument_parser = argparse.ArgumentParser("Pixcap65 Measurements")
     argument_parser.add_argument("-u", "--unbiased", action='store_true', dest='total_unbiased', help='Unbiased total capacitance measurement to perform')
@@ -230,25 +229,35 @@ if __name__ == "__main__":
 
     # initial measurement sample
     perform_initial_total_measurement(arguments)
+    time.sleep(600)
 
     # I-V characterization!
     perform_iv_measurement(arguments)
+    time.sleep(600)
 
     # C-V characterization sample
-    coarse_bias_range = -1 * np.arange(1, MAXIMUM_HV_VOLTAGE, HV_STEP)
+    coarse_bias_range = -1 * np.arange(0.1, MAXIMUM_HV_VOLTAGE, HV_STEP)
+    # fine grid for HPK sensors.
     # fine_bias_range = -1 * np.unique(np.concat((
-    #     np.geomspace(0.01,20,20),
-    #     np.geomspace(20,60,25),
+    #     np.geomspace(0.1, 1, 8),
+    #     np.geomspace(1, 15, 14),
+    #     np.arange(15, 50.1, 5),
+    #     np.geomspace(50,150, 26),
+    #     np.arange(150, 350,10)
     # )))
-    # coarse_bias_range = -1 * np.arange(1,250.1,0.5)
-    # fine_bias_range = -1 * np.concat((
-    #     np.geomspace(0.1,80,40),
-    #     np.arange(81,250,1),
-    # ))
-    fine_bias_range = -1 * np.geomspace(70, 350, 46)
+    # fine grid sintef
+    fine_bias_range = -1 * np.unique(np.concat((
+        np.geomspace(0.1, 30, 30),
+        np.geomspace(30, 58, 41)
+    )))
+    # fine grid R11/R13/R1
+    # fine_bias_range = -1 * np.unique(np.concat((
+    #     np.geomspace(0.1, 30, 20),
+    #     np.arange(30, 160.1, 2)
+    # )))
     # noqa: S125
     scan_configuration[ScanConfigurationKeys.BIAS_VOLTAGE_RANGE] = coarse_bias_range
-    scan_configuration.update(start_row=35, stop_row=39, start_column=35, stop_column=39)
+    scan_configuration.update(start_row=20, stop_row=25, start_column=20, stop_column=25)
     scan_configuration[ScanConfigurationKeys.FREQUENCY_RANGE] = np.arange(1, MAXIMUM_CV_FREQ, CV_FREQ_STEP)
     if ScanConfigurationKeys.BIAS_AVERAGE_MEASUREMENTS in scan_configuration:
         del scan_configuration[ScanConfigurationKeys.BIAS_AVERAGE_MEASUREMENTS]
@@ -258,12 +267,16 @@ if __name__ == "__main__":
     # coarse scan
     # noqa: S125
     perform_coarse_cv_scan(arguments, coarse_bias_range)
+    time.sleep(600)
 
     # fine scan
     perform_fine_cv_scan(arguments, fine_bias_range)
+    time.sleep(600)
 
     # completing scan
     perform_biased_total_cap(arguments)
+    time.sleep(600)
 
     # perform the inter-pixel cap scans
     perform_inter_pix_scan(arguments)
+    time.sleep(600)

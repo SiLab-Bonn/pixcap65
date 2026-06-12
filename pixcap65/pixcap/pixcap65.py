@@ -568,14 +568,8 @@ class Pixcap65(Dut):
         self[smu].set_voltage_range(voltage_range, **kwargs)
         self[smu].set_current_nlpc(plc, **kwargs)
         self[smu].set_voltage(src_u, **kwargs)
-        print("WAUT FOR SETTING LIMIT FOR SMU", smu)
-        time.sleep(5)
         self[smu].set_current_limit(current_limit, **kwargs)
-        print("WAIT FOR SETTING RANGE FOR SMU", smu)
-        time.sleep(5)
         self[smu].set_current_sense_range(current_range, **kwargs)
-        print("Finished for SETTLING RANGE FOR SMU", smu)
-        time.sleep(5)
 
     def smu_source_volt(self, smu: str, **kwargs):
         """
