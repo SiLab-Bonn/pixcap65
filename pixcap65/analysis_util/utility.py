@@ -234,7 +234,7 @@ def handle_minuit_advanced_options(fit_object, apply_contour, x_label, y_label, 
     for key, value in fit_object.values.to_dict().items():
         model_parameters += f"{key} = {value:.4g}\n"
     ax.legend(["model", "data"],
-              title=f"{model_parameters}\nGoF={conv_result['x']:.4f}\nndf={conv_result['ndf']}\np={conv_result['p']:.4f}",
+              title=f"{model_parameters}\nGoF={conv_result['x']:.4f} / ndf={conv_result['ndf']} = {conv_result["xn"]:.4f}\np={conv_result['p']:.4f}",
               frameon=False)
 
     # for error bands we must perform something similar
@@ -298,11 +298,8 @@ def handle_minuit_advanced_options(fit_object, apply_contour, x_label, y_label, 
                     # ax[i, j].clabel(second_set)
                     # ax[i, j].colorbar(second_set)
                 except:
-                    print(par1)
-                    print(par2)
-                    fit_object.draw_contour(par2, par1, cl=cls)
-                    logger.error("The minos based nll profiling/contour failed.", exc_info=True)
-                    raise
+                    fit_object.draw_contour(par2, par1)
+
                 ax[j, i].set_visible(False)
 
         fig.suptitle(contours_title)
@@ -324,6 +321,8 @@ def investigate_fit_convergence(fitter):
     else:
         raise TypeError("Fitter must be either a Minuit or XYFit object.")
     from scipy.stats.distributions import chi2
+    if ndf == 0:
+        ndf = -1
     regular_cost = cost_value / ndf if cost_value is not None else -1
     p_value = 1 - chi2.cdf(regular_cost, df=ndf)
     convergence = dict(x=cost_value, xn=regular_cost, ndf=ndf, p=p_value)

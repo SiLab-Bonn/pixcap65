@@ -3,15 +3,19 @@
 #   All rights reserved
 #  SiLab, Institute of Physics, University of Bonn
 # ----------------------------------------------------------
-
+import contextvars
+import queue
 import threading
 
-import plotting
+import pixcap65.plotting as plotting
+
+thread_storage = queue.SimpleQueue()
+threading_lock = contextvars.ContextVar("threading_lock").get(threading.RLock())
 
 
 # for plotting we could do this as a file could be opened in reading mode multiple times, the only issue may be the backend.
 
-def plot_data(interpreted_data, base_path=None, suffix="general_data", use_group=False, **kwargs):
+def plot_data(interpreted_data, base_path=None, suffix="general_data", use_group=False, lock=threading_lock, **kwargs):
     """
     plot_data
 
@@ -31,13 +35,15 @@ def plot_data(interpreted_data, base_path=None, suffix="general_data", use_group
     :key extract_pixel: iterable of pixel positions on the grid to extract the figures from.
     :key distribution: boolean, indicating whether to investigate the capacitance distribution over the whole sensor.
     """
-    thread = threading.Thread(target=plotting.plot_data, args=(interpreted_data, base_path, suffix, use_group), kwargs=kwargs)
-    thread.start()
+    with lock:
+        thread = threading.Thread(target=plotting.plot_data, args=(interpreted_data, base_path, suffix, use_group), kwargs=kwargs)
+        thread.start()
+        thread_storage.put(thread)
     return thread
 
 
 def plot_inter_pix_data(interpreted_data, base_path=None, suffix="general_inter_pix_data", use_group=False,
-                    total_path=None, total_data=None, **kwargs):
+                    total_path=None, total_data=None, lock=threading_lock, **kwargs):
     """
     plot_data
 
@@ -67,12 +73,18 @@ def plot_inter_pix_data(interpreted_data, base_path=None, suffix="general_inter_
     :key mask_pixel: iterable of pixel positions on the grid to ignore for evaluations.
     :key extract_pixel: iterable of pixel positions on the grid to extract the figures from.
     """
-    thread = threading.Thread(target=plotting.plot_inter_pix_data, args=(interpreted_data, base_path, suffix, use_group,), kwargs=kwargs)
-    thread.start()
+    with lock:
+        if total_path is not None:
+            kwargs["total_path"] = total_path
+        if total_data is not None:
+            kwargs["total_data"] = total_data
+        thread = threading.Thread(target=plotting.plot_inter_pix_data, args=(interpreted_data, base_path, suffix, use_group,), kwargs=kwargs)
+        thread.start()
+        thread_storage.put(thread)
     return thread
 
 
-def plot_bias_data(interpreted_data, base_path=None, suffix="bias_curve", use_group=False, **kwargs):
+def plot_bias_data(interpreted_data, base_path=None, suffix="bias_curve", use_group=False, lock=threading_lock, **kwargs):
     """
     plot_bias_data
 
@@ -83,12 +95,14 @@ def plot_bias_data(interpreted_data, base_path=None, suffix="bias_curve", use_gr
     :param suffix: additional suffix to use for naming the PDF containing the plots.
     :param use_group: boolean, whether to append the group name of the measurements to the PDF name.
     """
-    thread = threading.Thread(target=plotting.plot_bias_data, args=(interpreted_data, base_path, suffix, use_group), kwargs=kwargs)
-    thread.start()
+    with lock:
+        thread = threading.Thread(target=plotting.plot_bias_data, args=(interpreted_data, base_path, suffix, use_group), kwargs=kwargs)
+        thread.start()
+        thread_storage.put(thread)
     return thread
 
 
-def plot_cv_data(interpreted_data, base_path=None, suffix="C_V_characteristic", use_group=False, **kwargs):
+def plot_cv_data(interpreted_data, base_path=None, suffix="C_V_characteristic", use_group=False, lock=threading_lock, **kwargs):
     """
     plot_cv_data
 
@@ -108,12 +122,15 @@ def plot_cv_data(interpreted_data, base_path=None, suffix="C_V_characteristic", 
     :key distribution: boolean, indicating whether also the capacitance distribution of the whole sensor
         should be investigated.
     """
-    thread = threading.Thread(target=plotting.plot_cv_data, args=(interpreted_data, base_path, suffix, use_group), kwargs=kwargs)
-    thread.start()
+    with lock:
+        thread = threading.Thread(target=plotting.plot_cv_data, args=(interpreted_data, base_path, suffix, use_group), kwargs=kwargs)
+        thread.start()
+        thread_storage.put(thread)
     return thread
 
 
-def plot_combined_data(interpreted_data, base_path=None, suffix="combined_bias_cv_curve", use_group=False, **kwargs):
+def plot_combined_data(interpreted_data, base_path=None, suffix="combined_bias_cv_curve", use_group=False,
+                       lock=threading_lock, **kwargs):
     """
     plot_combined_data
 
@@ -134,6 +151,21 @@ def plot_combined_data(interpreted_data, base_path=None, suffix="combined_bias_c
     :key distribution: boolean, indicating whether also the capacitance distribution of the whole sensor
         should be investigated.
     """
-    thread = threading.Thread(target=plotting.plot_combined_data, args=(interpreted_data, base_path, suffix, use_group), kwargs=kwargs)
-    thread.start()
+    with lock:
+        thread = threading.Thread(target=plotting.plot_combined_data, args=(interpreted_data, base_path, suffix, use_group), kwargs=kwargs)
+        thread.start()
+        thread_storage.put(thread)
     return thread
+
+def joint_plotting(timeout=None, fetch_timeout=None, lock=threading_lock):
+    with lock:
+        while not thread_storage.empty():
+            try:
+                current_thread = thread_storage.get(timeout=fetch_timeout)
+                current_thread.join(timeout=timeout)
+            except queue.Empty:
+                print("Possible timeout on fetching remaing thread encountered")
+                break
+
+
+

@@ -10,7 +10,7 @@ maintainers = [
     { name = "Yannick Dieter", email = "dieter@physik.uni-bonn.de" },
     { name = "Dominik Fischer", email = "s6dkfisc@uni-bonn.de" },
 ]
-license = "MIT AND BSD-3-Clause"
+license = "Apache-2.0"
 readme = { file = "README.md", content-type = "text/markdown" }
 requires-python = ">=2.7"
 classifiers = [
@@ -71,6 +71,7 @@ visualization = [
     "pyqt5",
     "vitables",
     "matplotlib",
+    "pycairo",
 ]
 
 docs = [
@@ -82,8 +83,6 @@ docs = [
     "pkg-resources-backport ; python_version >= '3.9'",
     "myst-parser ; python_version >= '3.6'",
 ]
-
-
 
 
 # configuration of different build systems which could be used interchangebly!
@@ -124,14 +123,26 @@ packages = ["pixcap65"]
 exclude = [
     "*.h5",
     "*.pdf",
-    "**/full_analysis.py"
+    "**/full_analysis.py",
+    "/.github",
+    "/.venv",
+    "/.qodana",
+    "/.vscode",
+    "/.build",
+    "/Combination Plots",
+    "/data_local",
+    "/dist",
+    "/dist-uv",
+    "/Fit References",
+    "/out",
+    "/.gitignore"
 ]
 
 [tool.hatch.envs.hatch-build]
 installer = "pip"
 
 [tool.uv.sources]
-basil-daq = { path = "../basil-tree", editable = true }
+basil-daq = { path = "../basil-pixcap", editable = true }
 
 [tool.uv.build-backend]
 module-name = "pixcap65"

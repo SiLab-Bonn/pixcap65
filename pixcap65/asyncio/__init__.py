@@ -1,9 +1,13 @@
 import asyncio
+import concurrent.futures
 import re
 import tables as tb
 from contextlib import asynccontextmanager
 from tables import Filters
 from typing import Literal
+
+with concurrent.futures.ProcessPoolExecutor() as pool:
+    pool.map(print, [])
 
 lock = asyncio.Lock()
 __open_files__ = {}
@@ -13,7 +17,7 @@ regex = r"The files '.*' is already opened"
 
 
 # when using e.g. reading mode the same file could be read multiple times simultaneously.
-
+# BUT: Async locks are not re-entrant safe!
 async def __internal_tables_open_file(filename: str, mode: Literal["r", "w", "a", "r+"] = "r",
                                       title: str = "",
                                       root_uep: str = "/",

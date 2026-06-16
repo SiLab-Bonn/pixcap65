@@ -1,5 +1,8 @@
 # Pixcap 65
 
+[![License](https://img.shields.io/badge/License-Apache%202.0-blue.svg)](https://opensource.org/licenses/Apache-2.0)
+
+
 Host software for the PixCap65 chip control system based on MIO2 + GPAC hardware.
 
 ## Setup
