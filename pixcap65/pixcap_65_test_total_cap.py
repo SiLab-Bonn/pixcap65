@@ -448,7 +448,6 @@ class PixCap65Measurement(Pixcap65BaseMeasurement, metaclass=ABCMeta):
 
         self.dut.disable_all_pixels()
         self.dut.disable_all_columns()
-
         try:
             for k, bias_voltage in _get_enumerate(bias_voltages, **kwargs):
                 self.pixcap.bias_voltage = bias_voltage

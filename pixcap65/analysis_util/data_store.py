@@ -1,8 +1,80 @@
+import atexit
+import inspect
+import multiprocessing as mp
 import numpy as np
 import tables as tb
 import threading
+from multiprocessing.managers import BaseProxy
 
+import pixcap65.concurrency
 from pixcap65.analysis_util import GENERAL_PIXCAP_SHAPE
+
+
+# we should close these here aways such that they are not imported multiple times?
+class DepletionMPManager(mp.managers.BaseManager):
+    pass
+
+
+class ProxyBase(mp.managers.NamespaceProxy):
+    _exposed_ = ('__getattribute__', '__setattr__', '__delattr__')
+
+
+class DepletionArrayStoreProxy(ProxyBase): pass
+
+
+def register_proxy(name, cls, proxy, manager_cls=DepletionMPManager):
+    setattr(proxy, name, proxy)
+    for attr in dir(cls):
+        if "lock" in attr.lower():
+            continue
+        if inspect.ismethod(getattr(cls, attr)) and not attr.startswith("__"):
+            proxy._exposed_ += (attr,)
+            setattr(proxy, attr, lambda s: object.__getattribute__(s, '_callmethod')(attr))
+    manager_cls.register(name, cls, proxy)
+
+class NumpyProxy(BaseProxy):
+    _exposed_ = ('__getattr__', '__setattr__', '__delattr__', '__getitem__', '__setitem__', 'shape', )
+
+    def __getitem__(self, *args):
+        return self._callmethod('__getitem__', args)
+
+    def __setitem__(self, *args):
+        self._callmethod('__setitem__', args)
+
+    def shape(self):
+        self._callmethod('shape')
+
+    def __len__(self):
+        return self._callmethod('__len__')
+
+    def __contains__(self, *args):
+        return self._callmethod('__contains__', args)
+
+    def __iter__(self):
+        return self._callmethod('__iter__')
+
+    def __index__(self):
+        return self._callmethod('__index__')
+
+    def __lt__(self, other):
+        return self._callmethod('__lt__', other)
+
+    def __le__(self, other):
+        return self._callmethod('__le__', other)
+
+    def __gt__(self, other):
+        return self._callmethod('__gt__', other)
+
+    def __ge__(self, other):
+        return self._callmethod('__ge__', other)
+    def __eq__(self, other):
+        return self._callmethod('__eq__', other)
+    def __ne__(self, other):
+        return self._callmethod('__ne__', other)
+
+
+DepletionMPManager.register("full", np.full, NumpyProxy)
+pixcap65.concurrency.ExtendedSyncManager.register('full', np.full, NumpyProxy)
 
 
 class DepletionDataStore:
@@ -110,22 +182,38 @@ class DepletionNumpyStore(DepletionDataStore):
         return np.rec.array(self.data_temp, dtype=self.dtype)
 
 
+# What about about doing such things here directly within the Extended manager in the concurrency module?
+
+__manager = None
+
+
+def get_mp_manager():
+    global __manager
+    if __manager is None:
+        __manager = DepletionMPManager()
+        __manager.__enter__()
+        atexit.register(__manager.__exit__, None, None, None)
+
+    return __manager
+
 class DepletionArrayStore(DepletionDataStore):
     def __init__(self, n_depletions=None):
         general_shape = GENERAL_PIXCAP_SHAPE if n_depletions is None else tuple([*GENERAL_PIXCAP_SHAPE, n_depletions])
         parameter_shape = tuple([*GENERAL_PIXCAP_SHAPE, 4]) if n_depletions is None else tuple(
             [*GENERAL_PIXCAP_SHAPE, n_depletions, 4])
-        self.depletion_voltage = np.full(shape=general_shape, fill_value=np.nan)
-        self.depletion_error = np.full(shape=general_shape, fill_value=np.nan)
-        self.fit_parameter_estimators = np.full(shape=parameter_shape, fill_value=np.nan)
-        self.fit_parameter_errors = np.full(shape=parameter_shape, fill_value=np.nan)
-        self.lock = threading.RLock()
-        self._pixel_row = {}
-        self._pixel_col = {}
+        def create_full(*args, **kwargs):
+            return get_mp_manager().full(*args, **kwargs)
+        self.depletion_voltage = create_full(shape=general_shape, fill_value=np.nan)
+        self.depletion_error = create_full(shape=general_shape, fill_value=np.nan)
+        self.fit_parameter_estimators = create_full(shape=parameter_shape, fill_value=np.nan)
+        self.fit_parameter_errors = create_full(shape=parameter_shape, fill_value=np.nan)
+        self.lock = pixcap65.concurrency.get_manager().RLock()
+        self._pixel_row = pixcap65.concurrency.get_manager().dict()
+        self._pixel_col = pixcap65.concurrency.get_manager().dict()
         # could use the thread id to identify
-        self._depletion_reg = {}
-        self.systematic_errors = np.full(shape=general_shape, fill_value=np.nan)
-        self.systematic_dispersion = np.full(shape=general_shape, fill_value=np.nan)
+        self._depletion_reg = pixcap65.concurrency.get_manager().dict()
+        self.systematic_errors = create_full(shape=general_shape, fill_value=np.nan)
+        self.systematic_dispersion = create_full(shape=general_shape, fill_value=np.nan)
 
     @property
     def pixel_row(self):
@@ -140,7 +228,7 @@ class DepletionArrayStore(DepletionDataStore):
     @property
     def depletion_reg(self):
         with self.lock:
-            return self._depletion_reg.get(threading.get_native_id(), None)
+            return self._depletion_reg.get(-1, None)
 
     @pixel_row.setter
     def pixel_row(self, i):
@@ -152,11 +240,10 @@ class DepletionArrayStore(DepletionDataStore):
         with self.lock:
             self._pixel_col[threading.get_native_id()] = j
 
-
     @depletion_reg.setter
     def depletion_reg(self, i):
         with self.lock:
-            self._depletion_reg[threading.get_native_id()] = i
+            self._depletion_reg[-1] = i
 
     @pixel_row.deleter
     def pixel_row(self):
@@ -174,7 +261,7 @@ class DepletionArrayStore(DepletionDataStore):
     def depletion_reg(self):
         with self.lock:
             if threading.get_native_id() in self._depletion_reg:
-                del self._depletion_reg[threading.get_native_id()]
+                del self._depletion_reg[-1]
 
     def set_pixel(self, i_row, i_col):
         with self.lock:
@@ -186,46 +273,59 @@ class DepletionArrayStore(DepletionDataStore):
             self.depletion_reg = i
 
     def store_data(self, key, data):
-        if self.depletion_reg is None:
-            match key:
-                case "depletion":
-                    self.depletion_voltage[self.pixel_col, self.pixel_row] = data
-                case "depletion_error":
-                    self.depletion_error[self.pixel_col, self.pixel_row] = data
-                case "fit_result_first":
-                    self.fit_parameter_estimators[self.pixel_col, self.pixel_row, :2] = data
-                case "fit_error_first":
-                    self.fit_parameter_errors[self.pixel_col, self.pixel_row, :2] = data
-                case "fit_result_second":
-                    self.fit_parameter_estimators[self.pixel_col, self.pixel_row, 2:] = data
-                case "fit_error_second":
-                    self.fit_parameter_errors[self.pixel_col, self.pixel_row, 2:] = data
-                case "systematic":
-                    self.systematic_errors[self.pixel_col, self.pixel_row] = data
-                case "dispersion":
-                    self.systematic_dispersion[self.pixel_col, self.pixel_row] = data
-                case _:
-                    raise ValueError(f"The provided storage key is unknown: {key}")
-        else:
-            match key:
-                case "depletion":
-                    self.depletion_voltage[self.pixel_col, self.pixel_row, self.depletion_reg] = data
-                case "depletion_error":
-                    self.depletion_error[self.pixel_col, self.pixel_row, self.depletion_reg] = data
-                case "fit_result_first":
-                    self.fit_parameter_estimators[self.pixel_col, self.pixel_row, self.depletion_reg, :2] = data
-                case "fit_error_first":
-                    self.fit_parameter_errors[self.pixel_col, self.pixel_row, self.depletion_reg, :2] = data
-                case "fit_result_second":
-                    self.fit_parameter_estimators[self.pixel_col, self.pixel_row, self.depletion_reg, 2:] = data
-                case "fit_error_second":
-                    self.fit_parameter_errors[self.pixel_col, self.pixel_row, self.depletion_reg, 2:] = data
-                case "systematic":
-                    self.systematic_errors[self.pixel_col, self.pixel_row, self.depletion_reg] = data
-                case "dispersion":
-                    self.systematic_dispersion[self.pixel_col, self.pixel_row, self.depletion_reg] = data
-                case _:
-                    raise ValueError(f"The provided storage key is unknown: {key}")
+        # this part is not protected anyway from any access.
+        with self.lock:
+            if self.depletion_reg is None:
+                match key:
+                    case "depletion":
+                        self.depletion_voltage[self.pixel_col, self.pixel_row] = data
+                    case "depletion_error":
+                        self.depletion_error[self.pixel_col, self.pixel_row] = data
+                    case "fit_result_first":
+                        try:
+                            self.fit_parameter_estimators[self.pixel_col, self.pixel_row, :2] = data
+                        except:
+                            print(data)
+                            print(self.fit_parameter_errors.shape)
+                            print(self.fit_parameter_errors[self.pixel_col, self.pixel_row, :2].shape)
+                            print(data.shape)
+                            print(threading.get_native_id())
+                            print(self._depletion_reg)
+                            print(self.pixel_col)
+                            print(self.pixel_row)
+                            raise
+                    case "fit_error_first":
+                        self.fit_parameter_errors[self.pixel_col, self.pixel_row, :2] = data
+                    case "fit_result_second":
+                        self.fit_parameter_estimators[self.pixel_col, self.pixel_row, 2:] = data
+                    case "fit_error_second":
+                        self.fit_parameter_errors[self.pixel_col, self.pixel_row, 2:] = data
+                    case "systematic":
+                        self.systematic_errors[self.pixel_col, self.pixel_row] = data
+                    case "dispersion":
+                        self.systematic_dispersion[self.pixel_col, self.pixel_row] = data
+                    case _:
+                        raise ValueError(f"The provided storage key is unknown: {key}")
+            else:
+                match key:
+                    case "depletion":
+                        self.depletion_voltage[self.pixel_col, self.pixel_row, self.depletion_reg] = data
+                    case "depletion_error":
+                        self.depletion_error[self.pixel_col, self.pixel_row, self.depletion_reg] = data
+                    case "fit_result_first":
+                        self.fit_parameter_estimators[self.pixel_col, self.pixel_row, self.depletion_reg, :2] = data
+                    case "fit_error_first":
+                        self.fit_parameter_errors[self.pixel_col, self.pixel_row, self.depletion_reg, :2] = data
+                    case "fit_result_second":
+                        self.fit_parameter_estimators[self.pixel_col, self.pixel_row, self.depletion_reg, 2:] = data
+                    case "fit_error_second":
+                        self.fit_parameter_errors[self.pixel_col, self.pixel_row, self.depletion_reg, 2:] = data
+                    case "systematic":
+                        self.systematic_errors[self.pixel_col, self.pixel_row, self.depletion_reg] = data
+                    case "dispersion":
+                        self.systematic_dispersion[self.pixel_col, self.pixel_row, self.depletion_reg] = data
+                    case _:
+                        raise ValueError(f"The provided storage key is unknown: {key}")
 
 
 class DopingArrayStore(DepletionDataStore):
@@ -264,3 +364,9 @@ class SummaryTable(tb.IsDescription):
     sensor = tb.StringCol(10, pos=0)
     inj_cap = tb.Float64Col(pos=1)
     inj_cap_2 = tb.Float64Col(pos=2)
+
+
+register_proxy("DepletionArrayStorage", DepletionArrayStore, DepletionArrayStoreProxy)
+register_proxy("DepletionArrayStorage", DepletionArrayStore, DepletionArrayStoreProxy,
+               pixcap65.concurrency.ExtendedSyncManager)
+

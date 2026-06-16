@@ -57,3 +57,11 @@ And the same after processing the data
 | res_err/D                                   | Auswertung | Estimation for the error of the on-resistance          |
 | chi2/D                                      | Auswertung | Chi^2 Estimator at it's minimum for the fit statistics |
 | p/D                                         | Auswertung | p-Value of the fit to characterize its g.o.f.          |
+
+
+| HV            |
+|---------------|
+| 0V (unbiased) |
+| - 40.0 V      |
+
+
