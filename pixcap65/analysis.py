@@ -202,7 +202,7 @@ def analyze_data(raw_data, base_path=None, is_advanced=False, is_cv=False,
         corrected immediately; Will require the presence of further arguments as information about
         the parasitic capacitance needs to be submitted.
     :key use_corrected: boolean, False, indicates whether to use the corrected capacitance for the depletion
-        analysis. WILL be removed in the future.
+        analysis. Will be removed in the future.
     :key fit_plot_pdf_name:  Name of the PDF file to save fitting figures from the advanced procedures to.
         (Only used for the advanced procedure)
     :key bare_file: hdf file containing the measurements and investigation of a bare pix cap sample to obtain
@@ -2446,8 +2446,12 @@ if __name__ == '__main__':
     # some usage examples
     from pixcap65.utility.homogenize_plots import set_params
 
-    # analyze_data(raw_data="3D_Sensor_221_W13_X_Scan.h5", base_path="Thesis/ATLAS_ITk/X3/C_V_Characteristic", is_cv=True)
-    # analyze_data(raw_data="3D_Sensor_221_W6_j_Scan.h5", base_path="Thesis/ATLAS_ITk/X5/C_V_Characteristic", is_cv=True)
+    analyze_data(raw_data="data/3D_Sensor_221_W13_X_Scan.h5", base_path="Thesis/ATLAS_ITk/X3/C_V_Characteristic", is_cv=True)
+    analyze_data(raw_data="data/3D_Sensor_221_W6_j_Scan.h5", base_path="Thesis/ATLAS_ITk/X5/C_V_Characteristic", is_cv=True)
+    analyze_data(raw_data="data/3D_Sensor_I14_S24_Scan.h5", base_path="Thesis/ATLAS_ITk/X6/C_V_Characteristic", is_cv=True)
+    analyze_data(raw_data="data/3D_Sensor_H23_S24_Scan.h5", base_path="Thesis/ATLAS_ITk/X7/C_V_Characteristic", is_cv=True)
+    analyze_data(raw_data="data/argparser.h5", base_path="Reference/R11/C_V_Characteristic", is_cv=True)
+    analyze_data(raw_data="data/3D_Sensor_221_W5_S_Scan.h5", base_path="Thesis/ATLAS_ITk/X4/C_V_Characteristic", is_cv=True)
     try:
         from subprocess import run
 
