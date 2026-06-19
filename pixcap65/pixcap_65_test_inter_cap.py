@@ -91,6 +91,7 @@ class Pixcap65InterCap(PixCap65Measurement):
         self.total_hist_current_error = np.full(shape=(40, 40, self.n_frequencies),
                                                 fill_value=np.nan)
 
+        self.n_measurements = scan_config.get(ScanConfigurationKeys.AVERAGE_MEASUREMENTS, 1)
         self.inter_hist_individual_currents_1 = np.full(shape=(40,40,self.n_frequencies, 1), fill_value=np.nan)
         self.inter_hist_individual_currents_2 = np.full(shape=(40, 40, self.n_frequencies, 1), fill_value=np.nan)
         self.total_hist_individual_currents = np.full(shape=(40, 40, self.n_frequencies, 1), fill_value=np.nan)
