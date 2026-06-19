@@ -21,6 +21,7 @@ standard error
 from __future__ import annotations
 
 from collections import OrderedDict
+from importlib.resources import files
 
 import gc
 import logging
@@ -36,7 +37,6 @@ from collections.abc import Callable
 from contextlib import contextmanager
 from enum import StrEnum
 from numpy import ndarray
-from tables import Group, Node
 from tqdm import tqdm
 # noinspection PyProtectedMember
 from tqdm.contrib import DummyTqdmFile
@@ -84,6 +84,7 @@ log_formater = logging.Formatter('%(asctime)s - %(name)s - [%(levelname)-8s] (%(
 log_handler.setFormatter(log_formater)
 logger.addHandler(log_handler)
 logger.propagate = True
+
 
 def _get_enumerate(iterator, **kwargs) -> Iterable:
     use_tqdm = kwargs.pop("pbar", False)
@@ -243,19 +244,24 @@ class MeasurementAbstract(object, metaclass=ABCMeta):
 
 
 class Pixcap65BaseMeasurement(MeasurementAbstract, metaclass=ABCMeta):
-    pass
+    def __init__(self, pix_config=None, **kwargs):
+        super(Pixcap65BaseMeasurement, self).__init__(**kwargs)
+        if pix_config is None or not os.path.exists(pix_config):
+            logger.warning("The path to the pixcap firmware was recalculated from the package resources.")
+            pix_config = files("pixcap65").joinpath("device", "ise", "pixcap65.bit")
+
+        # init the dut
+        self.dut = Pixcap65(pix_config)
+        self.dut.init()
 
 
 class PixCap65Measurement(Pixcap65BaseMeasurement, metaclass=ABCMeta):
     # instantiation
     def __init__(self, scan_config, output_file, pix_config="pixcap65.yaml", **kwargs):
-        super(PixCap65Measurement, self).__init__(**kwargs)
+        super(PixCap65Measurement, self).__init__(pix_config, **kwargs)
         self.mode_logging_text = 'Scan pixel by single measurements.'
         self.smu_range_config = {}
         self.__group = None
-
-        self.dut = Pixcap65(pix_config)
-        self.dut.init()
 
         # CHECK: whether this could be moved to the configure methods.
         # move only possible if the `__slots__` is used to fix the members to prevent warnings.
@@ -280,8 +286,10 @@ class PixCap65Measurement(Pixcap65BaseMeasurement, metaclass=ABCMeta):
             else:
                 raise AttributeError("The requested SMU {} does not exist.".format(smu))
             device_name = hl["init"]['device'].lower().replace(' ', '_')
-            config_file = os.path.join(os.path.dirname(__file__), "configs",
-                                       "{name}_range.yaml".format(name=device_name))
+            config_file = files("pixcap65.configs").joinpath(device_name).joinpath(
+                "{name}_range.yaml".format(name=device_name))
+            # config_file = os.path.join(os.path.dirname(__file__), "configs",
+            #                            "{name}_range.yaml".format(name=device_name))
             assert os.path.exists(config_file) and os.path.isfile(config_file)
             print("Using the SMU range config file: ", config_file, " for the smu ", smu)
             with open(config_file, "r") as f:
@@ -321,7 +329,7 @@ class PixCap65Measurement(Pixcap65BaseMeasurement, metaclass=ABCMeta):
             self.out_file_h5 = tb.open_file(self.scan_config["output_file"], mode='a')
 
         # settings for sensor depletion source
-        # to exact: this should be done by the config_update handler as it relais on configuration options!
+        # to be exact: this should be done by the config_update handler as it relais on configuration options!
         # will be evaluated before the update of configuration is taken into account!
         if self.use_bias_supply and self.has_bias_supply:
             logging.warning("Bias supply is now active.")
@@ -342,13 +350,8 @@ class PixCap65Measurement(Pixcap65BaseMeasurement, metaclass=ABCMeta):
             self.has_bias_supply = False
 
         # init the primary smu or VM3
-        # self._smu_setup(self.pixcap.primary_smu_key).reset()
         self.init_smu()
         self._smu_setup(self.pixcap.primary_smu_key).drain_error_queue()
-        logger.info("fetch some configurations from the smu!")
-        print(self.pixcap[self.pixcap.primary_smu_key].get_sense_interval())
-        print(self._smu_setup(self.pixcap.primary_smu_key).get_lan_config_method())
-        print(self._smu_setup(self.pixcap.primary_smu_key).get_lan_ip_adress())
 
         # update the scan config parameters
         self.update_config()
@@ -413,7 +416,8 @@ class PixCap65Measurement(Pixcap65BaseMeasurement, metaclass=ABCMeta):
 
         self.pixcap.bias_voltage = value
 
-    def perform_bias_scan(self, bias_voltages: np.ndarray, post_handler: Callable, parameters, data_group_spec, handle_unit,
+    def perform_bias_scan(self, bias_voltages: np.ndarray, post_handler: Callable, parameters, data_group_spec,
+                          handle_unit,
                           **kwargs):
         """
         perform_bias_scan
@@ -767,7 +771,7 @@ class PixCap65Measurement(Pixcap65BaseMeasurement, metaclass=ABCMeta):
                     self.pixcap.bias_voltage = -0.1
                     logger.error("The measured current %f has exceeded the protection limit %f.",
                                  current_measurement, self.hv_limit)
-                    raise ValueError("The measured current %f has exceed the protection limit %f.",)
+                    raise ValueError("The measured current %f has exceed the protection limit %f.", )
 
                 logger.debug(LOG_SET_BIAS % float(self.scan_config[ScanConfigurationKeys.BIAS_VOLTAGE_SINGLE]))
 
@@ -957,6 +961,15 @@ class PixCap65Measurement(Pixcap65BaseMeasurement, metaclass=ABCMeta):
             self.pixcap[self.pixcap.primary_smu_key].set_current_nlpc(10)
             self._smu_setup(self.pixcap.primary_smu_key).text_format()
             self.pixcap.binary_active = False
+
+    @contextmanager
+    def enhanced_readout_mode(self):
+        try:
+            if self.n_measurements > 5:
+                self.pixcap[self.pixcap.primary_smu_key].set_current_nlpc(2)
+            yield self
+        finally:
+            self.pixcap[self.pixcap.primary_smu_key].set_current_nlpc(10)
 
     # region Pixcap measurement properties
     @property
@@ -1298,7 +1311,8 @@ class PixCap65Measurement(Pixcap65BaseMeasurement, metaclass=ABCMeta):
     def row_range(self):
         raise NotImplementedError("`row_range` is abstract and therefore not implemented.")
 
-    def measurement_procedure(self, data_group, sequence_call, post_hook: Callable[tb.Group] = None, reversed_order=False, internal_logger=logger):
+    def measurement_procedure(self, data_group, sequence_call, post_hook: Callable[tb.Group] = None,
+                              reversed_order=False, internal_logger=logger):
         """
         measurement_procedure
 
@@ -1342,7 +1356,8 @@ class PixCap65Measurement(Pixcap65BaseMeasurement, metaclass=ABCMeta):
                                                     leave=not sequence_call, unit=row_unit, logger=internal_logger,
                                                     colour='green'):
                     for i_col in advanced_tqdm_iterator(col_range, tqdm_class=tqdm, desc=col_desc,
-                                                        leave=False, unit="pixel", logger=internal_logger, colour='blue'):
+                                                        leave=False, unit="pixel", logger=internal_logger,
+                                                        colour='blue'):
                         if reversed_order:
                             yield i_row, i_col
                         else:
@@ -1417,7 +1432,8 @@ class PixCap65Measurement(Pixcap65BaseMeasurement, metaclass=ABCMeta):
                 if back_binary:
                     self.pixcap.binary_active = True
                     self._smu_setup(smu).binary_format()
-                logger.debug("Stabilized the measurement current and set the plc to %f after %i iterations.", back_nlpc, i)
+                logger.debug("Stabilized the measurement current and set the plc to %f after %i iterations.", back_nlpc,
+                             i)
 
     @abstractmethod
     def pre_scan_handler(self, unit=None):
@@ -1588,7 +1604,7 @@ class PixCap65TotalCap(PixCap65Measurement):
             self.scan(data_group_spec=scan_group, sequence_call=True)
 
     # noinspection PyMethodMayBeStatic
-    def prepare_biased_regular_scan(self, bias_voltage, data_group: Group) -> Node:
+    def prepare_biased_regular_scan(self, bias_voltage, data_group: tb.Group) -> tb.Node:
         """
         prepare_biased_regular_scan
 
@@ -1630,8 +1646,9 @@ class PixCap65TotalCap(PixCap65Measurement):
             # required
             pass
 
-        for k, voltage, data_group in self.perform_bias_scan(self.bias_voltages, _post_handle, self.bias_scan_parameters,
-                                                 data_group_spec, "bias", logger=logger):
+        for k, voltage, data_group in self.perform_bias_scan(self.bias_voltages, _post_handle,
+                                                             self.bias_scan_parameters,
+                                                             data_group_spec, "bias", logger=logger):
             self.handle_bias_measurement(k)
 
     def combined_bias_cv_scan(self, data_group_spec=None):
@@ -1816,7 +1833,8 @@ class PixCap65TotalCap(PixCap65Measurement):
                 voltage_errors = np.full_like(voltages, np.nan)
             if np.all(~np.isfinite(voltage_errors)):
                 try:
-                    voltage_errors = extract_smu_voltage_error(self.smu_range_config[self.pixcap.bias_smu_key], voltages, 1000)
+                    voltage_errors = extract_smu_voltage_error(self.smu_range_config[self.pixcap.bias_smu_key],
+                                                               voltages, 1000)
                 except:
                     voltage_errors = np.full_like(voltages, np.nan)
 

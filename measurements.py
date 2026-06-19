@@ -1,8 +1,7 @@
 import logging
-
+import multiprocessing
 import numpy as np
 import time
-import multiprocessing
 
 from pixcap65.pixcap_65_test_total_cap import ScanConfigurationKeys
 from pixcap65.utils import PixCapSetup, PixcapMeasurements
@@ -166,8 +165,9 @@ def perform_inter_pix_scan(cli_args):
 
     if cli_args.inter_pix_cap:
         with PixCapSetup(scan_configuration, output_file, measurement=PixcapMeasurements.INTER_CAPACITANCE) as pix:
-            pix.frequency_settling = cli_args.freq_settle
-            pix.scan(data_group_spec="inter_unbiased_full")
+            with pix.enhanced_readout_mode():
+                pix.frequency_settling = cli_args.freq_settle
+                pix.scan(data_group_spec="inter_unbiased_full_Extended")
 
     with lock:
         try:
@@ -182,8 +182,9 @@ def perform_inter_pix_scan(cli_args):
 
     if cli_args.inter_pix_cap:
         with PixCapSetup(scan_configuration, output_file, measurement=PixcapMeasurements.INTER_CAPACITANCE) as pix:
-            pix.frequency_settling = cli_args.freq_settle
-            pix.scan(data_group_spec="inter_biased_M_{}_V_full".format(cli_args.hv_voltage))
+            with pix.enhanced_readout_mode():
+                pix.frequency_settling = cli_args.freq_settle
+                pix.scan(data_group_spec="inter_biased_M_{}_V_full_Extended".format(cli_args.hv_voltage))
 
     with lock:
         try:
