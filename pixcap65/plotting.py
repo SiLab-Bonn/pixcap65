@@ -389,6 +389,9 @@ def plot_combined_data(interpreted_data, base_path=None, suffix="combined_bias_c
         with synchronized_process_open_file(interpreted_data, mode='r', lock=file_lock) as in_file_h5:
             base_group = get_base_group(base_path, in_file_h5)
             plot_bias_delegate(base_group.biasing.measurements, output_pdf)
+            print("test the analysis group in use for plotting!!!!!!")
+            print(get_analysis_group(base_group.biasing, **kwargs))
+            print(kwargs)
             plot_cv_data_delegate(base_group.biasing.measurements, get_analysis_group(base_group.biasing, **kwargs),
                                   output_pdf, **kwargs)
 
@@ -430,6 +433,7 @@ def _bias_voltage_plotter(ax, tabular: tb.Table, label, norm=1, apply_norm=False
     voltage_data = np.abs(tabular.col("U"))
     current_data = np.abs(tabular.col("I"))
     current_errors = tabular.col("DI")
+    # FIXME: R1/R11 seems to be missing i-v-errors!
     try:
         voltage_error = np.abs(tabular.col("DU"))
     except (AttributeError, KeyError):
@@ -438,12 +442,18 @@ def _bias_voltage_plotter(ax, tabular: tb.Table, label, norm=1, apply_norm=False
         current_errors = None
     ax.set(title="Bias data from the measurement", xlabel=BIAS_CURVE_X_LABEL, ylabel=BIAS_CURVE_Y_LABEL)
     # currently we could not use the correct voltage range, but we assume the errors to be within
+    normalized_errors = None if current_errors is None else current_errors / norm
+    if current_errors is None:
+        from warnings import warn
+        warn("The current sensor seems to be missing measurement uncertainties for the leakage current!")
     ax.errorbar(voltage_data, current_data * CURRENT_CONVERSION_FACTOR / norm, xerr=voltage_error,
-                yerr=current_errors / norm, fmt='o', label=label)
+                yerr=normalized_errors, fmt='o', label=label)
     if not np.isclose(norm, 1.0):
         ax.set_yscale('log')
-        temp_current_label = ax.get_ylabel()
-        ax.set_ylabel(temp_current_label.replace("A ", "A / cm^2 "))
+        # FIXME: make the correct labels!
+        # temp_current_label = ax.get_ylabel()
+        # ax.set_ylabel(temp_current_label.replace("A ", "A / cm^2 "))
+        ax.set_ylabel("I in \\unit{{\\nano\\ampere\\per\\centi\\meter\\squared}}")
 
 
 
@@ -499,6 +509,9 @@ def plot_cv_data_delegate(data_group: Union[tb.Group, SENSOR_ITERABLE],
         ax[0].legend()
         ax[1].legend(title=title_str)
         ax[1].grid(True)
+        if kwargs.get("use_log", False):
+            ax[0].set_yscale('log')
+            ax[1].set_yscale('log')
         fig.suptitle("C-V Characterization for Pixel ({}, {})".format(ii, jj))
         output_pdf.savefig(fig, bbox_inches='tight')
         with interactive_lock:
@@ -510,6 +523,7 @@ def plot_cv_data_delegate(data_group: Union[tb.Group, SENSOR_ITERABLE],
             depletion_width_plate = check_leaf_unit(analysis_group.DepletionWidth, "um")
             depletion_width_plate_error = check_leaf_unit(analysis_group.DepletionWidthErr, "um")
             effective_doping_table = check_leaf_unit(analysis_group.DepletionEffDoping, "cm^-3")
+            resistivity_table = check_leaf_unit(analysis_group.DepletionResitivity, "Ocm")
             origin_bias_voltages = check_leaf_unit(data_group.BiasVoltageHist, HIST_BIAS_MEAS_UNIT)
             if len(origin_bias_voltages.shape) > 1:
                 # TODO: better use the actual voltages here.
@@ -518,7 +532,7 @@ def plot_cv_data_delegate(data_group: Union[tb.Group, SENSOR_ITERABLE],
                 bias_voltages = origin_bias_voltages
             table = analysis_group.DepletionParamTable
             plot_depletion_pixel_delegate(bias_voltages, ii, depletion_width_plate, depletion_width_plate_error,
-                                          effective_doping_table, output_pdf, jj, table)
+                                          effective_doping_table, output_pdf, jj, table, resistivity_table)
 
     if not (kwargs.pop("distribution", False) and True):
         return
@@ -1234,7 +1248,7 @@ def plot_depletion_delegate(data_group: tb.Group, analysis_group: GroupType, out
 def plot_depletion_pixel_delegate(bias_voltages: TABLES_LEAF_COMPAT_TYPE, i_col,
                                   depletion_width_plate: TABLES_LEAF_COMPAT_TYPE,
                                   depletion_width_plate_error: TABLES_LEAF_COMPAT_TYPE,
-                                  effective_doping_table: TABLES_LEAF_COMPAT_TYPE, output_pdf: PdfPages, i_row, table):
+                                  effective_doping_table: TABLES_LEAF_COMPAT_TYPE, output_pdf: PdfPages, i_row, table, resistivity):
     if np.all(np.isfinite(depletion_width_plate[i_col, i_row])):
         condition = """(row == {}) & (col == {})""".format(i_row, i_col)
         for x in table.where(condition):
@@ -1244,6 +1258,7 @@ def plot_depletion_pixel_delegate(bias_voltages: TABLES_LEAF_COMPAT_TYPE, i_col,
             depletion_fit_propagate_parameters = {}
         doping_acceptor = depletion_fit_propagate_parameters["NAD"]
         effective_doping = effective_doping_table[i_col, i_row]
+        effective_resistivity = resistivity[i_col, i_row]
         with interactive_lock:
             fig, ax = plt.subplots(3)
         logger.debug("The type of bias_voltages is %s", type(bias_voltages))
@@ -1279,6 +1294,23 @@ def plot_depletion_pixel_delegate(bias_voltages: TABLES_LEAF_COMPAT_TYPE, i_col,
         # close the figures at last, to not waste any memory resources
         with interactive_lock:
             plt.close(fig)
+            fig, ax = plt.subplots(2)
+
+        ax[0].plot(-bias_voltages, effective_resistivity)
+        ax[0].set(xlabel='Bias Voltage [V]', ylabel='$\\rho$ in \\unit{{\\ohm\\centi\\meter}}',
+                  title="Analysis of the specific resistivity for pixel ({col}, {row}).")
+        ax[0].grid(True)
+        ax[0].set_yscale('log')
+        ax[1].plot(depletion_width_plate[i_col, i_row], effective_resistivity)
+        ax[1].set(xlabel='depletion width [um]', ylabel='$\\rho$ in \\unit{{\\ohm\\centi\\meter}}',
+                  title="Analysis of the specific resistivity for pixel ({col}, {row}).")
+        ax[1].set_yscale('log')
+        output_pdf.savefig(fig, bbox_inches='tight')
+
+        with interactive_lock:
+            plt.close(fig)
+
+
 
 
 def mp_plotting_init(backend, has_latex):
@@ -1288,7 +1320,8 @@ def mp_plotting_init(backend, has_latex):
     set_params(latex=has_latex,
                latex_extra=r"\sisetup{separate-uncertainty}\sisetup{locale = DE}\sisetup{uncertainty-descriptors={"
                            r"stat,sys}}\sisetup{uncertainty-descriptor-mode=subscript}\sisetup{"
-                           r"retain-zero-uncertainty}", fig_height=8.26772, fig_width=11.69291, )
+                           r"retain-zero-uncertainty}", fig_height=8.26772, fig_width=11.69291,
+               minor=True, fontsize=12)
 
 
 if __name__ == '__main__':
@@ -1323,7 +1356,7 @@ if __name__ == '__main__':
     set_params(latex=has_latex,
                latex_extra=r"\sisetup{separate-uncertainty}\sisetup{locale = DE}\sisetup{uncertainty-descriptors={"
                            r"stat,sys}}\sisetup{uncertainty-descriptor-mode=subscript}\sisetup{"
-                           r"retain-zero-uncertainty}", fig_height=8.26772, fig_width=11.69291, )
+                           r"retain-zero-uncertainty}", fig_height=8.26772, fig_width=11.69291,)
 
 
     def e1_plotter_first(tb_lock):
@@ -1350,6 +1383,23 @@ if __name__ == '__main__':
 
     print(mp.current_process().name)
     print(mp.cpu_count())
+    import sysconfig
+
+    print("Path names")
+    print(sysconfig.get_path_names())
+    print(sysconfig.get_path("data"))
+
+    print(__file__)
+    from importlib.resources import files
+    print(files())
+    print("Fetch resources A")
+    for resource in files().iterdir():
+        print(resource)
+
+    print("Fetch resources B")
+    print(files("pixcap65"))
+    for resource in files("pixcap65").joinpath("device","ise").iterdir():
+        print(resource)
 
     with mp.Manager() as manager, mp.Pool(initializer=mp_plotting_init, initargs=("PDF", False,)) as pool:
         tables_lock = manager.RLock()
@@ -1364,12 +1414,17 @@ if __name__ == '__main__':
             r1_plotter,
         ]
 
-        processes = [pool.apply_async(handle, (tables_lock,)) for handle in process_handles]
+        # processes = [pool.apply_async(handle, (tables_lock,)) for handle in process_handles]
 
-        for p in processes:
-            p.wait()
-            print("Finished the process; Was it sucessful?", p.successful())
+        # for p in processes:
+        #     p.wait()
+        #     print("Finished the process; Was it sucessful?", p.successful())
 
-        # FIXME: missing the distribution data for the c-v-plots
-        # e1_plotter_second(tables_lock)
+        x2_plotter_second(tables_lock)
+
+        set_params(latex=has_latex,
+                   latex_extra=r"\sisetup{separate-uncertainty}\sisetup{locale = DE}\sisetup{uncertainty-descriptors={"
+                               r"stat,sys}}\sisetup{uncertainty-descriptor-mode=subscript}\sisetup{"
+                               r"retain-zero-uncertainty}", fig_height=8.26772, fig_width=11.69291,
+                   minor=True, fontsize=12, dpi=1200)
         presentation_plotter(tables_lock)

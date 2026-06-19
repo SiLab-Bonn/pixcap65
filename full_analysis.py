@@ -43,79 +43,72 @@ from pixcap65.utility.tables_util import get_group_attribute
 # define the analysis handling
 def r1_analysator(tb_lock, correction_args, **kwargs):
     import pixcap65.concurrency
+    from mp_analysis import synchronize_full_model
     name = "R1"
     display_name = name
     top_ref = "Reference"
-    print("Analyze", name)
+    print("Analyze", display_name)
     print(threading.get_native_id())
     print(mp.current_process().name)
     print(mp.current_process().pid)
 
     _ = pixcap65.concurrency.get_manager(**kwargs)
 
-    with synchronized_process_open_file(R11_SCAN_FILE, mode='a', lock=tb_lock) as h5_file:
-        h5_file.copy_node(where="/Reference/R11", newname="unbiased_full_model", name="unbiased_full",
-                          recursive=True, overwrite=True)
-        h5_file.copy_node(where="/Reference/R1", newname="biased_80_V_full_model", name="biased_80_V_full",
-                          recursive=True, overwrite=True)
-        h5_file.copy_node(where="/Reference/R1", newname="inter_unbiased_full_model", name="inter_unbiased_full",
-                          recursive=True, overwrite=True)
-        h5_file.copy_node(where="/Reference/R1", newname="inter_biased_M_80_V_full_model", name="inter_biased_M_80_V_full",
-                          recursive=True, overwrite=True)
+    synchronize_full_model(R11_SCAN_FILE, top_ref, name, 80, tb_lock,)
+    # with synchronized_process_open_file(R11_SCAN_FILE, mode='a', lock=tb_lock) as h5_file:
+    #     h5_file.copy_node(where="/Reference/R11", newname="unbiased_full_model", name="unbiased_full",
+    #                       recursive=True, overwrite=True)
+    #     h5_file.copy_node(where="/Reference/R1", newname="biased_80_V_full_model", name="biased_80_V_full",
+    #                       recursive=True, overwrite=True)
+    #     h5_file.copy_node(where="/Reference/R1", newname="inter_unbiased_full_model", name="inter_unbiased_full",
+    #                       recursive=True, overwrite=True)
+    #     h5_file.copy_node(where="/Reference/R1", newname="inter_biased_M_80_V_full_model", name="inter_biased_M_80_V_full",
+    #                       recursive=True, overwrite=True)
 
     # handle the full sensor analysis
-    # name = "R11"
     analyze_data(raw_data=R11_SCAN_FILE, base_path="{}/{}/unbiased_full".format(top_ref, name),
                  is_advanced=True, distribution=True, full_model=False,
                  exclude_cap_test=True, mask_pixel=data_constants.r1_pixel_mask, lock=tb_lock,
                  fit_plot_pdf_name="Fit References/{}/unbiased_reduced_model.pdf".format(name), plot=True,
                  **correction_args)
-    # name = "R1"
     analyze_data(raw_data=R11_SCAN_FILE, base_path="{}/{}/biased_80_V_full".format(top_ref, name),
                  is_advanced=True, distribution=True, full_model=False,
                  fit_plot_pdf_name="Fit References/{}/biased_reduced_model.pdf".format(name), plot=True,
                  exclude_cap_test=True, mask_pixel=data_constants.r1_pixel_mask, lock=tb_lock, **correction_args)
-    # name = "R11"
     analyze_data(raw_data=R11_SCAN_FILE, base_path="{}/{}/unbiased_full_model".format(top_ref, name),
                  is_advanced=True, distribution=True, exclude_cap_test=True, mask_pixel=data_constants.r1_pixel_mask,
                  fit_plot_pdf_name="Fit References/{}/unbiased_full_model.pdf".format(name), plot=True,
                  lock=tb_lock, **correction_args)
-    # name = "R1"
     analyze_data(raw_data=R11_SCAN_FILE, base_path="{}/{}/biased_80_V_full_model".format(top_ref, name),
                  is_advanced=True, distribution=True, exclude_cap_test=True, mask_pixel=data_constants.r1_pixel_mask,
                  fit_plot_pdf_name="Fit References/{}/biased_full_model.pdf".format(name), plot=True,
                  lock=tb_lock, **correction_args)
 
     # handle the inter-pix analysis
-    # we will need a safe-guard
-    # TODO: remove the safe-guard after fixing the naming convention
-    # with synchronized_process_open_file(R11_SCAN_FILE, mode='a', lock=tb_lock) as h5_file:
-    #     h5_file.copy_node(where=h5_file.root.Reference.R11, newparent=h5_file.root.Reference.R1, name="unbiased_full",
-    #                       recursive=True, overwrite=False, createparents=True)
     analyze_data(raw_data=R11_SCAN_FILE, base_path="{}/{}/inter_unbiased_full".format(top_ref, name),
                  is_advanced=True, full_model=False, is_inter_pixel=True,
                  exclude_cap_test=True, distribution=True,
                  total_cap_file=R11_SCAN_FILE,
                  lock=tb_lock, mask_pixel=data_constants.r1_pixel_mask,
-                 total_cap_group="{}/{}/unbiased_full/total_cap".format(top_ref, name))
+                 total_cap_group="{}/{}/unbiased_full_model/total_cap".format(top_ref, name))
     analyze_data(raw_data=R11_SCAN_FILE, base_path="{}/{}/inter_biased_M_80_V_full".format(top_ref, name),
                  is_advanced=True, full_model=False, is_inter_pixel=True,
                  exclude_cap_test=True, distribution=True,
                  lock=tb_lock, mask_pixel=data_constants.r1_pixel_mask,
                  total_cap_file=R11_SCAN_FILE,
-                 total_cap_group="{}/{}/biased_80_V_full/total_cap".format(top_ref, name))
+                 total_cap_group="{}/{}/biased_80_V_full_model/total_cap".format(top_ref, name))
     analyze_data(raw_data=R11_SCAN_FILE, base_path="{}/{}/inter_unbiased_full_model".format(top_ref, name),
                  is_advanced=True, full_model=True, is_inter_pixel=True,
                  exclude_cap_test=True, distribution=True,
                  total_cap_file=R11_SCAN_FILE,
                  lock=tb_lock, mask_pixel=data_constants.r1_pixel_mask,
-                 total_cap_group="{}/{}/unbiased_full/total_cap".format(top_ref, name))
+                 total_cap_group="{}/{}/unbiased_full_model/total_cap".format(top_ref, name))
     analyze_data(raw_data=R11_SCAN_FILE, base_path="{}/{}/inter_biased_M_80_V_full_model".format(top_ref, name),
                  is_advanced=True, full_model=True, is_inter_pixel=True,
                  exclude_cap_test=True, distribution=True,
                  lock=tb_lock, mask_pixel=data_constants.r1_pixel_mask,
                  total_cap_file=R11_SCAN_FILE,
-                 total_cap_group="{}/{}/biased_80_V_full/total_cap".format(top_ref, name))
+                 total_cap_group="{}/{}/biased_80_V_full_model/total_cap".format(top_ref, name))
 
     # handle the C-V-analysis
     r11_depletion_args = {
@@ -140,13 +133,11 @@ def r1_analysator(tb_lock, correction_args, **kwargs):
     r11_depletion_args_refined.update(**correction_args)
 
     print("CV Analysis for", display_name)
-    # name = "R11"
     analyze_data(raw_data=R11_SCAN_FILE, base_path="{}/{}/C_V_Characteristic".format(top_ref, name),
                  is_advanced=True, full_model=False, is_cv=True, use_corrected=True,
                  exclude_cap_test=True, mask_pixel=data_constants.r1_pixel_mask,
                  lock=tb_lock, **r11_depletion_args)
 
-    # name = "R1"
     analyze_data(raw_data=R11_SCAN_FILE, base_path="{}/{}/C_V_Characteristic_refined".format(top_ref, name),
                  is_advanced=True, full_model=False, is_cv=True, use_corrected=True,
                  exclude_cap_test=True, mask_pixel=data_constants.r1_pixel_mask,
@@ -370,38 +361,31 @@ def r1_plotter(tb_lock):
     display_name = name
     top_ref = "Reference"
     print("Plotting", display_name)
-    # TODO: unify the naming convention here.
-    name = "R11"
     plot_data(interpreted_data=R11_SCAN_FILE, base_path="{}/{}/unbiased_full".format(top_ref, name), use_group=True,
               exclude_test_cap=True, distribution=True, lock=tb_lock, mask_pixel=data_constants.r1_pixel_mask)
     plot_data(interpreted_data=R11_SCAN_FILE, base_path="{}/{}/unbiased_full".format(top_ref, name), use_group=True,
               use_corrected=True, exclude_test_cap=True, distribution=True, lock=tb_lock,
               mask_pixel=data_constants.r1_pixel_mask)
-    name = "R1"
     plot_data(interpreted_data=R11_SCAN_FILE, base_path="{}/{}/biased_80_V_full".format(top_ref, name),
               use_group=True, exclude_test_cap=True, distribution=True, lock=tb_lock,
               mask_pixel=data_constants.r1_pixel_mask)
     plot_data(interpreted_data=R11_SCAN_FILE, base_path="{}/{}/biased_80_V_full".format(top_ref, name),
               use_group=True, use_corrected=True, exclude_test_cap=True, distribution=True, lock=tb_lock,
               mask_pixel=data_constants.r1_pixel_mask)
-    name = "R11"
     plot_data(interpreted_data=R11_SCAN_FILE, base_path="{}/{}/unbiased_full_model".format(top_ref, name), use_group=True,
               exclude_test_cap=True, distribution=True, lock=tb_lock, mask_pixel=data_constants.r1_pixel_mask)
     plot_data(interpreted_data=R11_SCAN_FILE, base_path="{}/{}/unbiased_full_model".format(top_ref, name), use_group=True,
               use_corrected=True, exclude_test_cap=True, distribution=True, lock=tb_lock,
               mask_pixel=data_constants.r1_pixel_mask)
-    name = "R1"
     plot_data(interpreted_data=R11_SCAN_FILE, base_path="{}/{}/biased_80_V_full_model".format(top_ref, name),
               use_group=True, exclude_test_cap=True, distribution=True, lock=tb_lock,
               mask_pixel=data_constants.r1_pixel_mask)
     plot_data(interpreted_data=R11_SCAN_FILE, base_path="{}/{}/biased_80_V_full_model".format(top_ref, name),
               use_group=True, use_corrected=True, exclude_test_cap=True, distribution=True, lock=tb_lock,
               mask_pixel=data_constants.r1_pixel_mask)
-    name = "R11"
     plot_bias_data(interpreted_data=R11_SCAN_FILE, base_path="{}/{}/I_V_Characteristic".format(top_ref, name),
                    use_group=True, lock=tb_lock, mask_pixel=data_constants.r1_pixel_mask)
 
-    name = "R1"
     plot_inter_pix_data(interpreted_data=R11_SCAN_FILE,
                         base_path="{}/{}/inter_unbiased_full".format(top_ref, name), use_group=True,
                         distribution=True, exclude_cap_test=True, total_data=R11_SCAN_FILE,
@@ -443,10 +427,9 @@ def r1_plotter(tb_lock):
                         mask_pixel=data_constants.r1_pixel_mask)
 
     print(display_name, "- CV")
-    name = "R11"
     threaded_plotting.plot_combined_data(interpreted_data=R11_SCAN_FILE,
                                          base_path="{}/{}/C_V_Characteristic".format(top_ref, name),
-                                         use_group=True, distribution=False, lock=tb_lock,
+                                         use_group=True, distribution=False, lock=tb_lock, apply_doping=False,
                                          mask_pixel=data_constants.r1_pixel_mask)
     threaded_plotting.plot_combined_data(interpreted_data=R11_SCAN_FILE,
                                          base_path="{}/{}/C_V_Characteristic".format(top_ref, name),
@@ -454,7 +437,7 @@ def r1_plotter(tb_lock):
                                          lock=tb_lock, mask_pixel=data_constants.r1_pixel_mask)
     threaded_plotting.plot_combined_data(interpreted_data=R11_SCAN_FILE,
                                          base_path="{}/{}/C_V_Characteristic_refined".format(top_ref, name),
-                                         use_group=True, distribution=True, lock=tb_lock,
+                                         use_group=True, distribution=True, lock=tb_lock, apply_doping=False,
                                          mask_pixel=data_constants.r1_pixel_mask)
     threaded_plotting.plot_combined_data(interpreted_data=R11_SCAN_FILE,
                                          base_path="{}/{}/C_V_Characteristic_refined".format(top_ref, name),
@@ -577,7 +560,7 @@ def r13_plotter_second(tb_lock):
     :param tb_lock: multiprocessing lock to make operations on the hdf files process- and thread-safe.
     """
     name = "R13"
-    display_name = name + "Second Try."
+    display_name = name + " Second Try."
     top_ref = "Reference"
     print("Plotting", display_name)
     plot_data(interpreted_data=R13_2_SCAN_FILE, base_path="{}/{}/unbiased_1_full".format(top_ref, name),
@@ -636,8 +619,8 @@ def r13_plotter_second(tb_lock):
     print(display_name, "- CV")
     threaded_plotting.plot_combined_data(interpreted_data=R13_2_SCAN_FILE,
                        base_path="{}/{}/C_V_Characteristic_refined".format(top_ref, name), lock=tb_lock,
-                       use_group=True, exclude_test_cap=True, distribution=True)
-    threaded_plotting.plot_combined_data(interpreted_data=R13_2_SCAN_FILE, lock=tb_lock,
+                       use_group=True, exclude_test_cap=True, distribution=True, apply_doping=False,)
+    threaded_plotting.plot_combined_data(interpreted_data=R13_2_SCAN_FILE, lock=tb_lock, apply_doping=False,
                        base_path="{}/{}/C_V_Characteristic_refined".format(top_ref, name),
                        use_group=True, exclude_test_cap=True, distribution=True, use_corrected=True)
     threaded_plotting.joint_plotting()
@@ -723,7 +706,6 @@ def e1_plotter_second(tb_lock):
                        use_group=True, distribution=True, mask_pixel=data_constants.e1_pixel_mask,
                        use_corrected=True, lock=tb_lock,)
 
-    threaded_plotting.joint_plotting()
     print("E1 - Switching to individual pixel regions.")
     for type_name in data_constants.e1_pixel_groups.keys():
         plot_data(interpreted_data=E1_2_SCAN_FILE, use_group=True,
@@ -799,11 +781,11 @@ def e1_plotter_second(tb_lock):
         threaded_plotting.plot_combined_data(interpreted_data=E1_2_SCAN_FILE,
                            base_path="{}/{}/C_V_Characteristic_refined_{}".format(top_ref, name, type_name),
                            use_group=True, distribution=True, mask_pixel=data_constants.e1_pixel_mask,
-                           lock=tb_lock,)
+                           lock=tb_lock, apply_doping=False)
         threaded_plotting.plot_combined_data(interpreted_data=E1_2_SCAN_FILE,
                            base_path="{}/{}/C_V_Characteristic_refined_{}".format(top_ref, name, type_name),
                            use_group=True, distribution=True, mask_pixel=data_constants.e1_pixel_mask,
-                           use_corrected=True, lock=tb_lock,)
+                           use_corrected=True, lock=tb_lock, apply_doping=False)
 
     threaded_plotting.joint_plotting()
     print("Finished -", display_name)
@@ -948,7 +930,6 @@ def x1_plotter(tb_lock):
     display_name = name + " Second Try."
     top_ref = "Thesis/ATLAS_ITk"
     print("Plotting", display_name)
-    top_ref = "ATLAS_ITk"
     plot_data(interpreted_data=X1_SCAN_2_FILE, base_path="{}/{}/unbiased_61_full".format(top_ref, name), use_group=True,
               exclude_test_cap=True, mask_pixel=data_constants.x1_second_pixel_mask, distribution=True, lock=tb_lock,)
     plot_data(interpreted_data=X1_SCAN_2_FILE, base_path="{}/{}/unbiased_61_full".format(top_ref, name), use_group=True,
@@ -972,7 +953,6 @@ def x1_plotter(tb_lock):
               exclude_test_cap=True, use_corrected=True, mask_pixel=data_constants.x1_second_pixel_mask,
               distribution=True, lock=tb_lock,)
 
-    top_ref = "Thesis/ATLAS_ITk"
     plot_inter_pix_data(interpreted_data=X1_SCAN_2_FILE, base_path="{}/{}/inter_unbiased_full".format(top_ref, name),
                         use_group=True, exclude_test_cap=True, distribution=True,
                         total_data=X1_SCAN_2_FILE, total_path="{}/{}/unbiased_61_full".format(top_ref, name),
@@ -1009,7 +989,6 @@ def x1_plotter(tb_lock):
                         use_group=True, exclude_test_cap=True, distribution=True, total_data=X1_SCAN_2_FILE,
                         total_path="{}/{}/biased_80_V_full".format(top_ref, name), mask_pixel=data_constants.x1_second_pixel_mask,
                         lock=tb_lock, suffix="inter-mix")
-    top_ref = "ATLAS_ITk"
     threaded_plotting.plot_bias_data(interpreted_data=X1_SCAN_2_FILE, base_path="{}/{}/I_V_Characteristic".format(top_ref, name),
                                      use_group=True, lock=tb_lock,)
 
@@ -1017,15 +996,14 @@ def x1_plotter(tb_lock):
     threaded_plotting.plot_combined_data(interpreted_data=X1_SCAN_2_FILE,
                                          base_path="{}/{}/C_V_Characteristic_refined".format(top_ref, name),
                                          use_group=True, mask_pixel=data_constants.x1_second_pixel_mask,
-                                         distribution=True,
+                                         distribution=True, apply_doping=False,
                                          lock=tb_lock,)
     threaded_plotting.plot_combined_data(interpreted_data=X1_SCAN_2_FILE,
                                          base_path="{}/{}/C_V_Characteristic_refined".format(top_ref, name),
                                          use_group=True, use_corrected=True,
-                                         apply_doping=True, distribution=True,
+                                         apply_doping=False, distribution=True,
                                          mask_pixel=data_constants.x1_second_pixel_mask,
                                          lock=tb_lock,)
-    top_ref = "Thesis/ATLAS_ITk"
     threaded_plotting.plot_combined_data(interpreted_data=X1_SCAN_2_FILE,
                                          base_path="{}/{}/C_V_Characteristic_Second_Extended".format(top_ref, name),
                                          use_group=True, mask_pixel=data_constants.x1_second_pixel_mask,
@@ -1034,18 +1012,18 @@ def x1_plotter(tb_lock):
     threaded_plotting.plot_combined_data(interpreted_data=X1_SCAN_2_FILE,
                                          base_path="{}/{}/C_V_Characteristic_Second_Extended".format(top_ref, name),
                                          use_group=True, use_corrected=True,
-                                         apply_doping=True, distribution=False,
+                                         apply_doping=False, distribution=False,
                                          mask_pixel=data_constants.x1_second_pixel_mask,
                                          lock=tb_lock,)
     threaded_plotting.plot_combined_data(interpreted_data=X1_SCAN_2_FILE,
                                          base_path="{}/{}/C_V_Characteristic_refined_Extended_Combined".format(top_ref, name),
                                          use_group=True, mask_pixel=data_constants.x1_second_pixel_mask,
-                                         distribution=True, apply_doping=True,
+                                         distribution=True, apply_doping=False,
                                          lock=tb_lock)
     threaded_plotting.plot_combined_data(interpreted_data=X1_SCAN_2_FILE,
                                          base_path="{}/{}/C_V_Characteristic_refined_Extended_Combined".format(top_ref,name),
                                          use_group=True, use_corrected=True,
-                                         apply_doping=False, distribution=True,
+                                         apply_doping=True, distribution=False,
                                          mask_pixel=data_constants.x1_second_pixel_mask,
                                          lock=tb_lock)
     threaded_plotting.joint_plotting()
@@ -1159,7 +1137,6 @@ def x2_plotter_second(tb_lock):
     display_name = name + "Second Try."
     top_ref = "Thesis/ATLAS_ITk"
     print("Plotting", display_name)
-    top_ref = "ATLAS_ITk"
     plot_data(interpreted_data=X2_SCAN_2_FILE, base_path="{}/{}/unbiased_1_full".format(top_ref, name), use_group=True,
               exclude_test_cap=True, distribution=True, lock=tb_lock, )
     plot_data(interpreted_data=X2_SCAN_2_FILE, base_path="{}/{}/unbiased_1_full".format(top_ref, name), use_group=True,
@@ -1176,7 +1153,6 @@ def x2_plotter_second(tb_lock):
               exclude_test_cap=True, distribution=True, lock=tb_lock, )
     plot_data(interpreted_data=X2_SCAN_2_FILE, base_path="{}/{}/biased_80_V_full_model".format(top_ref, name), use_group=True,
               exclude_test_cap=True, use_corrected=True, distribution=True, lock=tb_lock,)
-    top_ref = "Thesis/ATLAS_ITk"
     plot_bias_data(interpreted_data=X2_SCAN_2_FILE, base_path="{}/{}/I_V_Characteristic_2".format(top_ref, name),
                    use_group=True, lock=tb_lock,)
 
@@ -1184,16 +1160,14 @@ def x2_plotter_second(tb_lock):
 
     # plot the c-v data
     print(display_name, "- CV")
-    top_ref = "ATLAS_ITk"
     plot_combined_data(interpreted_data=X2_SCAN_2_FILE, base_path="{}/{}/C_V_Characteristic_refined".format(top_ref, name),
-                       use_group=True, lock=tb_lock, exclude_test_cap=True, distribution=True, )
+                       use_group=True, lock=tb_lock, exclude_test_cap=True, distribution=True, apply_doping=False,)
     plot_combined_data(interpreted_data=X2_SCAN_2_FILE, base_path="{}/{}/C_V_Characteristic_refined".format(top_ref, name),
                        use_group=True, use_corrected=True,
                        apply_doping=False, distribution=True, lock=tb_lock, exclude_test_cap=True,)
-    top_ref = "Thesis/ATLAS_ITk"
     plot_combined_data(interpreted_data=X2_SCAN_2_FILE,
                        base_path="{}/{}/C_V_Characteristic_refined_extended_renew_retry".format(top_ref, name),
-                       use_group=True, lock=tb_lock, distribution=True, exclude_test_cap=True)
+                       use_group=True, lock=tb_lock, distribution=True, exclude_test_cap=True, apply_doping=False,)
     plot_combined_data(interpreted_data=X2_SCAN_2_FILE,
                        base_path="{}/{}/C_V_Characteristic_refined_extended_renew_retry".format(top_ref, name),
                        use_group=True, use_corrected=True,
@@ -1262,6 +1236,8 @@ def x5_plotter(tb_lock):
               distribution=True, lock=tb_lock)
     plot_bias_data(interpreted_data=X5_SCAN_FILE, base_path="{}/{}/I_V_Characteristic".format(top_ref, name),
                    use_group=True, lock=tb_lock,)
+    plot_bias_data(interpreted_data=X5_SCAN_FILE, base_path="{}/{}/I_V_Characteristic_Extended".format(top_ref, name),
+                   use_group=True, lock=tb_lock, )
 
     plot_inter_pix_data(interpreted_data=X5_SCAN_FILE, base_path="{}/{}/inter_unbiased_full".format(top_ref, name),
                         use_group=True, distribution=True, mask_pixel=data_constants.x5_second_pixel_mask,
@@ -1305,7 +1281,7 @@ def x5_plotter(tb_lock):
     print(display_name, "- CV")
     threaded_plotting.plot_combined_data(interpreted_data=X5_SCAN_FILE,
                                          base_path="{}/{}/C_V_Characteristic".format(top_ref, name),
-                                         use_group=True, distribution=False, lock=tb_lock,
+                                         use_group=True, distribution=False, lock=tb_lock, apply_doping=False,
                                          mask_pixel=data_constants.x5_second_pixel_mask,)
     threaded_plotting.plot_combined_data(interpreted_data=X5_SCAN_FILE,
                                          base_path="{}/{}/C_V_Characteristic".format(top_ref, name),
@@ -1314,12 +1290,20 @@ def x5_plotter(tb_lock):
                                          mask_pixel=data_constants.x5_second_pixel_mask,)
     threaded_plotting.plot_combined_data(interpreted_data=X5_SCAN_FILE,
                                          base_path="{}/{}/C_V_Characteristic_refined".format(top_ref, name),
-                                         use_group=True, distribution=True, lock=tb_lock,
+                                         use_group=True, distribution=True, lock=tb_lock, apply_doping=False,
                                          mask_pixel=data_constants.x5_second_pixel_mask,)
     threaded_plotting.plot_combined_data(interpreted_data=X5_SCAN_FILE,
                                          base_path="{}/{}/C_V_Characteristic_refined".format(top_ref, name),
                                          use_group=True, use_corrected=True, apply_doping=False, distribution=True,
                                          lock=tb_lock, mask_pixel=data_constants.x5_second_pixel_mask,)
+    threaded_plotting.plot_combined_data(interpreted_data=X5_SCAN_FILE,
+                                         base_path="{}/{}/C_V_Characteristic_refined_Extended".format(top_ref, name),
+                                         use_group=True, distribution=True, lock=tb_lock, apply_doping=False,
+                                         mask_pixel=data_constants.x5_second_pixel_mask, )
+    threaded_plotting.plot_combined_data(interpreted_data=X5_SCAN_FILE,
+                                         base_path="{}/{}/C_V_Characteristic_refined_Extended".format(top_ref, name),
+                                         use_group=True, use_corrected=True, apply_doping=True, distribution=False,
+                                         lock=tb_lock, mask_pixel=data_constants.x5_second_pixel_mask, )
     threaded_plotting.joint_plotting()
     print("Finished -", display_name)
 
@@ -1358,7 +1342,6 @@ def x6_plotter(tb_lock):
     name = "X6"
     display_name = name
     top_ref = "Thesis/ATLAS_ITk"
-    # declare here a set of constants to use additonally!
     print("Plotting", display_name)
     plot_data(interpreted_data=X6_SCAN_FILE, base_path="{}/{}/unbiased_full".format(top_ref, name), use_group=True,
               exclude_test_cap=True, lock=tb_lock, mask_pixel=data_constants.x6_second_pixel_mask, distribution=True,)
@@ -1424,18 +1407,18 @@ def x6_plotter(tb_lock):
                                      lock=tb_lock)
     threaded_plotting.plot_combined_data(interpreted_data=X6_SCAN_FILE,
                                          base_path="{}/{}/C_V_Characteristic".format(top_ref, name),
-                                         use_group=True, distribution=False, lock=tb_lock)
+                                         use_group=True, distribution=False, lock=tb_lock, apply_doping=True,)
     threaded_plotting.plot_combined_data(interpreted_data=X6_SCAN_FILE,
                                          base_path="{}/{}/C_V_Characteristic".format(top_ref, name),
-                                         use_group=True, use_corrected=True, apply_doping=False, distribution=False,
+                                         use_group=True, use_corrected=True, apply_doping=True, distribution=False,
                                          lock=tb_lock)
     threaded_plotting.plot_combined_data(interpreted_data=X6_SCAN_FILE,
                                          base_path="{}/{}/C_V_Characteristic_refined".format(top_ref, name),
-                                         use_group=True, distribution=True, lock=tb_lock,
+                                         use_group=True, distribution=True, lock=tb_lock, apply_doping=True,
                                          mask_pixel=data_constants.x6_second_pixel_mask, exclude_test_cap=True,)
     threaded_plotting.plot_combined_data(interpreted_data=X6_SCAN_FILE,
                                          base_path="{}/{}/C_V_Characteristic_refined".format(top_ref, name),
-                                         use_group=True, use_corrected=True, apply_doping=False, distribution=True,
+                                         use_group=True, use_corrected=True, apply_doping=True, distribution=True,
                                          mask_pixel=data_constants.x6_second_pixel_mask, exclude_test_cap=True,)
     threaded_plotting.joint_plotting()
     print("Finished -", display_name)
@@ -1540,36 +1523,37 @@ def x7_plotter(tb_lock):
                                      lock=tb_lock)
     threaded_plotting.plot_combined_data(interpreted_data=X7_SCAN_FILE,
                                          base_path="{}/{}/C_V_Characteristic".format(top_ref, name),
-                                         use_group=True, distribution=False, lock=tb_lock)
+                                         use_group=True, distribution=False, lock=tb_lock, apply_doping=False,)
     threaded_plotting.plot_combined_data(interpreted_data=X7_SCAN_FILE,
-                                         base_path="{}/{}/C_V_Characteristic",
+                                         base_path="{}/{}/C_V_Characteristic".format(top_ref, name),
                                          use_group=True, use_corrected=True, apply_doping=False, distribution=False,
                                          lock=tb_lock)
     threaded_plotting.plot_combined_data(interpreted_data=X7_SCAN_FILE,
                                          base_path="{}/{}/C_V_Characteristic_refined".format(top_ref, name),
-                                         use_group=True, distribution=True, lock=tb_lock, exclude_cap_test=True,)
+                                         use_group=True, distribution=True, lock=tb_lock, exclude_cap_test=True,
+                                         apply_doping=False,)
     threaded_plotting.plot_combined_data(interpreted_data=X7_SCAN_FILE,
                                          base_path="{}/{}/C_V_Characteristic_refined".format(top_ref, name),
                                          use_group=True, use_corrected=True, apply_doping=False, distribution=True,
-                                         lock=tb_lock, exclude_cap_test=True,)
+                                         lock=tb_lock, exclude_cap_test=True)
     threaded_plotting.joint_plotting()
     print("Finished -", display_name)
 
 
 def presentation_plotter(tb_lock):
-    print("Plot Presentable")
-    with (tb_lock):
-        # noqa: S125
-        # examples
-        # plot_data(interpreted_data='pixcap65/Data/r13-measurement/R13_Full_Scan_80V.h5', suffix="general_data",
-        #           use_group=False)
-        # plot_inter_pix_data(interpreted_data='R13-Interpixel_Scan.h5',
-        #                     base_path="Reference/R13/demo_measurement_65_unbiased_1_discharge",
-        #                     use_group=True, suffix="inter_pix_65", total_data='Reference_R13_Scan.h5',
-        #                     distribution=True, set_parasitic=False, total_path="Reference/R13/unbiased_12_full")
-        # plot_bias_data(interpreted_data='Data/r13-measurement/R13_BIAS_2.h5')
-        # plot_combined_data(interpreted_data='Data/r13-measurement/R13_BIAS_CV_COMBI_6.h5', first_lower=-100,first_upper=-40, second_lower=-10, second_upper=0)
+    e1_full_size = 0
+    for key, content in data_constants.e1_pixel_groups.items():
+        size_parameter, _ = key.removeprefix("dnw").removeprefix("nw").split("_", 1)
+        implant_size = float(size_parameter)
+        n_pixels = 0
+        for col_reg, row_reg in zip(content["columns"], content["rows"]):
+            n_pixels = (col_reg[1] - col_reg[0]) * (row_reg[1] - row_reg[0])
 
+        e1_full_size += n_pixels * implant_size * implant_size
+    print("Plot Presentable")
+    print("The estimated E1 size is:")
+    print(e1_full_size)
+    with (tb_lock):
         # collect all our IV groups
         iv_file_names = [
             'pixcap65/Data/r13-measurement/R13_BIAS_2.h5',
@@ -1619,18 +1603,19 @@ def presentation_plotter(tb_lock):
         assert len(iv_file_names) == len(iv_group_names)
         assert len(iv_file_names) == len(iv_labels)
         normalisation = [
-            64 * 64 * 30 * 30,
-            384 * 400 * 30 * 30,
-            384 * 400 * 30 * 30,
-            384 * 400 * 30 * 30,
-            1*1 * 30 * 30,
-            384 * 400 * 30 * 30,
-            384 * 400 * 30 * 30,
-            384 * 400 * 30 * 30,
-            64 * 64 * 30 * 30,
-            384 * 400 * 30 * 30,
-            384 * 400 * 30 * 30,
-            64 * 64 * 8 * 81.,
+            39 * 40 * 30 * 30,
+            39 * 40 * 50 * 50,
+            39 * 40 * 50 * 50,
+            39 * 40 * 50 * 50,
+            e1_full_size,
+            39 * 40 * 50 * 50,
+            39 * 40 * 50 * 50,
+            39 * 40 * 50 * 50,
+            39 * 40 * 30 * 30,
+            39 * 40 * 50 * 50,
+            39 * 40 * 50 * 50,
+            39 * 40 * 50 * 50,
+            39 * 40 * 8 * 81.,
                          ]
         plot_bias_data(iv_file_names, iv_group_names, pdf_name="I-V Combination.pdf",
                        labels=["Bias Data for {}".format(item) for item in iv_labels])
@@ -1661,11 +1646,11 @@ def presentation_plotter(tb_lock):
         assert len(iv_file_names_final) == len(iv_group_names_final)
         assert len(iv_file_names_final) == len(iv_labels_final)
         normalisation_final = [
-            384 * 400 * 30 * 30,
-            1 * 1 * 30 * 30,
-            384 * 400 * 30 * 30,
-            64 * 64 * 30 * 30,
-            64 * 64 * 81 * 100,
+            39 * 40 * 50 * 50,
+            e1_full_size,
+            39 * 40 * 50 * 50,
+            39 * 40 * 30 * 30,
+            39 * 40 * 81 * 100,
         ]
         plot_bias_data(iv_file_names_final, iv_group_names_final, pdf_name="I-V Combination_final.pdf",
                        labels=["Bias Data for {}".format(item) for item in iv_labels_final])
@@ -1763,6 +1748,7 @@ def presentation_plotter(tb_lock):
             X7_SCAN_FILE,
             X6_SCAN_FILE,
             X6_SCAN_FILE,
+            X5_SCAN_FILE,
         ]
         iv_3d_group_names = [
             "Thesis/ATLAS_ITk/X5/I_V_Characteristic",
@@ -1771,6 +1757,7 @@ def presentation_plotter(tb_lock):
             "Thesis/ATLAS_ITk/X7/C_V_Characteristic",
             "Thesis/ATLAS_ITk/X6/I_V_Characteristic",
             "Thesis/ATLAS_ITk/X6/C_V_Characteristic",
+            "Thesis/ATLAS_ITk/X5/I_V_Characteristic_Extended",
         ]
         iv_3d_labels = [
             "X5",
@@ -1779,15 +1766,17 @@ def presentation_plotter(tb_lock):
             "X7 (CV)",
             "X6",
             "X6 (CV, coarse)",
+            "X5 (extended)",
         ]
         assert len(iv_3d_file_names) == len(iv_3d_group_names)
         assert len(iv_3d_file_names) == len(iv_3d_labels)
         normalisation = [
-            384 * 400 * 50 * 50,
-            384 * 400 * 50 * 50,
-            384 * 400 * 50 * 50,
-            384 * 400 * 50 * 50,
-            384 * 400 * 50 * 50,
+            39 * 40 * 50 * 50,
+            39 * 40 * 50 * 50,
+            39 * 40 * 50 * 50,
+            39 * 40 * 50 * 50,
+            39 * 40 * 50 * 50,
+            39 * 40 * 50 * 50,
         ]
         plot_bias_data(iv_3d_file_names, iv_3d_group_names, pdf_name="I-V 3D Combination.pdf",
                        labels=["Bias Data for {}".format(item) for item in iv_3d_labels])
@@ -1801,7 +1790,7 @@ def presentation_plotter(tb_lock):
             X6_SCAN_FILE,
         ]
         iv_3d_group_names_final = [
-            "Thesis/ATLAS_ITk/X5/I_V_Characteristic",
+            "Thesis/ATLAS_ITk/X5/I_V_Characteristic_Extended",
             "Thesis/ATLAS_ITk/X7/I_V_Characteristic",
             "Thesis/ATLAS_ITk/X6/I_V_Characteristic",
         ]
@@ -1813,9 +1802,9 @@ def presentation_plotter(tb_lock):
         assert len(iv_3d_file_names_final) == len(iv_3d_group_names_final)
         assert len(iv_3d_file_names_final) == len(iv_3d_labels_final)
         normalisation_final = [
-            384 * 400 * 50 * 50,
-            384 * 400 * 50 * 50,
-            384 * 400 * 50 * 50,
+            39 * 40 * 50 * 50,
+            39 * 40 * 50 * 50,
+            39 * 40 * 50 * 50,
         ]
         plot_bias_data(iv_3d_file_names_final, iv_3d_group_names_final, pdf_name="I-V 3D Combination_final.pdf",
                        labels=["Bias Data for {}".format(item) for item in iv_3d_labels_final])
@@ -1830,6 +1819,8 @@ def presentation_plotter(tb_lock):
             X6_SCAN_FILE,
             X7_SCAN_FILE,
             X7_SCAN_FILE,
+            X5_SCAN_FILE,
+            X6_SCAN_FILE,
         ]
         cv_3d_groups = [
             "Thesis/ATLAS_ITk/X5/C_V_Characteristic",
@@ -1837,6 +1828,8 @@ def presentation_plotter(tb_lock):
             "Thesis/ATLAS_ITk/X6/C_V_Characteristic",
             "Thesis/ATLAS_ITk/X7/C_V_Characteristic",
             "Thesis/ATLAS_ITk/X7/C_V_Characteristic_refined",
+            "Thesis/ATLAS_ITk/X5/C_V_Characteristic_refined_Extended",
+            "Thesis/ATLAS_ITk/X6/C_V_Characteristic_refined",
         ]
         cv_3d_labels = [
             'X5',
@@ -1844,6 +1837,8 @@ def presentation_plotter(tb_lock):
             "X6",
             "X7",
             "X7 (refined)",
+            "X5 (extended)",
+            "X6 (refined)",
         ]
         assert len(cv_3d_file_names) == len(cv_3d_groups)
         assert len(cv_3d_file_names) == len(cv_3d_labels)
@@ -1860,14 +1855,14 @@ def presentation_plotter(tb_lock):
             X7_SCAN_FILE,
         ]
         cv_3d_groups_final = [
-            "Thesis/ATLAS_ITk/X5/C_V_Characteristic_refined",
-            "Thesis/ATLAS_ITk/X6/C_V_Characteristic",
+            "Thesis/ATLAS_ITk/X5/C_V_Characteristic_refined_Extended",
+            "Thesis/ATLAS_ITk/X6/C_V_Characteristic_refined",
             "Thesis/ATLAS_ITk/X7/C_V_Characteristic_refined",
         ]
         cv_3d_labels_final = [
-            'X5 (refined)',
+            'X5',
             "X6",
-            "X7 (refined)",
+            "X7",
         ]
         assert len(cv_3d_file_names_final) == len(cv_3d_groups_final)
         assert len(cv_3d_file_names_final) == len(cv_3d_labels_final)
@@ -1881,7 +1876,7 @@ def presentation_plotter(tb_lock):
 
 def mp_plotting_init():
     import matplotlib
-    matplotlib.use('Agg')
+    matplotlib.use('PDF')
 
 
 if __name__ == '__main__':

@@ -84,15 +84,6 @@ def r13_analysator_second(tb_lock, correction_args):
 
     synchronize_full_model(R13_2_SCAN_FILE, top_ref, name, 80, tb_lock,
                            unbiased_group="unbiased_1_full")
-    # with synchronized_process_open_file(R13_2_SCAN_FILE, mode='a', lock=tb_lock) as h5_file:
-    #     h5_file.copy_node(where="/Reference/R13", newname="unbiased_1_full_model", name="unbiased_1_full",
-    #                       recursive=True, overwrite=True)
-    #     h5_file.copy_node(where="/Reference/R13", newname="biased_80_V_full_model", name="biased_80_V_full",
-    #                       recursive=True, overwrite=True)
-    #     h5_file.copy_node(where="/Reference/R13", newname="inter_unbiased_full_model", name="inter_unbiased_full",
-    #                       recursive=True, overwrite=True)
-    #     h5_file.copy_node(where="/Reference/R13", newname="inter_biased_M_80_V_full_model", name="inter_biased_M_80_V_full",
-    #                       recursive=True, overwrite=True)
 
     analyze_data(raw_data=R13_2_SCAN_FILE, base_path="{}/{}/unbiased_1_full".format(top_ref, name), is_advanced=True,
                  lock=tb_lock, exclude_test_cap=True, distribution=True, full_model=False,
@@ -157,51 +148,40 @@ def e1_analysator_second(tb_lock, correction_args):
         "apply_doping": True,
     }
     e1_depletion_args.update(**correction_args)
-    with synchronized_process_open_file(E1_2_SCAN_FILE, mode='a', lock=tb_lock) as h5_file:
-        h5_file.copy_node(where="/Reference/E1", newname="unbiased_full_model", name="unbiased_full",
-                          recursive=True, overwrite=True)
-        h5_file.copy_node(where="/Reference/E1", newname="biased_80_V_full_model", name="biased_80_V_full",
-                          recursive=True, overwrite=True)
-        h5_file.copy_node(where="/Reference/E1", newname="inter_unbiased_full_model", name="inter_unbiased_full",
-                          recursive=True, overwrite=True)
-        h5_file.copy_node(where="/Reference/E1", newname="inter_biased_M_80_V_full_model", name="inter_biased_M_80_V_full",
-                          recursive=True, overwrite=True)
+    synchronize_full_model(E1_2_SCAN_FILE, top_ref, name, 80, tb_lock)
 
-
-
-    analyze_data(raw_data=E1_2_SCAN_FILE, base_path="Reference/E1/unbiased_full", is_advanced=True, lock=tb_lock,
+    analyze_data(raw_data=E1_2_SCAN_FILE, base_path="{}/{}/unbiased_full".format(top_ref, name), is_advanced=True, lock=tb_lock,
                  full_model=False, distribution=True, exclude_cap_test=True, mask_pixel=data_constants.e1_pixel_mask,
                  **correction_args)
-    analyze_data(raw_data=E1_2_SCAN_FILE, base_path="Reference/E1/biased_80_V_full", is_advanced=True, lock=tb_lock,
+    analyze_data(raw_data=E1_2_SCAN_FILE, base_path="{}/{}/biased_80_V_full".format(top_ref, name), is_advanced=True, lock=tb_lock,
                  full_model=False, distribution=True, exclude_cap_test=True, mask_pixel=data_constants.e1_pixel_mask,
                  **correction_args)
-    analyze_data(raw_data=E1_2_SCAN_FILE, base_path="Reference/E1/unbiased_full_model", is_advanced=True, lock=tb_lock,
+    analyze_data(raw_data=E1_2_SCAN_FILE, base_path="{}/{}/unbiased_full_model".format(top_ref, name), is_advanced=True, lock=tb_lock,
                  distribution=True, exclude_cap_test=True, mask_pixel=data_constants.e1_pixel_mask, **correction_args)
-    analyze_data(raw_data=E1_2_SCAN_FILE, base_path="Reference/E1/biased_80_V_full_model", is_advanced=True, lock=tb_lock,
+    analyze_data(raw_data=E1_2_SCAN_FILE, base_path="{}/{}/biased_80_V_full_model".format(top_ref, name), is_advanced=True, lock=tb_lock,
                  distribution=True, exclude_cap_test=True, mask_pixel=data_constants.e1_pixel_mask, **correction_args)
 
-    analyze_data(raw_data=E1_2_SCAN_FILE, base_path="Reference/E1/inter_unbiased_full",
+    analyze_data(raw_data=E1_2_SCAN_FILE, base_path="{}/{}/inter_unbiased_full".format(top_ref, name),
                  is_advanced=True, full_model=False, is_inter_pixel=True, lock=tb_lock,
                  distribution=True, exclude_test_cap=True, mask_pixel=data_constants.e1_pixel_mask, total_cap_file=E1_2_SCAN_FILE,
-                 total_cap_group="Reference/E1/unbiased_full/total_cap")
-    analyze_data(raw_data=E1_2_SCAN_FILE, base_path="Reference/E1/inter_biased_M_80_V_full",
+                 total_cap_group="{}/{}/unbiased_full/total_cap".format(top_ref, name))
+    analyze_data(raw_data=E1_2_SCAN_FILE, base_path="{}/{}/inter_biased_M_80_V_full".format(top_ref, name),
                  is_advanced=True, full_model=False, is_inter_pixel=True, lock=tb_lock,
                  distribution=True, exclude_test_cap=True, mask_pixel=data_constants.e1_pixel_mask, total_cap_file=E1_2_SCAN_FILE,
-                 total_cap_group="Reference/E1/biased_80_V_full/total_cap")
-    analyze_data(raw_data=E1_2_SCAN_FILE, base_path="Reference/E1/inter_unbiased_full_model",
+                 total_cap_group="{}/{}/biased_80_V_full/total_cap".format(top_ref, name))
+    analyze_data(raw_data=E1_2_SCAN_FILE, base_path="{}/{}/inter_unbiased_full_model".format(top_ref, name),
                  is_advanced=True, full_model=True, is_inter_pixel=True, lock=tb_lock,
                  distribution=True, exclude_test_cap=True, mask_pixel=data_constants.e1_pixel_mask, total_cap_file=E1_2_SCAN_FILE,
-                 total_cap_group="Reference/E1/unbiased_full/total_cap")
-    analyze_data(raw_data=E1_2_SCAN_FILE, base_path="Reference/E1/inter_biased_M_80_V_full_model",
+                 total_cap_group="{}/{}/unbiased_full/total_cap".format(top_ref, name))
+    analyze_data(raw_data=E1_2_SCAN_FILE, base_path="{}/{}/inter_biased_M_80_V_full_model".format(top_ref, name),
                  is_advanced=True, full_model=True, is_inter_pixel=True, lock=tb_lock,
                  distribution=True, exclude_test_cap=True, mask_pixel=data_constants.e1_pixel_mask, total_cap_file=E1_2_SCAN_FILE,
-                 total_cap_group="Reference/E1/biased_80_V_full/total_cap")
+                 total_cap_group="{}/{}/biased_80_V_full/total_cap".format(top_ref, name))
 
-    with PdfPages("Fit References/E1/E1_Renew_C_V_Verify.pdf") as pdf:
-        analyze_data(raw_data=E1_2_SCAN_FILE, base_path="Reference/E1/C_V_Characteristic_refined",
-                     is_advanced=True, full_model=False, is_cv=True, use_corrected=True, cv_fit_plot_pdf=pdf,
-                     lock=tb_lock, exclude_test_cap=True, mask_pixel=data_constants.e1_pixel_mask,
-                     **e1_depletion_args)
+    analyze_data(raw_data=E1_2_SCAN_FILE, base_path="{}/{}/C_V_Characteristic_refined".format(top_ref, name),
+                 is_advanced=True, full_model=False, is_cv=True, use_corrected=True,
+                 lock=tb_lock, exclude_test_cap=True, mask_pixel=data_constants.e1_pixel_mask,
+                 **e1_depletion_args)
 
     for type_name in data_constants.e1_pixel_groups.keys():
         with synchronized_process_open_file(E1_2_SCAN_FILE, mode='a', lock=tb_lock) as h5_file:
@@ -210,55 +190,55 @@ def e1_analysator_second(tb_lock, correction_args):
             h5_file.copy_node(where="/Reference/E1", newname="biased_80_V_full_model_{}".format(type_name),
                               name="biased_80_V_full_{}".format(type_name), recursive=True, overwrite=True)
             h5_file.copy_node(where="/Reference/E1", newname="inter_unbiased_full_model_{}".format(type_name),
-                              name="inter_unbiased_full", recursive=True, overwrite=True)
+                              name="inter_unbiased_full_{}".format(type_name), recursive=True, overwrite=True)
             h5_file.copy_node(where="/Reference/E1", newname="inter_biased_M_80_V_full_model_{}".format(type_name),
                               name="inter_biased_M_80_V_full_{}".format(type_name), recursive=True, overwrite=True)
 
-        analyze_data(raw_data=E1_2_SCAN_FILE, base_path="Reference/E1/unbiased_full_{}".format(type_name),
+        analyze_data(raw_data=E1_2_SCAN_FILE, base_path="{}/{}/unbiased_full_{}".format(top_ref, name, type_name),
                      is_advanced=True, lock=tb_lock, full_model=False, distribution=True, exclude_cap_test=True,
                      mask_pixel=data_constants.e1_pixel_mask,
                      **correction_args)
-        analyze_data(raw_data=E1_2_SCAN_FILE, base_path="Reference/E1/biased_80_V_full_{}".format(type_name),
+        analyze_data(raw_data=E1_2_SCAN_FILE, base_path="{}/{}/biased_80_V_full_{}".format(top_ref, name, type_name),
                      is_advanced=True, lock=tb_lock, full_model=False, distribution=True, exclude_cap_test=True,
                      mask_pixel=data_constants.e1_pixel_mask,
                      **correction_args)
-        analyze_data(raw_data=E1_2_SCAN_FILE, base_path="Reference/E1/unbiased_full_model_{}".format(type_name),
+        analyze_data(raw_data=E1_2_SCAN_FILE, base_path="{}/{}/unbiased_full_model_{}".format(top_ref, name, type_name),
                      is_advanced=True, lock=tb_lock, distribution=True, exclude_cap_test=True,
                      mask_pixel=data_constants.e1_pixel_mask,
                      **correction_args)
-        analyze_data(raw_data=E1_2_SCAN_FILE, base_path="Reference/E1/biased_80_V_full_model_{}".format(type_name),
+        analyze_data(raw_data=E1_2_SCAN_FILE, base_path="{}/{}/biased_80_V_full_model_{}".format(top_ref, name, type_name),
                      is_advanced=True, lock=tb_lock, distribution=True, exclude_cap_test=True,
                      mask_pixel=data_constants.e1_pixel_mask,
                      **correction_args)
 
-        analyze_data(raw_data=E1_2_SCAN_FILE, base_path="Reference/E1/inter_unbiased_full_{}".format(type_name),
+        analyze_data(raw_data=E1_2_SCAN_FILE, base_path="{}/{}/inter_unbiased_full_{}".format(top_ref, name, type_name),
                      is_advanced=True, full_model=False, is_inter_pixel=True, lock=tb_lock,
                      distribution=True, exclude_cap_test=True, mask_pixel=data_constants.e1_pixel_mask, total_cap_file=E1_2_SCAN_FILE,
-                     total_cap_group="Reference/E1/unbiased_full/total_cap")
-        analyze_data(raw_data=E1_2_SCAN_FILE, base_path="Reference/E1/inter_biased_M_80_V_full_{}".format(type_name),
+                     total_cap_group="{}/{}/unbiased_full_model_{}/total_cap".format(top_ref, name, type_name),)
+        analyze_data(raw_data=E1_2_SCAN_FILE, base_path="{}/{}/inter_biased_M_80_V_full_{}".format(top_ref, name, type_name),
                      is_advanced=True, full_model=False, is_inter_pixel=True, lock=tb_lock,
                      distribution=True, exclude_cap_test=True, mask_pixel=data_constants.e1_pixel_mask, total_cap_file=E1_2_SCAN_FILE,
-                     total_cap_group="Reference/E1/biased_80_V_full/total_cap")
-        analyze_data(raw_data=E1_2_SCAN_FILE, base_path="Reference/E1/inter_unbiased_full_model_{}".format(type_name),
+                     total_cap_group="{}/{}/biased_80_V_full_model_{}/total_cap".format(top_ref, name, type_name),)
+        analyze_data(raw_data=E1_2_SCAN_FILE, base_path="{}/{}/inter_unbiased_full_model_{}".format(top_ref, name, type_name),
                      is_advanced=True, full_model=True, is_inter_pixel=True, lock=tb_lock,
                      distribution=True, exclude_cap_test=True, mask_pixel=data_constants.e1_pixel_mask, total_cap_file=E1_2_SCAN_FILE,
-                     total_cap_group="Reference/E1/unbiased_full/total_cap")
-        analyze_data(raw_data=E1_2_SCAN_FILE, base_path="Reference/E1/inter_biased_M_80_V_full_model_{}".format(type_name),
+                     total_cap_group="{}/{}/unbiased_full_model_{}/total_cap".format(top_ref, name, type_name),)
+        analyze_data(raw_data=E1_2_SCAN_FILE, base_path="{}/{}/inter_biased_M_80_V_full_model_{}".format(top_ref, name, type_name),
                      is_advanced=True, full_model=True, is_inter_pixel=True, lock=tb_lock,
                      distribution=True, exclude_cap_test=True, mask_pixel=data_constants.e1_pixel_mask, total_cap_file=E1_2_SCAN_FILE,
-                     total_cap_group="Reference/E1/biased_80_V_full/total_cap")
+                     total_cap_group="{}/{}/biased_80_V_full_model_{}/total_cap".format(top_ref, name, type_name),)
 
 
         actual_depletion_args = data_constants.e1_pixel_depletion_args[type_name]
         actual_depletion_args.update(**correction_args)
         actual_depletion_args.update(chip_group_name=hdf(top_ref, name, 'sensor'), apply_doping=True)
 
-        with PdfPages("Fit References/E1/E1_Renew_C_V_Verify_{}.pdf".format(type_name)) as pdf:
-            analyze_data(raw_data=E1_2_SCAN_FILE,
-                         base_path="Reference/E1/C_V_Characteristic_refined_{}".format(type_name),
-                         is_advanced=True, full_model=False, is_cv=True, use_corrected=True, cv_fit_plot_pdf=pdf,
-                         exclude_cap_test=True,
-                         lock=tb_lock, **actual_depletion_args)
+        # with PdfPages("Fit References/{}/Renew_C_V_Verify_{}.pdf".format(name, type_name)) as pdf:
+        analyze_data(raw_data=E1_2_SCAN_FILE,
+                     base_path="{}/{}/C_V_Characteristic_refined_{}".format(top_ref, name, type_name),
+                     is_advanced=True, full_model=False, is_cv=True, use_corrected=True,
+                     exclude_cap_test=True,
+                     lock=tb_lock, **actual_depletion_args)
 
     print("Finished", name)
 
@@ -267,7 +247,6 @@ def x1_analysator(tb_lock, correction_args):
     name = "X1"
     display_name = name + " Second Try."
     top_ref = "Thesis/ATLAS_ITk"
-    # top_ref = "ATLAS_ITk"
     print("Analyze", display_name)
     print(threading.get_native_id())
     print(mp.current_process().name)
@@ -283,15 +262,7 @@ def x1_analysator(tb_lock, correction_args):
     }
     x1_depletion_args.update(**correction_args)
 
-    with synchronized_process_open_file(X1_SCAN_2_FILE, mode='a', lock=tb_lock) as h5_file:
-        h5_file.copy_node(where="/ATLAS_ITk/X1", newname="unbiased_61_full_model", name="unbiased_61_full",
-                          recursive=True, overwrite=True)
-        h5_file.copy_node(where="/ATLAS_ITk/X1", newname="biased_80_V_full_model", name="biased_80_V_full",
-                          recursive=True, overwrite=True)
-        h5_file.copy_node(where="/Thesis/ATLAS_ITk/X1", newname="inter_unbiased_full_model", name="inter_unbiased_full",
-                          recursive=True, overwrite=True)
-        h5_file.copy_node(where="/Thesis/ATLAS_ITk/X1", newname="inter_biased_M_80_V_full_model", name="inter_biased_M_80_V_full",
-                          recursive=True, overwrite=True)
+    synchronize_full_model(X1_SCAN_2_FILE, top_ref, name, 80, tb_lock, unbiased_group="unbiased_61_full",)
 
     analyze_data(raw_data=X1_SCAN_2_FILE, base_path="{}/{}/unbiased_61_full".format(top_ref, name), is_advanced=True, full_model=False,
                  distribution=True, exclude_test_cap=True, pixel_mask=data_constants.x1_second_pixel_mask,
@@ -310,40 +281,27 @@ def x1_analysator(tb_lock, correction_args):
                  fit_plot_pdf_name="Fit References/{}/biased_full_model.pdf".format(name), plot=True,
                  lock=tb_lock, **correction_args)
 
-    # top_ref = "Thesis/ATLAS_ITk"
-    # temporary safe-guard to prevent errors when evaluating the inter-pix caps
-    # TODO: simplify the naming of the unbiased_61_full here!
-    with synchronized_process_open_file(X1_SCAN_2_FILE, mode='a', lock=tb_lock) as h5_file:
-        h5_file.copy_node(where=h5_file.root.ATLAS_ITk.X1, newparent=h5_file.root.Thesis.ATLAS_ITk.X1,
-                          name="unbiased_61_full", recursive=True, overwrite=False, createparents=True)
-        h5_file.copy_node(where=h5_file.root.ATLAS_ITk.X1, newparent=h5_file.root.Thesis.ATLAS_ITk.X1,
-                          name="unbiased_61_full_model", recursive=True, overwrite=False, createparents=True)
-        h5_file.copy_node(where=h5_file.root.ATLAS_ITk.X1, newparent=h5_file.root.Thesis.ATLAS_ITk.X1,
-                          name="biased_80_V_full", recursive=True, overwrite=False, createparents=True)
-        h5_file.copy_node(where=h5_file.root.ATLAS_ITk.X1, newparent=h5_file.root.Thesis.ATLAS_ITk.X1,
-                          name="biased_80_V_full_model", recursive=True, overwrite=False, createparents=True)
     analyze_data(raw_data=X1_SCAN_2_FILE, base_path="{}/{}/inter_unbiased_full".format(top_ref, name),
                  is_advanced=True, full_model=False, is_inter_pixel=True,
                  distribution=True, exclude_test_cap=True, pixel_mask=data_constants.x1_second_pixel_mask,
                  lock=tb_lock,
-                 total_cap_file=X1_SCAN_2_FILE, total_cap_group="{}/{}/unbiased_61_full/total_cap".format(top_ref, name))
+                 total_cap_file=X1_SCAN_2_FILE, total_cap_group="{}/{}/unbiased_61_full_model/total_cap".format(top_ref, name))
     analyze_data(raw_data=X1_SCAN_2_FILE, base_path="{}/{}/inter_biased_M_80_V_full".format(top_ref, name),
                  is_advanced=True, full_model=False, is_inter_pixel=True, distribution=True, exclude_test_cap=True,
                  pixel_mask=data_constants.x1_second_pixel_mask, total_cap_file=X1_SCAN_2_FILE,
-                 lock=tb_lock, total_cap_group="{}/{}/biased_80_V_full/total_cap".format(top_ref, name))
+                 lock=tb_lock, total_cap_group="{}/{}/biased_80_V_full_model/total_cap".format(top_ref, name))
     analyze_data(raw_data=X1_SCAN_2_FILE, base_path="{}/{}/inter_unbiased_full_model".format(top_ref, name),
                  is_advanced=True, full_model=True, is_inter_pixel=True,
                  distribution=True, exclude_test_cap=True, pixel_mask=data_constants.x1_second_pixel_mask,
                  lock=tb_lock,
-                 total_cap_file=X1_SCAN_2_FILE, total_cap_group="{}/{}/unbiased_61_full/total_cap".format(top_ref, name))
+                 total_cap_file=X1_SCAN_2_FILE, total_cap_group="{}/{}/unbiased_61_full_model/total_cap".format(top_ref, name))
     analyze_data(raw_data=X1_SCAN_2_FILE, base_path="{}/{}/inter_biased_M_80_V_full_model".format(top_ref, name),
                  is_advanced=True, full_model=True, is_inter_pixel=True, distribution=True, exclude_test_cap=True,
                  pixel_mask=data_constants.x1_second_pixel_mask, total_cap_file=X1_SCAN_2_FILE,
-                 lock=tb_lock, total_cap_group="{}/{}/biased_80_V_full/total_cap".format(top_ref, name))
+                 lock=tb_lock, total_cap_group="{}/{}/biased_80_V_full_model/total_cap".format(top_ref, name))
 
 
     print("CV -", display_name)
-    # top_ref = "ATLAS_ITk"
     analyze_data(raw_data=X1_SCAN_2_FILE, base_path="{}/{}/C_V_Characteristic_refined".format(top_ref, name),
                  is_advanced=True, full_model=False, is_cv=True, use_corrected=True,
                  exclude_test_cap=True, pixel_mask=data_constants.x1_second_pixel_mask,
@@ -359,7 +317,6 @@ def x1_analysator(tb_lock, correction_args):
         "apply_doping": True
     }
     x1_depletion_args.update(**correction_args)
-    # top_ref = "Thesis/ATLAS_ITk"
     analyze_data(raw_data=X1_SCAN_2_FILE, base_path="{}/{}/C_V_Characteristic_Second_Extended".format(top_ref, name),
                  is_advanced=True, full_model=False, is_inter_pixel=False, is_cv=True, use_corrected=True,
                  exclude_test_cap=True, pixel_mask=data_constants.x1_second_pixel_mask, lock=tb_lock,
@@ -399,11 +356,8 @@ def x1_analysator(tb_lock, correction_args):
 
 def x2_analysator(tb_lock, correction_args):
     name = "X2"
-    # FIXME: die Namen passen hier nicht zur Konvention => die Datei selbst muss modifiziert werden, um dies zu
-    # erreichen.
     display_name = name + " Second Try."
-    top_ref = "Thesis_ATLAS_ITk"
-    # top_ref = "ATLAS_ITk"
+    top_ref = "Thesis/ATLAS_ITk"
     print("Analyze", display_name)
     print(threading.get_native_id())
     print(mp.current_process().name)
@@ -429,6 +383,7 @@ def x2_analysator(tb_lock, correction_args):
     x2_depletion_args.update(**correction_args)
     x2_depletion_refined_args.update(**correction_args)
 
+    # TODO: missing the inter-pix measurements here -> this here must remain!
     with synchronized_process_open_file(X2_SCAN_2_FILE, mode='a', lock=tb_lock) as h5_file:
         h5_file.copy_node(where="/Thesis/ATLAS_ITk/X2", newname="unbiased_1_full_model", name="unbiased_1_full",
                           recursive=True, overwrite=True)
@@ -449,8 +404,6 @@ def x2_analysator(tb_lock, correction_args):
     analyze_data(raw_data=X2_SCAN_2_FILE, base_path="{}/{}/C_V_Characteristic_refined".format(top_ref, name),
                  is_advanced=True, full_model=False, is_cv=True, use_corrected=True, lock=tb_lock,
                  **x2_depletion_args)
-
-    # top_ref = "Thesis/ATLAS_ITk"
     analyze_data(raw_data=X2_SCAN_2_FILE, base_path="{}/{}/C_V_Characteristic_refined_extended_renew_retry".format(top_ref, name),
                  is_advanced=True, full_model=False, is_cv=True, use_corrected=True, lock=tb_lock,
                  **x2_depletion_refined_args)
@@ -478,15 +431,7 @@ def x5_analysator(tb_lock, correction_args):
         np.arange(40, 100.1, 1.25)
     )))
 
-    with synchronized_process_open_file(X5_SCAN_FILE, mode='a', lock=tb_lock) as h5_file:
-        h5_file.copy_node(where="/Thesis/ATLAS_ITk/X5", newname="unbiased_full_model", name="unbiased_full",
-                          recursive=True, overwrite=True)
-        h5_file.copy_node(where="/Thesis/ATLAS_ITk/X5", newname="biased_40_V_full_model", name="biased_40_V_full",
-                          recursive=True, overwrite=True)
-        h5_file.copy_node(where="/Thesis/ATLAS_ITk/X5", newname="inter_unbiased_full_model", name="inter_unbiased_full",
-                          recursive=True, overwrite=True)
-        h5_file.copy_node(where="/Thesis/ATLAS_ITk/X5", newname="inter_biased_M_40_V_full_model", name="inter_biased_M_40_V_full",
-                          recursive=True, overwrite=True)
+    synchronize_full_model(X5_SCAN_FILE, top_ref, name, 40, tb_lock)
 
     # handle the full sensor analysis
     analyze_data(raw_data=X5_SCAN_FILE, base_path="{}/{}/unbiased_full".format(top_ref, name), is_advanced=True,
@@ -520,13 +465,13 @@ def x5_analysator(tb_lock, correction_args):
                  mask_pixel=data_constants.x5_second_pixel_mask, exclude_cap_test=True, distribution=True,
                  total_cap_file=X5_SCAN_FILE,
                  lock=tb_lock,
-                 total_cap_group="{}/{}/unbiased_full/total_cap".format(top_ref, name))
+                 total_cap_group="{}/{}/unbiased_full_model/total_cap".format(top_ref, name))
     analyze_data(raw_data=X5_SCAN_FILE, base_path="{}/{}/inter_biased_M_40_V_full".format(top_ref, name),
                  is_advanced=True, full_model=False, is_inter_pixel=True,
                  mask_pixel=data_constants.x5_second_pixel_mask, exclude_cap_test=True, distribution=True,
                  lock=tb_lock,
                  total_cap_file=X5_SCAN_FILE,
-                 total_cap_group="{}/{}/biased_40_V_full/total_cap".format(top_ref, name))
+                 total_cap_group="{}/{}/biased_40_V_full_model/total_cap".format(top_ref, name))
     analyze_data(raw_data=X5_SCAN_FILE, base_path="{}/{}/inter_unbiased_full_model".format(top_ref, name),
                  is_advanced=True, full_model=True, is_inter_pixel=True,
                  mask_pixel=data_constants.x5_second_pixel_mask, exclude_cap_test=True, distribution=True,
@@ -564,17 +509,24 @@ def x5_analysator(tb_lock, correction_args):
     x5_depletion_args_refined.update(**correction_args)
 
     print("CV Analysis for X5")
-    # analyze_data(raw_data=X5_SCAN_FILE, base_path="{}/{}/C_V_Characteristic".format(top_ref, name),
-    #                                 is_advanced=True, full_model=False, is_cv=True, use_corrected=False,
-    #                                 mask_pixel=data_constants.x5_second_pixel_mask,
-    #                                 exclude_cap_test=True,
-    #                                 lock=tb_lock, **x5_depletion_args)
-    #
-    # analyze_data(raw_data=X5_SCAN_FILE, base_path="{}/{}/C_V_Characteristic_refined".format(top_ref, name),
-    #                     is_advanced=True, full_model=False, is_cv=True, use_corrected=False,
-    #                     mask_pixel=data_constants.x5_second_pixel_mask,
-    #                     exclude_cap_test=True,
-    #                     lock=tb_lock, **x5_depletion_args_refined)
+    analyze_data(raw_data=X5_SCAN_FILE, base_path="{}/{}/C_V_Characteristic".format(top_ref, name),
+                                    is_advanced=True, full_model=False, is_cv=True, use_corrected=False,
+                                    mask_pixel=data_constants.x5_second_pixel_mask,
+                                    exclude_cap_test=True,
+                                    lock=tb_lock, **x5_depletion_args)
+
+    analyze_data(raw_data=X5_SCAN_FILE, base_path="{}/{}/C_V_Characteristic_refined".format(top_ref, name),
+                        is_advanced=True, full_model=False, is_cv=True, use_corrected=False,
+                        mask_pixel=data_constants.x5_second_pixel_mask,
+                        exclude_cap_test=True,
+                        lock=tb_lock, **x5_depletion_args_refined)
+    analyze_data(raw_data=X5_SCAN_FILE, base_path="{}/{}/C_V_Characteristic_refined_Extended".format(top_ref, name),
+                 is_advanced=True, full_model=False, is_cv=True, use_corrected=False,
+                 mask_pixel=data_constants.x5_second_pixel_mask,
+                 exclude_cap_test=True,
+                 lock=tb_lock, **x5_depletion_args_refined)
+
+    # add here the additonal CV analysis used for extended range!
     print("Finished the Analysis for X5")
 
 
@@ -608,15 +560,7 @@ def x6_analysator(tb_lock, correction_args):
     }
     x6_depletion_args.update(**correction_args)
     x6_depletion_args_refined.update(**correction_args)
-    with synchronized_process_open_file(X6_SCAN_FILE, mode='a', lock=tb_lock) as h5_file:
-        h5_file.copy_node(where="/Thesis/ATLAS_ITk/X6", newname="unbiased_full_model", name="unbiased_full",
-                          recursive=True, overwrite=True)
-        h5_file.copy_node(where="/Thesis/ATLAS_ITk/X6", newname="biased_45_V_full_model", name="biased_45_V_full",
-                          recursive=True, overwrite=True)
-        h5_file.copy_node(where="/Thesis/ATLAS_ITk/X6", newname="inter_unbiased_full_model", name="inter_unbiased_full",
-                          recursive=True, overwrite=True)
-        h5_file.copy_node(where="/Thesis/ATLAS_ITk/X6", newname="inter_biased_M_45_V_full_model", name="inter_biased_M_45_V_full",
-                          recursive=True, overwrite=True)
+    synchronize_full_model(X6_SCAN_FILE, top_ref, name, 45, tb_lock)
 
     analyze_data(raw_data=data_constants.X6_SCAN_FILE, base_path="{}/{}/unbiased_full".format(top_ref, name),
                  is_advanced=True, distribution=True, full_model=False, exclude_cap_test=True,
@@ -642,25 +586,25 @@ def x6_analysator(tb_lock, correction_args):
                  exclude_cap_test=True, distribution=True,
                  total_cap_file=data_constants.X6_SCAN_FILE,
                  lock=tb_lock,
-                 total_cap_group="{}/{}/unbiased_full/total_cap".format(top_ref, name))
+                 total_cap_group="{}/{}/unbiased_full_model/total_cap".format(top_ref, name))
     analyze_data(raw_data=data_constants.X6_SCAN_FILE, base_path="{}/{}/inter_unbiased_full_model".format(top_ref, name),
                  is_advanced=True, full_model=True, is_inter_pixel=True,
                  exclude_cap_test=True, distribution=True,
                  total_cap_file=data_constants.X6_SCAN_FILE,
                  lock=tb_lock,
-                 total_cap_group="{}/{}/unbiased_full/total_cap".format(top_ref, name))
+                 total_cap_group="{}/{}/unbiased_full_model/total_cap".format(top_ref, name))
     analyze_data(raw_data=data_constants.X6_SCAN_FILE, base_path="{}/{}/inter_biased_M_45_V_full".format(top_ref, name),
                  is_advanced=True, full_model=False, is_inter_pixel=True,
                  exclude_cap_test=True, distribution=True,
                  lock=tb_lock,
                  total_cap_file=data_constants.X6_SCAN_FILE,
-                 total_cap_group="{}/{}/biased_45_V_full/total_cap".format(top_ref, name))
+                 total_cap_group="{}/{}/biased_45_V_full_model/total_cap".format(top_ref, name))
     analyze_data(raw_data=data_constants.X6_SCAN_FILE, base_path="{}/{}/inter_biased_M_45_V_full_model".format(top_ref, name),
                  is_advanced=True, full_model=True, is_inter_pixel=True,
                  exclude_cap_test=True, distribution=True,
                  lock=tb_lock,
                  total_cap_file=data_constants.X6_SCAN_FILE,
-                 total_cap_group="{}/{}/biased_45_V_full/total_cap".format(top_ref, name))
+                 total_cap_group="{}/{}/biased_45_V_full_model/total_cap".format(top_ref, name))
 
     # CV analysis
     print("Cv analysis for X6")
@@ -685,15 +629,7 @@ def x7_analysator(tb_lock, correction_args):
     print(mp.current_process().name)
     print(mp.current_process().pid)
 
-    with synchronized_process_open_file(data_constants.X7_SCAN_FILE, mode='a', lock=tb_lock) as h5_file:
-        h5_file.copy_node(where="/Thesis/ATLAS_ITk/X7", newname="unbiased_full_model", name="unbiased_full",
-                          recursive=True, overwrite=True)
-        h5_file.copy_node(where="/Thesis/ATLAS_ITk/X7", newname="biased_40.0_V_full_model", name="biased_40.0_V_full",
-                          recursive=True, overwrite=True)
-        h5_file.copy_node(where="/Thesis/ATLAS_ITk/X7", newname="inter_unbiased_full_model", name="inter_unbiased_full",
-                          recursive=True, overwrite=True)
-        h5_file.copy_node(where="/Thesis/ATLAS_ITk/X7", newname="inter_biased_M_40.0_V_full_model", name="inter_biased_M_40.0_V_full",
-                          recursive=True, overwrite=True)
+    synchronize_full_model(X7_SCAN_FILE, top_ref, name, 40.0, tb_lock)
 
     analyze_data(raw_data=data_constants.X7_SCAN_FILE, base_path="{}/{}/unbiased_full".format(top_ref, name), is_advanced=True,
                  distribution=True, full_model=False, exclude_cap_test=True, lock=tb_lock,
@@ -713,12 +649,12 @@ def x7_analysator(tb_lock, correction_args):
                  is_advanced=True, full_model=False, is_inter_pixel=True,
                  exclude_cap_test=True, distribution=True, lock=tb_lock,
                  total_cap_file=data_constants.X7_SCAN_FILE,
-                 total_cap_group="{}/{}/unbiased_full/total_cap".format(top_ref, name))
+                 total_cap_group="{}/{}/unbiased_full_model/total_cap".format(top_ref, name))
     analyze_data(raw_data=data_constants.X7_SCAN_FILE, base_path="{}/{}/inter_biased_M_40.0_V_full".format(top_ref, name),
                  is_advanced=True, full_model=False, is_inter_pixel=True,
                  exclude_cap_test=True, distribution=True, lock=tb_lock,
                  total_cap_file=data_constants.X7_SCAN_FILE,
-                 total_cap_group="{}/{}/biased_40.0_V_full/total_cap".format(top_ref, name))
+                 total_cap_group="{}/{}/biased_40.0_V_full_model/total_cap".format(top_ref, name))
     analyze_data(raw_data=data_constants.X7_SCAN_FILE, base_path="{}/{}/inter_unbiased_full_model".format(top_ref, name),
                  is_advanced=True, full_model=True, is_inter_pixel=True,
                  exclude_cap_test=True, distribution=True, lock=tb_lock,
@@ -808,6 +744,7 @@ if __name__ == "__main__":
             p.close()
 
     print(processes)
+    # e1_analysator_second(tables_lock, bare_correction_args)
     print("Elapsed time: ", time.time() - start_time)
     import gc
     gc.collect()

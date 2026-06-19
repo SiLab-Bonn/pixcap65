@@ -338,6 +338,7 @@ class DopingArrayStore(DepletionDataStore):
         self.depletion_fit_parameter_error_table = np.full((40, 40, 4), fill_value=np.nan)
         self.depletion_fit_covariance_table = np.full((40, 40, 4, 4), fill_value=np.nan)
         self.effective_doping_table = np.full(shape=doping_shape, fill_value=np.nan)
+        self.resistivity_table = np.full(shape=doping_shape, fill_value=np.nan)
 
     def set_pixel(self, i_row, i_col):
         self.pixel_row = i_row
@@ -357,6 +358,8 @@ class DopingArrayStore(DepletionDataStore):
                 self.depletion_fit_covariance_table[self.pixel_col, self.pixel_row] = data
             case "doping":
                 self.effective_doping_table[self.pixel_col, self.pixel_row] = data
+            case "resistivity":
+                self.resistivity_table[self.pixel_col, self.pixel_row] = data
             case _:
                 raise ValueError(f"Unknown data storage key {key}")
 

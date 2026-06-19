@@ -1,7 +1,7 @@
 # commented configuration options are the result when using hatch instead of setuptool
 [project]
 name = "pixcap65_DOMI1279"
-dynamic = ["version"]
+version = "0.1.0-dev4"
 description = "Host software for the PixCap65 chip control system based on MIO2 + GPAC hardware."
 authors = [
     { name = "Hans Krüger", email = "krueger@physik.uni-bonn.de" },
@@ -40,7 +40,7 @@ dependencies = [
 [project.urls]
 Homepage = "https://github.com/SiLab-Bonn/pixcap65/"
 Issues = "https://github.com/SiLab-Bonn/pixcap65/issues/"
-"Source code" = "https://github.com/SiLab-Bonn/pixcap65/"
+source = "https://github.com/SiLab-Bonn/pixcap65/"
 # no documentation present.
 
 [project.scripts]
@@ -73,7 +73,6 @@ visualization = [
     "matplotlib",
     "pycairo",
 ]
-
 docs = [
     "sphinxcontrib-blockdiag",
     "sphinx_rtd_theme",
@@ -88,35 +87,35 @@ docs = [
 # configuration of different build systems which could be used interchangebly!
 [build-system]
 requires = ["setuptools >= 77.0.3", "hatchling >= 1.26", "uv_build >= 0.11.7, <0.12.0"]
-build-backend = "setuptools.build_meta"
+# build-backend = "setuptools.build_meta"
 # build-backend = "hatchling.build"
-# build-backend = "uv_build"
+build-backend = "uv_build"
 
 # setuptools configuration
 [tool.setuptools]
 include-package-data = true
 
-[tool.setuptools.dynamic]
-version = { attr = "pixcap65.pixcap.__version__" }
+[tool.setuptools.package-data]
+pixcap65.device = ["*.bit"]
+device = ["*.bit"]
 
 [tool.setuptools.exclude-package-data]
 pixcap65 = [".gitattributes", ".gitignore", "**.h5"]
 
 [tool.setuptools.packages.find]
-include = ["pixcap65*"]
+include = ["pixcap65*", "device*"]
 exclude = ["tests", "data_local", "Data", "doc", "**full_analysis", "**.h5", "**.pdf", "legacy"]
 
 # hatch configuration
-[tool.hatch.version]
-path = "pixcap65/pixcap/__init__.py"
-
 [tool.hatch.metadata]
 allow-direct-references = true
 
 [tool.hatch.build]
 directory = "out"
+skip-excluded-dirs = true
 
 [tool.hatch.build.targets.wheel]
+# the wheel target will determine the editable installs
 packages = ["pixcap65"]
 
 [tool.hatch.build.targets.sdist]
@@ -141,6 +140,9 @@ exclude = [
 [tool.hatch.envs.hatch-build]
 installer = "pip"
 
+[tool.uv]
+package = false
+
 [tool.uv.sources]
 basil-daq = { path = "../basil-pixcap", editable = true }
 
@@ -148,6 +150,5 @@ basil-daq = { path = "../basil-pixcap", editable = true }
 module-name = "pixcap65"
 module-root = ""
 namespace = true
-data = ["pixcap65/device"]
+data = { data = "pixcap65/device" }
 source-exclude = ["doc", "Data", "data_local"]
-
