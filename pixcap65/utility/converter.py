@@ -8,7 +8,7 @@ from pixcap65 import data_constants
 from pixcap65.analysis_util.utility import HIST_BIAS_MEAS_UNIT, HIST_CURRENT_MEAS_UNIT, GLOBAL_FILTERS
 from pixcap65.configs.config_handler import extract_smu_voltage_error
 from pixcap65.data_constants import E1_2_SCAN_FILE, R13_2_SCAN_FILE, X1_SCAN_2_FILE, X2_SCAN_2_FILE, X6_SCAN_FILE, \
-    R11_SCAN_FILE
+    R11_SCAN_FILE, X5_SCAN_FILE, X7_SCAN_FILE
 from pixcap65.pixcap_65_test_total_cap import BiasTable, ScanConfigurationKeys
 from pixcap65.utility.tables_util import set_group_attribute, group_get_file, get_groups, list_group_attributes, \
     get_group_attribute
@@ -533,7 +533,6 @@ if __name__ == "__main__":
                           name="C_V_Characteristic_refined_Extended_Combined",
                           newname="C_V_Characteristic_refined_Extended_Combined",
                           overwrite=True, recursive=True)
-        # TODO: verify whether this general approach may work
         old_x1 = h5_file.root.ATLAS_ITk.X1
         for group in old_x1._f_iter_nodes():
             if not isinstance(group, tb.Group):
@@ -545,7 +544,6 @@ if __name__ == "__main__":
                               newname=group._v_name,
                               newparent=h5_file.root.Thesis.ATLAS_ITk.X1, recursive=True, overwrite=True)
         generate_pixel_dimensions(h5_file.root.Thesis.ATLAS_ITk.X1)
-
 
     with tb.open_file(X2_SCAN_2_FILE, "a") as h5_file:
         # generate_bias_table(h5_file.root.ATLAS_ITk.X2.I_V_Characteristic.biasing.measurements)
@@ -567,12 +565,15 @@ if __name__ == "__main__":
 
     with tb.open_file(R11_SCAN_FILE, "a") as h5_file:
         generate_pixel_dimensions(h5_file.root.Reference.R1)
-        # TODO: verify whether this general approach may work
         old_sensor = h5_file.root.Reference.R11
         for group in old_sensor._f_iter_nodes():
             if not isinstance(group, tb.Group):
                 continue
             if group == old_sensor:
+                continue
+            if group._v_name == "C_V_Characteristic_refined":
+                continue
+            if group._v_name == "I_V_Characteristic":
                 continue
             print(group)
             h5_file.copy_node(where=old_sensor, name=group._v_name,
@@ -584,8 +585,6 @@ if __name__ == "__main__":
         physical_dimensions[:, 0] = np.nan
         h5_file.root.Reference.R1.sensor.PhysicalDimensions[:] = physical_dimensions
         h5_file.root.Reference.R1.sensor.PhysicalDimensions.flush()
-
-
 
     with tb.open_file("packaged/R13_2_Scan.h5", "a") as h5_file:
         h5_file.copy_children(h5_file.root.ATLAS_ITk.X2, h5_file.root.Reference.R13, recursive=True, overwrite=True)
@@ -627,7 +626,9 @@ if __name__ == "__main__":
         split_sensor_group(h5_file.root.Reference.E1.unbiased_full)
         split_sensor_group(h5_file.root.Reference.E1.inter_unbiased_full)
 
-    # need to correct for invalid naming at x6 => only run this part here once!
+    with tb.open_file(X5_SCAN_FILE, "a") as h5_file:
+        generate_pixel_dimensions(h5_file.root.Thesis.ATLAS_ITk.X5)
+
     with tb.open_file(X6_SCAN_FILE, "a") as h5_file:
         wrong_parent = h5_file.root.Thesis.ATLAS_ITk.X7
         right_parent = h5_file.root.Thesis.ATLAS_ITk.X6
@@ -638,6 +639,9 @@ if __name__ == "__main__":
             h5_file.move_node(where=wrong_parent, name="C_V_Characteristic_refined", newparent=right_parent, overwrite=True)
 
         generate_pixel_dimensions(h5_file.root.Thesis.ATLAS_ITk.X6)
+
+    with tb.open_file(X7_SCAN_FILE, 'a') as h5_file:
+        generate_pixel_dimensions(h5_file.root.Thesis.ATLAS_ITk.X7)
 
     # When have I repaired all the implementations.
     # All the first try measurement series needs to consolidated and their entries needs to be adjusted for the new formats

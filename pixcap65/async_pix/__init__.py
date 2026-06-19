@@ -1,4 +1,4 @@
-import asyncio
+import asyncio as async_lib
 import concurrent.futures
 import re
 import tables as tb
@@ -9,7 +9,7 @@ from typing import Literal
 with concurrent.futures.ProcessPoolExecutor() as pool:
     pool.map(print, [])
 
-lock = asyncio.Lock()
+lock = async_lib.Lock()
 __open_files__ = {}
 __events__ = {}
 regex = r"The files '.*' is already opened"
@@ -40,7 +40,7 @@ async def __internal_tables_open_file(filename: str, mode: Literal["r", "w", "a"
             need_wait = False
 
         if need_wait:
-            await asyncio.sleep(10)
+            await async_lib.sleep(10)
 
 
 
@@ -54,7 +54,7 @@ async def tables_open_file(filename: str,
                            **kwargs,):
     timeout = kwargs.pop("timeout", None)
     if timeout:
-        file = await asyncio.wait_for(__internal_tables_open_file(filename, mode, title, root_uep, filters, **kwargs), timeout)
+        file = await async_lib.wait_for(__internal_tables_open_file(filename, mode, title, root_uep, filters, **kwargs), timeout)
         yield file
     else:
         yield await __internal_tables_open_file(filename, mode, title, root_uep, filters, **kwargs)

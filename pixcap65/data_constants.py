@@ -114,7 +114,6 @@ e1_pixel_dimensions = {
     "dnw25_50": 25,
 }
 
-# TODO: we need a recalculation of all the errors for the E1 sample as the cap errors seems to be much to large
 e1_pixel_depletion_args = {
     "dnw30_50": {
         "first_boundaries": (-100, -25),
