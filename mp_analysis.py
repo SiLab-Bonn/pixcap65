@@ -20,7 +20,6 @@ import multiprocessing as mp
 import numpy as np
 import threading
 import time
-from matplotlib.backends.backend_pdf import PdfPages
 
 import pixcap65.concurrency as concurrency
 import pixcap65.data_constants as data_constants
@@ -85,6 +84,12 @@ def r13_analysator_second(tb_lock, correction_args):
     synchronize_full_model(R13_2_SCAN_FILE, top_ref, name, 80, tb_lock,
                            unbiased_group="unbiased_1_full")
 
+    with synchronized_process_open_file(R13_2_SCAN_FILE, mode='a', lock=tb_lock) as h5_file:
+        h5_file.copy_node(where="/Reference/R13", newname="inter_unbiased_full_renew_model", name="inter_unbiased_full_renew",
+                          recursive=True, overwrite=True)
+        h5_file.copy_node(where="/Reference/R13", newname="inter_biased_M_80_V_full_renew_model", name="inter_biased_M_80_V_full_renew",
+                          recursive=True, overwrite=True)
+
     analyze_data(raw_data=R13_2_SCAN_FILE, base_path="{}/{}/unbiased_1_full".format(top_ref, name), is_advanced=True,
                  lock=tb_lock, exclude_test_cap=True, distribution=True, full_model=False,
                  fit_plot_pdf_name="Fit References/{}/unbiased_reduced_model.pdf".format(name), plot=True,
@@ -118,6 +123,27 @@ def r13_analysator_second(tb_lock, correction_args):
                  total_cap_file=R13_2_SCAN_FILE,
                  total_cap_group="{}/{}/unbiased_1_full_model/total_cap".format(top_ref, name))
     analyze_data(raw_data=R13_2_SCAN_FILE, base_path="{}/{}/inter_biased_M_80_V_full_model".format(top_ref, name),
+                 lock=tb_lock, distribution=True, exclude_test_cap=True,
+                 is_advanced=True, full_model=True, is_inter_pixel=True,
+                 total_cap_file=R13_2_SCAN_FILE,
+                 total_cap_group="{}/{}/biased_80_V_full_model/total_cap".format(top_ref, name))
+
+    analyze_data(raw_data=R13_2_SCAN_FILE, base_path="{}/{}/inter_unbiased_full_renew".format(top_ref, name),
+                 lock=tb_lock, distribution=True, exclude_test_cap=True,
+                 is_advanced=True, full_model=False, is_inter_pixel=True,
+                 total_cap_file=R13_2_SCAN_FILE,
+                 total_cap_group="{}/{}/unbiased_1_full_model/total_cap".format(top_ref, name))
+    analyze_data(raw_data=R13_2_SCAN_FILE, base_path="{}/{}/inter_biased_M_80_V_full_renew".format(top_ref, name),
+                 lock=tb_lock, distribution=True, exclude_test_cap=True,
+                 is_advanced=True, full_model=False, is_inter_pixel=True,
+                 total_cap_file=R13_2_SCAN_FILE,
+                 total_cap_group="{}/{}/biased_80_V_full_model/total_cap".format(top_ref, name))
+    analyze_data(raw_data=R13_2_SCAN_FILE, base_path="{}/{}/inter_unbiased_full_renew_model".format(top_ref, name),
+                 lock=tb_lock, distribution=True, exclude_test_cap=True,
+                 is_advanced=True, full_model=True, is_inter_pixel=True,
+                 total_cap_file=R13_2_SCAN_FILE,
+                 total_cap_group="{}/{}/unbiased_1_full_model/total_cap".format(top_ref, name))
+    analyze_data(raw_data=R13_2_SCAN_FILE, base_path="{}/{}/inter_biased_M_80_V_full_renew_model".format(top_ref, name),
                  lock=tb_lock, distribution=True, exclude_test_cap=True,
                  is_advanced=True, full_model=True, is_inter_pixel=True,
                  total_cap_file=R13_2_SCAN_FILE,
@@ -264,6 +290,11 @@ def x1_analysator(tb_lock, correction_args):
 
     synchronize_full_model(X1_SCAN_2_FILE, top_ref, name, 80, tb_lock, unbiased_group="unbiased_61_full",)
 
+    with synchronized_process_open_file("packaged/data/X1_12_Renew_Scan.h5", 'a', lock=tb_lock) as h5_file:
+        h5_file.copy_node(where="/Thesis/ATLAS_ITk/X1", name="biased_200_V_full", newname="biased_200_V_full_model", overwrite=True, recursive=True)
+        h5_file.copy_node(where="/Thesis/ATLAS_ITk/X1", name="inter_unbiased_full_renew_Extended", newname="inter_unbiased_full_model_renew_Extended", overwrite=True, recursive=True)
+
+
     analyze_data(raw_data=X1_SCAN_2_FILE, base_path="{}/{}/unbiased_61_full".format(top_ref, name), is_advanced=True, full_model=False,
                  distribution=True, exclude_test_cap=True, pixel_mask=data_constants.x1_second_pixel_mask,
                  lock=tb_lock, fit_plot_pdf_name="Fit References/{}/unbiased_reduced_model.pdf".format(name), plot=True,
@@ -272,6 +303,10 @@ def x1_analysator(tb_lock, correction_args):
                  distribution=True, exclude_test_cap=True, pixel_mask=data_constants.x1_second_pixel_mask,
                  fit_plot_pdf_name="Fit References/{}/biased_reduced_model.pdf".format(name), plot=True,
                  lock=tb_lock, **correction_args)
+    analyze_data(raw_data="packaged/data/X1_12_Renew_Scan.h5", base_path="{}/{}/biased_200_V_full".format(top_ref, name), is_advanced=True,
+                 full_model=False,
+                 distribution=True, exclude_test_cap=True, pixel_mask=data_constants.x1_second_pixel_mask,
+                 lock=tb_lock, **correction_args)
     analyze_data(raw_data=X1_SCAN_2_FILE, base_path="{}/{}/unbiased_61_full_model".format(top_ref, name), is_advanced=True,
                  distribution=True, exclude_test_cap=True, pixel_mask=data_constants.x1_second_pixel_mask,
                  lock=tb_lock, fit_plot_pdf_name="Fit References/{}/unbiased_full_model.pdf".format(name), plot=True,
@@ -279,6 +314,10 @@ def x1_analysator(tb_lock, correction_args):
     analyze_data(raw_data=X1_SCAN_2_FILE, base_path="{}/{}/biased_80_V_full_model".format(top_ref, name), is_advanced=True,
                  distribution=True, exclude_test_cap=True, pixel_mask=data_constants.x1_second_pixel_mask,
                  fit_plot_pdf_name="Fit References/{}/biased_full_model.pdf".format(name), plot=True,
+                 lock=tb_lock, **correction_args)
+    analyze_data(raw_data="packaged/data/X1_12_Renew_Scan.h5", base_path="{}/{}/biased_200_V_full_model".format(top_ref, name),
+                 is_advanced=True,
+                 distribution=True, exclude_test_cap=True, pixel_mask=data_constants.x1_second_pixel_mask,
                  lock=tb_lock, **correction_args)
 
     analyze_data(raw_data=X1_SCAN_2_FILE, base_path="{}/{}/inter_unbiased_full".format(top_ref, name),
@@ -299,6 +338,19 @@ def x1_analysator(tb_lock, correction_args):
                  is_advanced=True, full_model=True, is_inter_pixel=True, distribution=True, exclude_test_cap=True,
                  pixel_mask=data_constants.x1_second_pixel_mask, total_cap_file=X1_SCAN_2_FILE,
                  lock=tb_lock, total_cap_group="{}/{}/biased_80_V_full_model/total_cap".format(top_ref, name))
+
+    analyze_data(raw_data="packaged/data/X1_12_Renew_Scan.h5", base_path="{}/{}/inter_unbiased_full_renew_Extended".format(top_ref, name),
+                 is_advanced=True, full_model=False, is_inter_pixel=True,
+                 distribution=True, exclude_test_cap=True, pixel_mask=data_constants.x1_second_pixel_mask,
+                 lock=tb_lock,
+                 total_cap_file=X1_SCAN_2_FILE,
+                 total_cap_group="{}/{}/unbiased_61_full_model/total_cap".format(top_ref, name))
+    analyze_data(raw_data="packaged/data/X1_12_Renew_Scan.h5", base_path="{}/{}/inter_unbiased_full_model_renew_Extended".format(top_ref, name),
+                 is_advanced=True, full_model=True, is_inter_pixel=True,
+                 distribution=True, exclude_test_cap=True, pixel_mask=data_constants.x1_second_pixel_mask,
+                 lock=tb_lock,
+                 total_cap_file=X1_SCAN_2_FILE,
+                 total_cap_group="{}/{}/unbiased_61_full_model/total_cap".format(top_ref, name))
 
 
     print("CV -", display_name)

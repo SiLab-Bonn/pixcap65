@@ -248,7 +248,12 @@ class Pixcap65BaseMeasurement(MeasurementAbstract, metaclass=ABCMeta):
         super(Pixcap65BaseMeasurement, self).__init__(**kwargs)
         if pix_config is None or not os.path.exists(pix_config):
             logger.warning("The path to the pixcap firmware was recalculated from the package resources.")
-            pix_config = files("pixcap65").joinpath("device", "ise", "pixcap65.bit")
+            packaged_config = files("pixcap65").joinpath("device", "ise", "pixcap65.bit")
+            assert packaged_config.is_file()
+
+            # FIXME: this will only work if the actual exists on disk
+            # as_file might be an alternative, but it would return a context manager => in that case we would need to submit the dictionary itself directly!
+            pix_config = str(packaged_config)
 
         # init the dut
         self.dut = Pixcap65(pix_config)

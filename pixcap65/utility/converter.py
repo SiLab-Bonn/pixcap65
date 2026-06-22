@@ -1,3 +1,5 @@
+from importlib.resources import files
+
 import logging
 import numpy as np
 import tables as tb
@@ -377,8 +379,12 @@ def regenerate_inter_pix_errors(group):
     if "HistCurrValues" not in group:
         from pixcap65.configs.config_handler import extract_smu_current_error
         import yaml
-        with open("pixcap65/configs/keithley_2602a_range.yaml") as f:
+
+        with files("pixcap65.configs").joinpath("keithley_2602a_range.yaml").open() as f:
+            # with open("pixcap65/configs/keithley_2602a_range.yaml") as f:
             config = yaml.safe_load(f)
+            print("Read the configuration")
+            print(config)
             total_data = group.TotalHistCurr[:]
             total_errors = np.where(np.isfinite(total_data),
                                     extract_smu_current_error(config, total_data, 0.000001), np.nan)
@@ -586,13 +592,13 @@ if __name__ == "__main__":
         h5_file.root.Reference.R1.sensor.PhysicalDimensions[:] = physical_dimensions
         h5_file.root.Reference.R1.sensor.PhysicalDimensions.flush()
 
-    with tb.open_file("packaged/R13_2_Scan.h5", "a") as h5_file:
+    with tb.open_file("packaged/data/R13_2_Scan.h5", "a") as h5_file:
         h5_file.copy_children(h5_file.root.ATLAS_ITk.X2, h5_file.root.Reference.R13, recursive=True, overwrite=True)
         h5_file.flush()
         with tb.open_file(R13_2_SCAN_FILE, "a") as second_file:
             h5_file.copy_children(h5_file.root, second_file.root, recursive=True, overwrite=True)
 
-    with tb.open_file("packaged/R13_3_Scan.h5", "a") as h5_file:
+    with tb.open_file("packaged/data/R13_3_Scan.h5", "a") as h5_file:
         with tb.open_file(R13_2_SCAN_FILE, "a") as second_file:
             h5_file.copy_children(h5_file.root.Reference.R13, second_file.root.Reference.R13, recursive=True, overwrite=True)
 

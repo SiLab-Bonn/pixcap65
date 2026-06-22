@@ -3,21 +3,19 @@
 #   All rights reserved
 #  SiLab, Institute of Physics, University of Bonn
 # ----------------------------------------------------------
-import logging
 from os import PathLike
 
-from collections.abc import Iterable
-
-import time
-
+import logging
 import numpy as np
 import tables as tb
+import time
+from collections.abc import Iterable
 
+from pixcap65.analysis import get_test_capacitance_data
 from pixcap65.analysis_util.data_store import SummaryTable
 from pixcap65.data_constants import R11_SCAN_FILE, R13_2_SCAN_FILE, E1_2_SCAN_FILE
 from pixcap65.data_constants import X1_SCAN_2_FILE, X2_SCAN_2_FILE
 from pixcap65.data_constants import X5_SCAN_FILE, X6_SCAN_FILE, X7_SCAN_FILE
-from pixcap65.analysis import get_test_capacitance_data
 from pixcap65.utility import synchronized_process_open_file
 from pixcap65.utility.utils_2 import walk_to_node
 
@@ -44,6 +42,57 @@ field_names = [name.replace(" ", "_") for name in [
     "28 w_ bump", "29 w_ bump", "30 w_ bump", "31 w_ bump", "32 w_ bump", "33 w_ bump",
     "34 w_ bump", "35 w_o bump", "36 w_o bump", "37 w_o bump", "38 w_o bump", "39 w_o bump"
 ]]
+
+field_design_values = {
+    "0 w_o bump": 0,
+    "1 w_o bump": 0,
+    "2 w_o bump": 0,
+    "3 w_o bump": 0,
+    "4 w_o bump": 0,
+    "5": 15.41,
+    "6": 30.33,
+    "7": 60.14,
+    "8": 119.39,
+    "9": 237.87,
+    "10": 30.82,
+    "11": 61.64,
+    "12": 123.28,
+    "13": 2.51,
+    "14": 1.63,
+    "15": 5.51,
+    "17": 8.53,
+    "18": 8.53,
+    "19": 8.53,
+    "20": 8.53,
+    "21": 8.53,
+    "22": 8.53,
+    "23": 8.53,
+    "24": 8.53,
+    "25": 8.53,
+    "26": 8.53,
+    "27 w_ bump": 0,
+    "28 w_ bump": 0,
+    "29 w_ bump": 0,
+    "30 w_ bump": 0,
+    "31 w_ bump": 0,
+    "32 w_ bump": 0,
+    "33 w_ bump": 0,
+    "34 w_ bump": 0,
+    "35 w_o bump": 0,
+    "36 w_o bump": 0,
+    "37 w_o bump": 0,
+    "38 w_o bump": 0,
+    "39 w_o bump": 0
+}
+
+test_design_values = {name.replace(" ", "_") : field_design_values[name] for name in [
+"0 w_o bump", "1 w_o bump", "2 w_o bump", "3 w_o bump", "4 w_o bump", "5",
+"6", "7", "8", "9", "10", "11", "12", "13", "14", "15", "17",
+"18", "19", "20", "21", "22", "23", "24", "25", "26", "27 w_ bump",
+"28 w_ bump", "29 w_ bump", "30 w_ bump", "31 w_ bump", "32 w_ bump", "33 w_ bump",
+"34 w_ bump", "35 w_o bump", "36 w_o bump", "37 w_o bump", "38 w_o bump", "39 w_o bump"] }
+
+spatial_identifier = ["X{}".format(i) for i in range(3, 9)]
 
 def generate_test_summary(files: Iterable[PathLike], groups: Iterable[PathLike], sensors: Iterable[str], summary_file: PathLike) -> None:
     with synchronized_process_open_file(summary_file, mode='a') as summary_file:
@@ -136,9 +185,10 @@ def generate_test_summary(files: Iterable[PathLike], groups: Iterable[PathLike],
 
 if __name__ == "__main__":
     logging.basicConfig(level=logging.DEBUG)
-    summary_files = [R13_2_SCAN_FILE, R11_SCAN_FILE, X1_SCAN_2_FILE, X2_SCAN_2_FILE, X5_SCAN_FILE, X6_SCAN_FILE,
-                     X7_SCAN_FILE]
+    summary_files = ["packaged/Reference_Bare_renewed.h5", R13_2_SCAN_FILE, R11_SCAN_FILE, X1_SCAN_2_FILE, X2_SCAN_2_FILE, X5_SCAN_FILE, X6_SCAN_FILE,
+                     X7_SCAN_FILE, E1_2_SCAN_FILE]
     summary_groups = [
+        "Reference/Bare/unbiased_31_renew/total_cap/analysis",
         "Reference/R13/unbiased_1_full_model/total_cap/analysis",
         "Reference/R11/unbiased_full_model/total_cap/analysis",
         "Thesis/ATLAS_ITk/X1/unbiased_61_full_model/total_cap/analysis",
@@ -146,8 +196,9 @@ if __name__ == "__main__":
         "Thesis/ATLAS_ITk/X5/unbiased_full_model/total_cap/analysis",
         "Thesis/ATLAS_ITk/X6/unbiased_full_model/total_cap/analysis",
         "Thesis/ATLAS_ITk/X7/unbiased_full_model/total_cap/analysis",
+        "Reference/E1/unbiased_full_model/total_cap/analysis",
     ]
-    summary_sensors = ["R13", "R1/R11", "X1", "X2", "X5", "X6", "X7"]
+    summary_sensors = ["Bare", "R13", "R1/R11", "X1", "X2", "X5", "X6", "X7", "E1"]
 
     logger.info("generate summary")
     generate_test_summary(summary_files, summary_groups, summary_sensors, SUMMARY_FILE)
@@ -409,10 +460,10 @@ if __name__ == "__main__":
         "E1_nw20_50",
         "E1_nw25_50",
         "E1_nw30_50",
-        "E1_dnw_15_50",
-        "E1_dnw_20_50",
-        "E1_dnw_25_50",
-        "E1_dnw_30_50",
+        "E1_dnw15_50",
+        "E1_dnw20_50",
+        "E1_dnw25_50",
+        "E1_dnw30_50",
     ]
 
     records = []
@@ -435,7 +486,7 @@ if __name__ == "__main__":
     # we need to generate plots for all the different dependencies of sensors
     # but this implies to first
     sensor_primary_properties_type = np.dtype([
-        ("sensor", str, 100),
+        ("sensor", 'S16'),
         ("pitch_x", np.float64),
         ("pitch_y", np.float64),
         ("implantation_size_x", np.float64),
@@ -444,7 +495,7 @@ if __name__ == "__main__":
         ("sensor_depth", np.float64),
     ])
     sensor_properties_type = np.dtype([
-        ("sensor", str, 100),
+        ("sensor", 'S16'),
         ("pitch_x", np.float64),
         ("pitch_y", np.float64),
         ("implantation_size_x", np.float64),
@@ -456,24 +507,28 @@ if __name__ == "__main__":
         ("pixel_separation_area", np.float64),
         ("implantation_depth", np.float64),
         ("sensor_depth", np.float64),
+        ("Perimeter", np.float64),
     ])
 
     sensor_primary_properties = np.rec.array([
-        ("R1", 25, 100, 8, 81, 4, 150),
-        ("R13", 50, 50, 30, 30, 4, 150),
+        ("R1", 25, 100, 8, 81, 1, 150),
+        ("R13", 50, 50, 30, 30, 1, 150),
         ("X1", 50, 50, 50, 50, 4, 150),
         ("X2", 50, 50, 50, 50, 4, 150),
-        ("X5", 50, 50, 50, 50, 150, 250),
-        ("X6", 50, 50, 50, 50, 150, 250),
-        ("X7", 50, 50, 50, 50, 150, 250),
+        # ("X5", 50, 50, 50, 50, 150, 250),
+        # ("X6", 50, 50, 50, 50, 150, 250),
+        # ("X7", 50, 50, 50, 50, 150, 250),
+        ("X5", 50, 50, 130, 10, 25, 150),
+        ("X6", 50, 50, 130, 10, 25, 150),
+        ("X7", 50, 50, 130, 10, 25, 150),
         ("E1_nw15_50", 50, 50, 15, 15, 1, 100),
         ("E1_nw20_50", 50, 50, 20, 20, 1, 100),
         ("E1_nw25_50", 50, 50, 25, 25, 1, 100),
         ("E1_nw30_50", 50, 50, 30, 30, 1, 100),
-        ("E1_dnw_15_50", 50, 50, 15, 15, 2, 100),
-        ("E1_dnw_20_50", 50, 50, 20, 20, 2, 100),
-        ("E1_dnw_25_50", 50, 50, 25, 25, 2, 100),
-        ("E1_dnw_30_50", 50, 50, 30, 30, 2, 100),
+        ("E1_dnw15_50", 50, 50, 15, 15, 2, 100),
+        ("E1_dnw20_50", 50, 50, 20, 20, 2, 100),
+        ("E1_dnw25_50", 50, 50, 25, 25, 2, 100),
+        ("E1_dnw30_50", 50, 50, 30, 30, 2, 100),
     ], dtype=sensor_primary_properties_type)
 
     sensors = sensor_primary_properties.sensor
@@ -487,7 +542,7 @@ if __name__ == "__main__":
     sensor_pixel_separations_y = sensor_pitches_y - sensor_implant_sizes_y
     sensor_pixel_separation_areas = sensor_pixel_areas - sensor_implant_areas
 
-    sensor_properties = np.rec.array([item for item in zip(
+    zipping = zip(
         sensors,
         sensor_pitches_x,
         sensor_pitches_y,
@@ -500,7 +555,26 @@ if __name__ == "__main__":
         sensor_pixel_separation_areas,
         sensor_primary_properties.implantation_depth,
         sensor_primary_properties.sensor_depth,
-    )], dtype=sensor_properties_type)
+        2 * (sensor_primary_properties.implantation_size_x + sensor_primary_properties.implantation_size_y),
+    )
+
+    sensor_properties = np.rec.array([item for item in zipping], dtype=sensor_properties_type)
+
+    # this will yield wrong results for the 3d sensors pixel separations
+    for sensor_record in sensor_properties:
+        assert isinstance(sensor_record, np.record)
+        assert sensor_record.dtype == sensor_properties_type
+        if sensor_record.sensor not in spatial_identifier:
+            continue
+
+
+        sensor_record.implantation_area = sensor_record.implantation_size_x * sensor_record.implantation_size_y * np.pi
+        sensor_record.pixel_separation_x = sensor_record.pixel_separation_x = np.mean((sensor_record.pitch_x, sensor_record.pitch_y)) - sensor_record.implantation_size_y
+        sensor_record.pixel_separation_area = sensor_record.pixel_area - np.pi * (sensor_record.implantation_size_y / 2) ** 2
+
+
+
+
     with tb.open_file(SUMMARY_FILE, mode='a') as h5_conslusion:
         if "SensorTypes" in h5_conslusion.root:
             h5_conslusion.root.SensorTypes.remove()

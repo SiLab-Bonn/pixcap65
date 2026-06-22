@@ -299,12 +299,14 @@ def analyze_data(raw_data, base_path=None, is_advanced=False, is_cv=False,
             else:
                 bias_voltage_data = origin_bias_voltage_data
 
+            bias_voltage_mapping = {}
             for k, bias_voltage in enumerate(tqdm(bias_voltage_data)):
                 if np.isnan(bias_voltage) or (len(origin_bias_voltage_data.shape) > 1 and np.isnan(origin_bias_voltage_data[k, 1])):
                     cv_data[:, :, k] = np.nan
                     cv_err_data[:, :, k] = np.nan
                 else:
                     bias_name = "bias_{volt}_V".format(volt=bias_voltage).replace('-', "M_").replace(".", "__")
+                    bias_voltage_mapping[bias_voltage] = bias_name
                     data_group = base_group.biasing.measurements[bias_name]
                     ana_group, _ = walk_to_node(base_group.biasing,
                                                 str_join("/", ANALYSIS_GROUP_NAME, bias_name), create=True,
@@ -341,7 +343,8 @@ def analyze_data(raw_data, base_path=None, is_advanced=False, is_cv=False,
 
                 for k, bias_voltage in enumerate(bias_voltage_data):
                     ana_group_correction, _ = walk_to_node(reference_group,
-                                                           str_join("/", ANALYSIS_CORRECTED_GROUP_NAME, bias_name),
+                                                           str_join("/", ANALYSIS_CORRECTED_GROUP_NAME,
+                                                                    bias_voltage_mapping[bias_voltage]),
                                                            create=True, verify_create=True)
                     cap_data = ana_group_correction.HistCap[:]
                     cap_error_data = ana_group_correction.HistCapErr[:]
@@ -352,20 +355,20 @@ def analyze_data(raw_data, base_path=None, is_advanced=False, is_cv=False,
                 create_carray(in_file_h5, reference_group.analysis_correction, name="UCHist",
                               title="Histogram of the U-C-curve",
                               filters=GLOBAL_FILTERS,
-                              obj=cv_data, unit=HIST_CAP_UNIT)
+                              obj=cv_data_corrected, unit=HIST_CAP_UNIT)
                 create_carray(in_file_h5, reference_group.analysis_correction, name="UCErrHist",
                               title="Error Histogram of the U-C-curve",
                               filters=GLOBAL_FILTERS,
-                              obj=cv_err_data, unit=HIST_CAP_UNIT)
+                              obj=cv_err_data_corrected, unit=HIST_CAP_UNIT)
 
                 create_carray(in_file_h5, reference_group.analysis_correction, name="UCSystematicHist",
                               title="Error Histogram of the U-C-curve (systematic uncertainty)",
                               filters=GLOBAL_FILTERS,
-                              obj=np.full_like(cv_data, fill_value=parasitic_error), unit=HIST_CAP_UNIT)
+                              obj=np.full_like(cv_data_corrected, fill_value=parasitic_error), unit=HIST_CAP_UNIT)
                 create_carray(in_file_h5, reference_group.analysis_correction, name="UCSystematicDispersionHist",
                               title="Error Histogram of the U-C-curve (uncertainty by systematic dispersion)",
                               filters=GLOBAL_FILTERS,
-                              obj=np.full_like(cv_data, fill_value=DISPERSION_PARASITIC_DEVIATION), unit=HIST_CAP_UNIT)
+                              obj=np.full_like(cv_data_corrected, fill_value=DISPERSION_PARASITIC_DEVIATION), unit=HIST_CAP_UNIT)
 
             if first_boundaries is not None and second_boundaries is not None:
                 # We will need all the usages as here might be a inconsitency with the data systems.
@@ -1079,60 +1082,6 @@ def _handle_parasitic_cap(bare_path: Optional[str], in_file_h5: tb.File) -> tupl
     return parasitic, parasitic_error
 
 
-@deprecated("Please use analsis_data_handle instead.")
-def analysis_data_handle_temporary_replacement(file: tb.File, data_group: GroupType, result_group: GroupType,
-                                               is_advanced=False, is_inter_pixel=False, **kwargs):
-    """
-    advanced_analysis_data_handle
-
-    Implementation of the analysis strategy for the capacitance measurement of a pixel sensor.
-    The capacitance of the pixels are measured and investigated individually. For determination of the
-    capacitance values either a linear fit or non-linear least square fit algorithms are used.
-    Depending on the choice of the ´is_advanced` parameter non-linear techniques are used.
-    In this case either 'kafe2' or 'iminuit' are used for the least-squares minimization depending on the choice
-    of parameters.
-    When using the advanced least-squares procedure the fit results will be plotted to verify the convergence of the
-    fit.
-
-    Afterwards, it is possible to directly correct the results for the capacitance by the connection and the
-    measurement circuit.
-
-    In Addition, there is the special case of an inter-pixel capacitance measurement.
-    If the data to be analysed comes from such a measurement this needs to be specified.
-    Thus, in this case it will be checked which of the total current or the two inter-pix current data sets exist.
-    The analysis will be done for each existing data set.
-    Combinations with a C-V-Characterization might still be an issue.
-
-    :param file: h5 file object containing the data to be analysed.
-    :param data_group: hierarchy group of the opened hdf file containing the raw data (measurements).
-    :param result_group: hierarchy group of the opened hdf file to write the analysis results to.
-    :param is_advanced: boolean indicating if the advanced analysis strategy should be used
-        or not (may require additional keyword arguments)
-    :param is_inter_pixel: boolean, False, indicating whether the measurement to be analysed is an inter-pixel
-        capacitance measurement. In this case more fits will be applied, adjusted to the specific structure of this
-        problem
-    :key full_model: boolean, True, indicates whether the full model for extended frequency range is to be used.
-        Otherwise, the linear model is used. (Only used for the advanced procedure)
-    :key use_kafe2: boolean, indicates whether kafe2 is used for the fit. (Only used for the advanced procedure)
-    :key plot: boolean, indicates whether to plot the data. An output PDF object could be submitted here
-         instead of an explicitly created one. (Only used for the advanced procedure)
-    :key apply_contour: boolean, indicates whether to determine the contours and try to plot them.
-        (Only used for the advanced procedure)
-    :key fit_plot_pdf: PdfPages object, to save the fit plot figures to (will override the plot object if provided,
-        Only used for the advanced procedure)
-    :key apply_correction: boolean, False, indicates whether the measured capacitance should be
-        corrected immediately; Will require the presence of further arguments as information about
-        the parasitic capacitance needs to be submitted.
-    :key bare_file: hdf file containing the measurements and investigation of a bare pix cap sample to obtain
-        information about intrinsic and parasitic capacitance. (Only required for the correction procedure, but in
-        this case it must be present)
-    :key bare_path: hdf files hierarchy path to the group containing the bare pix cap analysis with the information
-        about the parasitic after investigating the capacitance distribution. (Only required for
-        the correction procedure, but in this case it must be present)
-    """
-    analysis_data_handle(file, data_group, result_group, is_advanced, is_inter_pixel, **kwargs)
-
-
 def analysis_data_handle(file: tb.File, data_group: GroupType, result_group: GroupType,
                          is_advanced=False, is_inter_pixel=False, **kwargs):
     """
@@ -1701,6 +1650,10 @@ def analyze_doping_profile(bias_voltages: np.ndarray,
     depletion_width_error_data = (constants.epsilon_0 * pixel_area * effective_cap_errors * EPS_SILICON) / (np.array(
         pixel_cap_data) ** 2) * 1e-6
 
+    if np.any(pixel_cap_data > 1e-5):
+        with open("doping_handler.txt", 'a') as f:
+            print("There was capacitance data much to large for F.", file=f)
+
     # fit the theoretical expected depletion width to determine some of the properties of the pixel diode
     parameter_guess = {
         "NAD": n_a,
@@ -2085,8 +2038,7 @@ def effective_doping(capacitance, bias_voltages, diode_area=None) -> np.ndarray:
             actual_doping = derivative[actual_index]
             derivative[indices] = actual_doping
 
-    n_eff = 2 / (constants.elementary_charge * constants.epsilon_0 * EPS_SILICON * (diode_area ** 2) * np.asarray(
-        derivative))
+    n_eff = 2 / (constants.elementary_charge * constants.epsilon_0 * EPS_SILICON * (diode_area ** 2) * np.asarray(derivative))
     # FIXME: may be the wrong unit here?
     return n_eff
 
@@ -2185,7 +2137,8 @@ def analyze_capacitance_distribution_delegate(analysis_group: Optional[tb.Group]
         assert analysis_group is not None
         cap_hist = check_leaf_unit(analysis_group.HistCap, HIST_CAP_UNIT)
     cv_height, cv_width = rcParams['figure.figsize']
-    fig, ax = plt.subplots(figsize=(cv_width, cv_height))
+    # fig, ax = plt.subplots(figsize=(cv_width, cv_height))
+    fig, ax = plt.subplots()
     hist_cap_hist = evaluate_pixel_mask(cap_hist, **kargs)
     temp_hist_back_data = hist_cap_hist[~np.isnan(hist_cap_hist)].reshape(-1) * CAPACITANCE_CONVERSION_FACTOR
     hist_data, bins, _ = ax.hist(temp_hist_back_data,
@@ -2445,18 +2398,17 @@ if __name__ == '__main__':
 
     # some usage examples
     from pixcap65.utility.homogenize_plots import set_params
-
-    analyze_data(raw_data="data/3D_Sensor_221_W13_X_Scan.h5", base_path="Thesis/ATLAS_ITk/X3/C_V_Characteristic",
-                 is_cv=True)
-    analyze_data(raw_data="data/3D_Sensor_221_W6_j_Scan.h5", base_path="Thesis/ATLAS_ITk/X5/C_V_Characteristic",
-                 is_cv=True)
-    analyze_data(raw_data="data/3D_Sensor_I14_S24_Scan.h5", base_path="Thesis/ATLAS_ITk/X6/C_V_Characteristic",
-                 is_cv=True)
-    analyze_data(raw_data="data/3D_Sensor_H23_S24_Scan.h5", base_path="Thesis/ATLAS_ITk/X7/C_V_Characteristic",
-                 is_cv=True)
-    analyze_data(raw_data="data/argparser.h5", base_path="Reference/R11/C_V_Characteristic", is_cv=True)
-    analyze_data(raw_data="data/3D_Sensor_221_W5_S_Scan.h5", base_path="Thesis/ATLAS_ITk/X4/C_V_Characteristic",
-                 is_cv=True)
+    # analyze_data(raw_data="data/3D_Sensor_221_W13_X_Scan.h5", base_path="Thesis/ATLAS_ITk/X3/C_V_Characteristic",
+    #              is_cv=True)
+    # analyze_data(raw_data="data/3D_Sensor_221_W6_j_Scan.h5", base_path="Thesis/ATLAS_ITk/X5/C_V_Characteristic",
+    #              is_cv=True)
+    # analyze_data(raw_data="data/3D_Sensor_I14_S24_Scan.h5", base_path="Thesis/ATLAS_ITk/X6/C_V_Characteristic",
+    #              is_cv=True)
+    # analyze_data(raw_data="data/3D_Sensor_H23_S24_Scan.h5", base_path="Thesis/ATLAS_ITk/X7/C_V_Characteristic",
+    #              is_cv=True)
+    # analyze_data(raw_data="data/argparser.h5", base_path="Reference/R11/C_V_Characteristic", is_cv=True)
+    # analyze_data(raw_data="data/3D_Sensor_221_W5_S_Scan.h5", base_path="Thesis/ATLAS_ITk/X4/C_V_Characteristic",
+    #              is_cv=True)
     try:
         from subprocess import run
 
@@ -2479,10 +2431,24 @@ if __name__ == '__main__':
     }
 
     # noqa: S125
-    # analyze_capacitance_distribution(raw_data='Bare_Repeat_2_Scan.h5', base_path="Reference/bare/unbiased_8",
-    #                                  corrected_distribution=False,
-    #                                  exclude_test_cap=True, use_kafe2=False,
-    #                                  fit_plot_pdf_name="Bare_analysis_parasitic.pdf")
+    with synchronized_process_open_file("packaged/Reference_Bare_renewed.h5", 'a') as h5_file:
+        h5_file.copy_node(where="/Reference/Bare", name="unbiased_31_renew", newname="unbiased_31_renew_full_model", overwrite=True, recursive=True)
+
+    analyze_data(raw_data="packaged/Reference_Bare_renewed.h5", base_path="Reference/Bare/unbiased_31_renew", is_advanced=True, full_model=False)
+    analyze_data(raw_data="packaged/Reference_Bare_renewed.h5", base_path="Reference/Bare/unbiased_31_renew_full_model", is_advanced=True,
+                 full_model=True)
+    analyze_capacitance_distribution(raw_data="packaged/Reference_Bare_renewed.h5", base_path="Reference/Bare/unbiased_31_renew",
+                                     corrected_distribution=False,
+                                     exclude_test_cap=True, use_kafe2=False,
+                                     fit_plot_pdf_name="Bare_analysis_renew_parasitic.pdf")
+    analyze_capacitance_distribution(raw_data="packaged/Reference_Bare_renewed.h5", base_path="Reference/Bare/unbiased_31_renew_full_model",
+                                     corrected_distribution=False,
+                                     exclude_test_cap=True, use_kafe2=False,
+                                     fit_plot_pdf_name="Bare_analysis_renew_parasitic_full_model.pdf")
+    analyze_capacitance_distribution(raw_data='Bare_Repeat_2_Scan.h5', base_path="Reference/bare/unbiased_8_full_model",
+                                     corrected_distribution=False,
+                                     exclude_test_cap=True, use_kafe2=False,
+                                     fit_plot_pdf_name="Bare_analysis_parasitic_full_model.pdf")
     # analyze_data(raw_data='pixcap65/Data/r13-measurement/R13_Full_Scan_80V.h5', is_advanced=True,
     #              **bare_correction_args)
     # analyze_data(raw_data='R13-Interpixel_Scan.h5',

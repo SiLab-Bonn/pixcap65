@@ -41,6 +41,13 @@ class PixCapSetup(Dut):
         assert isinstance(measurement, PixcapMeasurements) or isinstance(measurement, str) or (
                 isinstance(measurement, type) and issubclass(measurement,
                                                              PixCap65Measurement))
+
+        # we need to catch the None case first here
+        # PROBLEM: Our default configuration lies currently outside of the package and is thus not packaged at all!
+        # SOLUTION: First of all package a suitable variant of the configuration!
+        # FIXME: package a example configuration together with the package
+        # FIXME: there parts of the data repositories packaged as well => these need to be removed.
+
         if isinstance(config, str) and config.endswith(".yaml"):
             # verify the path and modify the configuration if necessary!
             import os

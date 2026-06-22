@@ -17,7 +17,6 @@ from matplotlib.axes import Axes
 from types import NoneType
 from typing import Any, Optional, Union, List, Tuple
 
-import pixcap65.data_constants as data_constants
 from pixcap65.analysis_util.physics_modelling import model_depletion
 from pixcap65.utility import synchronized_process_open_file, tables_lock as file_access_lock
 from pixcap65.utility.tables_util import group_get_file
@@ -389,9 +388,6 @@ def plot_combined_data(interpreted_data, base_path=None, suffix="combined_bias_c
         with synchronized_process_open_file(interpreted_data, mode='r', lock=file_lock) as in_file_h5:
             base_group = get_base_group(base_path, in_file_h5)
             plot_bias_delegate(base_group.biasing.measurements, output_pdf)
-            print("test the analysis group in use for plotting!!!!!!")
-            print(get_analysis_group(base_group.biasing, **kwargs))
-            print(kwargs)
             plot_cv_data_delegate(base_group.biasing.measurements, get_analysis_group(base_group.biasing, **kwargs),
                                   output_pdf, **kwargs)
 
@@ -541,8 +537,6 @@ def plot_cv_data_delegate(data_group: Union[tb.Group, SENSOR_ITERABLE],
     assert isinstance(voltage_data_sets[0], Iterable)
     def iterator_filter(item):
         return voltage_data_sets[0].shape[0] < 10 or item[0] % 10 == 0
-
-    fig, ax = plt.subplots(ncols=2)
     # first prepare the datasets
     combiner = True
     if isinstance(analysis_group, tb.Group):
@@ -553,15 +547,22 @@ def plot_cv_data_delegate(data_group: Union[tb.Group, SENSOR_ITERABLE],
         back_fig = (fig, ax)
         for k, bias_voltage in iterator:
             fig, ax = plt.subplots()
+            # TODO: we should use here the dynamic binning used at any other point to!
             ax.set(title="Capacitance distribution for bias voltage {}".format(bias_voltage), xlabel=CAPACITANCE_LABEL)
-            ax.hist(analysis_group.UCHist[:, :, k].reshape(-1) * 1e15, bins=50)
+            ax.hist(analysis_group.UCHist[:, :, k].reshape(-1) * CAPACITANCE_CONVERSION_FACTOR, bins=50)
             output_pdf.savefig(fig, bbox_inches='tight')
             plt.close(fig)
-        fig, ax = back_fig
+        fig, ax = plt.subplots(ncols=2)
+        fig = [fig]
     else:
         group_handle = analysis_group
         n_items = len(analysis_group)
         label_handle = labels if len(labels) == n_items else ['?'] * n_items
+        # FIXME: Additional swap of the actual dimensions here?
+        fig_cv, ax_cv = plt.subplots()
+        fig_dep, ax_dep = plt.subplots()
+        ax = [ax_cv, ax_dep]
+        fig = [fig_cv, fig_dep]
 
 
     x_limits, y_limits = None, None
@@ -577,10 +578,13 @@ def plot_cv_data_delegate(data_group: Union[tb.Group, SENSOR_ITERABLE],
         ax[1].set_xlim(*x_limits)
         ax[1].set_ylim(*y_limits)
         ax[1].legend()
-        fig.suptitle(title_str)
-        output_pdf.savefig(fig, bbox_inches='tight')
-
-    plt.close(fig)
+        ax[0].legend()
+        for figure in fig:
+            if not combiner:
+                figure.suptitle(title_str)
+            output_pdf.savefig(figure, bbox_inches='tight')
+    for figure in fig:
+        plt.close(figure)
 
 def _plot_cv_distribution(group: tb.Group, ax, x_limits=None, y_limits=None, **kwargs) -> Tuple[Optional[Tuple], Optional[Tuple], str]:
     title_str = ""
@@ -1368,57 +1372,25 @@ if __name__ == '__main__':
         # proceed as if no latex exists
         logger.exception("Could not verify whether latex exists.")
         has_latex = False
-    set_params(latex=has_latex,
+    set_params(latex=False,
                latex_extra=r"\sisetup{separate-uncertainty}\sisetup{locale = DE}\sisetup{uncertainty-descriptors={"
-                           r"stat,sys}}\sisetup{uncertainty-descriptor-mode=subscript}\sisetup{"
-                           r"retain-zero-uncertainty}", fig_height=8.26772, fig_width=11.69291,)
-
-
-    def e1_plotter_first(tb_lock):
-        print("Plot E1")
-        plot_data(interpreted_data=E1_SCAN_FILE, base_path="Reference/E1/unbiased_4_full", use_group=True,
-                  exclude_test_cap=True, mask_pixel=data_constants.e1_pixel_mask, lock=tb_lock,)
-        plot_data(interpreted_data=E1_SCAN_FILE, base_path="Reference/E1/unbiased_4_full", use_group=True,
-                  use_corrected=True, distribution=True, exclude_test_cap=True,
-                  mask_pixel=data_constants.e1_pixel_mask, lock = tb_lock,)
-        plot_bias_data(interpreted_data=E1_SCAN_FILE, base_path="Reference/E1/I_V_Characteristic",
-                       use_group=True, lock=tb_lock,)
-        plot_combined_data(interpreted_data=E1_SCAN_FILE, base_path="Reference/E1/C_V_Characteristic",
-                           use_group=True, distribution=True, lock=tb_lock,)
-        plot_combined_data(interpreted_data=E1_SCAN_FILE, base_path="Reference/E1/C_V_Characteristic",
-                           use_group=True,
-                           use_corrected=True,
-                           apply_doping=False, distribution=False, lock=tb_lock,)
+                           r"stat,sys,sys-disp.}}\sisetup{uncertainty-descriptor-mode=subscript}\sisetup{"
+                           r"retain-zero-uncertainty}", fig_height=8.26772, fig_width=11.69291,
+               minor=True, fontsize=16, dpi=300)
 
     # use this attempt to achieve a better performance when generating the plots
     import multiprocessing as mp
     from full_analysis import x1_plotter, x2_plotter_second, x5_plotter, x6_plotter, x7_plotter, r13_plotter_second, \
-    presentation_plotter
+    presentation_plotter, bare_sample_plotter_second
     from full_analysis import e1_plotter_second, r1_plotter
 
     print(mp.current_process().name)
     print(mp.cpu_count())
-    import sysconfig
-
-    print("Path names")
-    print(sysconfig.get_path_names())
-    print(sysconfig.get_path("data"))
-
-    print(__file__)
-    from importlib.resources import files
-    print(files())
-    print("Fetch resources A")
-    for resource in files().iterdir():
-        print(resource)
-
-    print("Fetch resources B")
-    print(files("pixcap65"))
-    for resource in files("pixcap65").joinpath("device","ise").iterdir():
-        print(resource)
 
     with mp.Manager() as manager, mp.Pool(initializer=mp_plotting_init, initargs=("PDF", False,)) as pool:
         tables_lock = manager.RLock()
         process_handles = [
+            bare_sample_plotter_second,
             x1_plotter,
             x2_plotter_second,
             x5_plotter,
@@ -1430,16 +1402,10 @@ if __name__ == '__main__':
         ]
 
         # processes = [pool.apply_async(handle, (tables_lock,)) for handle in process_handles]
-
+        #
         # for p in processes:
         #     p.wait()
         #     print("Finished the process; Was it sucessful?", p.successful())
 
-        x2_plotter_second(tables_lock)
-
-        set_params(latex=has_latex,
-                   latex_extra=r"\sisetup{separate-uncertainty}\sisetup{locale = DE}\sisetup{uncertainty-descriptors={"
-                               r"stat,sys}}\sisetup{uncertainty-descriptor-mode=subscript}\sisetup{"
-                               r"retain-zero-uncertainty}", fig_height=8.26772, fig_width=11.69291,
-                   minor=True, fontsize=12, dpi=1200)
+        bare_sample_plotter_second(tables_lock)
         presentation_plotter(tables_lock)
