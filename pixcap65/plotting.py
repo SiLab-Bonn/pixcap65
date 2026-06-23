@@ -497,7 +497,8 @@ def plot_cv_data_delegate(data_group: Union[tb.Group, SENSOR_ITERABLE],
         # will not only generate the title string of the figure but also the figure with the depletion fits.
         title_str = __plot_depletion_estimation(analysis_group, approx_depletion, ax, ii, jj, voltage_data_sets[0])
 
-        if not _cv_plotter(analysis_group, jj, ii, ax, voltage_data_sets, labels):
+        # fixme:
+        if jj == 40 or not _cv_plotter(analysis_group, jj, ii, ax, voltage_data_sets, labels):
             with interactive_lock:
                 plt.close(fig)
             continue
@@ -661,9 +662,9 @@ def __plot_depletion_estimation(analysis_group: Union[tb.Group, SENSOR_ITERABLE]
         assert isinstance(depletion_hist, np.ndarray)
         if len(depletion_fit_data.shape) == 3:
             # could the reshape throw things althogether
-            depletion_fit_data_temp = depletion_fit_data.reshape((40, 40, 1, 4))
+            depletion_fit_data_temp = depletion_fit_data.reshape((40, 41, 1, 4))
             depletion_fit_data = depletion_fit_data_temp
-            depletion_hist = depletion_hist.reshape((40, 40, 1))
+            depletion_hist = depletion_hist.reshape((40, 41, 1))
 
         for dep_idx in range(depletion_fit_data.shape[2]):
             first_dep_parameters = depletion_fit_data[ii, jj, dep_idx, :2]
@@ -1401,11 +1402,10 @@ if __name__ == '__main__':
             r1_plotter,
         ]
 
-        # processes = [pool.apply_async(handle, (tables_lock,)) for handle in process_handles]
-        #
-        # for p in processes:
-        #     p.wait()
-        #     print("Finished the process; Was it sucessful?", p.successful())
+        processes = [pool.apply_async(handle, (tables_lock,)) for handle in process_handles]
 
-        bare_sample_plotter_second(tables_lock)
+        for p in processes:
+            p.wait()
+            print("Finished the process; Was it sucessful?", p.successful())
+
         presentation_plotter(tables_lock)

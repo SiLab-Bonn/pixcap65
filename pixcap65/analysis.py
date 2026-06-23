@@ -266,13 +266,13 @@ def analyze_data(raw_data, base_path=None, is_advanced=False, is_cv=False,
         if is_cv:
             # need to perform the analysis for every bias voltage
             reference_group = base_group.biasing
-            cv_data = np.full(shape=(40, 40, reference_group.measurements.BiasVoltageHist.shape[0]),
+            cv_data = np.full(shape=(40, 41, reference_group.measurements.BiasVoltageHist.shape[0]),
                               fill_value=np.nan)
-            cv_err_data = np.full(shape=(40, 40, reference_group.measurements.BiasVoltageHist.shape[0]),
+            cv_err_data = np.full(shape=(40, 41, reference_group.measurements.BiasVoltageHist.shape[0]),
                                   fill_value=np.nan)
-            cv_data_corrected = np.full(shape=(40, 40, reference_group.measurements.BiasVoltageHist.shape[0]),
+            cv_data_corrected = np.full(shape=(40, 41, reference_group.measurements.BiasVoltageHist.shape[0]),
                                         fill_value=np.nan)
-            cv_err_data_corrected = np.full(shape=(40, 40, reference_group.measurements.BiasVoltageHist.shape[0]),
+            cv_err_data_corrected = np.full(shape=(40, 41, reference_group.measurements.BiasVoltageHist.shape[0]),
                                             fill_value=np.nan)
 
             # make sure to not mix-up with previous analysis results
@@ -606,13 +606,19 @@ def perform_inter_pix_deep_dive(reference_group, get_total_cap_group: Optional[s
                                           parasitic_error,
                                           reference_group, in_file_h5)
     with synchronized_process_open_file(get_total_cap_file, mode='a') as total_h5_file:
-        return __perform_inter_pix_deeper(apply_correction_arg, get_total_cap_group, in_file_h5, parasitic,
-                                          parasitic_error,
-                                          reference_group, total_h5_file)
+        total_node = __perform_inter_pix_deeper(apply_correction_arg, get_total_cap_group, in_file_h5, parasitic,
+                                          parasitic_error, reference_group, total_h5_file)
+        # save it as temporary node
+        if "temporary" not in in_file_h5.root:
+            in_file_h5.create_group(in_file_h5.root, name="temporary")
+
+        import uuid
+        return total_h5_file.copy_node(where=total_node._v_parent, name=total_node._v_name, newparent=in_file_h5.root.temporary, newname=uuid.uuid4().hex, recursive=True)
+
 
 
 def __perform_inter_pix_deeper(apply_correction_arg, get_total_cap_group: str, in_file_h5: File, parasitic: float,
-                               parasitic_error: float, reference_group, total_h5_file: File):
+                               parasitic_error: float, reference_group, total_h5_file: File) -> tb.Group:
     # this reference implementation has the drawback that always the uncorrected data is used.
     # this should not make any difference as we are taking the differences.
 
@@ -1389,11 +1395,11 @@ def analyze_depletion_delegate(data_group: tb.Group, analysis_group: tb.Group,
     for col, row in np.ndindex(GENERAL_PIXCAP_SHAPE):
         propagate_kwargs['fit_description_text'] = ' for Pixel ({col},{row})'.format(col=col, row=row)
         # make sure the provided data is useful for further investigation.
-        if not np.all(np.isfinite(physical_dimensions_data[col, row])):
+        if row == 0 or not np.all(np.isfinite(physical_dimensions_data[col, row - 1])):
             continue
         pixel_cap_data = cap_data[col, row]
         pixel_cap_error_data = cap_error_data[col, row]
-        pixel_area = pixel_areas[col, row] # should be calculated from the provded data in µm^2
+        pixel_area = pixel_areas[col, row - 1] # should be calculated from the provded data in µm^2
         if not np.all(np.isfinite(pixel_cap_data)):
             continue
         doping_result_storage.set_pixel(row, col)

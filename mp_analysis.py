@@ -43,7 +43,6 @@ bare_correction_args = {
 
 
 def synchronize_full_model(file, reference, name, bias, p_lock, **kwargs):
-    reference_node = "/{}/{}".format(reference, name)
     unbiased_name = kwargs.get("unbiased_group", "unbiased_full")
     inter_unbiased_name = kwargs.get("inter_unbiased_group", "inter_unbiased_full")
     biased_name = kwargs.get("biased_group", "biased_{}_V_full")
@@ -52,14 +51,19 @@ def synchronize_full_model(file, reference, name, bias, p_lock, **kwargs):
     biased_name = biased_name.format(bias)
     inter_biased_name = inter_biased_name.format(bias)
     with synchronized_process_open_file(file, mode='a', lock=p_lock) as h5_file:
-        h5_file.copy_node(where=reference_node, newname=unbiased_name + "_model", name=unbiased_name,
-                          recursive=True, overwrite=True)
-        h5_file.copy_node(where=reference_node, newname=biased_name + "_model", name=biased_name,
-                          recursive=True, overwrite=True)
-        h5_file.copy_node(where=reference_node, newname=inter_unbiased_name + "_model", name=inter_unbiased_name,
-                          recursive=True, overwrite=True)
-        h5_file.copy_node(where=reference_node, newname=inter_biased_name + "_model", name=inter_biased_name,
-                          recursive=True, overwrite=True)
+        reference_node = h5_file._get_or_create_path("/{}/{}".format(reference, name), create=False)
+        if unbiased_name in reference_node:
+            h5_file.copy_node(where=reference_node, newname=unbiased_name + "_model", name=unbiased_name,
+                              recursive=True, overwrite=True)
+        if biased_name in reference_node:
+            h5_file.copy_node(where=reference_node, newname=biased_name + "_model", name=biased_name,
+                              recursive=True, overwrite=True)
+        if inter_biased_name in reference_node:
+            h5_file.copy_node(where=reference_node, newname=inter_unbiased_name + "_model", name=inter_unbiased_name,
+                              recursive=True, overwrite=True)
+        if inter_biased_name in reference_node:
+            h5_file.copy_node(where=reference_node, newname=inter_biased_name + "_model", name=inter_biased_name,
+                              recursive=True, overwrite=True)
 
 
 def r13_analysator_second(tb_lock, correction_args):
@@ -436,19 +440,27 @@ def x2_analysator(tb_lock, correction_args):
     x2_depletion_refined_args.update(**correction_args)
 
     # TODO: missing the inter-pix measurements here -> this here must remain!
-    with synchronized_process_open_file(X2_SCAN_2_FILE, mode='a', lock=tb_lock) as h5_file:
-        h5_file.copy_node(where="/Thesis/ATLAS_ITk/X2", newname="unbiased_1_full_model", name="unbiased_1_full",
-                          recursive=True, overwrite=True)
-        h5_file.copy_node(where="/Thesis/ATLAS_ITk/X2", newname="biased_80_V_full_model", name="biased_80_V_full",
-                          recursive=True, overwrite=True)
+    synchronize_full_model(X2_SCAN_2_FILE, top_ref, name, 80, tb_lock, unbiased_group="unbiased_1_full")
+    synchronize_full_model(X2_SCAN_2_FILE, top_ref, name, 200, tb_lock)
+    # with synchronized_process_open_file(X2_SCAN_2_FILE, mode='a', lock=tb_lock) as h5_file:
+    #     h5_file.copy_node(where="/Thesis/ATLAS_ITk/X2", newname="unbiased_1_full_model", name="unbiased_1_full",
+    #                       recursive=True, overwrite=True)
+    #     h5_file.copy_node(where="/Thesis/ATLAS_ITk/X2", newname="biased_80_V_full_model", name="biased_80_V_full",
+    #                       recursive=True, overwrite=True)
 
     analyze_data(raw_data=X2_SCAN_2_FILE, base_path="{}/{}/unbiased_1_full".format(top_ref, name), is_advanced=True, lock=tb_lock,
                  full_model=False, distribution=True, **correction_args)
     analyze_data(raw_data=X2_SCAN_2_FILE, base_path="{}/{}/biased_80_V_full".format(top_ref, name), is_advanced=True, lock=tb_lock,
                  full_model=False, distribution=True, **correction_args)
+    analyze_data(raw_data=X2_SCAN_2_FILE, base_path="{}/{}/biased_200_V_full".format(top_ref, name), is_advanced=True,
+                 lock=tb_lock,
+                 full_model=False, distribution=True, **correction_args)
     analyze_data(raw_data=X2_SCAN_2_FILE, base_path="{}/{}/unbiased_1_full_model".format(top_ref, name), is_advanced=True, lock=tb_lock,
                  distribution=True, **correction_args)
     analyze_data(raw_data=X2_SCAN_2_FILE, base_path="{}/{}/biased_80_V_full_model".format(top_ref, name), is_advanced=True, lock=tb_lock,
+                 distribution=True, **correction_args)
+    analyze_data(raw_data=X2_SCAN_2_FILE, base_path="{}/{}/biased_200_V_full_model".format(top_ref, name),
+                 is_advanced=True, lock=tb_lock,
                  distribution=True, **correction_args)
 
     print("CV -", display_name)
@@ -461,6 +473,7 @@ def x2_analysator(tb_lock, correction_args):
                  **x2_depletion_refined_args)
 
     # TODO: the inter-pix measurements are still missing.
+    # After all they could not be measured at all.
     print("Finished -", display_name)
 
 
