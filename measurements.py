@@ -11,29 +11,30 @@ MAXIMUM_CV_FREQ = 4.1
 CV_FREQ_STEP = 1
 HV_STEP = 0.5
 MAXIMUM_HV_VOLTAGE = 100
-MAXIMUM_FULL_SCAN_FREQ = 10.1
-FULL_SCAN_FREQ_STEP = 0.75
+MAXIMUM_FULL_SCAN_FREQ = 12.1
+FULL_SCAN_FREQ_STEP = 0.5
 MAXIMUM_INTER_PIX_FREQ = 6.1
 INTER_PIX_FREQ_STEP = 0.5
 
 
 lock = multiprocessing.RLock()
 
+
 scan_configuration = {
     'start_column': 0,
     'stop_column': 40,
     'start_row': 0,
-    'stop_row': 40,
+    'stop_row': 41,
 
     'Vin': 1.0,  # input voltage in V
     'frequency_range': np.arange(1, 6.1, 0.5),  # frequency sweep in MHz
     # 'bias_range': -1 * np.geomspace(1, 80, 25),
     # 'bias': -80.0,   # bias voltage to apply in V
-    'bias_limit': 0.0000008,
-    'bias_sense_range': 0.000001,
-    'bias_hv_limit': 0.0000008,
+    'bias_limit': 0.000008,
+    'bias_sense_range': 0.00001,
+    'bias_hv_limit': 0.000008,
 
-    'data_path': "Reference/R13",
+    'data_path': "Thesis/ATLAS_ITk/X5",
     "out_file_mode": "append",
 }
 
@@ -41,7 +42,7 @@ scan_configuration = {
 def perform_initial_total_measurement(cli_args):
     global scan_configuration
     with lock:
-        scan_configuration[ScanConfigurationKeys.AVERAGE_MEASUREMENTS] = 30
+        scan_configuration[ScanConfigurationKeys.AVERAGE_MEASUREMENTS] = 25
         scan_configuration[ScanConfigurationKeys.FREQUENCY_RANGE] = np.arange(1, MAXIMUM_FULL_SCAN_FREQ, FULL_SCAN_FREQ_STEP)
 
     if cli_args.total_unbiased:
@@ -159,15 +160,16 @@ def perform_inter_pix_scan(cli_args):
     global scan_configuration
 
     with lock:
-        scan_configuration[ScanConfigurationKeys.FREQUENCY_RANGE] = np.arange(1, MAXIMUM_INTER_PIX_FREQ, INTER_PIX_FREQ_STEP)
-        scan_configuration.update(start_row=10, stop_row=35, start_column=10, stop_column=35)
+        scan_configuration[ScanConfigurationKeys.FREQUENCY_RANGE] = np.around(np.arange(1, MAXIMUM_INTER_PIX_FREQ, INTER_PIX_FREQ_STEP), 2)
+        scan_configuration.update(start_row=5, stop_row=40, start_column=5, stop_column=38)
         if ScanConfigurationKeys.BIAS_VOLTAGE_SINGLE in scan_configuration:
             del scan_configuration[ScanConfigurationKeys.BIAS_VOLTAGE_SINGLE]
 
     if cli_args.inter_pix_cap:
         with PixCapSetup(scan_configuration, output_file, measurement=PixcapMeasurements.INTER_CAPACITANCE) as pix:
-            pix.frequency_settling = cli_args.freq_settle
-            pix.scan(data_group_spec="inter_unbiased_full_renew_Extended")
+            with pix.enhanced_readout_mode():
+                pix.frequency_settling = cli_args.freq_settle
+                pix.scan(data_group_spec="inter_unbiased_full_Extended")
 
     with lock:
         try:
@@ -182,8 +184,9 @@ def perform_inter_pix_scan(cli_args):
 
     if cli_args.inter_pix_cap:
         with PixCapSetup(scan_configuration, output_file, measurement=PixcapMeasurements.INTER_CAPACITANCE) as pix:
-            pix.frequency_settling = cli_args.freq_settle
-            pix.scan(data_group_spec="inter_biased_M_{}_V_full_renew_Extended".format(cli_args.hv_voltage))
+            with pix.enhanced_readout_mode():
+                pix.frequency_settling = cli_args.freq_settle
+                pix.scan(data_group_spec="inter_biased_M_{}_V_full_Extended".format(cli_args.hv_voltage))
 
     with lock:
         try:
@@ -198,7 +201,7 @@ if __name__ == "__main__":
     import shutil
     import argparse
     # one setup trial per measurement
-    output_file = "data/X2_2_Scan.h5"
+    output_file = "data/3D_Sensor_221_W6_J_Scan.h5"
 
     argument_parser = argparse.ArgumentParser("Pixcap65 Measurements")
     argument_parser.add_argument("-u", "--unbiased", action='store_true', dest='total_unbiased', help='Unbiased total capacitance measurement to perform')
@@ -218,6 +221,11 @@ if __name__ == "__main__":
     print(type(arguments.wait))
     print(arguments.wait)
     print(type(arguments.hv_voltage))
+
+    rounded = int(arguments.hv_voltage)
+    if np.abs(arguments.hv_voltage - rounded) < 0.05:
+        arguments.hv_voltage = rounded
+
     print(arguments.hv_voltage)
     print(type(arguments.freq_settle))
     print(arguments.freq_settle)
@@ -284,6 +292,6 @@ if __name__ == "__main__":
     # time.sleep(600)
 
     # perform the inter-pixel cap scans
-    scan_configuration[ScanConfigurationKeys.AVERAGE_MEASUREMENTS] = 5
+    scan_configuration[ScanConfigurationKeys.AVERAGE_MEASUREMENTS] = 30
     perform_inter_pix_scan(arguments)
     # time.sleep(600)
