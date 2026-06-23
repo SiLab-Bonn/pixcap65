@@ -1359,6 +1359,10 @@ def x2_plotter_second(tb_lock):
               exclude_test_cap=True, distribution=True, lock=tb_lock, )
     plot_data(interpreted_data=X2_SCAN_2_FILE, base_path=hdf(top_ref, name, 'biased_80_V_full'), use_group=True,
               exclude_test_cap=True, use_corrected=True, distribution=True, lock=tb_lock, )
+    plot_data(interpreted_data=X2_SCAN_2_FILE, base_path=hdf(top_ref, name, 'biased_200_V_full'), use_group=True,
+              exclude_test_cap=True, distribution=True, lock=tb_lock, )
+    plot_data(interpreted_data=X2_SCAN_2_FILE, base_path=hdf(top_ref, name, 'biased_200_V_full'), use_group=True,
+              exclude_test_cap=True, use_corrected=True, distribution=True, lock=tb_lock, )
     plot_data(interpreted_data=X2_SCAN_2_FILE, base_path=hdf(top_ref, name, 'unbiased_1_full_model'), use_group=True,
              exclude_test_cap=True, distribution=True, lock=tb_lock, )
     plot_data(interpreted_data=X2_SCAN_2_FILE, base_path=hdf(top_ref, name, 'unbiased_1_full_model'), use_group=True,
@@ -1366,6 +1370,10 @@ def x2_plotter_second(tb_lock):
     plot_data(interpreted_data=X2_SCAN_2_FILE, base_path=hdf(top_ref, name, 'biased_80_V_full_model'), use_group=True,
               exclude_test_cap=True, distribution=True, lock=tb_lock, )
     plot_data(interpreted_data=X2_SCAN_2_FILE, base_path=hdf(top_ref, name, 'biased_80_V_full_model'), use_group=True,
+              exclude_test_cap=True, use_corrected=True, distribution=True, lock=tb_lock,)
+    plot_data(interpreted_data=X2_SCAN_2_FILE, base_path=hdf(top_ref, name, 'biased_200_V_full_model'), use_group=True,
+              exclude_test_cap=True, distribution=True, lock=tb_lock, )
+    plot_data(interpreted_data=X2_SCAN_2_FILE, base_path=hdf(top_ref, name, 'biased_200_V_full_model'), use_group=True,
               exclude_test_cap=True, use_corrected=True, distribution=True, lock=tb_lock,)
     plot_bias_data(interpreted_data=X2_SCAN_2_FILE, base_path=hdf(top_ref, name, 'I_V_Characteristic_2'),
                    use_group=True, lock=tb_lock,)

@@ -569,6 +569,10 @@ if __name__ == "__main__":
                               newname=group._v_name,
                               newparent=h5_file.root.Thesis.ATLAS_ITk.X2, recursive=True, overwrite=True)
 
+        with tb.open_file("packaged/data/X2_12_Renew_Scan.h5") as backing_file:
+            backing_file.copy_children(backing_file.root.Thesis.ATLAS_ITk.X2, h5_file.root.Thesis.ATLAS_ITk.X2, recursive=True, overwrite=True)
+
+
     with tb.open_file(R11_SCAN_FILE, "a") as h5_file:
         generate_pixel_dimensions(h5_file.root.Reference.R1)
         old_sensor = h5_file.root.Reference.R11
