@@ -20,6 +20,7 @@ standard error
 
 from __future__ import annotations
 
+import traceback
 from collections import OrderedDict
 from importlib.resources import files
 
@@ -246,7 +247,10 @@ class MeasurementAbstract(object, metaclass=ABCMeta):
 class Pixcap65BaseMeasurement(MeasurementAbstract, metaclass=ABCMeta):
     def __init__(self, pix_config=None, **kwargs):
         super(Pixcap65BaseMeasurement, self).__init__(**kwargs)
-        if pix_config is None or not os.path.exists(pix_config):
+
+        if isinstance(pix_config, dict):
+            pass
+        elif pix_config is None or not os.path.exists(pix_config):
             logger.warning("The path to the pixcap firmware was recalculated from the package resources.")
             packaged_config = files("pixcap65").joinpath("device", "ise", "pixcap65.bit")
             assert packaged_config.is_file()
@@ -277,6 +281,7 @@ class PixCap65Measurement(Pixcap65BaseMeasurement, metaclass=ABCMeta):
                                                      fill_value=np.nan)
 
         # handle smu error configuration
+        # TODO: requires refactor!
         adjusted_config = self.dut._conf.copy()
         self._environ_config = OrderedDict()
         hl_mapping, _, rl_mapping = extract_basil_layers(adjusted_config)
@@ -291,8 +296,10 @@ class PixCap65Measurement(Pixcap65BaseMeasurement, metaclass=ABCMeta):
             else:
                 raise AttributeError("The requested SMU {} does not exist.".format(smu))
             device_name = hl["init"]['device'].lower().replace(' ', '_')
-            config_file = files("pixcap65.configs").joinpath(device_name).joinpath(
-                "{name}_range.yaml".format(name=device_name))
+            config_file = str(files("pixcap65.configs").joinpath(
+                "{name}_range.yaml".format(name=device_name)))
+            print("The config file is")
+            print(config_file)
             # config_file = os.path.join(os.path.dirname(__file__), "configs",
             #                            "{name}_range.yaml".format(name=device_name))
             assert os.path.exists(config_file) and os.path.isfile(config_file)
@@ -497,7 +504,7 @@ class PixCap65Measurement(Pixcap65BaseMeasurement, metaclass=ABCMeta):
 
                 if allow_continuous_measurement:
                     self.pixcap.bias_initiate_multiple_voltage(3)
-                    logger.warn("Tried to perform multiple voltage measurements.")
+                    logger.warning("Tried to perform multiple voltage measurements.")
 
                 yield k, bias_voltage, data_group
                 if allow_continuous_measurement:
@@ -891,6 +898,10 @@ class PixCap65Measurement(Pixcap65BaseMeasurement, metaclass=ABCMeta):
         else:
             return False
 
+    @abstractmethod
+    def storage_exception_handler(self, temp_id):
+        pass
+
     def post_scan_handler(self, data_group, sequence_call=False, unit=None, saving_unit: Optional[str] = "regular",
                           **kwargs):
         """
@@ -918,6 +929,11 @@ class PixCap65Measurement(Pixcap65BaseMeasurement, metaclass=ABCMeta):
             self.handle_store_configuration(data_group, sequence_call)
             self.store_measurement_data(data_group, sequence_call, unit=saving_unit)
             self.handle_cv_compaction(kwargs, unit, data_group)
+        except:
+            import uuid
+            temp_id = uuid.uuid5(self.output_file, str(data_group))
+            logger.error("An error has occurred while saving the data. The temporary id is %s.", temp_id, exc_info=True)
+            self.storage_exception_handler(temp_id)
         finally:
             self.out_file_h5.flush()
             # do some clean-up for the performance
@@ -1338,7 +1354,7 @@ class PixCap65Measurement(Pixcap65BaseMeasurement, metaclass=ABCMeta):
             post_hook = default_callback
 
         continue_error = None
-        voltage_reference_data = np.full((40, 40), fill_value=np.nan, dtype=np.float64)
+        voltage_reference_data = np.full((40, 41), fill_value=np.nan, dtype=np.float64)
         try:
             if reversed_order:
                 row_range = self.col_range
@@ -1496,11 +1512,11 @@ class PixCap65TotalCap(PixCap65Measurement):
             self.n_frequencies *= 2
 
         # the initialization of this could be moved to configuration?
-        self.hist_current = np.full(shape=(40, 40, self.n_frequencies),
+        self.hist_current = np.full(shape=(40, 41, self.n_frequencies),
                                     fill_value=np.nan)  # current value for each measured frequency per pixel
-        self.hist_current_errors = np.full(shape=(40, 40, self.n_frequencies), fill_value=np.nan)
+        self.hist_current_errors = np.full(shape=(40, 41, self.n_frequencies), fill_value=np.nan)
         self.n_measurements = scan_config.get(NUMBER_AVERAGE_MEASUREMENTS_KEY, 1)
-        self.hist_individual_currents = np.full(shape=(40, 40, self.n_frequencies, self.n_measurements),
+        self.hist_individual_currents = np.full(shape=(40, 41, self.n_frequencies, self.n_measurements),
                                                 fill_value=np.nan)
 
         # this could safely be moved to the super class!
@@ -1877,7 +1893,7 @@ class PixCap65TotalCap(PixCap65Measurement):
         """
         if self.averaging:
             self.n_measurements = self.scan_config[NUMBER_AVERAGE_MEASUREMENTS_KEY]
-            individual_currents_shape = (40, 40, self.n_frequencies, self.n_measurements)
+            individual_currents_shape = (40, 41, self.n_frequencies, self.n_measurements)
             if self.hist_individual_currents.shape != individual_currents_shape:
                 self.hist_individual_currents = np.full(shape=individual_currents_shape,
                                                         fill_value=np.nan)
@@ -1928,6 +1944,29 @@ class PixCap65TotalCap(PixCap65Measurement):
             print(k, self.bias_measurements, file=self.dummy_file)
             print(measurement.shape, file=self.dummy_file)
             raise
+
+    def storage_exception_handler(self, temp_id):
+        np.save("error_storage_bias_currents_{}".format(temp_id), self.hist_bias_current)
+        np.save("error_storage_bias_current_errors_{}".format(temp_id), self.hist_bias_current_errors)
+        np.save("error_storage_bias_currents_individual_{}".format(temp_id), self.hist_bias_individual_currents)
+        with open("error_storage_configuration_{].yaml".format(temp_id), 'w') as f:
+            import yaml
+            yaml.safe_dump(self.scan_config, f)
+        with open("error_storage_scan_parameters_{}.yaml".format(temp_id), 'w') as f:
+            import yaml
+            yaml.safe_dump(self.scan_parameters, f)
+        if hasattr(self, 'bias_scan_parameters'):
+            with open("error_storage_bias_parameters_{}.yaml".format(temp_id), 'w') as f:
+                import yaml
+                yaml.safe_dump(self.bias_scan_parameters, f)
+
+        np.save("error_storage_currents_{}".format(temp_id), self.hist_current)
+        np.save("error_storage_current_errors_{}".format(temp_id), self.hist_current_errors)
+        np.save("error_storage_individual_currents_{}".format(temp_id), self.hist_individual_currents)
+
+
+
+
 
     # region Pixcap Properties
     @property
