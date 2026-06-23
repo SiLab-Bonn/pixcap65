@@ -2,6 +2,8 @@
 Script for measuring Inter Pixel Capacitance 
 """
 import logging
+from contextlib import contextmanager
+
 import numpy as np
 import tables as tb
 import time
@@ -74,26 +76,27 @@ class Pixcap65InterCap(PixCap65Measurement):
         super(Pixcap65InterCap, self).__init__(scan_config, out_file, **kwargs)
 
         # prepare the data fields for the measurement
-        self.inter_hist_current_1 = np.full(shape=(40, 40, self.n_frequencies),
+        self.inter_hist_current_1 = np.full(shape=(40, 41, self.n_frequencies),
                                             fill_value=np.nan)  # current value for each measured frequency per pixel
-        self.inter_hist_current_2 = np.full(shape=(40, 40, self.n_frequencies),
+        self.inter_hist_current_2 = np.full(shape=(40, 41, self.n_frequencies),
                                             fill_value=np.nan)  # current value for each measured frequency per pixel
-        self.total_hist_current = np.full(shape=(40, 40, self.n_frequencies),
+        self.total_hist_current = np.full(shape=(40, 41, self.n_frequencies),
                                           fill_value=np.nan)  # current value for each measured frequency per pixel
 
         # current value for each measured frequency per pixel
-        self.inter_hist_current_1_error = np.full(shape=(40, 40, self.n_frequencies),
+        self.inter_hist_current_1_error = np.full(shape=(40, 41, self.n_frequencies),
                                                   fill_value=np.nan)
         # current value for each measured frequency per pixel
-        self.inter_hist_current_2_error = np.full(shape=(40, 40, self.n_frequencies),
+        self.inter_hist_current_2_error = np.full(shape=(40, 41, self.n_frequencies),
                                                   fill_value=np.nan)
         # current value for each measured frequency per pixel
-        self.total_hist_current_error = np.full(shape=(40, 40, self.n_frequencies),
+        self.total_hist_current_error = np.full(shape=(40, 41, self.n_frequencies),
                                                 fill_value=np.nan)
 
-        self.inter_hist_individual_currents_1 = np.full(shape=(40,40,self.n_frequencies, 1), fill_value=np.nan)
-        self.inter_hist_individual_currents_2 = np.full(shape=(40, 40, self.n_frequencies, 1), fill_value=np.nan)
-        self.total_hist_individual_currents = np.full(shape=(40, 40, self.n_frequencies, 1), fill_value=np.nan)
+        self.n_measurements = scan_config.get(ScanConfigurationKeys.AVERAGE_MEASUREMENTS, 1)
+        self.inter_hist_individual_currents_1 = np.full(shape=(40,41,self.n_frequencies, 1), fill_value=np.nan)
+        self.inter_hist_individual_currents_2 = np.full(shape=(40, 41, self.n_frequencies, 1), fill_value=np.nan)
+        self.total_hist_individual_currents = np.full(shape=(40, 41, self.n_frequencies, 1), fill_value=np.nan)
 
 
         # this kind of setup is somewhat misplaced.
@@ -110,9 +113,9 @@ class Pixcap65InterCap(PixCap65Measurement):
         # simplify switch the order of the clocks for once.
         self.pixcap.seq_init(clk_0='0100', clk_1='0001', clk_2='0001', clk_3='0100')
 
-        self.inter_hist_individual_currents_1 = np.full(shape=(40, 40, self.n_frequencies, self.n_measurements), fill_value=np.nan)
-        self.inter_hist_individual_currents_2 = np.full(shape=(40, 40, self.n_frequencies, self.n_measurements), fill_value=np.nan)
-        self.total_hist_individual_currents = np.full(shape=(40, 40, self.n_frequencies, self.n_measurements), fill_value=np.nan)
+        self.inter_hist_individual_currents_1 = np.full(shape=(40, 41, self.n_frequencies, self.n_measurements), fill_value=np.nan)
+        self.inter_hist_individual_currents_2 = np.full(shape=(40, 41, self.n_frequencies, self.n_measurements), fill_value=np.nan)
+        self.total_hist_individual_currents = np.full(shape=(40, 41, self.n_frequencies, self.n_measurements), fill_value=np.nan)
 
         self.pixcap.vm3_on()
         self.pixcap.vm2_on()
@@ -178,6 +181,9 @@ class Pixcap65InterCap(PixCap65Measurement):
                 self.handle_measurement(i_col, i_row, k)
 
                 self.store_iteration_parameters(freq, k)
+                logger.info("Get the nlpc values")
+                logger.info(self.pixcap[self.pixcap.vm2_smu_key].get_current_nlpc())
+                logger.info(self.pixcap[self.pixcap.vm3_smu_key].get_current_nlpc())
 
     def store_measurement_data(self, data_group: tb.Group, sequence_call: bool, unit=None):
         try:
@@ -325,6 +331,44 @@ class Pixcap65InterCap(PixCap65Measurement):
         self.pixcap.vm2_off()
         self.pixcap.vm3_off()
         super(Pixcap65InterCap, self).close()
+
+    def storage_exception_handler(self, temp_id):
+        np.save("error_storage_bias_currents_{}".format(temp_id), self.hist_bias_current)
+        np.save("error_storage_bias_current_errors_{}".format(temp_id), self.hist_bias_current_errors)
+        np.save("error_storage_bias_currents_individual_{}".format(temp_id), self.hist_bias_individual_currents)
+        with open("error_storage_configuration_{].yaml".format(temp_id), 'w') as f:
+            import yaml
+            yaml.safe_dump(self.scan_config, f)
+        with open("error_storage_scan_parameters_{}.yaml".format(temp_id), 'w') as f:
+            import yaml
+            yaml.safe_dump(self.scan_parameters, f)
+        if hasattr(self, 'bias_scan_parameters'):
+            with open("error_storage_bias_parameters_{}.yaml".format(temp_id), 'w') as f:
+                import yaml
+                yaml.safe_dump(self.bias_scan_parameters, f)
+
+        np.save("error_storage_currents_total_{}".format(temp_id), self.total_hist_current)
+        np.save("error_storage_current_errors_total_{}".format(temp_id), self.total_hist_current_error)
+        np.save("error_storage_individual_currents_total_{}".format(temp_id), self.total_hist_individual_currents)
+
+        np.save("error_storage_currents_inter_a_{}".format(temp_id), self.inter_hist_current_1)
+        np.save("error_storage_current_errors_inter_a_{}".format(temp_id), self.inter_hist_current_1_error)
+        np.save("error_storage_individual_currents_inter_a_{}".format(temp_id), self.inter_hist_individual_currents_1)
+
+        np.save("error_storage_currents_inter_b_{}".format(temp_id), self.inter_hist_current_2)
+        np.save("error_storage_current_errors_inter_b_{}".format(temp_id), self.inter_hist_current_2_error)
+        np.save("error_storage_individual_currents_inter_b_{}".format(temp_id), self.inter_hist_individual_currents_2)
+
+    @contextmanager
+    def enhanced_readout_mode(self):
+        try:
+            if self.n_measurements > 5:
+                self.pixcap[self.pixcap.vm2_smu_key].set_current_nlpc(2)
+                self.pixcap[self.pixcap.vm3_smu_key].set_current_nlpc(2)
+            yield self
+        finally:
+            self.pixcap[self.pixcap.vm2_smu_key].set_current_nlpc(10)
+            self.pixcap[self.pixcap.vm3_smu_key].set_current_nlpc(10)
 
     # region Pixcap Properties
     # specialized for the inter capacitance measurement.
