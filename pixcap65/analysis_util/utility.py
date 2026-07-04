@@ -30,8 +30,8 @@ FULL_MODEL_LABEL = "I_\\text{{full}}"
 SIMPLE_MODEL_LABEL = "I_\\text{{approximation}}"
 FULL_MODEL_EXPRESSION = "\\frac{{{u0}\\cdot{c}\\cdot{freq}+{i}}}{{1+{r}\\cdot{c}\\cdot{freq}}}"
 SIMPLE_MODEL_EXPRESSION = "{u0}\\cdot{c\\cdot{freq}+{i}}"
-FULL_MODEL_PARAMETER_DICT = {"c": "C", "r": "R", "i": "I_\\text{{Leakage}}", "u0": "U_{{0}}", "freq": "\\nu"}
-SIMPLE_MODEL_PARAMETER_DICT = {"c": "C", "i": "I", "u0": "U_{{0}}", "freq": "\\nu"}
+FULL_MODEL_PARAMETER_DICT = {"c": r"C", "r": "R", "i": r"I_\\text{{Leakage}}", "u0": "U_{{0}}", "freq": "\\nu"}
+SIMPLE_MODEL_PARAMETER_DICT = {"c": r"C", "i": r"I", "u0": r"U_{0}", "freq": r"\nu"}
 GLOBAL_FILTERS = tb.Filters(complevel=5, complib='blosc', shuffle=False, fletcher32=False)
 FARAD_CONVERSION_FACTOR = 1e-6
 CURRENT_CONVERSION_FACTOR = 1e9
@@ -547,6 +547,10 @@ class DepletionData(tb.IsDescription):
     Ubi_systematic_corrected = tb.Float64Col(pos=21)
     Ubi_systematic_dispersion = tb.Float64Col(pos=22)
     Ubi_systematic_dispersion_corrected_error = tb.Float64Col(pos=23)
+    rho = tb.Float64Col(pos=24)
+    rho_error = tb.Float64Col(pos=25)
+    rho_corrected = tb.Float64Col(pos=26)
+    rho_corrected_error = tb.Float64Col(pos=27)
 
     def __new__(cls, classname: str, bases: Sequence, classdict: dict[str, Any]):
         print("Called new!")
