@@ -3,10 +3,10 @@
 #   All rights reserved
 #  SiLab, Institute of Physics, University of Bonn
 # ----------------------------------------------------------
-
 import atexit
 import multiprocessing as mp
 import sys
+from contextlib import contextmanager
 from multiprocessing.managers import SyncManager
 
 __manager = None
@@ -25,6 +25,13 @@ def exit_manager():
 class ExtendedSyncManager(SyncManager):
     pass
 
+@contextmanager
+def get_context_manager(**kwargs):
+    try:
+        yield get_manager(**kwargs)
+    finally:
+        close_manager()
+
 def get_manager(**kwargs):
     with __manager_handling_lock:
         global __manager
@@ -34,7 +41,7 @@ def get_manager(**kwargs):
                 __manager.connect()
             else:
                 __manager.__enter__()
-                atexit.register(__manager.shutdown)
+                atexit.register(close_manager)
 
     return __manager
 
@@ -44,6 +51,7 @@ def close_manager():
         if __manager is not None:
             __manager.shutdown()
             __manager = None
+            atexit.unregister(close_manager)
 
 try:
     from matplotlib.backends.backend_pdf import PdfPages
@@ -96,5 +104,9 @@ try:
     ExtendedSyncManager.register("ThreadedPdfPages", ThreadedPdfPages, ThreadedPdfPagesProxy)
 except ImportError:
     pass
+
+def initialize_worker_manager(**kwargs):
+    _ = get_manager(**kwargs)
+
 
 

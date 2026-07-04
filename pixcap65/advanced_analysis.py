@@ -11,7 +11,7 @@ from pixcap65.analysis_util.utility import HandleFitterStubClass, HandleFitterGe
 from pixcap65.analysis_util.utility import transform_covariance, TABLES_ARRAY_TYPE, GENERAL_PIXCAP_SHAPE, \
     FULL_MODEL_LABEL, \
     SIMPLE_MODEL_LABEL, FULL_MODEL_EXPRESSION, SIMPLE_MODEL_EXPRESSION, FULL_MODEL_PARAMETER_DICT, \
-    SIMPLE_MODEL_PARAMETER_DICT, GLOBAL_FILTERS, FARAD_CONVERSION_FACTOR, CURRENT_CONVERSION_FACTOR, TABLES_TABLE_TYPE
+    GLOBAL_FILTERS, FARAD_CONVERSION_FACTOR, CURRENT_CONVERSION_FACTOR, TABLES_TABLE_TYPE
 from pixcap65.utility.tables_util import get_node_pathname
 from pixcap65.utility.utils_2 import create_carray
 
@@ -99,6 +99,11 @@ def _perform_advanced_fit(file: tb.File, group: tb.Group, current_hist: np.ndarr
     (cov_array_limit, effective_model, effective_expression, effective_label,
      effective_parameter_dict, initial_guess) = __declare_fit_model(full_model)
 
+    # print("Investigate the effective parameter dict")
+    # print(effective_parameter_dict)
+    # print("Investigate the effective expression")
+    # print(initial_guess)
+
     fit_cov = np.full(shape=tuple([*GENERAL_PIXCAP_SHAPE, cov_array_limit + 1, cov_array_limit + 1]), fill_value=np.nan)
 
     # Fit pixel data in order to extract capacitance for each pixel
@@ -112,7 +117,7 @@ def _perform_advanced_fit(file: tb.File, group: tb.Group, current_hist: np.ndarr
 
         # make a first capacitance approximation using numpy; this needs to be done for each pixel individually.
         pre_result = np.polyfit(frequencies, currents, 1)
-        effective_parameter_dict.update(c=pre_result[0], i=pre_result[1])
+        initial_guess.update(c=pre_result[0], i=pre_result[1])
 
         cap, cap_error, fit_cov_temp, fitter, leakage, leakage_error, resistor, resistor_error = __perform_pixel_fit(
             currents, current_errors, frequencies, effective_expression, effective_label, effective_model,
@@ -173,10 +178,17 @@ def __perform_pixel_fit(currents: np.ndarray, current_errors: np.ndarray, freque
         # errors?
         if np.all(np.isfinite(current_errors)):
             xy_data.add_error('y', err_val=current_errors)
+
+        freq_errors = frequencies * 150e-6
+        xy_data.add_error('x', err_val=freq_errors)
         fitter = XYFit(xy_data, model_function=effective_model)
         fitter.assign_model_function_latex_name(effective_label)
         fitter.assign_model_function_latex_expression(effective_expression)
-        fitter.assign_parameter_latex_names(**effective_parameter_dict)
+        try:
+            fitter.assign_parameter_latex_names(**effective_parameter_dict)
+        except:
+            print(effective_parameter_dict)
+            raise
         fitter.set_parameter_values(**initial_guess)
         fitter.fix_parameter('u0', 1)
         fitter.do_fit()
@@ -249,7 +261,8 @@ def __declare_fit_model(full_model) -> tuple[int, Callable[..., Any], str, str, 
         effective_model = simple_capacitance_model
         effective_label = SIMPLE_MODEL_LABEL
         effective_expression = SIMPLE_MODEL_EXPRESSION
-        effective_parameter_dict = SIMPLE_MODEL_PARAMETER_DICT
+        effective_parameter_dict = {"c": r"C", "i": r"I", "u0": r"U_{0}", "freq": r"\nu"}
         param_defaults = {'c': ANALYSIS_INITIAL_CAPACITANCE, 'i': ANALYSIS_INITIAL_LEAKAGE, 'u0': ANALYSIS_REFERENCE_VOLTAGE}
         cov_array_limit = 2
+
     return cov_array_limit, effective_model, effective_expression, effective_label, effective_parameter_dict, param_defaults

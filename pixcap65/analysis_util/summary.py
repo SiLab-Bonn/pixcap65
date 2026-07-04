@@ -190,7 +190,7 @@ if __name__ == "__main__":
     summary_groups = [
         "Reference/Bare/unbiased_31_renew/total_cap/analysis",
         "Reference/R13/unbiased_1_full_model/total_cap/analysis",
-        "Reference/R11/unbiased_full_model/total_cap/analysis",
+        "Reference/R1/unbiased_full_model/total_cap/analysis",
         "Thesis/ATLAS_ITk/X1/unbiased_61_full_model/total_cap/analysis",
         "Thesis/ATLAS_ITk/X2/unbiased_1_full_model/total_cap/analysis",
         "Thesis/ATLAS_ITk/X5/unbiased_full_model/total_cap/analysis",
@@ -198,13 +198,13 @@ if __name__ == "__main__":
         "Thesis/ATLAS_ITk/X7/unbiased_full_model/total_cap/analysis",
         "Reference/E1/unbiased_full_model/total_cap/analysis",
     ]
-    summary_sensors = ["Bare", "R13", "R1/R11", "X1", "X2", "X5", "X6", "X7", "E1"]
+    summary_sensors = ["Bare", "R13", "R1", "X1", "X2", "X5", "X6", "X7", "E1"]
 
     logger.info("generate summary")
     generate_test_summary(summary_files, summary_groups, summary_sensors, SUMMARY_FILE)
 
     with tb.open_file(R11_SCAN_FILE) as h5_file:
-        get_test_capacitance_data(h5_file.root.Reference.R11.unbiased_full.total_cap.analysis)
+        get_test_capacitance_data(h5_file.root.Reference.R1.unbiased_full.total_cap.analysis)
 
 
     # but how to format such a table?
@@ -230,6 +230,8 @@ if __name__ == "__main__":
         biased_capacitance = MasterTableCapacitanceEntry()
         bias_voltage = tb.Float64Col(pos=1)
         biased_inter_capacitance = MasterTableCapacitanceEntry()
+        biased_inter_capacitance_side = MasterTableCapacitanceEntry()
+        biased_inter_capacitance_top = MasterTableCapacitanceEntry()
         depletion_voltage = MasterTableVoltageEntry()
 
 
@@ -240,6 +242,8 @@ if __name__ == "__main__":
         biased_group = tb.StringCol(itemsize=100, pos=3)
         biased_inter_pix_group = tb.StringCol(itemsize=100, pos=4)
         cv_group = tb.StringCol(itemsize=100, pos=5)
+        biased_inter_pix_group_sides = tb.StringCol(itemsize=100, pos=6)
+        biased_inter_pix_group_tops = tb.StringCol(itemsize=100, pos=7)
 
 
     # generate the table with summarieses all the data!
@@ -275,7 +279,7 @@ if __name__ == "__main__":
                                 current_entry = generate_cap_entry(result_table)
 
                     current_row['unbiased_capacitance'] = current_entry
-                    current_entry  = DEFAULT_ENTRY
+                    current_entry = DEFAULT_ENTRY
 
                     if entry.biased_group is not None and 'None' not in entry.biased_group:
                         group = h5_file._get_or_create_path("/" + entry.biased_group, False)
@@ -314,6 +318,47 @@ if __name__ == "__main__":
                     current_row["biased_inter_capacitance"] = current_entry
                     current_entry = DEFAULT_ENTRY
 
+                    # TODO: implement the side capacitances in Addition
+                    if entry.biased_inter_pix_group_sides is not None and 'None' not in entry.biased_inter_pix_group_sides:
+                        group = h5_file._get_or_create_path("/" + entry.biased_inter_pix_group_sides, False)
+                        if "DistResultfF" in group:
+                            # we must read here at the right position
+                            result_table = np.rec.array(group.DistResultfF.read_where("""(bias == {})""".format(20000)),
+                                                        dtype=group.DistResultfF.dtype)
+                            correct_implant = 2
+                            assert isinstance(result_table, np.recarray)
+                            if result_table.shape[0] == 0:
+                                result_table = np.rec.array(
+                                    group.DistResultfF.read_where("""(bias == {})""".format(14000)),
+                                    dtype=group.DistResultfF.dtype)
+                                correct_implant = 8
+
+                            assert isinstance(result_table, np.recarray)
+                            if result_table.shape[0] > 0:
+                                current_entry = tuple(np.asarray(generate_cap_entry(result_table), dtype=np.float64) / correct_implant)
+                    current_row["biased_inter_capacitance_side"] = current_entry
+                    current_entry = DEFAULT_ENTRY
+                    if entry.biased_inter_pix_group_tops is not None and 'None' not in entry.biased_inter_pix_group_tops:
+                        group = h5_file._get_or_create_path("/" + entry.biased_inter_pix_group_tops, False)
+                        if "DistResultfF" in group:
+                            # we must read here at the right position
+                            result_table = np.rec.array(group.DistResultfF.read_where("""(bias == {})""".format(19000)),
+                                                        dtype=group.DistResultfF.dtype)
+                            correct_implant = 2
+                            assert isinstance(result_table, np.recarray)
+                            if result_table.shape[0] == 0:
+                                result_table = np.rec.array(
+                                    group.DistResultfF.read_where("""(bias == {})""".format(14000)),
+                                    dtype=group.DistResultfF.dtype)
+                                correct_implant = 8
+
+                            assert isinstance(result_table, np.recarray)
+                            if result_table.shape[0] > 0:
+                                current_entry = tuple(np.asarray(generate_cap_entry(result_table), dtype=np.float64) / correct_implant)
+                    current_row["biased_inter_capacitance_top"] = current_entry
+                    current_entry = DEFAULT_ENTRY
+
+
                     # handle the C-V-Parameterisation
                     if entry.cv_group is not None and 'None' not in entry.cv_group:
                         group = h5_file._get_or_create_path("/" + entry.cv_group, False)
@@ -322,15 +367,16 @@ if __name__ == "__main__":
                                                         dtype=group.SensorDepletionRaw.dtype)
                             assert isinstance(result_table, np.recarray)
                             if result_table.shape[0] > 0:
-                                current_entry = (result_table.Ubi_corrected[0],
-                                                                    result_table.Ubi_corrected_error[0],
-                                                                    result_table.Ubi_systematic_corrected[0],
-                                                                    result_table.Ubi_systematic_dispersion_corrected_error[
-                                                                        0])
+                                idx = np.argmin(result_table.Ubi_corrected)
+                                current_entry = (result_table.Ubi_corrected[idx],
+                                                                    result_table.Ubi_corrected_error[idx],
+                                                                    result_table.Ubi_systematic_corrected[idx],
+                                                                    result_table.Ubi_systematic_dispersion_corrected_error[idx])
 
                     current_row["depletion_voltage"] = current_entry
 
                 current_row['sensor'] = entry.sensor
+                current_row['bias_voltage'] = entry.biasing
                 current_row.append()
 
             table.flush()
@@ -341,7 +387,9 @@ if __name__ == "__main__":
     group_provider_dtype = np.dtype([('file', str, 220), ('unbiased_group', str, 100),
                                      ('unbiased_inter_pix_group', str, 100), ('biased_group', str, 100),
                                      ('biased_inter_pix_group', str, 100), ('cv_group', str, 100),
-                                     ('sensor', str, 100)])
+                                     ('sensor', str, 100), ('biasing', np.float64),
+                                     ('biased_inter_pix_group_tops', str, 100),
+                                     ('biased_inter_pix_group_sides', str, 100),])
     extraction_files = [
         X1_SCAN_2_FILE,
         R13_2_SCAN_FILE,
@@ -465,6 +513,61 @@ if __name__ == "__main__":
         "E1_dnw25_50",
         "E1_dnw30_50",
     ]
+    extract_bias_voltages = [
+        80,
+        80,
+        40,
+        40,
+        80,
+        80,
+        45,
+        80,
+        80,
+        80,
+        80,
+        80,
+        80,
+        80,
+        80,
+    ]
+    extract_biased_inter_groups_top = [
+        "Thesis/ATLAS_ITk/X1/inter_biased_M_80_V_full/inter_cap/analysis",
+        # "Reference/R13/inter_biased_M_80_V_full/inter_cap/analysis",
+        None,
+        "Thesis/ATLAS_ITk/X5/inter_biased_M_40_V_full/inter_cap/analysis",
+        "Thesis/ATLAS_ITk/X7/inter_biased_M_40.0_V_full/inter_cap/analysis",
+        # "Thesis/ATLASK_ITk/X2/inter_unbiased_full/inter_cap/analysis",
+        None,
+        "Reference/R1/inter_biased_M_80_V_full/inter_cap/analysis",
+        "Thesis/ATLAS_ITk/X6/inter_biased_M_45_V_full/inter_cap/analysis",
+        "Reference/E1/inter_biased_M_80_V_full_nw15_50/inter_cap/analysis",
+        "Reference/E1/inter_biased_M_80_V_full_nw20_50/inter_cap/analysis",
+        "Reference/E1/inter_biased_M_80_V_full_nw25_50/inter_cap/analysis",
+        "Reference/E1/inter_biased_M_80_V_full_nw30_50/inter_cap/analysis",
+        "Reference/E1/inter_biased_M_80_V_full_dnw15_50/inter_cap/analysis",
+        "Reference/E1/inter_biased_M_80_V_full_dnw20_50/inter_cap/analysis",
+        "Reference/E1/inter_biased_M_80_V_full_dnw25_50/inter_cap/analysis",
+        "Reference/E1/inter_biased_M_80_V_full_dnw30_50/inter_cap/analysis",
+    ]
+    extract_biased_inter_groups_side = [
+        "Thesis/ATLAS_ITk/X1/inter_biased_M_80_V_full/inter_cap/analysis",
+        # "Reference/R13/inter_biased_M_80_V_full/inter_cap/analysis",
+        None,
+        "Thesis/ATLAS_ITk/X5/inter_biased_M_40_V_full/inter_cap/analysis",
+        "Thesis/ATLAS_ITk/X7/inter_biased_M_40.0_V_full/inter_cap/analysis",
+        # "Thesis/ATLASK_ITk/X2/inter_unbiased_full/inter_cap/analysis",
+        None,
+        "Reference/R1/inter_biased_M_80_V_full/inter_cap/analysis",
+        "Thesis/ATLAS_ITk/X6/inter_biased_M_45_V_full/inter_cap/analysis",
+        "Reference/E1/inter_biased_M_80_V_full_nw15_50/inter_cap/analysis",
+        "Reference/E1/inter_biased_M_80_V_full_nw20_50/inter_cap/analysis",
+        "Reference/E1/inter_biased_M_80_V_full_nw25_50/inter_cap/analysis",
+        "Reference/E1/inter_biased_M_80_V_full_nw30_50/inter_cap/analysis",
+        "Reference/E1/inter_biased_M_80_V_full_dnw15_50/inter_cap/analysis",
+        "Reference/E1/inter_biased_M_80_V_full_dnw20_50/inter_cap/analysis",
+        "Reference/E1/inter_biased_M_80_V_full_dnw25_50/inter_cap/analysis",
+        "Reference/E1/inter_biased_M_80_V_full_dnw30_50/inter_cap/analysis",
+    ]
 
     records = []
     print(np.asarray(extraction_files).dtype)
@@ -476,6 +579,9 @@ if __name__ == "__main__":
             extract_biased_inter_groups,
             extract_cv_groups,
             extract_sensors,
+            extract_bias_voltages,
+            extract_biased_inter_groups_top,
+            extract_biased_inter_groups_side,
     ):
         records.append(record)
 
@@ -511,10 +617,10 @@ if __name__ == "__main__":
     ])
 
     sensor_primary_properties = np.rec.array([
-        ("R1", 25, 100, 8, 81, 3, 150),
+        ("R1", 25, 100, 6, 81, 3, 150),
         ("R13", 50, 50, 30, 30, 3, 150),
-        ("X1", 50, 50, 50, 50, 3, 150),
-        ("X2", 50, 50, 50, 50, 3, 150),
+        ("X1", 50, 50, 45, 45, 3, 150),
+        ("X2", 50, 50, 45, 45, 3, 150),
         # ("X5", 50, 50, 50, 50, 150, 250),
         # ("X6", 50, 50, 50, 50, 150, 250),
         # ("X7", 50, 50, 50, 50, 150, 250),
@@ -538,8 +644,8 @@ if __name__ == "__main__":
     sensor_implant_sizes_x = sensor_primary_properties.implantation_size_x
     sensor_implant_sizes_y = sensor_primary_properties.implantation_size_y
     sensor_implant_areas = sensor_implant_sizes_y * sensor_implant_sizes_x
-    sensor_pixel_separations_x = sensor_pitches_x - sensor_implant_sizes_x
-    sensor_pixel_separations_y = sensor_pitches_y - sensor_implant_sizes_y
+    sensor_pixel_separations_x = (sensor_pitches_x - sensor_implant_sizes_x - 4) / 2
+    sensor_pixel_separations_y = (sensor_pitches_y - sensor_implant_sizes_y - 4) / 2
     sensor_pixel_separation_areas = sensor_pixel_areas - sensor_implant_areas
 
     zipping = zip(
@@ -569,7 +675,9 @@ if __name__ == "__main__":
 
 
         sensor_record.implantation_area = sensor_record.implantation_size_x * sensor_record.implantation_size_y * np.pi
-        sensor_record.pixel_separation_x = sensor_record.pixel_separation_x = np.mean((sensor_record.pitch_x, sensor_record.pitch_y)) - sensor_record.implantation_size_y
+        sensor_record.pixel_separation_x = np.mean((sensor_record.pitch_x, sensor_record.pitch_y)) - sensor_record.implantation_size_y
+        sensor_record.pixel_separation_y = np.mean(
+            (sensor_record.pitch_x, sensor_record.pitch_y)) - sensor_record.implantation_size_y
         sensor_record.pixel_separation_area = sensor_record.pixel_area - np.pi * (sensor_record.implantation_size_y / 2) ** 2
 
 

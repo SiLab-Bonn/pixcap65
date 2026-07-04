@@ -43,11 +43,6 @@ Issues = "https://github.com/SiLab-Bonn/pixcap65/issues/"
 source = "https://github.com/SiLab-Bonn/pixcap65/"
 # no documentation present.
 
-[project.scripts]
-# pixcap_inter_cap = "pixcap65.pixcap_65_test_inter_cap"
-# pixcap_total_cap = "pixcap65.pixcap_65_test_total_cap"
-# pixcap_line = "pixcap65.pixcap.pixcap_65_test_load_line"
-
 [project.optional-dependencies]
 dut = [
     "pyserial",
@@ -152,3 +147,10 @@ module-root = ""
 namespace = true
 data = { data = "pixcap65/device" }
 source-exclude = ["doc", "Data", "data_local"]
+
+[dependency-groups]
+modelling = [
+    "iminuit>=1.4.9",
+    "numdifftools>=0.9.41",
+    "numpy>=1.16.6",
+]

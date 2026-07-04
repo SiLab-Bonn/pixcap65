@@ -1,6 +1,7 @@
 import matplotlib
 # from matplotlib.ticker import AutoMinorLocator
 import numpy as np
+import threading
 
 # If the code gives a lot of matplotlib deprecation warnings
 # these can be turned off (although this is not a recommended procedure)
@@ -10,6 +11,10 @@ import numpy as np
 # Store original plot parameters so that we can revert:
 ORIG_MATPLOTLIB_CONF = dict(matplotlib.rcParams)
 
+def get_error_cycler():
+    from cycler import cycler
+    standard_color = matplotlib.rcParams['axes.prop_cycle'].by_key()['color']
+    return cycler(marker=['x', '*', 'v'], linestyle=['','','']) * cycler(color=standard_color)
 
 # noinspection PyUnboundLocalVariable
 def set_params(fig_width=None, fig_height=None, columns=1, fontsize=8, dpi=300,
@@ -51,12 +56,18 @@ def set_params(fig_width=None, fig_height=None, columns=1, fontsize=8, dpi=300,
     # print('\nOld keys:')
     # print(matplotlib.rcParams.keys())
 
+    from cycler import cycler
+    standard_color = matplotlib.rcParams['axes.prop_cycle'].by_key()['color']
+    cc = cycler(linestyle=['-', '--', '-.']) * cycler(color=standard_color)
+
     # May have to set 'backend': 'ps'
     params = {
         'axes.labelsize': fontsize,
         'axes.titlesize': 1.2 * fontsize,
+        'axes.prop_cycle': cc,
         'font.size': fontsize,
         'legend.fontsize': fontsize,
+        'legend.frameon': False,
         'xtick.labelsize': fontsize,
         'ytick.labelsize': fontsize,
         'axes.linewidth': 1,
@@ -64,7 +75,8 @@ def set_params(fig_width=None, fig_height=None, columns=1, fontsize=8, dpi=300,
         'figure.figsize': [fig_width, fig_height],
         'font.family': serif,
         'savefig.bbox': 'tight',
-        'savefig.dpi': dpi
+        'savefig.dpi': dpi,
+        'errorbar.capsize': 3.0,
     }
 
     # Set serif or sans serif font
@@ -75,10 +87,15 @@ def set_params(fig_width=None, fig_height=None, columns=1, fontsize=8, dpi=300,
 
     # LaTeX preamble
     latex_preamble = r'\usepackage{siunitx}'
+    latex_preamble += r'\usepackage{newtxtext}'
+    latex_preamble += r'\usepackage{newtxmath}'
     latex_preamble += r'\usepackage[utf8]{inputenc}\usepackage[T1]{fontenc}'
+    latex_preamble += r'\usepackage{}'
     if latex_extra: latex_preamble += latex_extra
     latex_params = {'text.usetex': latex,
-                    'text.latex.preamble': latex_preamble
+                    'text.latex.preamble': latex_preamble,
+                    'pgf.preamble': latex_preamble,
+                    'pgf.texsystem': 'pdflatex',
                     }
     # print(params)
     # print(latex_params)
@@ -131,3 +148,25 @@ def revert_params():
 
     dict.update(matplotlib.rcParams, ORIG_MATPLOTLIB_CONF)
     # matplotlib.rcParams.update(ORIG_MATPLOTLIB_CONF)
+
+
+homo_lock = threading.RLock()
+current_cycle_data = {}
+enhanced_cycler =list( get_error_cycler())
+
+def enhanced_error_bar(ax: matplotlib.axes.Axes, *args, **kwargs):
+    h = hash(ax)
+    with homo_lock:
+        current_cycle_idx = current_cycle_data.setdefault(h, 0)
+    style_information = enhanced_cycler[current_cycle_idx]
+    style_information.update(**kwargs)
+    if 'xerr' in style_information:
+        del style_information['xerr']
+    result = ax.errorbar(*args, **style_information)
+    current_cycle_idx += 1
+    current_cycle_idx %= len(enhanced_cycler)
+    with homo_lock:
+        current_cycle_data[h] = current_cycle_idx
+    return result
+
+

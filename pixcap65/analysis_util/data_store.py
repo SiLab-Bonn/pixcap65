@@ -4,6 +4,7 @@ import multiprocessing as mp
 import numpy as np
 import tables as tb
 import threading
+from contextlib import contextmanager
 from multiprocessing.managers import BaseProxy
 
 import pixcap65.concurrency
@@ -74,6 +75,8 @@ class NumpyProxy(BaseProxy):
 
 
 DepletionMPManager.register("full", np.full, NumpyProxy)
+# the question now is whether a already started manager will be affected by a change of registered methods?
+# registration must be completed before the manager is started at all.
 pixcap65.concurrency.ExtendedSyncManager.register('full', np.full, NumpyProxy)
 
 
@@ -94,7 +97,6 @@ class DepletionDataStore:
         """
         # stub function for further implemenation by more specialized subclasses.
         pass
-
 
 class DepletionTableStore(DepletionDataStore):
     def __init__(self, table: tb.Table, n_depletions=None):
@@ -186,23 +188,50 @@ class DepletionNumpyStore(DepletionDataStore):
 
 __manager = None
 
+@contextmanager
+def get_mp_context_manager(**kwargs):
+    try:
+        yield get_mp_manager(**kwargs)
+    finally:
+        close_manager()
 
-def get_mp_manager():
+def get_mp_manager(**kwargs):
+    with pixcap65.concurrency.__manager_handling_lock:
+        global __manager
+        if __manager is None:
+            __manager = DepletionMPManager(**kwargs)
+            if "address" in kwargs:
+                __manager.connect()
+            else:
+                __manager.__enter__()
+                atexit.register(close_manager)
+
+        return __manager
+
+def close_manager():
     global __manager
-    if __manager is None:
-        __manager = DepletionMPManager()
-        __manager.__enter__()
-        atexit.register(__manager.__exit__, None, None, None)
-
-    return __manager
+    with pixcap65.concurrency.__manager_handling_lock:
+        if __manager is not None:
+            __manager.__exit__(None, None, None)
+            __manager = None
+            atexit.unregister(close_manager)
 
 class DepletionArrayStore(DepletionDataStore):
-    def __init__(self, n_depletions=None):
+    def __init__(self, n_depletions=None, **manager_kwargs):
         general_shape = GENERAL_PIXCAP_SHAPE if n_depletions is None else tuple([*GENERAL_PIXCAP_SHAPE, n_depletions])
         parameter_shape = tuple([*GENERAL_PIXCAP_SHAPE, 4]) if n_depletions is None else tuple(
             [*GENERAL_PIXCAP_SHAPE, n_depletions, 4])
         def create_full(*args, **kwargs):
-            return get_mp_manager().full(*args, **kwargs)
+            # FIXME: in ideal case we could fetch another mamager right from here!
+            if "address" in manager_kwargs:
+                manager_kwargs["authkey"] = mp.current_process().authkey
+                try:
+                    return pixcap65.concurrency.get_manager(**manager_kwargs).full(*args, **kwargs)
+                except:
+                    import logging
+                    logging.exception("Failed to fetch manager and initialize the object")
+                    return get_mp_manager().full(*args, **kwargs)
+            return get_mp_manager(**manager_kwargs).full(*args, **kwargs)
         self.depletion_voltage = create_full(shape=general_shape, fill_value=np.nan)
         self.depletion_error = create_full(shape=general_shape, fill_value=np.nan)
         self.fit_parameter_estimators = create_full(shape=parameter_shape, fill_value=np.nan)
@@ -214,6 +243,10 @@ class DepletionArrayStore(DepletionDataStore):
         self._depletion_reg = pixcap65.concurrency.get_manager().dict()
         self.systematic_errors = create_full(shape=general_shape, fill_value=np.nan)
         self.systematic_dispersion = create_full(shape=general_shape, fill_value=np.nan)
+        with open("depletion_manager_information_{}.txt".format(mp.current_process().pid), 'a') as f:
+            print(mp.current_process().pid, mp.current_process().name, mp.current_process().authkey, file=f)
+
+
 
     @property
     def pixel_row(self):
@@ -327,18 +360,24 @@ class DepletionArrayStore(DepletionDataStore):
                     case _:
                         raise ValueError(f"The provided storage key is unknown: {key}")
 
-
 class DopingArrayStore(DepletionDataStore):
-    def __init__(self, doping_shape):
+    # FIXME: issue with the number of rows on the pixcap chip!
+    def __init__(self, doping_shape, n_depletions=1):
+        shape_list = [*GENERAL_PIXCAP_SHAPE, 4]
+        general_shape = tuple(shape_list)
+        matrix_shape = tuple(shape_list + [4])
+        depletion_shape = tuple([*GENERAL_PIXCAP_SHAPE, n_depletions])
         self.pixel_row = 1
         self.pixel_col = 1
         self.depletion_width_plate = np.full(shape=doping_shape, fill_value=np.nan)
         self.depletion_width_plate_error = np.full(shape=doping_shape, fill_value=np.nan)
-        self.depletion_fit_parameter_table = np.full((40, 40, 4), fill_value=np.nan)
-        self.depletion_fit_parameter_error_table = np.full((40, 40, 4), fill_value=np.nan)
-        self.depletion_fit_covariance_table = np.full((40, 40, 4, 4), fill_value=np.nan)
+        self.depletion_fit_parameter_table = np.full(general_shape, fill_value=np.nan)
+        self.depletion_fit_parameter_error_table = np.full(general_shape, fill_value=np.nan)
+        self.depletion_fit_covariance_table = np.full(matrix_shape, fill_value=np.nan)
         self.effective_doping_table = np.full(shape=doping_shape, fill_value=np.nan)
         self.resistivity_table = np.full(shape=doping_shape, fill_value=np.nan)
+        self.second_resistivities = np.full(shape=depletion_shape, fill_value=np.nan)
+        self.second_resistivities_err = np.full(shape=depletion_shape, fill_value=np.nan)
 
     def set_pixel(self, i_row, i_col):
         self.pixel_row = i_row
@@ -360,6 +399,10 @@ class DopingArrayStore(DepletionDataStore):
                 self.effective_doping_table[self.pixel_col, self.pixel_row] = data
             case "resistivity":
                 self.resistivity_table[self.pixel_col, self.pixel_row] = data
+            case "res_mod":
+                self.second_resistivities[self.pixel_col, self.pixel_row] = data
+            case "res_mod_err":
+                self.second_resistivities_err[self.pixel_col, self.pixel_row] = data
             case _:
                 raise ValueError(f"Unknown data storage key {key}")
 
