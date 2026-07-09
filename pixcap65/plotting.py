@@ -68,7 +68,7 @@ X1_SCAN_2_FILE = "packaged/data/X1_4_Renew_Scan.h5"
 REFERENCE_TEST_FILE = "packaged/Reference_Demo.h5"
 CV_DATA_FOR_ = "CV Data for {}"
 NEW_PLOT_FILE_MODE = True
-GENERATE_THESIS_PLOTS = True
+GENERATE_THESIS_PLOTS = False
 CV_USE_SEPARATE_PAGES = True
 
 global_interactive_lock = threading.RLock()
@@ -1505,7 +1505,7 @@ if __name__ == '__main__':
 
     # use this attempt to achieve a better performance when generating the plots
     import multiprocessing as mp
-    from full_analysis import x7_plotter, presentation_plotter
+    from full_analysis import x7_plotter, presentation_plotter, bare_sample_plotter_second, r1_plotter
 
     print(mp.current_process().name)
     print(mp.cpu_count())
@@ -1515,15 +1515,15 @@ if __name__ == '__main__':
     with mp.Manager() as manager, mp.Pool(initializer=mp_plotting_init, initargs=("PDF", has_latex,)) as pool:
         tables_lock = manager.RLock()
         process_handles = [
-            # bare_sample_plotter_second,
-            # x1_plotter,
-            # x2_plotter_second,
-            # x5_plotter,
-            # x6_plotter,
+            bare_sample_plotter_second,
+            x1_plotter,
+            x2_plotter_second,
+            x5_plotter,
+            x6_plotter,
             x7_plotter,
-            # r13_plotter_second,
-            # e1_plotter_second,
-            # r1_plotter,
+            r13_plotter_second,
+            e1_plotter_second,
+            r1_plotter,
         ]
 
         processes = [pool.apply_async(handle, (tables_lock,)) for handle in process_handles]
