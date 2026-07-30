@@ -9,9 +9,9 @@ import yaml
 from pixcap65 import data_constants
 from pixcap65.analysis_util.utility import HIST_BIAS_MEAS_UNIT, HIST_CURRENT_MEAS_UNIT, GLOBAL_FILTERS
 from pixcap65.configs.config_handler import extract_smu_voltage_error
-from pixcap65.data_constants import E1_2_SCAN_FILE, R13_2_SCAN_FILE, X1_SCAN_2_FILE, X2_SCAN_2_FILE, X6_SCAN_FILE, \
-    R11_SCAN_FILE, X5_SCAN_FILE, X7_SCAN_FILE
-from pixcap65.pixcap_65_test_total_cap import BiasTable, ScanConfigurationKeys
+from pixcap65.data_constants import X5_SCAN_FILE
+from pixcap65.pixcap.pixcap65_measurement import ScanConfigurationKeys
+from pixcap65.pixcap_65_test_total_cap import BiasTable
 from pixcap65.utility.tables_util import set_group_attribute, group_get_file, get_groups, list_group_attributes, \
     get_group_attribute
 from pixcap65.utility.utils_2 import UNITS_ATTRIBUTE_KEY, create_carray, prevent_group_mix_up
@@ -528,130 +528,145 @@ def split_sensor_group(group: tb.Group):
 # FIXME: Why are there no error estimations for I-V curves?
 
 if __name__ == "__main__":
-    with tb.open_file(X1_SCAN_2_FILE, "a") as h5_file:
-        generate_bias_table(h5_file.root.ATLAS_ITk.X1.I_V_Characteristic.biasing.measurements, transform_api=True)
-        regenerate_c_v_errors(h5_file.root.ATLAS_ITk.X1.C_V_Characteristic_refined.biasing.measurements)
-        regenerate_inter_pix_errors(h5_file.root.Thesis.ATLAS_ITk.X1.inter_unbiased_full.inter_cap.measurements)
-        regenerate_inter_pix_errors(h5_file.root.Thesis.ATLAS_ITk.X1.inter_biased_M_80_V_full.inter_cap.measurements)
-        combine_cv_measurements(h5_file.root.ATLAS_ITk.X1.C_V_Characteristic_refined,
-                                h5_file.root.Thesis.ATLAS_ITk.X1.C_V_Characteristic_refined_Extended,)
-        h5_file.copy_node(where=h5_file.root.ATLAS_ITk.X1, newparent=h5_file.root.Thesis.ATLAS_ITk.X1,
-                          name="C_V_Characteristic_refined_Extended_Combined",
-                          newname="C_V_Characteristic_refined_Extended_Combined",
-                          overwrite=True, recursive=True)
-        old_x1 = h5_file.root.ATLAS_ITk.X1
-        for group in old_x1._f_iter_nodes():
-            if not isinstance(group, tb.Group):
-                continue
-            if group == old_x1:
-                continue
-            print(group)
-            h5_file.copy_node(where=old_x1, name=group._v_name,
-                              newname=group._v_name,
-                              newparent=h5_file.root.Thesis.ATLAS_ITk.X1, recursive=True, overwrite=True)
-        generate_pixel_dimensions(h5_file.root.Thesis.ATLAS_ITk.X1)
+    # with tb.open_file(X1_SCAN_2_FILE, "a") as h5_file:
+    #     generate_bias_table(h5_file.root.ATLAS_ITk.X1.I_V_Characteristic.biasing.measurements, transform_api=True)
+    #     regenerate_c_v_errors(h5_file.root.ATLAS_ITk.X1.C_V_Characteristic_refined.biasing.measurements)
+    #     regenerate_inter_pix_errors(h5_file.root.Thesis.ATLAS_ITk.X1.inter_unbiased_full.inter_cap.measurements)
+    #     regenerate_inter_pix_errors(h5_file.root.Thesis.ATLAS_ITk.X1.inter_biased_M_80_V_full.inter_cap.measurements)
+    #     combine_cv_measurements(h5_file.root.ATLAS_ITk.X1.C_V_Characteristic_refined,
+    #                             h5_file.root.Thesis.ATLAS_ITk.X1.C_V_Characteristic_refined_Extended,)
+    #     h5_file.copy_node(where=h5_file.root.ATLAS_ITk.X1, newparent=h5_file.root.Thesis.ATLAS_ITk.X1,
+    #                       name="C_V_Characteristic_refined_Extended_Combined",
+    #                       newname="C_V_Characteristic_refined_Extended_Combined",
+    #                       overwrite=True, recursive=True)
+    #     old_x1 = h5_file.root.ATLAS_ITk.X1
+    #     for group in old_x1._f_iter_nodes():
+    #         if not isinstance(group, tb.Group):
+    #             continue
+    #         if group == old_x1:
+    #             continue
+    #         print(group)
+    #         h5_file.copy_node(where=old_x1, name=group._v_name,
+    #                           newname=group._v_name,
+    #                           newparent=h5_file.root.Thesis.ATLAS_ITk.X1, recursive=True, overwrite=True)
+    #     generate_pixel_dimensions(h5_file.root.Thesis.ATLAS_ITk.X1)
+    #
+    # with tb.open_file(X2_SCAN_2_FILE, "a") as h5_file:
+    #     # generate_bias_table(h5_file.root.ATLAS_ITk.X2.I_V_Characteristic.biasing.measurements)
+    #     generate_bias_table(h5_file.root.ATLAS_ITk.X2.C_V_Characteristic_refined.biasing.measurements)
+    #     regenerate_c_v_errors(h5_file.root.ATLAS_ITk.X2.C_V_Characteristic_refined.biasing.measurements)
+    #     generate_pixel_dimensions(h5_file.root.ATLAS_ITk.X2)
+    #     h5_file.root.ATLAS_ITk.X2.C_V_Characteristic_refined.biasing.measurements.BiasVoltageHist.attrs["Units"] = "V"
+    #     old_x2 = h5_file.root.ATLAS_ITk.X2
+    #     assert isinstance(old_x2, tb.Group)
+    #     for group in old_x2._f_iter_nodes():
+    #         if not isinstance(group, tb.Group):
+    #             continue
+    #         if group == old_x2:
+    #             continue
+    #         print(group)
+    #         h5_file.copy_node(where=old_x2, name=group._v_name,
+    #                           newname=group._v_name,
+    #                           newparent=h5_file.root.Thesis.ATLAS_ITk.X2, recursive=True, overwrite=True)
+    #
+    #     with tb.open_file("packaged/data/X2_12_Renew_Scan.h5") as backing_file:
+    #         backing_file.copy_children(backing_file.root.Thesis.ATLAS_ITk.X2, h5_file.root.Thesis.ATLAS_ITk.X2, recursive=True, overwrite=True)
+    #
+    #
+    # with tb.open_file(R11_SCAN_FILE, "a") as h5_file:
+    #     generate_pixel_dimensions(h5_file.root.Reference.R1)
+    #     old_sensor = h5_file.root.Reference.R11
+    #     for group in old_sensor._f_iter_nodes():
+    #         if not isinstance(group, tb.Group):
+    #             continue
+    #         if group == old_sensor:
+    #             continue
+    #         if group._v_name == "C_V_Characteristic_refined":
+    #             continue
+    #         if group._v_name == "I_V_Characteristic":
+    #             continue
+    #         print(group)
+    #         h5_file.copy_node(where=old_sensor, name=group._v_name,
+    #                           newname=group._v_name,
+    #                           newparent=h5_file.root.Reference.R1, recursive=True, overwrite=True)
+    #
+    #     physical_dimensions = h5_file.root.Reference.R1.sensor.PhysicalDimensions[:]
+    #     physical_dimensions[:, :] = np.asarray([6, 81], dtype=np.float64)
+    #     physical_dimensions[:, 0] = np.nan
+    #     h5_file.root.Reference.R1.sensor.PhysicalDimensions[:] = physical_dimensions
+    #     h5_file.root.Reference.R1.sensor.PhysicalDimensions.flush()
 
-    with tb.open_file(X2_SCAN_2_FILE, "a") as h5_file:
-        # generate_bias_table(h5_file.root.ATLAS_ITk.X2.I_V_Characteristic.biasing.measurements)
-        generate_bias_table(h5_file.root.ATLAS_ITk.X2.C_V_Characteristic_refined.biasing.measurements)
-        regenerate_c_v_errors(h5_file.root.ATLAS_ITk.X2.C_V_Characteristic_refined.biasing.measurements)
-        generate_pixel_dimensions(h5_file.root.ATLAS_ITk.X2)
-        h5_file.root.ATLAS_ITk.X2.C_V_Characteristic_refined.biasing.measurements.BiasVoltageHist.attrs["Units"] = "V"
-        old_x2 = h5_file.root.ATLAS_ITk.X2
-        assert isinstance(old_x2, tb.Group)
-        for group in old_x2._f_iter_nodes():
-            if not isinstance(group, tb.Group):
-                continue
-            if group == old_x2:
-                continue
-            print(group)
-            h5_file.copy_node(where=old_x2, name=group._v_name,
-                              newname=group._v_name,
-                              newparent=h5_file.root.Thesis.ATLAS_ITk.X2, recursive=True, overwrite=True)
+    # with tb.open_file("packaged/data/R13_2_Scan.h5", "a") as h5_file:
+    #     h5_file.copy_children(h5_file.root.ATLAS_ITk.X2, h5_file.root.Reference.R13, recursive=True, overwrite=True)
+    #     h5_file.flush()
+    #     with tb.open_file(R13_2_SCAN_FILE, "a") as second_file:
+    #         h5_file.copy_children(h5_file.root, second_file.root, recursive=True, overwrite=True)
+    #
+    # with tb.open_file("packaged/data/R13_3_Scan.h5", "a") as h5_file:
+    #     with tb.open_file(R13_2_SCAN_FILE, "a") as second_file:
+    #         h5_file.copy_children(h5_file.root.Reference.R13, second_file.root.Reference.R13, recursive=True, overwrite=True)
+    #
+    # with tb.open_file(R13_2_SCAN_FILE, 'a') as h5_file:
+    #     generate_pixel_dimensions(h5_file.root.Reference.R13, 30)
+    #     generate_bias_table(h5_file.root.Reference.R13.C_V_Characteristic_refined.biasing.measurements)
+    #     regenerate_c_v_errors(h5_file.root.Reference.R13.C_V_Characteristic_refined.biasing.measurements)
+    #     regenerate_inter_pix_errors(h5_file.root.Reference.R13.inter_unbiased_full.inter_cap.measurements)
+    #     regenerate_inter_pix_errors(h5_file.root.Reference.R13.inter_biased_M_80_V_full.inter_cap.measurements)
+    #
+    #     with tb.open_file(X2_SCAN_2_FILE, 'a') as old_file:
+    #         old_file.copy_node(where=old_file.root.Reference.R13, newparent=h5_file.root.Reference.R13,
+    #                            name="inter_unbiased_full_renew_Extended",
+    #                            newname="inter_unbiased_renew_Extended_full", recursive=True, overwrite=True)
+    #         old_file.copy_node(where=old_file.root.Reference.R13, newparent=h5_file.root.Reference.R13,
+    #                            name="inter_biased_M_80_V_full_renew_Extended",
+    #                            newname="inter_biased_M_80_V_renew_Extended_full", recursive=True, overwrite=True)
 
-        with tb.open_file("packaged/data/X2_12_Renew_Scan.h5") as backing_file:
-            backing_file.copy_children(backing_file.root.Thesis.ATLAS_ITk.X2, h5_file.root.Thesis.ATLAS_ITk.X2, recursive=True, overwrite=True)
-
-
-    with tb.open_file(R11_SCAN_FILE, "a") as h5_file:
-        generate_pixel_dimensions(h5_file.root.Reference.R1)
-        old_sensor = h5_file.root.Reference.R11
-        for group in old_sensor._f_iter_nodes():
-            if not isinstance(group, tb.Group):
-                continue
-            if group == old_sensor:
-                continue
-            if group._v_name == "C_V_Characteristic_refined":
-                continue
-            if group._v_name == "I_V_Characteristic":
-                continue
-            print(group)
-            h5_file.copy_node(where=old_sensor, name=group._v_name,
-                              newname=group._v_name,
-                              newparent=h5_file.root.Reference.R1, recursive=True, overwrite=True)
-
-        physical_dimensions = h5_file.root.Reference.R1.sensor.PhysicalDimensions[:]
-        physical_dimensions[:, :] = np.asarray([8, 81], dtype=np.float64)
-        physical_dimensions[:, 0] = np.nan
-        h5_file.root.Reference.R1.sensor.PhysicalDimensions[:] = physical_dimensions
-        h5_file.root.Reference.R1.sensor.PhysicalDimensions.flush()
-
-    with tb.open_file("packaged/data/R13_2_Scan.h5", "a") as h5_file:
-        h5_file.copy_children(h5_file.root.ATLAS_ITk.X2, h5_file.root.Reference.R13, recursive=True, overwrite=True)
-        h5_file.flush()
-        with tb.open_file(R13_2_SCAN_FILE, "a") as second_file:
-            h5_file.copy_children(h5_file.root, second_file.root, recursive=True, overwrite=True)
-
-    with tb.open_file("packaged/data/R13_3_Scan.h5", "a") as h5_file:
-        with tb.open_file(R13_2_SCAN_FILE, "a") as second_file:
-            h5_file.copy_children(h5_file.root.Reference.R13, second_file.root.Reference.R13, recursive=True, overwrite=True)
-
-    with tb.open_file(R13_2_SCAN_FILE, 'a') as h5_file:
-        generate_pixel_dimensions(h5_file.root.Reference.R13, 30)
-        generate_bias_table(h5_file.root.Reference.R13.C_V_Characteristic_refined.biasing.measurements)
-        regenerate_c_v_errors(h5_file.root.Reference.R13.C_V_Characteristic_refined.biasing.measurements)
-        regenerate_inter_pix_errors(h5_file.root.Reference.R13.inter_unbiased_full.inter_cap.measurements)
-        regenerate_inter_pix_errors(h5_file.root.Reference.R13.inter_biased_M_80_V_full.inter_cap.measurements)
-
-    with tb.open_file(E1_2_SCAN_FILE, "a") as h5_file:
-        generate_pixel_dimensions(h5_file.root.Reference.E1)
-        physical_dimensions = h5_file.root.Reference.E1.sensor.PhysicalDimensions[:]
-        physical_dimensions[:, 0] = np.nan
-        for key, region in data_constants.e1_pixel_groups.items():
-            for col_range, row_range in zip(region["columns"], region["rows"]):
-                physical_dimensions[col_range[0]:col_range[1], row_range[0]:row_range[1]] = [data_constants.e1_pixel_dimensions[key],
-                                                                                             data_constants.e1_pixel_dimensions[key]]
-
-        h5_file.root.Reference.E1.sensor.PhysicalDimensions[:] = physical_dimensions
-        h5_file.root.Reference.E1.sensor.PhysicalDimensions.flush()
-
-        # still need to generate all the measurement errors
-        regenerate_c_v_errors(h5_file.root.Reference.E1.C_V_Characteristic_refined.biasing.measurements)
-        regenerate_inter_pix_errors(h5_file.root.Reference.E1.inter_unbiased_full.inter_cap.measurements)
-        regenerate_inter_pix_errors(h5_file.root.Reference.E1.inter_biased_M_80_V_full.inter_cap.measurements)
-
-        split_sensor_group(h5_file.root.Reference.E1.inter_biased_M_80_V_full)
-        split_sensor_group(h5_file.root.Reference.E1.C_V_Characteristic_refined)
-        split_sensor_group(h5_file.root.Reference.E1.biased_80_V_full)
-        split_sensor_group(h5_file.root.Reference.E1.unbiased_full)
-        split_sensor_group(h5_file.root.Reference.E1.inter_unbiased_full)
+    # with tb.open_file(E1_2_SCAN_FILE, "a") as h5_file:
+    #     generate_pixel_dimensions(h5_file.root.Reference.E1)
+    #     physical_dimensions = h5_file.root.Reference.E1.sensor.PhysicalDimensions[:]
+    #     physical_dimensions[:, 0] = np.nan
+    #     for key, region in data_constants.e1_pixel_groups.items():
+    #         for col_range, row_range in zip(region["columns"], region["rows"]):
+    #             physical_dimensions[col_range[0]:col_range[1], row_range[0]:row_range[1]] = [data_constants.e1_pixel_dimensions[key],
+    #                                                                                          data_constants.e1_pixel_dimensions[key]]
+    #
+    #     h5_file.root.Reference.E1.sensor.PhysicalDimensions[:] = physical_dimensions
+    #     h5_file.root.Reference.E1.sensor.PhysicalDimensions.flush()
+    #
+    #     # still need to generate all the measurement errors
+    #     regenerate_c_v_errors(h5_file.root.Reference.E1.C_V_Characteristic_refined.biasing.measurements)
+    #     regenerate_inter_pix_errors(h5_file.root.Reference.E1.inter_unbiased_full.inter_cap.measurements)
+    #     regenerate_inter_pix_errors(h5_file.root.Reference.E1.inter_biased_M_80_V_full.inter_cap.measurements)
+    #
+    #     split_sensor_group(h5_file.root.Reference.E1.inter_biased_M_80_V_full)
+    #     split_sensor_group(h5_file.root.Reference.E1.C_V_Characteristic_refined)
+    #     split_sensor_group(h5_file.root.Reference.E1.biased_80_V_full)
+    #     split_sensor_group(h5_file.root.Reference.E1.unbiased_full)
+    #     split_sensor_group(h5_file.root.Reference.E1.inter_unbiased_full)
+    #
+    # with tb.open_file(X4_SCAN_FILE, "a") as h5_file:
+    #     generate_pixel_dimensions(h5_file.root.Thesis.ATLAS_ITk.X4)
+    #     h5_file.copy_node(where=h5_file.root.Thesis.ATLAS_ITk.X4, name="inter_unbiased_full_Extended_Second",
+    #                       newname="inter_unbiased_full", overwrite=True, recursive=True)
+    #     h5_file.copy_node(where=h5_file.root.Thesis.ATLAS_ITk.X4, name="inter_biased_M_80_V_full_Extended",
+    #                       newname="inter_biased_M_80_V_full", overwrite=True, recursive=True)
 
     with tb.open_file(X5_SCAN_FILE, "a") as h5_file:
         generate_pixel_dimensions(h5_file.root.Thesis.ATLAS_ITk.X5)
 
-    with tb.open_file(X6_SCAN_FILE, "a") as h5_file:
-        wrong_parent = h5_file.root.Thesis.ATLAS_ITk.X7
-        right_parent = h5_file.root.Thesis.ATLAS_ITk.X6
-        if "inter_unbiased_full" in wrong_parent:
-            h5_file.move_node(where=wrong_parent, name="inter_unbiased_full", newparent=right_parent,)
-            h5_file.move_node(where=wrong_parent, name="inter_biased_M_45.0_V_full", newparent=right_parent, newname="inter_biased_M_45_V_full")
-            h5_file.move_node(where=wrong_parent, name="biased_45.0_V_full", newparent=right_parent, newname="biased_45_V_full")
-            h5_file.move_node(where=wrong_parent, name="C_V_Characteristic_refined", newparent=right_parent, overwrite=True)
-
-        generate_pixel_dimensions(h5_file.root.Thesis.ATLAS_ITk.X6)
-
-    with tb.open_file(X7_SCAN_FILE, 'a') as h5_file:
-        generate_pixel_dimensions(h5_file.root.Thesis.ATLAS_ITk.X7)
+    # with tb.open_file(X6_SCAN_FILE, "a") as h5_file:
+    #     wrong_parent = h5_file.root.Thesis.ATLAS_ITk.X7
+    #     right_parent = h5_file.root.Thesis.ATLAS_ITk.X6
+    #     if "inter_unbiased_full" in wrong_parent:
+    #         h5_file.move_node(where=wrong_parent, name="inter_unbiased_full", newparent=right_parent,)
+    #         h5_file.move_node(where=wrong_parent, name="inter_biased_M_45.0_V_full", newparent=right_parent, newname="inter_biased_M_45_V_full")
+    #         h5_file.move_node(where=wrong_parent, name="biased_45.0_V_full", newparent=right_parent, newname="biased_45_V_full")
+    #         h5_file.move_node(where=wrong_parent, name="C_V_Characteristic_refined", newparent=right_parent, overwrite=True)
+    #
+    #     generate_pixel_dimensions(h5_file.root.Thesis.ATLAS_ITk.X6)
+    #
+    # with tb.open_file(X7_SCAN_FILE, 'a') as h5_file:
+    #     generate_pixel_dimensions(h5_file.root.Thesis.ATLAS_ITk.X7)
 
     # When have I repaired all the implementations.
     # All the first try measurement series needs to consolidated and their entries needs to be adjusted for the new formats

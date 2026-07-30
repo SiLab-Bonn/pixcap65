@@ -65,6 +65,8 @@ def set_params(fig_width=None, fig_height=None, columns=1, fontsize=8, dpi=300,
         'axes.labelsize': fontsize,
         'axes.titlesize': 1.2 * fontsize,
         'axes.prop_cycle': cc,
+        'axes.formatter.use_locale': True,
+        'axes.unicode_minus': False,
         'font.size': fontsize,
         'legend.fontsize': fontsize,
         'legend.frameon': False,
@@ -90,7 +92,6 @@ def set_params(fig_width=None, fig_height=None, columns=1, fontsize=8, dpi=300,
     latex_preamble += r'\usepackage{newtxtext}'
     latex_preamble += r'\usepackage{newtxmath}'
     latex_preamble += r'\usepackage[utf8]{inputenc}\usepackage[T1]{fontenc}'
-    latex_preamble += r'\usepackage{}'
     if latex_extra: latex_preamble += latex_extra
     latex_params = {'text.usetex': latex,
                     'text.latex.preamble': latex_preamble,
@@ -168,5 +169,19 @@ def enhanced_error_bar(ax: matplotlib.axes.Axes, *args, **kwargs):
     with homo_lock:
         current_cycle_data[h] = current_cycle_idx
     return result
+
+def close_figure(figs):
+    from matplotlib import pyplot as plt
+    import numpy as np
+    figs = np.atleast_1d(figs)
+    for fig in figs:
+        # need to check the axis of this figure and wether they are a key for our special dict.
+        for ax in fig.get_axes():
+            key = hash(ax)
+            with homo_lock:
+                if key in current_cycle_data:
+                    del current_cycle_data[key]
+        plt.close(fig)
+
 
 

@@ -17,6 +17,8 @@ logger = logging.getLogger(__name__)
 # region Analysis constants
 GENERAL_TRANSFORMATION_MATRIX = np.array(
     [[1.e-12, 1.e-6, 1.e3, 1.e-6], [1.e-6, 1, 1.e9, 1], [1.e3, 1.e9, 1.e18, 1.e9], [1.e-6, 1, 1.e9, 1]])
+GENERAL_TRANSFORMATION_MATRIX_TAU = np.array(
+    [[1.e-12, 1.e-6, 1.e3, 1.e-6, 1e-6], [1.e-6, 1, 1.e9, 1, 1], [1.e3, 1.e9, 1.e18, 1.e9, 1e9], [1.e-6, 1, 1.e9, 1, 1], [1e-6, 1, 1.e9, 1, 1]])
 ANALYSIS_GROUP_NAME = "analysis"
 ANALYSIS_CORRECTED_GROUP_NAME = "analysis_correction"
 TABLES_ARRAY_TYPE = Union[np.ndarray, tb.CArray]
@@ -82,6 +84,12 @@ def transform_covariance(cov):
             mask = np.array([[True, True, True, False], [True, True, True, False], [True, True, True, False],
                              [False, False, False, False]])
             return cov[mask].reshape((3, 3)) * GENERAL_TRANSFORMATION_MATRIX[mask].reshape((3, 3))
+        case (5, 5):
+            assert cov.shape == (5, 5)
+            # here it is necessary to reduce the parts from the covariance of u0 to
+            mask = np.array([[True, True, True, False, True], [True, True, True, False, True], [True, True, True, False, True],
+                             [False, False, False, False, False], [True, True, True, False, True]])
+            return cov[mask].reshape((4, 4)) * GENERAL_TRANSFORMATION_MATRIX_TAU[mask].reshape((4, 4))
         case _:
             raise ValueError(
                 "The dimension of the covariance matrix does not fit to any of the fitting functions and their "
@@ -176,7 +184,7 @@ def handle_kafe2_advanced_options(fit_object, apply_contour, x_label, y_label, t
             elif fit_title is not None:
                 fig.suptitle(fit_title, fontsize=20)
             ax.set_title(title)
-            ax.text(0, 0.9, f"Fit with cost={conv_invest['x']:.4f} and \np={conv_invest['p']:.4f}",
+            ax.text(0, 0.9, f"Fit with cost={conv_invest['x']:.4n} and \np={conv_invest['p']:.4n}",
                     transform=ax.transAxes)
             break
         pdf.savefig(fig, bbox_inches='tight')
@@ -232,9 +240,9 @@ def handle_minuit_advanced_options(fit_object, apply_contour, x_label, y_label, 
     conv_result = investigate_fit_convergence(fit_object)
     model_parameters = ""
     for key, value in fit_object.values.to_dict().items():
-        model_parameters += f"{key} = {value:.4g}\n"
+        model_parameters += f"{key} = \\num{{{value:.4f}}}\n"
     ax.legend(["model", "data"],
-              title=f"{model_parameters}\nGoF={conv_result['x']:.4f} / ndf={conv_result['ndf']} = {conv_result["xn"]:.4f}\np={conv_result['p']:.4f}",
+              title=f"{model_parameters}\nGoF={conv_result['x']:.4n} / ndf={conv_result['ndf']:n} = {conv_result["xn"]:.4n}\np={conv_result['p']:.4n}",
               frameon=False)
 
     # for error bands we must perform something similar

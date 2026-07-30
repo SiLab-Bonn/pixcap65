@@ -65,8 +65,9 @@ advanced = [
 visualization = [
     "pyqt5",
     "vitables",
-    "matplotlib",
+    "matplotlib<=3.10.9",
     "pycairo",
+    "mpld3"
 ]
 docs = [
     "sphinxcontrib-blockdiag",
@@ -140,6 +141,7 @@ package = false
 
 [tool.uv.sources]
 basil-daq = { path = "../basil-pixcap", editable = true }
+smoda-fitter = { path = "../Smoda_2025_Final_Project_Temp", editable = true }
 
 [tool.uv.build-backend]
 module-name = "pixcap65"
@@ -153,4 +155,5 @@ modelling = [
     "iminuit>=1.4.9",
     "numdifftools>=0.9.41",
     "numpy>=1.16.6",
+    "scikit-learn>=0.21.0",
 ]

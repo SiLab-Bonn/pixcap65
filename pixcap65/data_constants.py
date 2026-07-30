@@ -3,10 +3,12 @@
 #   All rights reserved
 #  SiLab, Institute of Physics, University of Bonn
 # ----------------------------------------------------------
+import numpy as np
 
 X1_SCAN_2_FILE = "packaged/data/X1_4_Renew_Scan.h5"
 X2_SCAN_FILE = 'New_2_Scan.h5'
 X2_SCAN_2_FILE = "packaged/data/X2_2_Scan.h5"
+X4_SCAN_FILE = "packaged/data/3D_Sensor_221_W5_S_Scan.h5"
 X5_SCAN_FILE = "packaged/data/3D_Sensor_221_W6_J_Scan.h5"
 X6_SCAN_FILE = "packaged/data/3D_Sensor_I14_S24_Full_Scan.h5"
 X7_SCAN_FILE = "packaged/data/3D_Sensor_H23_S24_Full_Scan.h5"
@@ -17,6 +19,15 @@ R13_2_SCAN_FILE = "packaged/R13_Renew_Scan.h5"
 R11_SCAN_FILE = "packaged/data/R11_R1_RX_Scan.h5"
 
 x1_second_pixel_mask = [[39, 39], [38, 39]]
+x4_pixel_mask_temp = np.load("x4_mask.npy")
+x4_pixel_mask = []
+for entry in x4_pixel_mask_temp:
+    x4_pixel_mask.append([*entry])
+
+x4_pixel_mask.append([1, 3])
+x4_pixel_mask.append([1, 2])
+x4_pixel_mask.append([2, 3])
+x4_pixel_mask.append([2, 4])
 x5_second_pixel_mask = [
     [0, 39],
     [0, 38],
@@ -55,6 +66,10 @@ x5_second_pixel_mask = [
     [10, 39],
     [37, 39],
 ]
+x5_pixel_mask_temp = np.load("x5_mask.npy")
+x5_pixel_mask = x5_second_pixel_mask.copy()
+for entry in x4_pixel_mask_temp:
+    x5_pixel_mask.append([*entry])
 x6_second_pixel_mask = [
     [0, 38],
 ]
@@ -117,7 +132,7 @@ e1_pixel_dimensions = {
 e1_pixel_depletion_args = {
     "dnw30_50": {
         "first_boundaries": (-100, -25),
-        "second_boundaries": (-4, 0),
+        "second_boundaries": (-7, -2),
         "distribution": True,
         "apply_contour": False,
         "apply_contours": False,
@@ -127,7 +142,7 @@ e1_pixel_depletion_args = {
     },
     "nw15_50": {
         "first_boundaries": (-100, -30),
-        "second_boundaries": (-2.5, 0),
+        "second_boundaries": (-15, -2.5),
         "distribution": True,
         "apply_contour": False,
         "apply_contours": False,
@@ -137,7 +152,7 @@ e1_pixel_depletion_args = {
     },
     "nw20_50": {
         "first_boundaries": (-100, -30),
-        "second_boundaries": (-2.5, 0),
+        "second_boundaries": (-17.5, -2.5),
         "distribution": True,
         "apply_contour": False,
         "apply_contours": False,
@@ -147,7 +162,7 @@ e1_pixel_depletion_args = {
     },
     "nw25_50": {
         "first_boundaries": (-100, -30),
-        "second_boundaries": (-3, 0),
+        "second_boundaries": (-10, -2),
         "distribution": True,
         "apply_contour": False,
         "apply_contours": False,
@@ -157,7 +172,7 @@ e1_pixel_depletion_args = {
     },
     "nw30_50": {
         "first_boundaries": (-100, -25),
-        "second_boundaries": (-4, 0),
+        "second_boundaries": (-10, -2),
         "distribution": True,
         "apply_contour": False,
         "apply_contours": False,
@@ -167,7 +182,7 @@ e1_pixel_depletion_args = {
     },
     "dnw15_50": {
         "first_boundaries": (-100, -40),
-        "second_boundaries": (-5, 0),
+        "second_boundaries": (-12, -2),
         "distribution": True,
         "apply_contour": False,
         "apply_contours": False,
@@ -177,7 +192,7 @@ e1_pixel_depletion_args = {
     },
     "dnw20_50": {
         "first_boundaries": (-100, -40),
-        "second_boundaries": (-2.8, 0),
+        "second_boundaries": (-12, -3),
         "distribution": True,
         "apply_contour": False,
         "apply_contours": False,
@@ -187,7 +202,7 @@ e1_pixel_depletion_args = {
     },
     "dnw25_50": {
         "first_boundaries": (-100, -25),
-        "second_boundaries": (-5, 0),
+        "second_boundaries": (-11, -2),
         "distribution": True,
         "apply_contour": False,
         "apply_contours": False,
@@ -196,3 +211,5 @@ e1_pixel_depletion_args = {
         "chip_group_name": "Reference/E1/sensor",
     },
 }
+
+# multiprocessing_key = b"\x1f\xb8MC3\xf8@7\x11\x9fh7,\x11\xb5\xd4JI\x06e\xdc<b\x0f\x92\x04\xb9C\xfb\xb0\xc8\xa2"
