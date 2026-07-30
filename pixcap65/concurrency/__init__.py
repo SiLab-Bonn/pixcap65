@@ -36,6 +36,9 @@ def get_manager(**kwargs):
     with __manager_handling_lock:
         global __manager
         if __manager is None:
+            # if "address" in kwargs and not "authkey" in kwargs:
+            #     from pixcap65.data_constants import multiprocessing_key
+            #     kwargs["authkey"] = multiprocessing_key
             __manager = ExtendedSyncManager(**kwargs)
             if "address" in kwargs:
                 __manager.connect()
@@ -108,5 +111,11 @@ except ImportError:
 def initialize_worker_manager(**kwargs):
     _ = get_manager(**kwargs)
 
-
+# we need to make sure that also our primary manager could be equipped with the relevant data store objects to only
+# start a single manager when to perform all our tasks
+# from pixcap65.analysis_util.data_store import NumpyProxy, DepletionArrayStore, DepletionArrayStoreProxy, register_proxy
+# import numpy as np
+# ExtendedSyncManager.register('full', np.full, NumpyProxy)
+# register_proxy("DepletionArrayStorage", DepletionArrayStore, DepletionArrayStoreProxy,
+#                ExtendedSyncManager)
 

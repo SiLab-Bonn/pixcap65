@@ -1,3 +1,4 @@
+import locale
 import numpy as np
 import tables as tb
 from collections.abc import Iterable, Mapping, Callable
@@ -103,96 +104,96 @@ def enhanced_logical_or(*args):
 
 def generate_siunitx(data_set: np.recarray, depletion=False) -> str:
     if depletion:
-        test_format = "{:.3g}".format(data_set.dep_voltage_err)
+        test_format = "{:.3g}".format(data_set.stat_error)
         _, text_n_digits = test_format.removeprefix('-').split('.', 1)
         n_digits = len(text_n_digits)
-        return SECOND_GENERAL_PART.format(n_digits).format(data_set.dep_voltage,
-                                                           int(data_set.dep_voltage_err * 10 ** n_digits),
-                                                           int(data_set.dep_voltage_systematic_general * 10 ** n_digits),
-                                                           int(data_set.dep_voltage_systematic_dispersion * 10 ** n_digits), )
+        return SECOND_GENERAL_PART.format(n_digits).format(data_set.magnitude,
+                                                           int(data_set.stat_error * 10 ** n_digits),
+                                                           int(data_set.systematic_general * 10 ** n_digits),
+                                                           int(data_set.systematic_dispersion * 10 ** n_digits), )
 
         # old approach
-        # test_format = GENERAL_TEST_FORMAT.format(data_set.dep_voltage)
+        # test_format = GENERAL_TEST_FORMAT.format(data_set.magnitude)
         # int_part, _ = test_format.removeprefix('-').split('.', 1)
         # sig = GENERAL_PREC if int(int_part) == 0 else GENERAL_PREC + len(int_part)
-        # return GENERAL_PART.format(sig).format(data_set.dep_voltage,
-        #                                     int(data_set.dep_voltage_err * GENERAL_UNCERT_MULTIPLIER),
-        #                                     int(data_set.dep_voltage_systematic_general * GENERAL_UNCERT_MULTIPLIER),
-        #                                     int(data_set.dep_voltage_systematic_dispersion * GENERAL_UNCERT_MULTIPLIER), "\\volt")
+        # return GENERAL_PART.format(sig).format(data_set.magnitude,
+        #                                     int(data_set.stat_error * GENERAL_UNCERT_MULTIPLIER),
+        #                                     int(data_set.systematic_general * GENERAL_UNCERT_MULTIPLIER),
+        #                                     int(data_set.systematic_dispersion * GENERAL_UNCERT_MULTIPLIER), "\\volt")
     else:
-        if np.isnan(data_set.capacitance):
+        if np.isnan(data_set.magnitude):
             return "\\text{k.A.}"
 
-        test_format = "{:.3g}".format(data_set.capacitance_err)
+        test_format = "{:.3g}".format(data_set.stat_error)
         _, text_n_digits = test_format.removeprefix('-').split('.', 1)
         n_digits = len(text_n_digits)
-        return SECOND_GENERAL_PART.format(n_digits).format(data_set.capacitance,
-                                                           int(data_set.capacitance_err * 10 ** n_digits),
-                                                           int(data_set.capacitance_systematic_general * 10 ** n_digits),
-                                                           int(data_set.capacitance_systematic_dispersion * 10 ** n_digits), )
+        return SECOND_GENERAL_PART.format(n_digits).format(data_set.magnitude,
+                                                           int(data_set.stat_error * 10 ** n_digits),
+                                                           int(data_set.systematic_general * 10 ** n_digits),
+                                                           int(data_set.systematic_dispersion * 10 ** n_digits), )
 
         # old approach
-        # test_format = GENERAL_TEST_FORMAT.format(data_set.capacitance)
+        # test_format = GENERAL_TEST_FORMAT.format(data_set.magnitude)
         # int_part, _ = test_format.removeprefix('-').split('.', 1)
         # sig = GENERAL_PREC if int(int_part) == 0 else GENERAL_PREC + len(int_part)
-        # return GENERAL_PART.format(sig).format(data_set.capacitance,
-        #                                        int(data_set.capacitance_err * GENERAL_UNCERT_MULTIPLIER),
-        #                                        int(data_set.capacitance_systematic_general * GENERAL_UNCERT_MULTIPLIER),
-        #                                        int(data_set.capacitance_systematic_dispersion * GENERAL_UNCERT_MULTIPLIER), "\\femto\\farad")
+        # return GENERAL_PART.format(sig).format(data_set.magnitude,
+        #                                        int(data_set.stat_error * GENERAL_UNCERT_MULTIPLIER),
+        #                                        int(data_set.systematic_general * GENERAL_UNCERT_MULTIPLIER),
+        #                                        int(data_set.systematic_dispersion * GENERAL_UNCERT_MULTIPLIER), "\\femto\\farad")
 
 def generate_siunitx_2(data_set: np.recarray, depletion=False) -> str:
     if depletion:
-        return GENERAL_SIUNITX_FORMAT_2.format(data_set.dep_voltage,
-                                               data_set.dep_voltage_err,
-                                               data_set.dep_voltage_systematic_general,
-                                               data_set.dep_voltage_systematic_dispersion, "\\volt")
+        return GENERAL_SIUNITX_FORMAT_2.format(data_set.magnitude,
+                                               data_set.stat_error,
+                                               data_set.systematic_general,
+                                               data_set.systematic_dispersion, "\\volt")
     else:
-        if np.isnan(data_set.capacitance):
+        if np.isnan(data_set.magnitude):
             return "\\text{k.A.}"
-        return GENERAL_SIUNITX_FORMAT_2.format(data_set.capacitance,
-                                               data_set.capacitance_err,
-                                               data_set.capacitance_systematic_general,
-                                               data_set.capacitance_systematic_dispersion, "\\femto\\farad")
+        return GENERAL_SIUNITX_FORMAT_2.format(data_set.magnitude,
+                                               data_set.stat_error,
+                                               data_set.systematic_general,
+                                               data_set.systematic_dispersion, "\\femto\\farad")
 
 def generate_siunitx_3(data_set: np.recarray, depletion=False) -> str:
     if depletion:
-        test_format = "{:.3g}".format(data_set.dep_voltage_err)
+        test_format = "{:.3g}".format(data_set.stat_error)
         _, text_n_digits = test_format.removeprefix('-').split('.', 1)
         n_digits = len(text_n_digits)
-        return THIRD_GENERAL_PART.format(n_digits).format(data_set.dep_voltage,
-                                                           int(data_set.dep_voltage_err * 10 ** n_digits),
-                                                           int(data_set.dep_voltage_systematic_general * 10 ** n_digits),
-                                                           int(data_set.dep_voltage_systematic_dispersion * 10 ** n_digits), )
+        return THIRD_GENERAL_PART.format(n_digits).format(data_set.magnitude,
+                                                           int(data_set.stat_error * 10 ** n_digits),
+                                                           int(data_set.systematic_general * 10 ** n_digits),
+                                                           int(data_set.systematic_dispersion * 10 ** n_digits), )
 
         # old approach
-        # test_format = GENERAL_TEST_FORMAT.format(data_set.dep_voltage)
+        # test_format = GENERAL_TEST_FORMAT.format(data_set.magnitude)
         # int_part, _ = test_format.removeprefix('-').split('.', 1)
         # sig = GENERAL_PREC if int(int_part) == 0 else GENERAL_PREC + len(int_part)
-        # return GENERAL_PART.format(sig).format(data_set.dep_voltage,
-        #                                     int(data_set.dep_voltage_err * GENERAL_UNCERT_MULTIPLIER),
-        #                                     int(data_set.dep_voltage_systematic_general * GENERAL_UNCERT_MULTIPLIER),
-        #                                     int(data_set.dep_voltage_systematic_dispersion * GENERAL_UNCERT_MULTIPLIER), "\\volt")
+        # return GENERAL_PART.format(sig).format(data_set.magnitude,
+        #                                     int(data_set.stat_error * GENERAL_UNCERT_MULTIPLIER),
+        #                                     int(data_set.systematic_general * GENERAL_UNCERT_MULTIPLIER),
+        #                                     int(data_set.systematic_dispersion * GENERAL_UNCERT_MULTIPLIER), "\\volt")
     else:
-        if np.isnan(data_set.capacitance):
+        if np.isnan(data_set.magnitude):
             # TODO: könnte man hier auch direkt 'k.A.' raus machen?
             return "\\text{k.A.}"
 
-        test_format = "{:.3g}".format(data_set.capacitance_err)
+        test_format = "{:.3g}".format(data_set.stat_error)
         _, text_n_digits = test_format.removeprefix('-').split('.', 1)
         n_digits = len(text_n_digits)
-        return THIRD_GENERAL_PART.format(n_digits).format(data_set.capacitance,
-                                                           int(data_set.capacitance_err * 10 ** n_digits),
-                                                           int(data_set.capacitance_systematic_general * 10 ** n_digits),
-                                                           int(data_set.capacitance_systematic_dispersion * 10 ** n_digits), )
+        return THIRD_GENERAL_PART.format(n_digits).format(data_set.magnitude,
+                                                           int(data_set.stat_error * 10 ** n_digits),
+                                                           int(data_set.systematic_general * 10 ** n_digits),
+                                                           int(data_set.systematic_dispersion * 10 ** n_digits), )
 
         # old approach
-        # test_format = GENERAL_TEST_FORMAT.format(data_set.capacitance)
+        # test_format = GENERAL_TEST_FORMAT.format(data_set.magnitude)
         # int_part, _ = test_format.removeprefix('-').split('.', 1)
         # sig = GENERAL_PREC if int(int_part) == 0 else GENERAL_PREC + len(int_part)
-        # return GENERAL_PART.format(sig).format(data_set.capacitance,
-        #                                        int(data_set.capacitance_err * GENERAL_UNCERT_MULTIPLIER),
-        #                                        int(data_set.capacitance_systematic_general * GENERAL_UNCERT_MULTIPLIER),
-        #                                        int(data_set.capacitance_systematic_dispersion * GENERAL_UNCERT_MULTIPLIER), "\\femto\\farad")
+        # return GENERAL_PART.format(sig).format(data_set.magnitude,
+        #                                        int(data_set.stat_error * GENERAL_UNCERT_MULTIPLIER),
+        #                                        int(data_set.systematic_general * GENERAL_UNCERT_MULTIPLIER),
+        #                                        int(data_set.systematic_dispersion * GENERAL_UNCERT_MULTIPLIER), "\\femto\\farad")
 
 def read_rec_array(table: tb.Table, *args, **kwargs) -> np.recarray:
     return np.rec.array(table.read(*args, **kwargs), dtype=table.dtype)
@@ -217,18 +218,39 @@ def investigate_dependences_graphical(summary_data: np.recarray, property_data: 
     plotter("Dependencies-log-log.pdf", spatial_mask, interesting_data, summary_data, property_data,
             scalex='log', scaley='log', **keys)
 
+
+def get_test_capacitance_data_correction(group: tb.Group, **kwargs):
+    locale.setlocale(locale.LC_NUMERIC, "DE")
+    table = read_rec_array(group.TestCapCorrected)
+    capacitances = [item for item in table.dtype.names if item != "sensor" and not item.endswith('_error')]
+    exclusion_list = kwargs.get("exlusion_list", [])
+    if kwargs.get("print_result", True):
+        for sensor in np.strings.decode(table.sensor):
+            if sensor in exclusion_list:
+                continue
+            record = table[sensor]
+            print("handling now the test capacitances for board", sensor)
+            for k, cap_name in enumerate(capacitances):
+                cap = record[cap_name]
+                err = record[cap_name + "_error"]
+                eff_cap = cap * 1e15
+                eff_err = err * 1e15
+                print(k, f"{eff_cap:.3n}+-{eff_err:.3n}")
+
+
+
 def __dependence_fit(spatial_mask, properties: np.recarray, y_data_set: np.recarray, model_name, model: Callable, condition: Optional[Callable]=None, systematic=True, x_log=False, y_log=False):
     if condition is None:
         mask = np.logical_not(spatial_mask)
     else:
-        mask = np.logical_and(np.logical_not(spatial_mask), condition(y_data_set.capacitance))
+        mask = np.logical_and(np.logical_not(spatial_mask), condition(y_data_set.magnitude))
 
     x_data = properties[key][mask]
-    y_data = y_data_set.capacitance[mask]
+    y_data = y_data_set.magnitude[mask]
     if systematic:
-        y_error = y_data_set.capacitance_systematic_dispersion[mask]
+        y_error = y_data_set.systematic_dispersion[mask]
     else:
-        y_error = y_data_set.capacitance_err[mask]
+        y_error = y_data_set.stat_error[mask]
 
     if x_log:
         x_data = np.log(x_data)
@@ -246,10 +268,10 @@ def investigate_dependencies_fitting(summary_data: np.recarray, property_data: n
         if total_model is not None:
             mask = np.logical_not(spatial_mask)
             x_data = property_data[key][mask]
-            y_data = summary_data.biased_capacitance.capacitance[mask]
-            y_error = summary_data.biased_capacitance.capacitance_systematic_dispersion[mask]
+            y_data = summary_data.biased_capacitance.magnitude[mask]
+            y_error = summary_data.biased_capacitance.systematic_dispersion[mask]
             if x_log:
-                x_data = np.where(x_data>0, np.log(x_data), 0)
+                x_data = np.where(x_data > 0, np.log(x_data), 0)
             if y_log:
                 y_error = y_error / y_data
                 y_data = np.where(y_data > 0, np.log(y_data), 0)
@@ -257,10 +279,10 @@ def investigate_dependencies_fitting(summary_data: np.recarray, property_data: n
 
         if inter_model is not None:
             mask = np.logical_and(np.logical_not(spatial_mask), np.isfinite(
-                summary_data.biased_inter_capacitance.capacitance))
+                summary_data.biased_inter_capacitance.magnitude))
             x_data = property_data[key][mask]
-            y_data = summary_data.biased_inter_capacitance.capacitance[mask]
-            y_error = summary_data.biased_inter_capacitance.capacitance_systematic_dispersion[mask]
+            y_data = summary_data.biased_inter_capacitance.magnitude[mask]
+            y_error = summary_data.biased_inter_capacitance.systematic_dispersion[mask]
             if x_log:
                 x_data = np.where(x_data > 0, np.log(x_data), 0)
             if y_log:
@@ -321,12 +343,17 @@ def plotter(file, spatial_mask, keys: Iterable, data: np.recarray, properties: n
         physical_property = None
         for physical_property in keys:
             __plot_dependence(pdf, spatial_mask, physical_property, "capacitance", 'C',
-                              '\\femto\\farad', properties, data.biased_capacitance.capacitance,
+                              '\\femto\\farad', properties, data.biased_capacitance.magnitude,
                               **keywords)
 
             __plot_dependence(pdf, spatial_mask, physical_property, 'inter-pixel capacitance',
                               'C_\\text{inter}', '\\femto\\farad', properties,
-                              data.biased_inter_capacitance.capacitance, condition=lambda x: x >= 0,
+                              data.biased_inter_capacitance.magnitude, condition=lambda x: x >= 0,
+                              **keywords)
+
+            __plot_dependence(pdf, spatial_mask, physical_property, 'backplane capacitance',
+                              'C_\\text{back}', '\\femto\\farad', properties,
+                              data.biased_back_capacitance.magnitude, condition=lambda x: x >= 0,
                               **keywords)
 
             scalex = keywords.get("scalex", None)
@@ -339,12 +366,12 @@ def plotter(file, spatial_mask, keys: Iterable, data: np.recarray, properties: n
                 ax.set_xscale(scalex)
             if scaley is not None:
                 ax.set_yscale(scaley)
-            mask = np.isfinite(final_summary.depletion_voltage.dep_voltage)
+            mask = np.isfinite(final_summary.depletion_voltage.magnitude)
             first_mask = np.logical_and(mask, spatial_mask)
             second_mask = np.logical_and(mask, np.logical_not(spatial_mask))
-            ax.errorbar(final_properties[physical_property][first_mask], final_summary.depletion_voltage.dep_voltage[first_mask], fmt='x', label='3D')
+            ax.errorbar(final_properties[physical_property][first_mask], final_summary.depletion_voltage.magnitude[first_mask], fmt='x', label='3D')
             ax.errorbar(final_properties[physical_property][second_mask],
-                        final_summary.depletion_voltage.dep_voltage[second_mask], fmt='x', label='planar')
+                        final_summary.depletion_voltage.magnitude[second_mask], fmt='x', label='planar')
             ax.legend()
             pdf.savefig(fig, bbox_inches='tight')
             plt.close(fig)
@@ -453,13 +480,25 @@ if __name__ == "__main__":
                minor=True, fontsize=24, dpi=1200)
     with tb.open_file('conclude_summary.h5', mode='r') as h5_conclusion:
         summary_data = h5_conclusion.root.GeneralSummaryTable
+        # CHECK: whether 'test_data' is still used!
+        test_data = read_rec_array(h5_conclusion.root.TestCapCorrected)
         sensor_properties = h5_conclusion.root.SensorTypes
         assert isinstance(sensor_properties, tb.Table)
         final_properties = read_rec_array_sorted(sensor_properties, 'sensor')
         final_summary = read_rec_array_sorted(summary_data, 'sensor')
         assert isinstance(final_properties, np.recarray)
 
+        enhanced_properties = final_properties.copy()
+        enhanced_summary = final_summary.copy()
+        for cap_key in [
+            'biased_back_capacitance',
+            'biased_inter_capacitance',
+            'biased_capacitance',
+        ]:
+            enhanced_summary[cap_key].magnitude /= final_properties.pixel_area
+
         investigate_dependences_graphical(final_summary, final_properties, interesting_keys, no_plot=True)
+        # investigate_dependences_graphical(enhanced_summary, final_properties, interesting_keys, no_plot=True)
 
         model_mapper = {
             "implantation_area": (linear_model, linear_model),
@@ -487,7 +526,10 @@ if __name__ == "__main__":
         # investigate_dependencies_fitting(final_summary, final_properties, third_model_mapper, x_log=True, y_log=True)
 
         # it is also necessary to get a ND-Fit of our model for the capacitance distribution!
-        upper_limit = 5
+        # TODO: refine the selection procedure!
+        upper_limit = 6
+        general_upper_selection = slice(0, -6)
+        assert np.shape(final_properties.implantation_area[:-upper_limit]) == np.shape(final_properties.implantation_area[general_upper_selection])
         suited_implant_area = final_properties.implantation_area[:-upper_limit]
         suited_depth = final_properties.implantation_depth[:-upper_limit]
         suited_perimeter = final_properties.Perimeter[:-upper_limit]
@@ -500,17 +542,16 @@ if __name__ == "__main__":
         full_x_separation = final_properties.pixel_separation_x
         full_y_separation = final_properties.pixel_separation_y
 
-        capacitance_data = final_summary.biased_capacitance.capacitance[:-upper_limit]
-        capacitance_errors = final_summary.biased_capacitance.capacitance_systematic_dispersion[:-upper_limit]
-        # capacitance_errors = final_summary.biased_capacitance.capacitance_err[:-upper_limit]
-        inter_capacitance_data = final_summary.biased_inter_capacitance.capacitance[:-upper_limit]
-        inter_capacitance_errors = final_summary.biased_inter_capacitance.capacitance_err[
-            :-upper_limit]
+        capacitance_data = final_summary.biased_capacitance.magnitude[:-upper_limit]
+        capacitance_errors = final_summary.biased_capacitance.systematic_dispersion[:-upper_limit]
+        # capacitance_errors = final_summary.biased_capacitance.stat_error[:-upper_limit]
+        inter_capacitance_data = final_summary.biased_inter_capacitance.magnitude[:-upper_limit]
+        inter_capacitance_errors = final_summary.biased_inter_capacitance.stat_error[:-upper_limit]
 
-        full_capacitance_data = final_summary.biased_capacitance.capacitance
-        full_capacitance_errors = final_summary.biased_capacitance.capacitance_systematic_dispersion
-        full_inter_capacitance_data = final_summary.biased_inter_capacitance.capacitance
-        full_inter_capacitance_errors = final_summary.biased_inter_capacitance.capacitance_err
+        full_capacitance_data = final_summary.biased_capacitance.magnitude
+        full_capacitance_errors = final_summary.biased_capacitance.systematic_dispersion
+        full_inter_capacitance_data = final_summary.biased_inter_capacitance.magnitude
+        full_inter_capacitance_errors = final_summary.biased_inter_capacitance.stat_error
 
         inter_cap_mask = np.isfinite(inter_capacitance_data)
         inter_capacitance_data = inter_capacitance_data[inter_cap_mask]
@@ -696,7 +737,7 @@ if __name__ == "__main__":
         inter_cap_dof.append(inter_dof_1)
 
         # generate a latex table of the test capacitances:
-        test_table = h5_conclusion.root.TestCap
+        test_table = h5_conclusion.root.TestCapCorrected
         test_properties = read_rec_array_sorted(test_table, 'Sensor')
 
         standard_cap_list = [
@@ -798,15 +839,15 @@ if __name__ == "__main__":
                   "&", "{\\(C_\\text{inter}\\text{ / }\\unit{\\femto\\farad}\\)}", "\\\\", **print_args)
             print("\\midrule", **print_args)
             for record in final_summary:
-                test_format = "{:.3g}".format(record.biased_capacitance.capacitance_err)
+                test_format = "{:.3g}".format(record.biased_capacitance.stat_error)
                 _, text_n_digits = test_format.removeprefix('-').split('.', 1)
                 n_digits = len(text_n_digits)
                 number_format = "{{:.{}f}}".format(n_digits)
 
-                print(record.sensor.decode().replace('_', '\\_'), "&", record.bias_voltage, "&", number_format.format(record.biased_capacitance.capacitance),
-                      "&", "+-" + number_format.format(record.biased_capacitance.capacitance_err) + '\\textstatistic', "&",
-                      "+-" + number_format.format(record.biased_capacitance.capacitance_systematic_general) + '\\textsystematic',
-                      "&", "+-" + number_format.format(record.biased_capacitance.capacitance_systematic_dispersion) + '\\textdispersion',
+                print(record.sensor.decode().replace('_', '\\_'), "&", record.bias_voltage, "&", number_format.format(record.biased_capacitance.magnitude),
+                      "&", "+-" + number_format.format(record.biased_capacitance.stat_error) + '\\textstatistic', "&",
+                      "+-" + number_format.format(record.biased_capacitance.systematic_general) + '\\textsystematic',
+                      "&", "+-" + number_format.format(record.biased_capacitance.systematic_dispersion) + '\\textdispersion',
                       "&", generate_siunitx_3(record.biased_inter_capacitance), "\\\\", **print_args)
 
 
@@ -838,7 +879,7 @@ if __name__ == "__main__":
                 if sensor.decode() in ("X5", "X6", "X7", "X8", "X3", "X4"):
                     continue
 
-                test_format = "{:.3g}".format(dep_set.dep_voltage_err)
+                test_format = "{:.3g}".format(dep_set.stat_error)
                 try:
                     _, text_n_digits = test_format.removeprefix('-').split('.', 1)
                 except:
@@ -846,9 +887,9 @@ if __name__ == "__main__":
                     raise
                 n_digits = len(text_n_digits)
                 number_format = "{{:.{}f}}".format(n_digits)
-                print(sensor.decode().replace('_', '\\_'), "&", number_format.format(dep_set.dep_voltage),
-                      "&", "+-" + number_format.format(dep_set.dep_voltage_err) + '\\textstatistic', "&", "+-" + number_format.format(dep_set.dep_voltage_systematic_general) + '\\textsystematic',
-                      "&", "+-" + number_format.format(dep_set.dep_voltage_systematic_dispersion) + '\\textdispersion', "\\\\", **print_args)
+                print(sensor.decode().replace('_', '\\_'), "&", number_format.format(dep_set.magnitude),
+                      "&", "+-" + number_format.format(dep_set.stat_error) + '\\textstatistic', "&", "+-" + number_format.format(dep_set.systematic_general) + '\\textsystematic',
+                      "&", "+-" + number_format.format(dep_set.systematic_dispersion) + '\\textdispersion', "\\\\", **print_args)
 
             print("\\bottomrule", **print_args)
             print("\\end{tabular}", **print_args)
@@ -871,14 +912,14 @@ if __name__ == "__main__":
             for sensor, dep_set in zip(final_summary.sensor, final_summary.depletion_voltage):
                 if sensor.decode() not in ("X5", "X6", "X7", "X8", "X3", "X4"):
                     continue
-                test_format = "{:.3g}".format(dep_set.dep_voltage_err)
+                test_format = "{:.3g}".format(dep_set.stat_error)
                 _, text_n_digits = test_format.removeprefix('-').split('.', 1)
                 n_digits = len(text_n_digits)
                 number_format = "{{:.{}f}}".format(n_digits)
-                print(sensor.decode().replace('_', '\\_'), "&", number_format.format(dep_set.dep_voltage),
-                      "&", "+-" + number_format.format(dep_set.dep_voltage_err) + '\\textstatistic', "&",
-                      "+-" + number_format.format(dep_set.dep_voltage_systematic_general) + '\\textsystematic',
-                      "&", "+-" + number_format.format(dep_set.dep_voltage_systematic_dispersion) + '\\textdispersion', "\\\\", **print_args)
+                print(sensor.decode().replace('_', '\\_'), "&", number_format.format(dep_set.magnitude),
+                      "&", "+-" + number_format.format(dep_set.stat_error) + '\\textstatistic', "&",
+                      "+-" + number_format.format(dep_set.systematic_general) + '\\textsystematic',
+                      "&", "+-" + number_format.format(dep_set.systematic_dispersion) + '\\textdispersion', "\\\\", **print_args)
 
             print("\\bottomrule", **print_args)
             print("\\end{tabular}", **print_args)
@@ -911,18 +952,7 @@ if __name__ == "__main__":
         # * the quadratic LF pixels have for each depth a perfect proportionality to the implantation area but indeed both implantation depths have different slopes => TODO: estimate the slopes for the 'A' dependence independently for the two implantation depths and determine it's dependence on the implantation depth
         # * the rectangular LF pixel does not match the slope behaviour of the other two. => capacitance increase by dependendence on the implantation area exposed to the p-stop implantations? (This would need a parameter: 'perimeter * depth')
         # * the two HPK sensors are significant outliers as they have a much higher pixel capacitance with the same implantation depth (their pixel separation is much smaller)
-        # * TODO: ask whether there are different resistivities used for the foundrys?
+        # * TODO: ask whether there are different resistivities used for the foundrys? -> answer: should not be the case!
         # * Behaviour of the implantation depth is difficult to say, as there are only to different implanation depths for same area sensors!
         # * all the planar sensors could be matched perfectly well by their pixel separation (the capacitance seems to decay strongly with the pixel separation, it would assume a exponential decay but polynomial/reciprocal one could not be excluded but in the later case the hpk pixel separation would be an significant issue; pixel separation seems to be different for the different implantation depths??; would also need to exclude R1 for a refined fit here as it strongly deviates from the behaviour of all the others)
         # * for the perimeter it is the same as for the pixel separation fits.
-
-        from cycler import cycler
-        from matplotlib import rcParams
-        standard_color = rcParams['axes.prop_cycle'].by_key()['color']
-        cc = cycler(linestyle=['-', '--', '-.'], marker=['x', '*', 'v']) * cycler(color=standard_color)
-        for d in cc:
-            print(d)
-
-        second = list(cc)
-        print(second[0])
-        print(plt.get_cmap().name)

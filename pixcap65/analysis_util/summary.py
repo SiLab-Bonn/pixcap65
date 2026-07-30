@@ -13,7 +13,7 @@ from collections.abc import Iterable
 
 from pixcap65.analysis import get_test_capacitance_data
 from pixcap65.analysis_util.data_store import SummaryTable
-from pixcap65.data_constants import R11_SCAN_FILE, R13_2_SCAN_FILE, E1_2_SCAN_FILE
+from pixcap65.data_constants import R11_SCAN_FILE, R13_2_SCAN_FILE, E1_2_SCAN_FILE, X4_SCAN_FILE
 from pixcap65.data_constants import X1_SCAN_2_FILE, X2_SCAN_2_FILE
 from pixcap65.data_constants import X5_SCAN_FILE, X6_SCAN_FILE, X7_SCAN_FILE
 from pixcap65.utility import synchronized_process_open_file
@@ -93,6 +93,8 @@ test_design_values = {name.replace(" ", "_") : field_design_values[name] for nam
 "34 w_ bump", "35 w_o bump", "36 w_o bump", "37 w_o bump", "38 w_o bump", "39 w_o bump"] }
 
 spatial_identifier = ["X{}".format(i) for i in range(3, 9)]
+
+
 
 def generate_test_summary(files: Iterable[PathLike], groups: Iterable[PathLike], sensors: Iterable[str], summary_file: PathLike) -> None:
     with synchronized_process_open_file(summary_file, mode='a') as summary_file:
@@ -185,10 +187,10 @@ def generate_test_summary(files: Iterable[PathLike], groups: Iterable[PathLike],
 
 if __name__ == "__main__":
     logging.basicConfig(level=logging.DEBUG)
-    summary_files = ["packaged/Reference_Bare_renewed.h5", R13_2_SCAN_FILE, R11_SCAN_FILE, X1_SCAN_2_FILE, X2_SCAN_2_FILE, X5_SCAN_FILE, X6_SCAN_FILE,
-                     X7_SCAN_FILE, E1_2_SCAN_FILE]
+    summary_files = ["packaged/data/Bare_Sample_05_Extended_Scan.h5", R13_2_SCAN_FILE, R11_SCAN_FILE, X1_SCAN_2_FILE, X2_SCAN_2_FILE, X5_SCAN_FILE, X6_SCAN_FILE,
+                     X7_SCAN_FILE, E1_2_SCAN_FILE, X4_SCAN_FILE]
     summary_groups = [
-        "Reference/Bare/unbiased_31_renew/total_cap/analysis",
+        "Reference/Bare/unbiased_full_model/total_cap/analysis",
         "Reference/R13/unbiased_1_full_model/total_cap/analysis",
         "Reference/R1/unbiased_full_model/total_cap/analysis",
         "Thesis/ATLAS_ITk/X1/unbiased_61_full_model/total_cap/analysis",
@@ -197,8 +199,9 @@ if __name__ == "__main__":
         "Thesis/ATLAS_ITk/X6/unbiased_full_model/total_cap/analysis",
         "Thesis/ATLAS_ITk/X7/unbiased_full_model/total_cap/analysis",
         "Reference/E1/unbiased_full_model/total_cap/analysis",
+        "Thesis/ATLAS_ITk/X4/unbiased_full_model/total_cap/analysis"
     ]
-    summary_sensors = ["Bare", "R13", "R1", "X1", "X2", "X5", "X6", "X7", "E1"]
+    summary_sensors = ["Bare", "R13", "R1", "X1", "X2", "X5", "X6", "X7", "E1", "X4"]
 
     logger.info("generate summary")
     generate_test_summary(summary_files, summary_groups, summary_sensors, SUMMARY_FILE)
@@ -209,12 +212,17 @@ if __name__ == "__main__":
 
     # but how to format such a table?
     # we will need a master table 'to do' so.
+    class MasterTableResultEntry(tb.IsDescription):
+        magnitude = tb.Float64Col(pos=0)
+        stat_error = tb.Float64Col(pos=1)
+        systematic_general = tb.Float64Col(pos=2)
+        systematic_dispersion = tb.Float64Col(pos=3)
+
     class MasterTableCapacitanceEntry(tb.IsDescription):
         capacitance = tb.Float64Col(pos=0)
         capacitance_err = tb.Float64Col(pos=1)
         capacitance_systematic_general = tb.Float64Col(pos=2)
         capacitance_systematic_dispersion = tb.Float64Col(pos=3)
-
 
     class MasterTableVoltageEntry(tb.IsDescription):
         dep_voltage = tb.Float64Col(pos=0)
@@ -222,18 +230,17 @@ if __name__ == "__main__":
         dep_voltage_systematic_general = tb.Float64Col(pos=2)
         dep_voltage_systematic_dispersion = tb.Float64Col(pos=3)
 
-
     class MasterExtractionTable(tb.IsDescription):
         sensor = tb.StringCol(pos=0, itemsize=16)
-        unbiased_capacitance = MasterTableCapacitanceEntry()
-        unbiased_inter_capacitance = MasterTableCapacitanceEntry()
-        biased_capacitance = MasterTableCapacitanceEntry()
+        unbiased_capacitance = MasterTableResultEntry()
+        unbiased_inter_capacitance = MasterTableResultEntry()
+        biased_capacitance = MasterTableResultEntry()
         bias_voltage = tb.Float64Col(pos=1)
-        biased_inter_capacitance = MasterTableCapacitanceEntry()
-        biased_inter_capacitance_side = MasterTableCapacitanceEntry()
-        biased_inter_capacitance_top = MasterTableCapacitanceEntry()
-        depletion_voltage = MasterTableVoltageEntry()
-
+        biased_inter_capacitance = MasterTableResultEntry()
+        biased_inter_capacitance_side = MasterTableResultEntry()
+        biased_inter_capacitance_top = MasterTableResultEntry()
+        biased_back_capacitance = MasterTableResultEntry()
+        depletion_voltage = MasterTableResultEntry()
 
     class GroupProviderScheme(tb.IsDescription):
         file = tb.StringCol(itemsize=220, pos=0)
@@ -307,6 +314,17 @@ if __name__ == "__main__":
 
                     if entry.biased_inter_pix_group is not None and 'None' not in entry.biased_inter_pix_group:
                         group = h5_file._get_or_create_path("/" + entry.biased_inter_pix_group, False)
+
+                        if "DistResultfF" in group:
+                            # we must read here at the right position
+                            result_table = np.rec.array(group.DistResultfF.read_where("""(bias == {})""".format(13000)),
+                                                        dtype=group.DistResultfF.dtype)
+                            assert isinstance(result_table, np.recarray)
+                            if result_table.shape[0] > 0:
+                                current_entry = generate_cap_entry(result_table)
+                        current_row["biased_back_capacitance"] = current_entry
+                        current_entry = DEFAULT_ENTRY
+
                         if "DistResultfF" in group:
                             # we must read here at the right position
                             result_table = np.rec.array(group.DistResultfF.read_where("""(bias == {})""".format(14000)),
@@ -314,6 +332,10 @@ if __name__ == "__main__":
                             assert isinstance(result_table, np.recarray)
                             if result_table.shape[0] > 0:
                                 current_entry = generate_cap_entry(result_table)
+
+                    else:
+                        current_row["biased_inter_capacitance"] = current_entry
+                        current_entry = DEFAULT_ENTRY
 
                     current_row["biased_inter_capacitance"] = current_entry
                     current_entry = DEFAULT_ENTRY
@@ -383,7 +405,7 @@ if __name__ == "__main__":
             table.cols.sensor.create_csindex()
             table.flush()
 
-
+    # TODO: need a extraction of the backplane capacitance! But we need to use the corrected capacitances;
     group_provider_dtype = np.dtype([('file', str, 220), ('unbiased_group', str, 100),
                                      ('unbiased_inter_pix_group', str, 100), ('biased_group', str, 100),
                                      ('biased_inter_pix_group', str, 100), ('cv_group', str, 100),
@@ -406,6 +428,7 @@ if __name__ == "__main__":
         E1_2_SCAN_FILE,
         E1_2_SCAN_FILE,
         E1_2_SCAN_FILE,
+        X4_SCAN_FILE,
     ]
     extract_unbiased_full_groups = [
         "Thesis/ATLAS_ITk/X1/unbiased_61_full_model/total_cap/analysis_correction",
@@ -423,13 +446,14 @@ if __name__ == "__main__":
         "Reference/E1/unbiased_full_model_dnw20_50/total_cap/analysis_correction",
         "Reference/E1/unbiased_full_model_dnw25_50/total_cap/analysis_correction",
         "Reference/E1/unbiased_full_model_dnw30_50/total_cap/analysis_correction",
+        "Thesis/ATLAS_ITk/X4/unbiased_full_model/total_cap/analysis_correction",
     ]
     extract_biased_full_groups = [
-        "Thesis/ATLAS_ITk/X1/biased_80_V_full_model/total_cap/analysis_correction",
+        "Thesis/ATLAS_ITk/X1/biased_80_V_full/total_cap/analysis_correction",
         "Reference/R13/biased_80_V_full_model/total_cap/analysis_correction",
         "Thesis/ATLAS_ITk/X5/biased_40_V_full_model/total_cap/analysis_correction",
         "Thesis/ATLAS_ITk/X7/biased_40.0_V_full_model/total_cap/analysis_correction",
-        "Thesis/ATLAS_ITk/X2/biased_80_V_full_model/total_cap/analysis_correction",
+        "Thesis/ATLAS_ITk/X2/biased_80_V_full/total_cap/analysis_correction",
         "Reference/R1/biased_80_V_full_model/total_cap/analysis_correction",
         "Thesis/ATLAS_ITk/X6/biased_45_V_full_model/total_cap/analysis_correction",
         "Reference/E1/biased_80_V_full_model_nw15_50/total_cap/analysis_correction",
@@ -440,6 +464,7 @@ if __name__ == "__main__":
         "Reference/E1/biased_80_V_full_model_dnw20_50/total_cap/analysis_correction",
         "Reference/E1/biased_80_V_full_model_dnw25_50/total_cap/analysis_correction",
         "Reference/E1/biased_80_V_full_model_dnw30_50/total_cap/analysis_correction",
+        "Thesis/ATLAS_ITk/X4/biased_80_V_full_model/total_cap/analysis_correction",
     ]
     extract_unbiased_inter_groups = [
         "Thesis/ATLAS_ITk/X1/inter_unbiased_full/inter_cap/analysis",
@@ -459,6 +484,7 @@ if __name__ == "__main__":
         "Reference/E1/inter_unbiased_full_dnw20_50/inter_cap/analysis",
         "Reference/E1/inter_unbiased_full_dnw25_50/inter_cap/analysis",
         "Reference/E1/inter_unbiased_full_dnw30_50/inter_cap/analysis",
+        "Thesis/ATLAS_ITk/X4/inter_unbiased_full/inter_cap/analysis",
     ]
     extract_biased_inter_groups = [
         "Thesis/ATLAS_ITk/X1/inter_biased_M_80_V_full/inter_cap/analysis",
@@ -478,6 +504,7 @@ if __name__ == "__main__":
         "Reference/E1/inter_biased_M_80_V_full_dnw20_50/inter_cap/analysis",
         "Reference/E1/inter_biased_M_80_V_full_dnw25_50/inter_cap/analysis",
         "Reference/E1/inter_biased_M_80_V_full_dnw30_50/inter_cap/analysis",
+        "Thesis/ATLAS_ITk/X4/inter_biased_M_80_V_full/inter_cap/analysis",
     ]
     extract_cv_groups = [
         "Thesis/ATLAS_ITk/X1/C_V_Characteristic_refined_Extended_Combined/biasing/analysis_correction",
@@ -495,6 +522,7 @@ if __name__ == "__main__":
         "Reference/E1/C_V_Characteristic_refined_dnw20_50/biasing/analysis_correction",
         "Reference/E1/C_V_Characteristic_refined_dnw25_50/biasing/analysis_correction",
         "Reference/E1/C_V_Characteristic_refined_dnw30_50/biasing/analysis_correction",
+        "Thesis/ATLAS_ITk/X4/C_V_Characteristic_refined_Extended/biasing/analysis_correction",
     ]
     extract_sensors = [
         "X1",
@@ -512,6 +540,7 @@ if __name__ == "__main__":
         "E1_dnw20_50",
         "E1_dnw25_50",
         "E1_dnw30_50",
+        "X4"
     ]
     extract_bias_voltages = [
         80,
@@ -521,6 +550,7 @@ if __name__ == "__main__":
         80,
         80,
         45,
+        80,
         80,
         80,
         80,
@@ -548,6 +578,7 @@ if __name__ == "__main__":
         "Reference/E1/inter_biased_M_80_V_full_dnw20_50/inter_cap/analysis",
         "Reference/E1/inter_biased_M_80_V_full_dnw25_50/inter_cap/analysis",
         "Reference/E1/inter_biased_M_80_V_full_dnw30_50/inter_cap/analysis",
+        "Thesis/ATLAS_ITk/X4/inter_biased_M_80_V_full/inter_cap/analysis",
     ]
     extract_biased_inter_groups_side = [
         "Thesis/ATLAS_ITk/X1/inter_biased_M_80_V_full/inter_cap/analysis",
@@ -567,6 +598,7 @@ if __name__ == "__main__":
         "Reference/E1/inter_biased_M_80_V_full_dnw20_50/inter_cap/analysis",
         "Reference/E1/inter_biased_M_80_V_full_dnw25_50/inter_cap/analysis",
         "Reference/E1/inter_biased_M_80_V_full_dnw30_50/inter_cap/analysis",
+        "Thesis/ATLAS_ITk/X4/inter_biased_M_80_V_full/inter_cap/analysis",
     ]
 
     records = []
@@ -624,9 +656,10 @@ if __name__ == "__main__":
         # ("X5", 50, 50, 50, 50, 150, 250),
         # ("X6", 50, 50, 50, 50, 150, 250),
         # ("X7", 50, 50, 50, 50, 150, 250),
-        ("X5", 50, 50, 130, 10, 25, 150),
-        ("X6", 50, 50, 130, 10, 25, 150),
-        ("X7", 50, 50, 130, 10, 25, 150),
+        ("X4", 50, 50, 130, 5, 25, 150),
+        ("X5", 50, 50, 130, 5, 25, 150),
+        ("X6", 50, 50, 130, 5, 25, 150),
+        ("X7", 50, 50, 130, 5, 25, 150),
         ("E1_nw15_50", 50, 50, 15, 15, 3, 100),
         ("E1_nw20_50", 50, 50, 20, 20, 3, 100),
         ("E1_nw25_50", 50, 50, 25, 25, 3, 100),
@@ -667,18 +700,21 @@ if __name__ == "__main__":
     sensor_properties = np.rec.array([item for item in zipping], dtype=sensor_properties_type)
 
     # this will yield wrong results for the 3d sensors pixel separations
-    for sensor_record in sensor_properties:
+    for k, sensor_record in enumerate(sensor_properties):
         assert isinstance(sensor_record, np.record)
         assert sensor_record.dtype == sensor_properties_type
-        if sensor_record.sensor not in spatial_identifier:
+        if sensor_record.sensor.decode() not in spatial_identifier:
             continue
 
 
-        sensor_record.implantation_area = sensor_record.implantation_size_x * sensor_record.implantation_size_y * np.pi
-        sensor_record.pixel_separation_x = np.mean((sensor_record.pitch_x, sensor_record.pitch_y)) - sensor_record.implantation_size_y
-        sensor_record.pixel_separation_y = np.mean(
-            (sensor_record.pitch_x, sensor_record.pitch_y)) - sensor_record.implantation_size_y
-        sensor_record.pixel_separation_area = sensor_record.pixel_area - np.pi * (sensor_record.implantation_size_y / 2) ** 2
+        print("Cross check the spatial parameters!")
+        print(np.mean((sensor_record.pitch_x, sensor_record.pitch_y)))
+        print(sensor_record.implantation_size_x)
+        print(sensor_record.implantation_size_y)
+        sensor_properties.implantation_area[k] = sensor_record.implantation_size_x * sensor_record.implantation_size_y * np.pi
+        sensor_properties.pixel_separation_x[k] = np.mean((sensor_record.pitch_x, sensor_record.pitch_y)) - sensor_record.implantation_size_y
+        sensor_properties.pixel_separation_y[k] = np.mean((sensor_record.pitch_x, sensor_record.pitch_y)) - sensor_record.implantation_size_y
+        sensor_properties.pixel_separation_area[k] = sensor_record.pixel_area - np.pi * (sensor_record.implantation_size_y / 2) ** 2
 
 
 
@@ -690,3 +726,44 @@ if __name__ == "__main__":
         table.flush()
         table.cols.sensor.create_csindex()
         table.flush()
+
+    # correct all the test capacitance's for the parasitic capacitance of the measurement circuit!
+    from plot_dependencies import read_rec_array
+    from pixcap65.plotting import CAPACITANCE_CONVERSION_FACTOR
+    with tb.open_file('conclude_summary.h5', mode='a') as summary_file:
+        test_data = read_rec_array(summary_file.root.TestCap)
+        test_cap_intrinsic_names = ["test_{}_w__bump".format(it) for it in range(27, 35)]
+        test_cap_intrinsic_error_names = ["test_{}_w__bump".format(it) for it in range(27, 35)]
+        test_cap_intrinsic = np.concatenate([test_data[name] for name in test_cap_intrinsic_names])
+        test_cap_intrinsic_error = np.concatenate([test_data[name] for name in test_cap_intrinsic_error_names])
+
+        # make all this more accurately by using a fit and also determine the remaining capacitance's
+        parasitic_mean_keep = np.average(test_cap_intrinsic, keepdims=True, weights=np.reciprocal(
+            test_cap_intrinsic_error) ** 2) * CAPACITANCE_CONVERSION_FACTOR
+        parasitic_mean = parasitic_mean_keep[0]
+        parastic_std = np.std(test_cap_intrinsic * CAPACITANCE_CONVERSION_FACTOR, mean=parasitic_mean_keep)
+        print(parasitic_mean, parastic_std)
+        print(14.901 - parasitic_mean)
+        print(np.sqrt(0.079 ** 2 + parastic_std ** 2))
+
+        # correct for some of the capacitances
+        corrected_test_data = test_data.copy()
+        assert isinstance(corrected_test_data, np.recarray)
+        entry_fields = corrected_test_data.dtype.names
+        assert entry_fields is not None
+        for field in entry_fields:
+            if field == "Sensor" or field in test_cap_intrinsic_names or field.endswith('_error'):
+                continue
+            print("The current field is", field)
+            corrected_test_data[field] = test_data[field] - parasitic_mean * 1.e-15
+            corrected_test_data[field + '_error'] = np.sqrt(
+                test_data[field + '_error'] ** 2 + parastic_std * 1.e-15 ** 2)
+
+        if "TestCapCorrected" in summary_file.root:
+            summary_file.root.TestCapCorrected._f_remove()
+        table = summary_file.create_table(where=summary_file.root, name='TestCapCorrected',
+                                  title="Corrected Values of the test capacitances", description=corrected_test_data,)
+        table.cols.Sensor.create_csindex()
+        table.flush()
+
+        # TODO: correct all the measured test capacitances for the effect of the circuits parasitic capacitance!

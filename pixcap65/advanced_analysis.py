@@ -5,7 +5,8 @@ from typing import Any, Callable, Union
 
 from pixcap65.analysis_util.configuration_constants import ANALYSIS_INITIAL_CAPACITANCE, ANALYSIS_INITIAL_LEAKAGE, \
     ANALYSIS_INITIAL_RESISTANCE, ANALYSIS_REFERENCE_VOLTAGE
-from pixcap65.analysis_util.physics_modelling import full_capacitance_model, simple_capacitance_model
+from pixcap65.analysis_util.physics_modelling import full_capacitance_model, simple_capacitance_model, \
+    extended_full_capacitance_model, enhanced_full_capacitance_model
 from pixcap65.analysis_util.utility import HandleFitterStubClass, HandleFitterGeneral, HIST_CAP_UNIT, \
     HIST_LEAK_CURRENT_UNIT
 from pixcap65.analysis_util.utility import transform_covariance, TABLES_ARRAY_TYPE, GENERAL_PIXCAP_SHAPE, \
@@ -121,7 +122,7 @@ def _perform_advanced_fit(file: tb.File, group: tb.Group, current_hist: np.ndarr
 
         cap, cap_error, fit_cov_temp, fitter, leakage, leakage_error, resistor, resistor_error = __perform_pixel_fit(
             currents, current_errors, frequencies, effective_expression, effective_label, effective_model,
-            effective_parameter_dict, full_model, initial_guess, use_kafe2)
+            effective_parameter_dict, full_model, initial_guess, use_kafe2, kwargs.get('is_inter_b', False))
 
         # https://matplotlib.org/3.10.9/api/pyplot_api.html#matplotlib.pyplot.get_fignums
         # https://matplotlib.org/3.10.9/api/_as_gen/matplotlib.pyplot.get_fignums.html
@@ -169,7 +170,7 @@ def __perform_pixel_fit(currents: np.ndarray, current_errors: np.ndarray, freque
                         effective_expression: str,
                         effective_label: str, effective_model: Callable[..., Any],
                         effective_parameter_dict: dict[str, str], full_model: bool, initial_guess: dict[str, float],
-                        use_kafe2) -> tuple[float, float, np.ndarray, Any, float, float, float, float]:
+                        use_kafe2, inter_b=False) -> tuple[float, float, np.ndarray, Any, float, float, float, float]:
     resistor = np.nan
     resistor_error = np.nan
     if use_kafe2:
@@ -190,7 +191,8 @@ def __perform_pixel_fit(currents: np.ndarray, current_errors: np.ndarray, freque
             print(effective_parameter_dict)
             raise
         fitter.set_parameter_values(**initial_guess)
-        fitter.fix_parameter('u0', 1)
+        # FIXME: perhaps there should be a switch like keyword to toggle this here to 2 or better -2
+        fitter.fix_parameter('u0', -2 if inter_b else 1)
         fitter.do_fit()
 
         # extract the fit parameters
@@ -215,7 +217,7 @@ def __perform_pixel_fit(currents: np.ndarray, current_errors: np.ndarray, freque
         cost = LeastSquares(x=frequencies, y=currents,
                             yerror=errors, model=effective_model)
         fitter = Minuit(cost, **initial_guess)
-        fitter.fixto('u0', 1)
+        fitter.fixto('u0', -2 if inter_b else 1)
         fitter.migrad()
         fitter.hesse()
 
@@ -250,7 +252,25 @@ PERFORM_PIXEL_TYPE = np.dtype([('C', np.float64), ('Cerr', np.float64),
 
 
 def __declare_fit_model(full_model) -> tuple[int, Callable[..., Any], str, str, dict[str, str], dict[str, float]]:
-    if full_model:
+    if isinstance(full_model, str) and full_model == "extended":
+        effective_model = extended_full_capacitance_model
+        effective_label = FULL_MODEL_LABEL
+        effective_expression = FULL_MODEL_EXPRESSION
+        effective_parameter_dict = FULL_MODEL_PARAMETER_DICT
+        effective_parameter_dict["tau"] = r"\tau"
+        param_defaults = {'c': ANALYSIS_INITIAL_CAPACITANCE, 'r': ANALYSIS_INITIAL_RESISTANCE,
+                          'i': ANALYSIS_INITIAL_LEAKAGE, 'u0': ANALYSIS_REFERENCE_VOLTAGE}
+        param_defaults['tau'] = 1
+        cov_array_limit = 4
+    elif isinstance(full_model, str) and full_model == "quad":
+        effective_model = enhanced_full_capacitance_model
+        effective_label = FULL_MODEL_LABEL
+        effective_expression = FULL_MODEL_EXPRESSION
+        effective_parameter_dict = FULL_MODEL_PARAMETER_DICT
+        param_defaults = {'c': ANALYSIS_INITIAL_CAPACITANCE, 'r': ANALYSIS_INITIAL_RESISTANCE,
+                          'i': ANALYSIS_INITIAL_LEAKAGE, 'u0': ANALYSIS_REFERENCE_VOLTAGE}
+        cov_array_limit = 3
+    elif full_model:
         effective_model = full_capacitance_model
         effective_label = FULL_MODEL_LABEL
         effective_expression = FULL_MODEL_EXPRESSION

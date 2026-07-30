@@ -29,6 +29,9 @@ def reciprocal_model(x, a, b):
 def reciprocal_deriv(x, a, b):
     return - b / x ** 2
 
+def inverted_reciprocal_model(y, a, b):
+    return b / (y - a)
+
 
 def combined_model(x, a, b, c):
     return a + b * x + c / x

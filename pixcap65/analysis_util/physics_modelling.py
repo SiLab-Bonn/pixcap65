@@ -16,6 +16,16 @@ def full_capacitance_model(freq, c=1e-6, r=1e6, i=0, u0=1):
     # ignores the reference voltage for now
     return (u0 * c * freq + i) / (1 + r * c * freq)
 
+@nb.njit(parallel=True, fastmath=True)
+def extended_full_capacitance_model(freql, c=1e-6, r=1e6, i=0, u0=1, tau=1.0):
+    return full_capacitance_model(freql, c, r, i, u0=u0*(1 - np.exp(-1/(2*tau*freql))))
+
+
+@nb.njit(parallel=True, fastmath=True)
+def enhanced_full_capacitance_model(freq, c=1e-6, r=1e6, i=0, u0=1):
+    # ignores the reference voltage for now
+    return (u0 * c * freq + i) / (1 + r * c * freq)**2
+
 
 @nb.njit(parallel=True, fastmath=True)
 def grad_full_capacitance_model(freq, c=1e-6, r=1e6, i=0, u0=1):

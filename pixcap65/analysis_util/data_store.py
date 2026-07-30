@@ -1,4 +1,5 @@
 import atexit
+import datetime
 import inspect
 import multiprocessing as mp
 import numpy as np
@@ -9,18 +10,13 @@ from multiprocessing.managers import BaseProxy
 
 import pixcap65.concurrency
 from pixcap65.analysis_util import GENERAL_PIXCAP_SHAPE
+from pixcap65.concurrency.proxy import NumpyProxy, DepletionArrayStoreProxy
 
 
 # we should close these here aways such that they are not imported multiple times?
+# TODO: combine the two multiprocessing manager classes within this framework into a single one.
 class DepletionMPManager(mp.managers.BaseManager):
     pass
-
-
-class ProxyBase(mp.managers.NamespaceProxy):
-    _exposed_ = ('__getattribute__', '__setattr__', '__delattr__')
-
-
-class DepletionArrayStoreProxy(ProxyBase): pass
 
 
 def register_proxy(name, cls, proxy, manager_cls=DepletionMPManager):
@@ -32,46 +28,6 @@ def register_proxy(name, cls, proxy, manager_cls=DepletionMPManager):
             proxy._exposed_ += (attr,)
             setattr(proxy, attr, lambda s: object.__getattribute__(s, '_callmethod')(attr))
     manager_cls.register(name, cls, proxy)
-
-class NumpyProxy(BaseProxy):
-    _exposed_ = ('__getattr__', '__setattr__', '__delattr__', '__getitem__', '__setitem__', 'shape', )
-
-    def __getitem__(self, *args):
-        return self._callmethod('__getitem__', args)
-
-    def __setitem__(self, *args):
-        self._callmethod('__setitem__', args)
-
-    def shape(self):
-        self._callmethod('shape')
-
-    def __len__(self):
-        return self._callmethod('__len__')
-
-    def __contains__(self, *args):
-        return self._callmethod('__contains__', args)
-
-    def __iter__(self):
-        return self._callmethod('__iter__')
-
-    def __index__(self):
-        return self._callmethod('__index__')
-
-    def __lt__(self, other):
-        return self._callmethod('__lt__', other)
-
-    def __le__(self, other):
-        return self._callmethod('__le__', other)
-
-    def __gt__(self, other):
-        return self._callmethod('__gt__', other)
-
-    def __ge__(self, other):
-        return self._callmethod('__ge__', other)
-    def __eq__(self, other):
-        return self._callmethod('__eq__', other)
-    def __ne__(self, other):
-        return self._callmethod('__ne__', other)
 
 
 DepletionMPManager.register("full", np.full, NumpyProxy)
@@ -216,13 +172,19 @@ def close_manager():
             __manager = None
             atexit.unregister(close_manager)
 
+# FIXME: it is not allowed to provide multiprocessing authkeys by function arguments when using pooled executors.
 class DepletionArrayStore(DepletionDataStore):
     def __init__(self, n_depletions=None, **manager_kwargs):
         general_shape = GENERAL_PIXCAP_SHAPE if n_depletions is None else tuple([*GENERAL_PIXCAP_SHAPE, n_depletions])
         parameter_shape = tuple([*GENERAL_PIXCAP_SHAPE, 4]) if n_depletions is None else tuple(
             [*GENERAL_PIXCAP_SHAPE, n_depletions, 4])
+        # FIXME: perhaps we should simply save a concurrency manager object here?
+        # self.mp_manager = pixcap65.concurrency.get_manager()
+        # but how to delete this manager object on clean-up?
+
         def create_full(*args, **kwargs):
             # FIXME: in ideal case we could fetch another mamager right from here!
+            return get_mp_manager().full(*args, **kwargs)
             if "address" in manager_kwargs:
                 manager_kwargs["authkey"] = mp.current_process().authkey
                 try:
@@ -232,10 +194,13 @@ class DepletionArrayStore(DepletionDataStore):
                     logging.exception("Failed to fetch manager and initialize the object")
                     return get_mp_manager().full(*args, **kwargs)
             return get_mp_manager(**manager_kwargs).full(*args, **kwargs)
+
+        # FIXME: this implementation leads to start-up of quite many manager processes => we need to reduce this amount to work properly!
         self.depletion_voltage = create_full(shape=general_shape, fill_value=np.nan)
         self.depletion_error = create_full(shape=general_shape, fill_value=np.nan)
         self.fit_parameter_estimators = create_full(shape=parameter_shape, fill_value=np.nan)
         self.fit_parameter_errors = create_full(shape=parameter_shape, fill_value=np.nan)
+        # FIXME: issue with the mp manager retrieval!
         self.lock = pixcap65.concurrency.get_manager().RLock()
         self._pixel_row = pixcap65.concurrency.get_manager().dict()
         self._pixel_col = pixcap65.concurrency.get_manager().dict()
@@ -244,9 +209,25 @@ class DepletionArrayStore(DepletionDataStore):
         self.systematic_errors = create_full(shape=general_shape, fill_value=np.nan)
         self.systematic_dispersion = create_full(shape=general_shape, fill_value=np.nan)
         with open("depletion_manager_information_{}.txt".format(mp.current_process().pid), 'a') as f:
-            print(mp.current_process().pid, mp.current_process().name, mp.current_process().authkey, file=f)
+            date_obj = datetime.datetime.now()
+            full_str = date_obj.strftime("%Y-%m-%d %H:%M:%S")
+            date = date_obj.strftime("%Y-%m-%d")
+            time_str = date_obj.strftime("%H:%M:%S")
+            print(date, mp.current_process().pid, time_str,
+                  mp.current_process().name, mp.current_process().authkey, file=f)
 
-
+    def __del__(self):
+        # need to cleanup all the manager objects
+        del self.depletion_voltage
+        del self.depletion_error
+        del self.fit_parameter_estimators
+        del self.fit_parameter_errors
+        del self._pixel_col
+        del self._pixel_row
+        del self._depletion_reg
+        del self.systematic_errors
+        del self.systematic_dispersion
+        del self.lock
 
     @property
     def pixel_row(self):
@@ -342,7 +323,9 @@ class DepletionArrayStore(DepletionDataStore):
             else:
                 match key:
                     case "depletion":
-                        self.depletion_voltage[self.pixel_col, self.pixel_row, self.depletion_reg] = data
+                        self.depletion_voltage[
+                            self.pixel_col, self.pixel_row, self.depletion_reg
+                        ] = data
                     case "depletion_error":
                         self.depletion_error[self.pixel_col, self.pixel_row, self.depletion_reg] = data
                     case "fit_result_first":
@@ -415,4 +398,3 @@ class SummaryTable(tb.IsDescription):
 register_proxy("DepletionArrayStorage", DepletionArrayStore, DepletionArrayStoreProxy)
 register_proxy("DepletionArrayStorage", DepletionArrayStore, DepletionArrayStoreProxy,
                pixcap65.concurrency.ExtendedSyncManager)
-
