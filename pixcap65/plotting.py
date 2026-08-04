@@ -1338,8 +1338,10 @@ if __name__ == '__main__':
     logging.basicConfig(level=logging.INFO)
     # plot_bias_data(interpreted_data="data/3D_Sensor_221_Scan.h5", base_path="Thesis/ATLAS_ITk/X3/I_V_Characteristic",
     #                use_group=True)
-    # plot_bias_data(interpreted_data="data/3D_Sensor_221_W13_X_Scan.h5", base_path="Thesis/ATLAS_ITk/X3/I_V_Characteristic",
-    #                use_group=True)
+    plot_data('data/3D_Sensor_221_W5_S_Scan.h5', base_path='Thesis/ATLAS_ITk/X4/unbiased_full', use_group=True,
+              distribution=True)
+    plot_bias_data(interpreted_data="data/R13_3_Scan.h5", base_path="Reference/R13/I_V_Characteristic_Extended_20",
+                   use_group=True)
     # plot_combined_data(interpreted_data="data/3D_Sensor_221_W13_X_Scan.h5",
     #                    base_path="Thesis/ATLAS_ITk/X3/C_V_Characteristic", use_group=True)
     # plot_bias_data(interpreted_data="data/3D_Sensor_221_W6_j_Scan.h5", base_path="Thesis/ATLAS_ITk/X5/I_V_Characteristic",
@@ -1358,88 +1360,88 @@ if __name__ == '__main__':
     # plot_combined_data(interpreted_data="data/argparser.h5", base_path="Reference/R11/C_V_Characteristic", use_group=True)
     # plot_combined_data(interpreted_data="data/3D_Sensor_221_W5_S_Scan.h5", base_path="Thesis/ATLAS_ITk/X4/C_V_Characteristic",
     #                    use_group=True)
-    try:
-        from subprocess import run
-
-        run_result = run(['pdflatex', '--version'], check=True, capture_output=True)
-        has_latex = True
-        logger.info("The latex compiler to use is: %s", run_result.stdout.decode("utf-8"))
-    except (FileNotFoundError, ImportError):
-        # proceed as if no latex exists
-        logger.exception("Could not verify whether latex exists.")
-        has_latex = False
-    set_params(latex=has_latex,
-               latex_extra=r"\sisetup{separate-uncertainty}\sisetup{locale = DE}\sisetup{uncertainty-descriptors={"
-                           r"stat,sys}}\sisetup{uncertainty-descriptor-mode=subscript}\sisetup{"
-                           r"retain-zero-uncertainty}", fig_height=8.26772, fig_width=11.69291,)
-
-
-    def e1_plotter_first(tb_lock):
-        print("Plot E1")
-        plot_data(interpreted_data=E1_SCAN_FILE, base_path="Reference/E1/unbiased_4_full", use_group=True,
-                  exclude_test_cap=True, mask_pixel=data_constants.e1_pixel_mask, lock=tb_lock,)
-        plot_data(interpreted_data=E1_SCAN_FILE, base_path="Reference/E1/unbiased_4_full", use_group=True,
-                  use_corrected=True, distribution=True, exclude_test_cap=True,
-                  mask_pixel=data_constants.e1_pixel_mask, lock = tb_lock,)
-        plot_bias_data(interpreted_data=E1_SCAN_FILE, base_path="Reference/E1/I_V_Characteristic",
-                       use_group=True, lock=tb_lock,)
-        plot_combined_data(interpreted_data=E1_SCAN_FILE, base_path="Reference/E1/C_V_Characteristic",
-                           use_group=True, distribution=True, lock=tb_lock,)
-        plot_combined_data(interpreted_data=E1_SCAN_FILE, base_path="Reference/E1/C_V_Characteristic",
-                           use_group=True,
-                           use_corrected=True,
-                           apply_doping=False, distribution=False, lock=tb_lock,)
-
-    # use this attempt to achieve a better performance when generating the plots
-    import multiprocessing as mp
-    from full_analysis import x1_plotter, x2_plotter_second, x5_plotter, x6_plotter, x7_plotter, r13_plotter_second, \
-    presentation_plotter
-    from full_analysis import e1_plotter_second, r1_plotter
-
-    print(mp.current_process().name)
-    print(mp.cpu_count())
-    import sysconfig
-
-    print("Path names")
-    print(sysconfig.get_path_names())
-    print(sysconfig.get_path("data"))
-
-    print(__file__)
-    from importlib.resources import files
-    print(files())
-    print("Fetch resources A")
-    for resource in files().iterdir():
-        print(resource)
-
-    print("Fetch resources B")
-    print(files("pixcap65"))
-    for resource in files("pixcap65").joinpath("device","ise").iterdir():
-        print(resource)
-
-    with mp.Manager() as manager, mp.Pool(initializer=mp_plotting_init, initargs=("PDF", False,)) as pool:
-        tables_lock = manager.RLock()
-        process_handles = [
-            x1_plotter,
-            x2_plotter_second,
-            x5_plotter,
-            x6_plotter,
-            x7_plotter,
-            r13_plotter_second,
-            e1_plotter_second,
-            r1_plotter,
-        ]
-
-        # processes = [pool.apply_async(handle, (tables_lock,)) for handle in process_handles]
-
-        # for p in processes:
-        #     p.wait()
-        #     print("Finished the process; Was it sucessful?", p.successful())
-
-        x2_plotter_second(tables_lock)
-
-        set_params(latex=has_latex,
-                   latex_extra=r"\sisetup{separate-uncertainty}\sisetup{locale = DE}\sisetup{uncertainty-descriptors={"
-                               r"stat,sys}}\sisetup{uncertainty-descriptor-mode=subscript}\sisetup{"
-                               r"retain-zero-uncertainty}", fig_height=8.26772, fig_width=11.69291,
-                   minor=True, fontsize=12, dpi=1200)
-        presentation_plotter(tables_lock)
+    # try:
+    #     from subprocess import run
+    #
+    #     run_result = run(['pdflatex', '--version'], check=True, capture_output=True)
+    #     has_latex = True
+    #     logger.info("The latex compiler to use is: %s", run_result.stdout.decode("utf-8"))
+    # except (FileNotFoundError, ImportError):
+    #     # proceed as if no latex exists
+    #     logger.exception("Could not verify whether latex exists.")
+    #     has_latex = False
+    # set_params(latex=has_latex,
+    #            latex_extra=r"\sisetup{separate-uncertainty}\sisetup{locale = DE}\sisetup{uncertainty-descriptors={"
+    #                        r"stat,sys}}\sisetup{uncertainty-descriptor-mode=subscript}\sisetup{"
+    #                        r"retain-zero-uncertainty}", fig_height=8.26772, fig_width=11.69291,)
+    #
+    #
+    # def e1_plotter_first(tb_lock):
+    #     print("Plot E1")
+    #     plot_data(interpreted_data=E1_SCAN_FILE, base_path="Reference/E1/unbiased_4_full", use_group=True,
+    #               exclude_test_cap=True, mask_pixel=data_constants.e1_pixel_mask, lock=tb_lock,)
+    #     plot_data(interpreted_data=E1_SCAN_FILE, base_path="Reference/E1/unbiased_4_full", use_group=True,
+    #               use_corrected=True, distribution=True, exclude_test_cap=True,
+    #               mask_pixel=data_constants.e1_pixel_mask, lock = tb_lock,)
+    #     plot_bias_data(interpreted_data=E1_SCAN_FILE, base_path="Reference/E1/I_V_Characteristic",
+    #                    use_group=True, lock=tb_lock,)
+    #     plot_combined_data(interpreted_data=E1_SCAN_FILE, base_path="Reference/E1/C_V_Characteristic",
+    #                        use_group=True, distribution=True, lock=tb_lock,)
+    #     plot_combined_data(interpreted_data=E1_SCAN_FILE, base_path="Reference/E1/C_V_Characteristic",
+    #                        use_group=True,
+    #                        use_corrected=True,
+    #                        apply_doping=False, distribution=False, lock=tb_lock,)
+    #
+    # # use this attempt to achieve a better performance when generating the plots
+    # import multiprocessing as mp
+    # from full_analysis import x1_plotter, x2_plotter_second, x5_plotter, x6_plotter, x7_plotter, r13_plotter_second, \
+    # presentation_plotter
+    # from full_analysis import e1_plotter_second, r1_plotter
+    #
+    # print(mp.current_process().name)
+    # print(mp.cpu_count())
+    # import sysconfig
+    #
+    # print("Path names")
+    # print(sysconfig.get_path_names())
+    # print(sysconfig.get_path("data"))
+    #
+    # print(__file__)
+    # from importlib.resources import files
+    # print(files())
+    # print("Fetch resources A")
+    # for resource in files().iterdir():
+    #     print(resource)
+    #
+    # print("Fetch resources B")
+    # print(files("pixcap65"))
+    # for resource in files("pixcap65").joinpath("device","ise").iterdir():
+    #     print(resource)
+    #
+    # with mp.Manager() as manager, mp.Pool(initializer=mp_plotting_init, initargs=("PDF", False,)) as pool:
+    #     tables_lock = manager.RLock()
+    #     process_handles = [
+    #         x1_plotter,
+    #         x2_plotter_second,
+    #         x5_plotter,
+    #         x6_plotter,
+    #         x7_plotter,
+    #         r13_plotter_second,
+    #         e1_plotter_second,
+    #         r1_plotter,
+    #     ]
+    #
+    #     # processes = [pool.apply_async(handle, (tables_lock,)) for handle in process_handles]
+    #
+    #     # for p in processes:
+    #     #     p.wait()
+    #     #     print("Finished the process; Was it sucessful?", p.successful())
+    #
+    #     x2_plotter_second(tables_lock)
+    #
+    #     set_params(latex=has_latex,
+    #                latex_extra=r"\sisetup{separate-uncertainty}\sisetup{locale = DE}\sisetup{uncertainty-descriptors={"
+    #                            r"stat,sys}}\sisetup{uncertainty-descriptor-mode=subscript}\sisetup{"
+    #                            r"retain-zero-uncertainty}", fig_height=8.26772, fig_width=11.69291,
+    #                minor=True, fontsize=12, dpi=1200)
+    #     presentation_plotter(tables_lock)

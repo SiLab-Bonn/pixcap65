@@ -1386,20 +1386,14 @@ class PixCap65Measurement(Pixcap65BaseMeasurement, metaclass=ABCMeta):
 
         except KeyboardInterrupt as e:
             logger.info("Caught KeyboardInterrupt. Will terminate the program softly.")
-            continue_error = e
-            continue_saving_operation = True
-        else:
-            continue_saving_operation = True
-
-        if continue_saving_operation:
+            raise e
+        finally:
             self.create_carray(data_group, "SMUVoltageHist", unit="V", obj=voltage_reference_data)
             self.post_scan_handler(data_group, sequence_call, group=data_group)
 
-        post_hook(data_group)
-
-        if continue_error is not None:
+            post_hook(data_group)
             self.out_file_h5.flush()
-            raise continue_error
+
         logging.info('Done')
         logger.info('Done')
 
@@ -1593,6 +1587,11 @@ class PixCap65TotalCap(PixCap65Measurement):
             for k, freq in enumerate(frequency_range):
                 self.pixcap.cvm_frequency = freq
                 self.verify_stable_current(self.pixcap.primary_smu_key)
+                # TODO: catch errors except for KeyboardInterupt during measurement
+                # the implementation might be dangerous!
+                # there should be some emergency handling in case we encounter an full breakdown.
+                # e.g. if the SMU restarts unexpectedly, we don't know how the serial will behave and we would need to
+                # reinit it anyway!
                 self.handle_measurement(i_col, i_row, k)
                 self.store_iteration_parameters(freq, k)
 

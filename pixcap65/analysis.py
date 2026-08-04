@@ -2446,27 +2446,31 @@ if __name__ == '__main__':
     # some usage examples
     from pixcap65.utility.homogenize_plots import set_params
 
-    analyze_data(raw_data="data/3D_Sensor_221_W13_X_Scan.h5", base_path="Thesis/ATLAS_ITk/X3/C_V_Characteristic",
-                 is_cv=True)
-    analyze_data(raw_data="data/3D_Sensor_221_W6_j_Scan.h5", base_path="Thesis/ATLAS_ITk/X5/C_V_Characteristic",
-                 is_cv=True)
-    analyze_data(raw_data="data/3D_Sensor_I14_S24_Scan.h5", base_path="Thesis/ATLAS_ITk/X6/C_V_Characteristic",
-                 is_cv=True)
-    analyze_data(raw_data="data/3D_Sensor_H23_S24_Scan.h5", base_path="Thesis/ATLAS_ITk/X7/C_V_Characteristic",
-                 is_cv=True)
-    analyze_data(raw_data="data/argparser.h5", base_path="Reference/R11/C_V_Characteristic", is_cv=True)
-    analyze_data(raw_data="data/3D_Sensor_221_W5_S_Scan.h5", base_path="Thesis/ATLAS_ITk/X4/C_V_Characteristic",
-                 is_cv=True)
-    try:
-        from subprocess import run
+    analyze_data(raw_data="data/3D_Sensor_221_W5_S_Scan.h5", base_path='Thesis/ATLAS_ITk/X4/unbiased_full',
+                 is_advanced=True, full_model=False)
 
-        run_result = run(['pdflatex', '--version'], check=True, capture_output=True)
-        has_latex = True
-        logger.info("The latex compiler to use is: %s", run_result.stdout.decode("utf-8"))
-    except (FileNotFoundError, ImportError):
-        # proceed as if no latex exists
-        logger.exception("Could not verify whether latex exists.")
-        has_latex = False
+    # analyze_data(raw_data="data/3D_Sensor_221_W13_X_Scan.h5", base_path="Thesis/ATLAS_ITk/X3/C_V_Characteristic",
+    #              is_cv=True)
+    # analyze_data(raw_data="data/3D_Sensor_221_W6_j_Scan.h5", base_path="Thesis/ATLAS_ITk/X5/C_V_Characteristic",
+    #              is_cv=True)
+    # analyze_data(raw_data="data/3D_Sensor_I14_S24_Scan.h5", base_path="Thesis/ATLAS_ITk/X6/C_V_Characteristic",
+    #              is_cv=True)
+    # analyze_data(raw_data="data/3D_Sensor_H23_S24_Scan.h5", base_path="Thesis/ATLAS_ITk/X7/C_V_Characteristic",
+    #              is_cv=True)
+    # analyze_data(raw_data="data/argparser.h5", base_path="Reference/R11/C_V_Characteristic", is_cv=True)
+    # analyze_data(raw_data="data/3D_Sensor_221_W5_S_Scan.h5", base_path="Thesis/ATLAS_ITk/X4/C_V_Characteristic",
+    #              is_cv=True)
+    # try:
+    #     from subprocess import run
+    #
+    #     run_result = run(['pdflatex', '--version'], check=True, capture_output=True)
+    #     has_latex = True
+    #     logger.info("The latex compiler to use is: %s", run_result.stdout.decode("utf-8"))
+    # except (FileNotFoundError, ImportError):
+    #     # proceed as if no latex exists
+    #     logger.exception("Could not verify whether latex exists.")
+    #     has_latex = False
+    has_latex = False
     set_params(latex=False,
                latex_extra=r"\sisetup{separate-uncertainty}\sisetup{locale = DE}\sisetup{uncertainty-descriptors="
                            r"{stat,sys}}\sisetup{uncertainty-descriptor-mode=subscript}"
