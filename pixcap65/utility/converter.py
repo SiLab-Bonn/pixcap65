@@ -9,7 +9,7 @@ import yaml
 from pixcap65 import data_constants
 from pixcap65.analysis_util.utility import HIST_BIAS_MEAS_UNIT, HIST_CURRENT_MEAS_UNIT, GLOBAL_FILTERS
 from pixcap65.configs.config_handler import extract_smu_voltage_error
-from pixcap65.data_constants import X5_SCAN_FILE
+from pixcap65.data_constants import X2_SCAN_2_FILE
 from pixcap65.pixcap.pixcap65_measurement import ScanConfigurationKeys
 from pixcap65.pixcap_65_test_total_cap import BiasTable
 from pixcap65.utility.tables_util import set_group_attribute, group_get_file, get_groups, list_group_attributes, \
@@ -551,27 +551,27 @@ if __name__ == "__main__":
     #                           newparent=h5_file.root.Thesis.ATLAS_ITk.X1, recursive=True, overwrite=True)
     #     generate_pixel_dimensions(h5_file.root.Thesis.ATLAS_ITk.X1)
     #
-    # with tb.open_file(X2_SCAN_2_FILE, "a") as h5_file:
-    #     # generate_bias_table(h5_file.root.ATLAS_ITk.X2.I_V_Characteristic.biasing.measurements)
-    #     generate_bias_table(h5_file.root.ATLAS_ITk.X2.C_V_Characteristic_refined.biasing.measurements)
-    #     regenerate_c_v_errors(h5_file.root.ATLAS_ITk.X2.C_V_Characteristic_refined.biasing.measurements)
-    #     generate_pixel_dimensions(h5_file.root.ATLAS_ITk.X2)
-    #     h5_file.root.ATLAS_ITk.X2.C_V_Characteristic_refined.biasing.measurements.BiasVoltageHist.attrs["Units"] = "V"
-    #     old_x2 = h5_file.root.ATLAS_ITk.X2
-    #     assert isinstance(old_x2, tb.Group)
-    #     for group in old_x2._f_iter_nodes():
-    #         if not isinstance(group, tb.Group):
-    #             continue
-    #         if group == old_x2:
-    #             continue
-    #         print(group)
-    #         h5_file.copy_node(where=old_x2, name=group._v_name,
-    #                           newname=group._v_name,
-    #                           newparent=h5_file.root.Thesis.ATLAS_ITk.X2, recursive=True, overwrite=True)
-    #
-    #     with tb.open_file("packaged/data/X2_12_Renew_Scan.h5") as backing_file:
-    #         backing_file.copy_children(backing_file.root.Thesis.ATLAS_ITk.X2, h5_file.root.Thesis.ATLAS_ITk.X2, recursive=True, overwrite=True)
-    #
+    with tb.open_file(X2_SCAN_2_FILE, "a") as h5_file:
+        # generate_bias_table(h5_file.root.ATLAS_ITk.X2.I_V_Characteristic.biasing.measurements)
+        generate_bias_table(h5_file.root.ATLAS_ITk.X2.C_V_Characteristic_refined.biasing.measurements)
+        regenerate_c_v_errors(h5_file.root.ATLAS_ITk.X2.C_V_Characteristic_refined.biasing.measurements)
+        generate_pixel_dimensions(h5_file.root.ATLAS_ITk.X2)
+        h5_file.root.ATLAS_ITk.X2.C_V_Characteristic_refined.biasing.measurements.BiasVoltageHist.attrs["Units"] = "V"
+        old_x2 = h5_file.root.ATLAS_ITk.X2
+        assert isinstance(old_x2, tb.Group)
+        for group in old_x2._f_iter_nodes():
+            if not isinstance(group, tb.Group):
+                continue
+            if group == old_x2:
+                continue
+            print(group)
+            h5_file.copy_node(where=old_x2, name=group._v_name,
+                              newname=group._v_name,
+                              newparent=h5_file.root.Thesis.ATLAS_ITk.X2, recursive=True, overwrite=True)
+
+        with tb.open_file("packaged/data/X2_12_Renew_Scan.h5") as backing_file:
+            backing_file.copy_children(backing_file.root.Thesis.ATLAS_ITk.X2, h5_file.root.Thesis.ATLAS_ITk.X2, recursive=True, overwrite=True)
+
     #
     # with tb.open_file(R11_SCAN_FILE, "a") as h5_file:
     #     generate_pixel_dimensions(h5_file.root.Reference.R1)
@@ -651,8 +651,8 @@ if __name__ == "__main__":
     #     h5_file.copy_node(where=h5_file.root.Thesis.ATLAS_ITk.X4, name="inter_biased_M_80_V_full_Extended",
     #                       newname="inter_biased_M_80_V_full", overwrite=True, recursive=True)
 
-    with tb.open_file(X5_SCAN_FILE, "a") as h5_file:
-        generate_pixel_dimensions(h5_file.root.Thesis.ATLAS_ITk.X5)
+    # with tb.open_file(X5_SCAN_FILE, "a") as h5_file:
+    #     generate_pixel_dimensions(h5_file.root.Thesis.ATLAS_ITk.X5)
 
     # with tb.open_file(X6_SCAN_FILE, "a") as h5_file:
     #     wrong_parent = h5_file.root.Thesis.ATLAS_ITk.X7

@@ -253,12 +253,9 @@ class PixCapSetup(Dut):
             print(self["power"].get_current(channel=1))
 
             # init the pixcap system
-            if "out_file" not in self.measurement_arguments and "output_file" in self.measurement_arguments:
-                logger.warn("added out_file argument")
-                self.measurement_arguments["out_file"] = self.measurement_arguments["output_file"]
-            elif "out_file" in self.measurement_arguments and "output_file" not in self.measurement_arguments:
+            if "out_file" in self.measurement_arguments and "output_file" not in self.measurement_arguments:
                 self.measurement_arguments["output_file"] = self.measurement_arguments["out_file"]
-                logger.warn("added output_file argument")
+                logger.warning("added output_file argument")
 
             try:
                 self.pixcap = self.measurement_class(**self.measurement_arguments)

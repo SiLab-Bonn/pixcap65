@@ -1,3 +1,4 @@
+import atexit
 import matplotlib
 # from matplotlib.ticker import AutoMinorLocator
 import numpy as np
@@ -153,7 +154,14 @@ def revert_params():
 
 homo_lock = threading.RLock()
 current_cycle_data = {}
-enhanced_cycler =list( get_error_cycler())
+enhanced_cycler =list(get_error_cycler())
+
+def release_locks():
+    global homo_lock
+    del homo_lock
+    atexit.unregister(release_locks)
+
+atexit.register(release_locks)
 
 def enhanced_error_bar(ax: matplotlib.axes.Axes, *args, **kwargs):
     h = hash(ax)

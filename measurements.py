@@ -4,7 +4,7 @@ import numpy as np
 import time
 import multiprocessing
 
-from pixcap65.pixcap_65_test_total_cap import ScanConfigurationKeys
+from pixcap65.pixcap.pixcap65_measurement import ScanConfigurationKeys
 from pixcap65.utils import PixCapSetup, PixcapMeasurements
 
 MAXIMUM_CV_FREQ = 4.1
