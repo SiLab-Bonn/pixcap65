@@ -1,8 +1,6 @@
 import logging
-
 import numpy as np
 import time
-import multiprocessing
 
 from pixcap65.pixcap.pixcap65_measurement import ScanConfigurationKeys
 from pixcap65.utils import PixCapSetup, PixcapMeasurements
@@ -17,7 +15,25 @@ MAXIMUM_INTER_PIX_FREQ = 6.1
 INTER_PIX_FREQ_STEP = 0.5
 
 
-lock = multiprocessing.RLock()
+def release_lock():
+    global lock
+    if lock is not None:
+        lock.acquire()
+        lock.release()
+        del lock
+        lock = None
+
+def get_lock():
+    global lock
+    if lock is None:
+        import threading
+        import atexit
+        lock = threading.RLock()
+        atexit.register(release_lock)
+
+    return lock
+
+lock = None
 
 
 scan_configuration = {
@@ -41,7 +57,7 @@ scan_configuration = {
 
 def perform_initial_total_measurement(cli_args):
     global scan_configuration
-    with lock:
+    with get_lock():
         scan_configuration[ScanConfigurationKeys.AVERAGE_MEASUREMENTS] = 25
         scan_configuration[ScanConfigurationKeys.FREQUENCY_RANGE] = np.arange(1, MAXIMUM_FULL_SCAN_FREQ, FULL_SCAN_FREQ_STEP)
 
@@ -52,7 +68,7 @@ def perform_initial_total_measurement(cli_args):
             with pix.binary_readout_mode() as binary_pix:
                 binary_pix.scan(data_group_spec="unbiased_full")
 
-    with lock:
+    with get_lock():
         del scan_configuration[ScanConfigurationKeys.AVERAGE_MEASUREMENTS]
         try:
             time.sleep(cli_args.wait)
@@ -64,7 +80,7 @@ def perform_initial_total_measurement(cli_args):
 
 def perform_iv_measurement(cli_args):
     global scan_configuration
-    with lock:
+    with get_lock():
         scan_configuration[ScanConfigurationKeys.BIAS_VOLTAGE_RANGE] = -1 * np.arange(0, MAXIMUM_HV_VOLTAGE, HV_STEP)
         scan_configuration[ScanConfigurationKeys.BIAS_AVERAGE_MEASUREMENTS] = 10
         assert np.all(0 >= scan_configuration[ScanConfigurationKeys.BIAS_VOLTAGE_RANGE])
@@ -73,7 +89,7 @@ def perform_iv_measurement(cli_args):
         with PixCapSetup(scan_configuration, output_file, measurement=PixcapMeasurements.TOTAL_CAPACITANCE) as pix:
             pix.bias_scan(data_group_spec="I_V_Characteristic_Extended")
 
-    with lock:
+    with get_lock():
         del scan_configuration[ScanConfigurationKeys.BIAS_AVERAGE_MEASUREMENTS]
         try:
             time.sleep(cli_args.wait)
@@ -86,7 +102,7 @@ def perform_iv_measurement(cli_args):
 def perform_coarse_cv_scan(cli_args, hv_range):
     global scan_configuration
 
-    with lock:
+    with get_lock():
         assert np.all(scan_configuration[ScanConfigurationKeys.BIAS_VOLTAGE_RANGE] < 0)
 
     if cli_args.cv_general_flag and cli_args.cv_coarse_flag:
@@ -94,7 +110,7 @@ def perform_coarse_cv_scan(cli_args, hv_range):
         with PixCapSetup(scan_configuration, output_file, measurement=PixcapMeasurements.TOTAL_CAPACITANCE) as pix:
             pix.combined_bias_cv_scan(data_group_spec="C_V_Characteristic")
 
-    with lock:
+    with get_lock():
         try:
             time.sleep(cli_args.wait)
             if cli_args.cv_general_flag and cli_args.cv_coarse_flag:
@@ -106,7 +122,7 @@ def perform_coarse_cv_scan(cli_args, hv_range):
 def perform_fine_cv_scan(cli_args, hv_range):
     global scan_configuration
 
-    with lock:
+    with get_lock():
         scan_configuration[ScanConfigurationKeys.BIAS_VOLTAGE_RANGE] = hv_range
         scan_configuration.update(start_row=10, stop_row=35, start_column=10, stop_column=35)
         scan_configuration[ScanConfigurationKeys.FREQUENCY_RANGE] = np.arange(1, MAXIMUM_CV_FREQ, CV_FREQ_STEP)
@@ -118,7 +134,7 @@ def perform_fine_cv_scan(cli_args, hv_range):
             pix.frequency_settling = cli_args.freq_settle
             pix.combined_bias_cv_scan(data_group_spec="C_V_Characteristic_refined_Extended")
 
-    with lock:
+    with get_lock():
         try:
             time.sleep(cli_args.wait)
             if cli_args.cv_general_flag and cli_args.cv_fine_flag:
@@ -129,7 +145,7 @@ def perform_fine_cv_scan(cli_args, hv_range):
 
 def perform_biased_total_cap(cli_args):
     global scan_configuration
-    with lock:
+    with get_lock():
         if ScanConfigurationKeys.BIAS_VOLTAGE_RANGE in scan_configuration:
             del scan_configuration[ScanConfigurationKeys.BIAS_VOLTAGE_RANGE]
         scan_configuration.update(start_row=1, stop_row=40, start_column=0, stop_column=40, bias=-1 * cli_args.hv_voltage,
@@ -145,7 +161,7 @@ def perform_biased_total_cap(cli_args):
             with pix.binary_readout_mode() as binary_pix:
                 binary_pix.scan(data_group_spec="biased_{}_V_full".format(cli_args.hv_voltage))
 
-    with lock:
+    with get_lock():
         try:
             time.sleep(cli_args.wait)
             if cli_args.depleted_flag:
@@ -159,7 +175,7 @@ def perform_biased_total_cap(cli_args):
 def perform_inter_pix_scan(cli_args):
     global scan_configuration
 
-    with lock:
+    with get_lock():
         scan_configuration[ScanConfigurationKeys.FREQUENCY_RANGE] = np.around(np.arange(1, MAXIMUM_INTER_PIX_FREQ, INTER_PIX_FREQ_STEP), 2)
         scan_configuration.update(start_row=5, stop_row=40, start_column=5, stop_column=38)
         if ScanConfigurationKeys.BIAS_VOLTAGE_SINGLE in scan_configuration:
@@ -171,7 +187,7 @@ def perform_inter_pix_scan(cli_args):
                 pix.frequency_settling = cli_args.freq_settle
                 pix.scan(data_group_spec="inter_unbiased_full_Extended")
 
-    with lock:
+    with get_lock():
         try:
             time.sleep(cli_args.wait)
             if cli_args.inter_pix_cap:
@@ -188,7 +204,7 @@ def perform_inter_pix_scan(cli_args):
                 pix.frequency_settling = cli_args.freq_settle
                 pix.scan(data_group_spec="inter_biased_M_{}_V_full_Extended".format(cli_args.hv_voltage))
 
-    with lock:
+    with get_lock():
         try:
             time.sleep(cli_args.wait)
             if cli_args.inter_pix_cap:
