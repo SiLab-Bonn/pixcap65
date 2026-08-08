@@ -2,18 +2,18 @@
 Script for measuring Inter Pixel Capacitance 
 """
 import logging
-from contextlib import contextmanager
-
 import numpy as np
 import tables as tb
 import time
 import warnings
+from contextlib import contextmanager
 
 from pixcap65.analysis import analysis_data_handle
 from pixcap65.analysis_util import GENERAL_PIXCAP_SHAPE
 from pixcap65.analysis_util.utility import HIST_CURRENT_MEAS_UNIT, handle_analysis_mix_up
+from pixcap65.pixcap.pixcap65_measurement import ScanConfigurationKeys
 from pixcap65.pixcap_65_test_total_cap import PixCap65Measurement, MEASURING_PIXEL_TEXT, \
-    _store_scan_par_values, ScanConfigurationKeys
+    _store_scan_par_values
 from pixcap65.utility import pixcap65_constants as c
 from pixcap65.utility.tables_util import set_group_attribute
 from pixcap65.utility.utils_2 import walk_to_node
@@ -69,11 +69,8 @@ class Pixcap65InterCap(PixCap65Measurement):
             self.mode_logging_text = 'Scan pixel by single measurements.'
             self.handle_measurement = self._handle_single_measurement
 
-    def __init__(self, scan_config, out_file, **kwargs):
-        # FIXME: Issue with the naming convention for the output file!
-        if "output_file" in kwargs:
-            out_file = kwargs.pop("output_file")
-        super(Pixcap65InterCap, self).__init__(scan_config, out_file, **kwargs)
+    def __init__(self, scan_config, output_file, **kwargs):
+        super(Pixcap65InterCap, self).__init__(scan_config, output_file, **kwargs)
 
         # prepare the data fields for the measurement
         self.inter_hist_current_1 = np.full(shape=(40, 41, self.n_frequencies),

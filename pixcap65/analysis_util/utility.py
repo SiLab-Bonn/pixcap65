@@ -472,6 +472,7 @@ class CVDistributionSimpleData(tb.IsDescription):
     cap_systematic_general = tb.Float64Col(pos=10)
     cap_systematic_dispersion = tb.Float64Col(pos=11)
 
+# TODO: adjustment for corrected values of systematics
 class CVDistributionData(tb.IsDescription):
     bias = tb.Float64Col(pos=0)
     n_pixel = tb.Int64Col(pos=1)
@@ -559,6 +560,8 @@ class DepletionData(tb.IsDescription):
     rho_error = tb.Float64Col(pos=25)
     rho_corrected = tb.Float64Col(pos=26)
     rho_corrected_error = tb.Float64Col(pos=27)
+    first_covariance = tb.Float64Col(pos=28, shape=(2,2))
+    second_covariance = tb.Float64Col(pos=28, shape=(2, 2))
 
     def __new__(cls, classname: str, bases: Sequence, classdict: dict[str, Any]):
         print("Called new!")

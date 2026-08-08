@@ -1,6 +1,5 @@
 import tables as tb
-from typing import Any
-from typing import ItemsView
+from typing import Any, ItemsView
 
 
 def get_groups(parent: tb.Group) -> ItemsView[str, tb.Group]:

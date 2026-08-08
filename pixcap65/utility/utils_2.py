@@ -4,7 +4,6 @@ import numpy as np
 import sys
 import tables as tb
 import time
-from time import sleep
 # noinspection PyProtectedMember
 from tqdm.contrib import DummyTqdmFile
 from typing import Union, Tuple
@@ -111,17 +110,17 @@ def create_update_array(h5, where: tb.Group, name: str, **kwargs):
                 assert hasattr(where[name], "rename")
                 # noinspection PyUnresolvedReferences
                 where[name].rename("{old}_backing".format(old=name))
-                sleep(1)
+                time.sleep(1)
             else:
                 print("Array creation failed.")
                 logger.error(e)
                 logger.exception(e.args, e.__traceback__)
-                sleep(create_iteration // 2)
+                time.sleep(create_iteration // 2)
         except Exception as e:
             print("Array creation failed.")
             logger.error(e)
             logger.exception(e.args, e.__traceback__)
-            sleep(create_iteration // 2)
+            time.sleep(create_iteration // 2)
 
     logger.warning(f"Failed to create or update the array {name}")
     return None

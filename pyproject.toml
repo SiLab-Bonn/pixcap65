@@ -65,7 +65,9 @@ advanced = [
 visualization = [
     "pyqt5",
     "vitables",
-    "matplotlib<=3.10.9",
+    # "matplotlib<=3.10.9",
+    "matplotlib>=3.11.1; python_version >= '3.11'",
+    "matplotlib<3.10.9; python_version < '3.11'",
     "pycairo",
     "mpld3"
 ]

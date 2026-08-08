@@ -340,7 +340,6 @@ if __name__ == "__main__":
                     current_row["biased_inter_capacitance"] = current_entry
                     current_entry = DEFAULT_ENTRY
 
-                    # TODO: implement the side capacitances in Addition
                     if entry.biased_inter_pix_group_sides is not None and 'None' not in entry.biased_inter_pix_group_sides:
                         group = h5_file._get_or_create_path("/" + entry.biased_inter_pix_group_sides, False)
                         if "DistResultfF" in group:
@@ -405,7 +404,6 @@ if __name__ == "__main__":
             table.cols.sensor.create_csindex()
             table.flush()
 
-    # TODO: need a extraction of the backplane capacitance! But we need to use the corrected capacitances;
     group_provider_dtype = np.dtype([('file', str, 220), ('unbiased_group', str, 100),
                                      ('unbiased_inter_pix_group', str, 100), ('biased_group', str, 100),
                                      ('biased_inter_pix_group', str, 100), ('cv_group', str, 100),
@@ -765,5 +763,3 @@ if __name__ == "__main__":
                                   title="Corrected Values of the test capacitances", description=corrected_test_data,)
         table.cols.Sensor.create_csindex()
         table.flush()
-
-        # TODO: correct all the measured test capacitances for the effect of the circuits parasitic capacitance!

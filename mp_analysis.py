@@ -21,10 +21,11 @@ import multiprocessing as mp
 import numpy as np
 import threading
 import time
+from contextlib import contextmanager
 from matplotlib.backends.backend_pdf import PdfPages
 
-import pixcap65.concurrency as concurrency
 import pixcap65.data_constants as data_constants
+from full_analysis import x4_analysator, r1_analysator
 from pixcap65.analysis import analyze_data
 from pixcap65.data_constants import E1_2_SCAN_FILE, R13_2_SCAN_FILE
 from pixcap65.data_constants import X1_SCAN_2_FILE, X2_SCAN_2_FILE
@@ -385,7 +386,7 @@ def x1_analysator(tb_lock, correction_args, **kwargs):
     print(mp.current_process().pid)
     print(AUTHKEY_OUTPUT, mp.current_process().authkey)
 
-    _ = pixcap65.concurrency.get_manager(**kwargs)
+    primary_manager = pixcap65.concurrency.get_manager(**kwargs)
     x1_depletion_args = {
         "first_boundaries": [(-60, -20), (-83, -77.5)],
         "second_boundaries": [(-0.6, 0), (-77.5, -67.5)],
@@ -396,6 +397,7 @@ def x1_analysator(tb_lock, correction_args, **kwargs):
         "apply_doping": True
     }
     x1_depletion_args.update(**correction_args)
+    print("The manager address:", primary_manager.address)
 
     synchronize_full_model(X1_SCAN_2_FILE, top_ref, name, 80, tb_lock, unbiased_group="unbiased_61_full", )
 
@@ -720,7 +722,6 @@ def x2_analysator(tb_lock, correction_args, **kwargs):
     x2_depletion_args.update(**correction_args)
     x2_depletion_refined_args.update(**correction_args)
 
-    # TODO: missing the inter-pix measurements here -> this here must remain!
     synchronize_full_model(X2_SCAN_2_FILE, top_ref, name, 80, tb_lock, unbiased_group="unbiased_1_full")
     synchronize_full_model(X2_SCAN_2_FILE, top_ref, name, 200, tb_lock)
     with synchronized_process_open_file(X2_SCAN_2_FILE, mode='a', lock=tb_lock) as h5_file:
@@ -757,10 +758,8 @@ def x2_analysator(tb_lock, correction_args, **kwargs):
         analyze_data(raw_data=X2_SCAN_2_FILE,
                      base_path=hdf(top_ref, name, 'C_V_Characteristic_refined_extended_renew_retry'),
                      is_advanced=True, full_model=False, is_cv=True, use_corrected=True, lock=tb_lock,
-                     cv_fit_plot_pdf=cv_pdf,
+                     # cv_fit_plot_pdf=cv_pdf,
                      **x2_depletion_refined_args)
-
-    # TODO: the inter-pix measurements are still missing.
     # After all they could not be measured at all.
     print("Finished -", display_name)
 
@@ -792,73 +791,73 @@ def x5_analysator(tb_lock, correction_args, **kwargs):
     synchronize_full_model(X5_SCAN_FILE, top_ref, name, 90, tb_lock)
 
     # handle the full sensor analysis
-    # analyze_data(raw_data=X5_SCAN_FILE, base_path=hdf(top_ref, name, 'unbiased_full'), is_advanced=True,
-    #              distribution=True, full_model=False, mask_pixel=data_constants.x5_second_pixel_mask,
-    #              exclude_cap_test=True,
-    #              lock=tb_lock, plot=True, fit_plot_pdf_name="Fit References/{}/unbiased_reduced_model_reference_fits.pdf".format(name),
-    #              **correction_args)
-    # analyze_data(raw_data=X5_SCAN_FILE, base_path=hdf(top_ref, name, 'biased_40_V_full'),
-    #              is_advanced=True,
-    #              distribution=True, full_model=False, mask_pixel=data_constants.x5_second_pixel_mask,
-    #              exclude_cap_test=True,
-    #              lock=tb_lock, plot=True,
-    #              fit_plot_pdf_name="Fit References/{}/biased_reduced_model_reference_fits.pdf".format(name),
-    #              mask_lower=50e-15,
-    #              **correction_args)
-    # analyze_data(raw_data=X5_SCAN_FILE, base_path=hdf(top_ref, name, 'biased_90_V_full'),
-    #              is_advanced=True,
-    #              distribution=True, full_model=False, mask_pixel=data_constants.x5_second_pixel_mask,
-    #              exclude_cap_test=True,
-    #              lock=tb_lock,
-    #              # mask_lower=50e-15,
-    #              **correction_args)
-    # analyze_data(raw_data=X5_SCAN_FILE, base_path=hdf(top_ref, name, 'unbiased_full_model'),
-    #              is_advanced=True,
-    #              distribution=True, mask_pixel=data_constants.x5_second_pixel_mask, exclude_cap_test=True,
-    #              lock=tb_lock, plot=True,
-    #              fit_plot_pdf_name="Fit References/{}/unbiased_full_model_reference_fits.pdf".format(name),
-    #              **correction_args)
+    analyze_data(raw_data=X5_SCAN_FILE, base_path=hdf(top_ref, name, 'unbiased_full'), is_advanced=True,
+                 distribution=True, full_model=False, mask_pixel=data_constants.x5_second_pixel_mask,
+                 exclude_cap_test=True,
+                 lock=tb_lock, plot=True, fit_plot_pdf_name="Fit References/{}/unbiased_reduced_model_reference_fits.pdf".format(name),
+                 **correction_args)
+    analyze_data(raw_data=X5_SCAN_FILE, base_path=hdf(top_ref, name, 'biased_40_V_full'),
+                 is_advanced=True,
+                 distribution=True, full_model=False, mask_pixel=data_constants.x5_second_pixel_mask,
+                 exclude_cap_test=True,
+                 lock=tb_lock, plot=True,
+                 fit_plot_pdf_name="Fit References/{}/biased_reduced_model_reference_fits.pdf".format(name),
+                 mask_lower=50e-15,
+                 **correction_args)
+    analyze_data(raw_data=X5_SCAN_FILE, base_path=hdf(top_ref, name, 'biased_90_V_full'),
+                 is_advanced=True,
+                 distribution=True, full_model=False, mask_pixel=data_constants.x5_second_pixel_mask,
+                 exclude_cap_test=True,
+                 lock=tb_lock,
+                 # mask_lower=50e-15,
+                 **correction_args)
+    analyze_data(raw_data=X5_SCAN_FILE, base_path=hdf(top_ref, name, 'unbiased_full_model'),
+                 is_advanced=True,
+                 distribution=True, mask_pixel=data_constants.x5_second_pixel_mask, exclude_cap_test=True,
+                 lock=tb_lock, plot=True,
+                 fit_plot_pdf_name="Fit References/{}/unbiased_full_model_reference_fits.pdf".format(name),
+                 **correction_args)
     analyze_data(raw_data=X5_SCAN_FILE, base_path=hdf(top_ref, name, 'biased_40_V_full_model'),
                  is_advanced=True, full_model=True,
                  distribution=True, mask_pixel=data_constants.x5_second_pixel_mask, exclude_cap_test=True,
                  lock=tb_lock, mask_lower=51.5e-15,
                  **correction_args)
-    # analyze_data(raw_data=X5_SCAN_FILE, base_path=hdf(top_ref, name, 'biased_90_V_full_model'),
-    #              is_advanced=True,
-    #              distribution=True, mask_pixel=data_constants.x5_second_pixel_mask, exclude_cap_test=True,
-    #              lock=tb_lock,
-    #              # mask_lower=50e-15,
-    #              **correction_args)
-    #
-    # # handle the inter-pix analysis
-    # analyze_data(raw_data=X5_SCAN_FILE, base_path=hdf(top_ref, name, 'inter_unbiased_full'),
-    #              is_advanced=True, full_model=False, is_inter_pixel=True,
-    #              mask_pixel=data_constants.x5_second_pixel_mask, exclude_cap_test=True, distribution=True,
-    #              total_cap_file=X5_SCAN_FILE,
-    #              lock=tb_lock,
-    #              total_cap_group=hdf(top_ref, name, 'unbiased_full_model/total_cap'),
-    #              **correction_args)
-    # analyze_data(raw_data=X5_SCAN_FILE, base_path=hdf(top_ref, name, 'inter_biased_M_40_V_full'),
-    #              is_advanced=True, full_model=False, is_inter_pixel=True,
-    #              mask_pixel=data_constants.x5_pixel_mask, exclude_cap_test=True, distribution=True,
-    #              lock=tb_lock,
-    #              total_cap_file=X5_SCAN_FILE,
-    #              total_cap_group=hdf(top_ref, name, 'biased_40_V_full_model/total_cap'),
-    #              **correction_args)
-    # analyze_data(raw_data=X5_SCAN_FILE, base_path=hdf(top_ref, name, 'inter_unbiased_full_model'),
-    #              is_advanced=True, full_model=True, is_inter_pixel=True,
-    #              mask_pixel=data_constants.x5_second_pixel_mask, exclude_cap_test=True, distribution=True,
-    #              total_cap_file=X5_SCAN_FILE,
-    #              lock=tb_lock,
-    #              total_cap_group=hdf(top_ref, name, 'unbiased_full/total_cap'),
-    #              **correction_args)
-    # analyze_data(raw_data=X5_SCAN_FILE, base_path=hdf(top_ref, name, 'inter_biased_M_40_V_full_model'),
-    #              is_advanced=True, full_model=True, is_inter_pixel=True,
-    #              mask_pixel=data_constants.x5_pixel_mask, exclude_cap_test=True, distribution=True,
-    #              lock=tb_lock,
-    #              total_cap_file=X5_SCAN_FILE,
-    #              total_cap_group=hdf(top_ref, name, 'biased_40_V_full/total_cap'),
-    #              **correction_args)
+    analyze_data(raw_data=X5_SCAN_FILE, base_path=hdf(top_ref, name, 'biased_90_V_full_model'),
+                 is_advanced=True,
+                 distribution=True, mask_pixel=data_constants.x5_second_pixel_mask, exclude_cap_test=True,
+                 lock=tb_lock,
+                 # mask_lower=50e-15,
+                 **correction_args)
+
+    # handle the inter-pix analysis
+    analyze_data(raw_data=X5_SCAN_FILE, base_path=hdf(top_ref, name, 'inter_unbiased_full'),
+                 is_advanced=True, full_model=False, is_inter_pixel=True,
+                 mask_pixel=data_constants.x5_second_pixel_mask, exclude_cap_test=True, distribution=True,
+                 total_cap_file=X5_SCAN_FILE,
+                 lock=tb_lock,
+                 total_cap_group=hdf(top_ref, name, 'unbiased_full_model/total_cap'),
+                 **correction_args)
+    analyze_data(raw_data=X5_SCAN_FILE, base_path=hdf(top_ref, name, 'inter_biased_M_40_V_full'),
+                 is_advanced=True, full_model=False, is_inter_pixel=True,
+                 mask_pixel=data_constants.x5_pixel_mask, exclude_cap_test=True, distribution=True,
+                 lock=tb_lock,
+                 total_cap_file=X5_SCAN_FILE,
+                 total_cap_group=hdf(top_ref, name, 'biased_40_V_full_model/total_cap'),
+                 **correction_args)
+    analyze_data(raw_data=X5_SCAN_FILE, base_path=hdf(top_ref, name, 'inter_unbiased_full_model'),
+                 is_advanced=True, full_model=True, is_inter_pixel=True,
+                 mask_pixel=data_constants.x5_second_pixel_mask, exclude_cap_test=True, distribution=True,
+                 total_cap_file=X5_SCAN_FILE,
+                 lock=tb_lock,
+                 total_cap_group=hdf(top_ref, name, 'unbiased_full/total_cap'),
+                 **correction_args)
+    analyze_data(raw_data=X5_SCAN_FILE, base_path=hdf(top_ref, name, 'inter_biased_M_40_V_full_model'),
+                 is_advanced=True, full_model=True, is_inter_pixel=True,
+                 mask_pixel=data_constants.x5_pixel_mask, exclude_cap_test=True, distribution=True,
+                 lock=tb_lock,
+                 total_cap_file=X5_SCAN_FILE,
+                 total_cap_group=hdf(top_ref, name, 'biased_40_V_full/total_cap'),
+                 **correction_args)
 
     # handle the C-V-analysis
     x5_depletion_args = {
@@ -882,24 +881,24 @@ def x5_analysator(tb_lock, correction_args, **kwargs):
     x5_depletion_args.update(**correction_args)
     x5_depletion_args_refined.update(**correction_args)
 
-    # print("CV Analysis for X5")
-    # analyze_data(raw_data=X5_SCAN_FILE, base_path=hdf(top_ref, name, 'C_V_Characteristic'),
-    #              is_advanced=True, full_model=False, is_cv=True, use_corrected=False,
-    #              mask_pixel=data_constants.x5_second_pixel_mask,
-    #              exclude_cap_test=True,
-    #              lock=tb_lock, **x5_depletion_args)
-    # print("Finished first CV")
-    # analyze_data(raw_data=X5_SCAN_FILE, base_path=hdf(top_ref, name, 'C_V_Characteristic_refined'),
-    #              is_advanced=True, full_model=False, is_cv=True, use_corrected=False,
-    #              mask_pixel=data_constants.x5_pixel_mask,
-    #              exclude_cap_test=True,
-    #              lock=tb_lock, **x5_depletion_args_refined)
-    # print("Finished second CV")
-    # analyze_data(raw_data=X5_SCAN_FILE, base_path=hdf(top_ref, name, 'C_V_Characteristic_refined_Extended'),
-    #              is_advanced=True, full_model=False, is_cv=True, use_corrected=False,
-    #              mask_pixel=data_constants.x5_pixel_mask,
-    #              exclude_cap_test=True,
-    #              lock=tb_lock, **x5_depletion_args_refined)
+    print("CV Analysis for X5")
+    analyze_data(raw_data=X5_SCAN_FILE, base_path=hdf(top_ref, name, 'C_V_Characteristic'),
+                 is_advanced=True, full_model=False, is_cv=True, use_corrected=False,
+                 mask_pixel=data_constants.x5_second_pixel_mask,
+                 exclude_cap_test=True,
+                 lock=tb_lock, **x5_depletion_args)
+    print("Finished first CV")
+    analyze_data(raw_data=X5_SCAN_FILE, base_path=hdf(top_ref, name, 'C_V_Characteristic_refined'),
+                 is_advanced=True, full_model=False, is_cv=True, use_corrected=False,
+                 mask_pixel=data_constants.x5_pixel_mask,
+                 exclude_cap_test=True,
+                 lock=tb_lock, **x5_depletion_args_refined)
+    print("Finished second CV")
+    analyze_data(raw_data=X5_SCAN_FILE, base_path=hdf(top_ref, name, 'C_V_Characteristic_refined_Extended'),
+                 is_advanced=True, full_model=False, is_cv=True, use_corrected=False,
+                 mask_pixel=data_constants.x5_pixel_mask,
+                 exclude_cap_test=True,
+                 lock=tb_lock, **x5_depletion_args_refined)
     print("Finished third CV")
 
     # add here the additonal CV analysis used for extended range!
@@ -1098,6 +1097,20 @@ def x7_analysator(tb_lock, correction_args, **kwargs):
 def error_handler(exc):
     logger.error("While performing the analysis in multiple processes an error occured.", exc_info=exc)
 
+@contextmanager
+def processed_manager(**kwargs):
+    import pixcap65.concurrency
+    import gc
+    with pixcap65.concurrency.get_context_manager(**kwargs) as manager_ctx:
+        try:
+            lock = manager_ctx.RLock()
+            yield (manager_ctx, lock)
+        finally:
+            del lock
+            gc.collect()
+
+    gc.collect()
+
 
 if __name__ == "__main__":
     # perhaps it is necessary to provide the different locks as arguments to the
@@ -1106,28 +1119,28 @@ if __name__ == "__main__":
     start_time = time.time()
 
     process_handles = [
-        # x1_analysator,
-        # x2_analysator,
+        x1_analysator,
+        x2_analysator,
         x5_analysator,
-        # x6_analysator,
-        # x7_analysator,
-        # e1_analysator_second,
-        # r13_analysator_second,
-        # r1_analysator,
-        # x4_analysator,
+        x6_analysator,
+        x7_analysator,
+        e1_analysator_second,
+        r13_analysator_second,
+        r1_analysator,
+        x4_analysator,
     ]
 
-    with pixcap65.concurrency.get_context_manager() as manager:
+
+    with processed_manager() as (manager, tables_lock):
+        print("started the primary manager")
         # necessary to connect to the manager from the additional processes correctly
         authkey = mp.current_process().authkey
         manager_args = {
-            "authkey": authkey,
+            # "authkey": authkey,
             "address": manager.address,
         }
-        # manager_args = {}
         print("The following authkey is in use:", authkey)
         print("Fetched the authkey from the manager:", manager._authkey)
-        tables_lock = manager.RLock()
         # bare_analysis_handler(tables_lock)
         # handle all the processes
         # this could not be transformed to process handled as we could not submit authkeys!
@@ -1153,29 +1166,19 @@ if __name__ == "__main__":
                 del processes[name]
 
         print(processes)
-
-        # with mp.Pool(processes=mp.cpu_count() - 3, initializer=mp_plotting_init, initargs=('PDF', False)) as pool:
-        #     processes = {process.__name__: pool.apply_async(process, args=(tables_lock, bare_correction_args,),
-        #                                                     kwds=manager_args,
-        #                                                     error_callback=error_handler) for process in process_handles}
-        #
-        #     for name, p in processes.items():
-        #         p.wait()
-        #         print("Finished the process", name, "; Was it sucessful?", p.successful())
-
         print("Elapsed time: ", time.time() - start_time)
-        del tables_lock
-        import gc
 
-        gc.collect()
-        print("Finished collection!")
-        with open('depletion_manager_information_??.txt', 'a') as f:
-            date_obj = datetime.datetime.now()
-            full_str = date_obj.strftime("%Y-%m-%d %H:%M:%S")
-            date = date_obj.strftime("%Y-%m-%d")
-            time_str = date_obj.strftime("%H:%M:%S")
-            print(date, mp.current_process().pid, time_str,
-                  mp.current_process().name, mp.current_process().authkey, "FINISH - MARK", file=f)
+
+    import gc
+    gc.collect()
+    print("Finished collection!")
+    with open('depletion_manager_information_??.txt', 'a') as f:
+        date_obj = datetime.datetime.now()
+        full_str = date_obj.strftime("%Y-%m-%d %H:%M:%S")
+        date = date_obj.strftime("%Y-%m-%d")
+        time_str = date_obj.strftime("%H:%M:%S")
+        print(date, mp.current_process().pid, time_str,
+              mp.current_process().name, mp.current_process().authkey, "FINISH - MARK", file=f)
 
 
 # list of updated sensors

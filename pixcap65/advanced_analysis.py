@@ -191,7 +191,6 @@ def __perform_pixel_fit(currents: np.ndarray, current_errors: np.ndarray, freque
             print(effective_parameter_dict)
             raise
         fitter.set_parameter_values(**initial_guess)
-        # FIXME: perhaps there should be a switch like keyword to toggle this here to 2 or better -2
         fitter.fix_parameter('u0', -2 if inter_b else 1)
         fitter.do_fit()
 

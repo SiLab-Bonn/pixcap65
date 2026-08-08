@@ -1,12 +1,30 @@
-from multiprocessing import RLock
-
 import concurrent.futures as concurrency
 import sys
 import time
 from contextlib import contextmanager
 from tables import open_file, File
 
-tables_lock = RLock()
+tables_lock = None
+
+import atexit
+def release_tables_lock():
+    global tables_lock
+    tables_lock.acquire()
+    tables_lock.release()
+    del tables_lock
+    tables_lock = None
+    import gc
+    atexit.unregister(release_tables_lock)
+    gc.collect()
+
+
+def get_tables_lock():
+    from multiprocessing import RLock
+    global tables_lock
+    if tables_lock is None:
+        tables_lock = RLock()
+        # atexit.register(release_tables_lock)
+    return tables_lock
 
 
 @contextmanager
@@ -15,11 +33,11 @@ def synchronized_open_file(*args, **kwargs):
     try:
         yield file_handle.__enter__()
     finally:
-        with kwargs.get("lock", tables_lock):
+        with kwargs.get("lock", get_tables_lock()):
             file_handle.__exit__(*sys.exc_info())
 
-
-def __synchronized_tables_open_file(*args, lock=tables_lock, **kwargs) -> File:
+def __synchronized_tables_open_file(*args, **kwargs) -> File:
+    lock = kwargs.pop("lock", get_tables_lock())
     start_time = time.time()
     use_timeout = kwargs.get('max_time', None) is not None
     max_time = kwargs.pop('max_time', 0)
@@ -40,7 +58,8 @@ def __synchronized_tables_open_file(*args, lock=tables_lock, **kwargs) -> File:
 
 
 @contextmanager
-def synchronized_process_open_file(*args, lock=tables_lock, **kwargs):
+def synchronized_process_open_file(*args, **kwargs):
+    lock = kwargs.pop("lock", get_tables_lock())
     file_handle = __synchronized_tables_open_file(*args, lock=lock, **kwargs)
     try:
         yield file_handle.__enter__()
@@ -48,8 +67,11 @@ def synchronized_process_open_file(*args, lock=tables_lock, **kwargs):
         with lock:
             file_handle.__exit__(*sys.exc_info())
 
-def synchronized_process_open_file(*args, lock=tables_lock, **kwargs) -> File:
-    file_handle = __synchronized_tables_open_file(*args, lock=lock, **kwargs)
+def synchronized_process_open_file(*args, **kwargs) -> File:
+    kwargs.setdefault("lock", get_tables_lock())
+    if kwargs.get("lock", None) is None:
+        kwargs["lock"] = get_tables_lock()
+    file_handle = __synchronized_tables_open_file(*args, **kwargs)
     return file_handle
 
 def create_concurrent_wrapper(*args, iterable_position=0, iterable_name=None, **kwargs):

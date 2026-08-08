@@ -18,7 +18,7 @@ E1_2_SCAN_FILE = "packaged/E1_Renew_Scan.h5"
 R13_2_SCAN_FILE = "packaged/R13_Renew_Scan.h5"
 R11_SCAN_FILE = "packaged/data/R11_R1_RX_Scan.h5"
 
-x1_second_pixel_mask = [[39, 39], [38, 39]]
+x1_second_pixel_mask = [[39, 39], [38, 39], [39, 40]]
 x4_pixel_mask_temp = np.load("x4_mask.npy")
 x4_pixel_mask = []
 for entry in x4_pixel_mask_temp:
@@ -213,3 +213,4 @@ e1_pixel_depletion_args = {
 }
 
 # multiprocessing_key = b"\x1f\xb8MC3\xf8@7\x11\x9fh7,\x11\xb5\xd4JI\x06e\xdc<b\x0f\x92\x04\xb9C\xfb\xb0\xc8\xa2"
+multiprocessing_address = "/var/folders/dx/8f5fkysj3hd09_kxxswbk11r0000gt/T/pymp-h0892jfv/sock-gk7ht_jg"

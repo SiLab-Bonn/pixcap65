@@ -175,7 +175,6 @@ def generate_siunitx_3(data_set: np.recarray, depletion=False) -> str:
         #                                     int(data_set.systematic_dispersion * GENERAL_UNCERT_MULTIPLIER), "\\volt")
     else:
         if np.isnan(data_set.magnitude):
-            # TODO: könnte man hier auch direkt 'k.A.' raus machen?
             return "\\text{k.A.}"
 
         test_format = "{:.3g}".format(data_set.stat_error)
@@ -480,8 +479,8 @@ if __name__ == "__main__":
                minor=True, fontsize=24, dpi=1200)
     with tb.open_file('conclude_summary.h5', mode='r') as h5_conclusion:
         summary_data = h5_conclusion.root.GeneralSummaryTable
-        # CHECK: whether 'test_data' is still used!
-        test_data = read_rec_array(h5_conclusion.root.TestCapCorrected)
+        # CHECK: whether 'test_data' is still used! (UNDER INVESTIGATION)
+        # test_data = read_rec_array(h5_conclusion.root.TestCapCorrected)
         sensor_properties = h5_conclusion.root.SensorTypes
         assert isinstance(sensor_properties, tb.Table)
         final_properties = read_rec_array_sorted(sensor_properties, 'sensor')
@@ -949,10 +948,10 @@ if __name__ == "__main__":
 
 
         # some additional conclusions:
-        # * the quadratic LF pixels have for each depth a perfect proportionality to the implantation area but indeed both implantation depths have different slopes => TODO: estimate the slopes for the 'A' dependence independently for the two implantation depths and determine it's dependence on the implantation depth
+        # * the quadratic LF pixels have for each depth a perfect proportionality to the implantation area but indeed both implantation depths have different slopes => estimate the slopes for the 'A' dependence independently for the two implantation depths and determine it's dependence on the implantation depth
         # * the rectangular LF pixel does not match the slope behaviour of the other two. => capacitance increase by dependendence on the implantation area exposed to the p-stop implantations? (This would need a parameter: 'perimeter * depth')
         # * the two HPK sensors are significant outliers as they have a much higher pixel capacitance with the same implantation depth (their pixel separation is much smaller)
-        # * TODO: ask whether there are different resistivities used for the foundrys? -> answer: should not be the case!
+        # * ask whether there are different resistivities used for the foundrys? -> answer: should not be the case!
         # * Behaviour of the implantation depth is difficult to say, as there are only to different implanation depths for same area sensors!
         # * all the planar sensors could be matched perfectly well by their pixel separation (the capacitance seems to decay strongly with the pixel separation, it would assume a exponential decay but polynomial/reciprocal one could not be excluded but in the later case the hpk pixel separation would be an significant issue; pixel separation seems to be different for the different implantation depths??; would also need to exclude R1 for a refined fit here as it strongly deviates from the behaviour of all the others)
         # * for the perimeter it is the same as for the pixel separation fits.
