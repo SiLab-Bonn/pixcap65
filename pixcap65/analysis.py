@@ -230,7 +230,7 @@ def analyze_data(raw_data, base_path=None, is_advanced=False, is_cv=False,
     """
     manager_kargs = get_manager_keywords(**kwargs)
     if "lock" not in kwargs:
-        from mp_analysis import processed_manager
+        from examples.mp_analysis import processed_manager
         with processed_manager(**manager_kargs) as (manager, lock):
             kwargs["lock"] = lock
             manager_kargs.update(address=manager.address)

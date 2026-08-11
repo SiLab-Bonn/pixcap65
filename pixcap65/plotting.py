@@ -2131,7 +2131,7 @@ if __name__ == '__main__':
 
     # use this attempt to achieve a better performance when generating the plots
     import multiprocessing as mp
-    from full_analysis import presentation_plotter, \
+    from examples.full_analysis import presentation_plotter, \
     bare_sample_plotter_second, x1_plotter, r13_plotter_second, x2_plotter_second, x5_plotter, x6_plotter, x7_plotter, \
     e1_plotter_second, r1_plotter, x4_plotter
 
