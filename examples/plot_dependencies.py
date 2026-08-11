@@ -1,3 +1,20 @@
+
+# ----------------------------------------------------------
+#  Copyright (c) 2026. SiLab, Institute of Physics, University of Bonn.
+#
+#  Licensed under the Apache License, Version 2.0 (the "License");
+#  you may not use this file except in compliance with the License.
+#  You may obtain a copy of the License at
+#
+#     http://www.apache.org/licenses/LICENSE-2.0
+#
+#  Unless required by applicable law or agreed to in writing, software
+#  distributed under the License is distributed on an "AS IS" BASIS,
+#  WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
+#  See the License for the specific language governing permissions and
+#  limitations under the License.
+# ----------------------------------------------------------
+
 import locale
 import numpy as np
 import tables as tb
@@ -210,11 +227,11 @@ def investigate_dependences_graphical(summary_data: np.recarray, property_data: 
                                       interesting_data: Iterable, **keys):
     spatial_mask = np.array([sensor.decode() in spatial_identifier for sensor in summary_data.sensor], dtype=bool)
 
-    plotter("Dependencies.pdf", spatial_mask, interesting_data, summary_data, property_data, **keys)
+    plotter("../Dependencies.pdf", spatial_mask, interesting_data, summary_data, property_data, **keys)
 
-    plotter("Dependencies-log.pdf", spatial_mask, interesting_data, summary_data, property_data, scaley='log', **keys)
+    plotter("../Dependencies-log.pdf", spatial_mask, interesting_data, summary_data, property_data, scaley='log', **keys)
 
-    plotter("Dependencies-log-log.pdf", spatial_mask, interesting_data, summary_data, property_data,
+    plotter("../Dependencies-log-log.pdf", spatial_mask, interesting_data, summary_data, property_data,
             scalex='log', scaley='log', **keys)
 
 
@@ -477,7 +494,7 @@ if __name__ == "__main__":
                            r"stat,sys}}\sisetup{uncertainty-descriptor-mode=subscript}\sisetup{"
                            r"retain-zero-uncertainty}", fig_height=8.26772, fig_width=11.69291,
                minor=True, fontsize=24, dpi=1200)
-    with tb.open_file('conclude_summary.h5', mode='r') as h5_conclusion:
+    with tb.open_file('../conclude_summary.h5', mode='r') as h5_conclusion:
         summary_data = h5_conclusion.root.GeneralSummaryTable
         # CHECK: whether 'test_data' is still used! (UNDER INVESTIGATION)
         # test_data = read_rec_array(h5_conclusion.root.TestCapCorrected)
@@ -750,7 +767,7 @@ if __name__ == "__main__":
         sensor_trans_list = [
         ]
 
-        with open("tab_test_capacitance.tex", "w") as f:
+        with open("../tab_test_capacitance.tex", "w") as f:
             print_args = {
                 "file": f
             }
@@ -794,7 +811,7 @@ if __name__ == "__main__":
             print("\\bottomrule", **print_args)
             print("\\end{tabular}", **print_args)
 
-        with open("tab_test_capacitance_trans.tex", "w") as f:
+        with open("../tab_test_capacitance_trans.tex", "w") as f:
             print_args = {
                 "file": f
             }
@@ -819,7 +836,7 @@ if __name__ == "__main__":
 
         # generate the biased capacitance latex table
         print("Create the tables to use.")
-        with open("tab_capacitance_data.tex", "w") as f:
+        with open("../tab_capacitance_data.tex", "w") as f:
             print_args = {
                 "file": f
             }
@@ -860,7 +877,7 @@ if __name__ == "__main__":
             print("\\end{tabular}", **print_args)
 
         # generate the planar depletion voltages latex table
-        with open("tab_depletion_planar_data.tex", "w") as f:
+        with open("../tab_depletion_planar_data.tex", "w") as f:
             print_args = {
                 "file": f
             }
@@ -894,7 +911,7 @@ if __name__ == "__main__":
             print("\\end{tabular}", **print_args)
 
         # generate the 3d depletion voltages latex table
-        with open("tab_depletion_3d_data.tex", "w") as f:
+        with open("../tab_depletion_3d_data.tex", "w") as f:
             print_args = {
                 "file": f
             }

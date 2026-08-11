@@ -726,7 +726,7 @@ if __name__ == "__main__":
         table.flush()
 
     # correct all the test capacitance's for the parasitic capacitance of the measurement circuit!
-    from plot_dependencies import read_rec_array
+    from examples.plot_dependencies import read_rec_array
     from pixcap65.plotting import CAPACITANCE_CONVERSION_FACTOR
     with tb.open_file('conclude_summary.h5', mode='a') as summary_file:
         test_data = read_rec_array(summary_file.root.TestCap)

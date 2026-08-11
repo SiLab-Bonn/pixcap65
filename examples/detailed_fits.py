@@ -13,6 +13,19 @@
 #  See the License for the specific language governing permissions and
 #  limitations under the License.
 # ----------------------------------------------------------
+#
+#  Licensed under the Apache License, Version 2.0 (the "License");
+#  you may not use this file except in compliance with the License.
+#  You may obtain a copy of the License at
+#
+#     http://www.apache.org/licenses/LICENSE-2.0
+#
+#  Unless required by applicable law or agreed to in writing, software
+#  distributed under the License is distributed on an "AS IS" BASIS,
+#  WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
+#  See the License for the specific language governing permissions and
+#  limitations under the License.
+# ----------------------------------------------------------
 import numpy as np
 import tables as tb
 from collections.abc import Iterable, Callable
@@ -26,10 +39,10 @@ from numpy._typing import NDArray, ArrayLike
 from typing import Tuple, Union, Sequence, Optional, List
 
 from capacitance_models import linear_model, reciprocal_model, extended_cap_model_5, inverted_reciprocal_model
+from examples.plot_dependencies import read_rec_array_sorted, read_rec_array_sorted_where, chi2
 from general_model import exponential_model
 from pixcap65.plotting import GENERATE_THESIS_PLOTS
 from pixcap65.utility.homogenize_plots import set_params, get_error_cycler
-from plot_dependencies import read_rec_array_sorted, read_rec_array_sorted_where, chi2
 
 
 def quadratic_model(x, a, b, c):
@@ -207,10 +220,10 @@ if __name__ == "__main__":
     # need a fit for the areas with the same implantation depth
     # => thus could only use effectively R13 and E1 sensors
     # afterwards estimate the dependence of the A parameter on the depletion width.
-    with tb.open_file('conclude_summary.h5', mode='r') as h5_conclusion,\
-        PdfPages("Dependencies_fitted.pdf") as pdf,\
-        PdfPages("Dependencies_fitted_full.pdf") as pdf_log,\
-            PdfPages("Dependencies_fitted_full_full.pdf") as pdf_2:
+    with tb.open_file('../conclude_summary.h5', mode='r') as h5_conclusion,\
+        PdfPages("../Dependencies_fitted.pdf") as pdf,\
+        PdfPages("../Dependencies_fitted_full.pdf") as pdf_log,\
+            PdfPages("../Dependencies_fitted_full_full.pdf") as pdf_2:
 
         print("HANDLE THE AREA REDUCTION")
         full_properties = read_rec_array_sorted(h5_conclusion.root.SensorTypes, 'sensor')
