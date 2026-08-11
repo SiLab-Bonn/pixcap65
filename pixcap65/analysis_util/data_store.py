@@ -11,29 +11,30 @@ class DepletionDataStore:
     def store_data(self, key, data):
         """
         temporarily store the data for the given key into the internal data structures.
-        # TODO: add the keys which needs to be implemented with their meaning.
         For the depletion storage units
-        * depletion:
-        * depletion_error:
-        * fit_result_first:
-        * fit_error_first:
-        * fit_result_second:
-        * fit_error_second:
-        * fit_result_cov_first:
-        * fit_result_cov_second:
-        * systematic:
-        * dispersion:
+
+        * depletion: stores the estimation of the (full or surface) depletion voltage
+        * depletion_error: estimation of the statistical uncertainty of the depletion voltage
+        * fit_result_first: parameter vector for fit of the first linear region (high voltage limit)
+        * fit_error_first: vector of parameter errors for fit of the first linear region (high voltage limit)
+        * fit_result_second: parameter vector for fit of the second linear region (low voltage limit)
+        * fit_error_second: vector of parameter errors for fit of the second linear region (high voltage limit)
+        * fit_result_cov_first: covariance matrix of the first linear region (high voltage limit)
+        * fit_result_cov_second: covariance matrix of the second linear region (low voltage limit)
+        * systematic: estimation of the (general) systematic uncertainty of the depletion voltage
+        * dispersion: estimation of the systematic uncertainty of the depletion voltage by dispersion of parasitic capacitances between differen pixcap chips.
 
         For doping storage units:
-        * width:
-        * width_error:
-        * fit_parameters:
-        * fit_parameters_error:
-        * fit_covariance:
-        * doping:
-        * resistivity:
-        * res_mod:
-        * res_mod_error:
+
+        * width: estimation of the depletion width for the applied bias voltages
+        * width_error: (statistical) uncertainties for the depletion width for the applied bias voltages
+        * fit_parameters: estimation of the fit parameters to model the depletion width for the applied bias voltages
+        * fit_parameters_error: estimation of the fit parameter errors to model the depletion width for the applied bias voltages
+        * fit_covariance: covariance matrix of the fit parameters to model the depletion width for the applied bias voltages
+        * doping: effective doping concentration for the applied bias voltages estimated from the depletion width and capacitance behaviour
+        * resistivity: resistivity of the substrate estimated from effective doping concentration
+        * res_mod: resistivity of the substrate estimated from fit to low voltage limit region of the C-V-curve
+        * res_mod_error: (statistical) uncertainty of the substrate's resistivity estimated from fit to low voltage limit region of the C-V-curve.
 
 
         :param key: kind of data to store
@@ -70,7 +71,6 @@ class DepletionTableStore(DepletionDataStore):
 
     def store_data(self, key, data):
         match key:
-            # TODO: some keywords used with the others are missing here!
             case "depletion":
                 self.entry["Ubi"] = data
             case "depletion_error":
@@ -91,6 +91,10 @@ class DepletionTableStore(DepletionDataStore):
                 self.entry["first_covariance"] = data
             case "fit_result_cov_second":
                 self.entry["second_covariance"] = data
+            case "systematic":
+                self.entry["cap_systematic_error"] = data
+            case "dispersion":
+                self.entry["cap_systematic_dispersion"] = data
             case _:
                 raise ValueError(f"The provided storage key is unknown: {key}")
 
@@ -106,7 +110,6 @@ class DepletionNumpyStore(DepletionDataStore):
         self.fields = dtp.names
 
     def store_data(self, key, data):
-        # TODO: some keywords used by the other implementations are missing here.
         match key:
             case "depletion":
                 self.entry["Ubi"] = data
@@ -128,6 +131,10 @@ class DepletionNumpyStore(DepletionDataStore):
                 self.entry["first_covariance"] = data
             case "fit_result_cov_second":
                 self.entry["second_covariance"] = data
+            case "systematic":
+                self.entry["cap_systematic_error"] = data
+            case "dispersion":
+                self.entry["cap_systematic_dispersion"] = data
             case _:
                 raise ValueError(f"The provided storage key is unknown: {key}")
 
@@ -342,7 +349,6 @@ class DepletionArrayStoreMP(DepletionArrayStore):
                       mp.current_process().name, mp.current_process().authkey, file=f)
 
 class DopingArrayStore(DepletionDataStore):
-    # FIXME: issue with the number of rows on the pixcap chip!
     def __init__(self, doping_shape, n_depletions=1):
         shape_list = [*GENERAL_PIXCAP_SHAPE, 4]
         general_shape = tuple(shape_list)

@@ -389,7 +389,10 @@ def extract_parasitic_capacitance(hist):
 
 def get_analysis_group(base_group, **kwargs):
     """
-    get_analysis_grouo
+    get_analysis_group
+
+    @author Dominik Fischer
+    @date 2026-08-11
 
     Get the correct analysis group for the given occasion.
     Distinguish between analysis and corrected analysis groups and provides the correct one.
@@ -473,6 +476,7 @@ class CVDistributionSimpleData(tb.IsDescription):
     cap_systematic_dispersion = tb.Float64Col(pos=11)
 
 # TODO: adjustment for corrected values of systematics
+# Not sure whether this here is still necessary?
 class CVDistributionData(tb.IsDescription):
     bias = tb.Float64Col(pos=0)
     n_pixel = tb.Int64Col(pos=1)
