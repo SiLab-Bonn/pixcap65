@@ -458,7 +458,10 @@ def _cv_analysis(in_file_h5: tb.File, bare_file_arg, bare_path_arg, base_group: 
                  second_boundaries: Optional[Union[tuple, Iterable[tuple]]], is_advanced: bool, is_inter_pixel: bool,
                  get_distribution, parasitic: float, parasitic_error: float,
                  **kwargs) -> Optional[tb.Group]:
+    print("cv keywords")
+    print(kwargs)
     lockless_kargs = {key: value for key, value in kwargs.items() if "lock" not in key }
+    print(lockless_kargs)
     lock = kwargs.get("lock", None)
     # need to perform the analysis for every bias voltage
     reference_group = base_group.biasing
@@ -917,8 +920,6 @@ def _get_sensor_distribution(ana_group: tb.Group, bias_voltage, cap_data, dist_e
     For the spread of the parasitics two fits at the extremes are used with appropriately modified capacitance arrays.
     For the dispersion effects random samples of the dispersion are generated and added to the corrected capacitance
     data.
-
-
 
     :param ana_group: hdf files' analysis group which stores the capacitances' for the pixels on which to compute the
         capacitance distribution.
@@ -1716,8 +1717,9 @@ def analyze_depletion_delegate(data_group: tb.Group, analysis_group: tb.Group,
             create_carray(file_h5, where=analysis_group, name="DepFitParamCovHist",
                           title="Matrix of the 2x2 covariance matrices for each pixel",
                           obj=fit_result_storage.fit_parameter_covariances[:], filters=GLOBAL_FILTERS, unit="None")
-        except:
-            pass
+        except Exception as e:
+            from warnings import warn
+            warn("While verifying new implementations the following error occured" + repr(e))
 
         # remove the fit storage object as it is no longer used anyway
         del fit_result_storage
@@ -2202,8 +2204,52 @@ def _analyze_pixel_depletion_fit(pixel_cap_data: np.ndarray,
                                  pixel_cap_error_data: np.ndarray,
                                  voltage_data: TABLES_LEAF_COMPAT_TYPE,
                                  first_lower, first_upper, second_lower, second_upper, **kwargs) -> tuple:
-    # TODO: missing docstring
-    # no locks in use here!
+    """
+    _analyze_pixel_depletion_fit
+
+    @author Dominik Fischer
+    @date 2026-08-11
+
+    Helper function to analyze the properties of the depletion region and their dependence on the applied bias voltage (designed for reverse bias only).
+    This helper function does not use any locks for synchronization.
+    Here the analysis is handled for a single pixel or for average values over a whole sensor.
+
+    The depletion voltage is estimated by two fits.
+    One at high voltages and the other at low voltages in the asymptotic behaviour of the C-V characterization.
+    The fits are performed either by `iminuit` or by `kafe2` depending on the choice of keyword arguments provided.
+    The depletion voltage is then determined as the intersection these two straight lines.
+
+    :param pixel_cap_data: array-like of the pixel-capacitance's measured for the given bias voltages and one
+            particular pixel.
+    :type pixel_cap_data: numpy.ndarray
+    :param pixel_cap_error_data: array-like of the pixel capacitances' (statistical) uncertainties for the given
+            bias voltages for one particular pixel.
+    :type pixel_cap_error_data: numpy.ndarray
+    :param voltage_data: array-like of applied bias voltages for the measurement.
+    :param first_lower: lower bound for the fitting range in the high voltage limit of the C-V-curve to estimate the
+            depletion voltage.
+    :param first_upper: upper bound for the fitting range in the high voltage limit of the C-V-curve to estimate the
+            depletion voltage.
+    :param second_lower: lower bound for the fitting range in the low voltage limit of the C-V-curve to estimate the
+            depletion voltage.
+    :param second_upper: upper bound for the fitting range in the low voltage limit of the C-V-curve to estimate the
+            depletion voltage.
+    :key cv_fit_plot_pdf: pdf object to write the depletion voltages fits control plots to.
+    :key fit_plot_pdf: pdf object to write the all the fits control figures to.
+    :key enhanced: Not clear what this key really does. It should not be used at all.
+    :type enhanced: bool
+    :key fit_description_text: text describing the fit performed for usage within the plot handler of the fits.
+    :key use_kafe2: indicates whether kafe2 is used for the fit. (default: False)
+    :type use_kafe2: bool
+    :key apply_contours: indicates whether to determine the contours and try to plot them. (default: False)
+    :type apply_contours: bool
+    :key plot: indicates whether to plot the data. An output PDF object could be submitted here
+         instead of an explicitly created one. (default: False)
+    :type plot: bool
+    :key fit_plot_pdf: PDF object to save the fit figures to.
+    :return: tuple (Udep, error of Udep, first fits parameters, first fits parameter errors, covariance matrix of the first fit, second fits parameters, second fits parameter errors, covariance matrix for the second fit). If the `enhanced` keyword is present the return type/values might differ.
+    :rtype: tuple
+    """
     cv_fit_pdf = kwargs.pop("cv_fit_plot_pdf", None)
     if cv_fit_pdf:
         kwargs["fit_plot_pdf"] = cv_fit_pdf
@@ -2214,7 +2260,6 @@ def _analyze_pixel_depletion_fit(pixel_cap_data: np.ndarray,
     first_section_lower_mask = voltage_data >= first_lower
     first_section_mask = np.logical_and(first_section_upper_mask, first_section_lower_mask)
 
-    # print(second_upper, second_lower)
     second_section_upper_mask = voltage_data <= second_upper
     second_section_lower_mask = voltage_data >= second_lower
     second_section_mask = np.logical_and(second_section_upper_mask, second_section_lower_mask)
@@ -2295,10 +2340,13 @@ def get_depletion_fit(cap_data: np.ndarray, cap_error_data: np.ndarray, voltage_
     @author Dominik Fischer
     @date 2026-05-07
 
-    NO LOCKS IN USE ANYWHERE
+    last updated: 2026-08-11
 
-    performs the necessary fits to estimate the depletion voltage from to linear fits to the capacitance
+    Helper function to perform the necessary fits to estimate the depletion voltage from linear fits to the capacitance
     characterization.
+    For performing the fits either the `iminuit` or the `kafe2` framework are used with correct estimation of the
+    parameter uncertainties.
+    This function does not use locks for synchronization.
 
 
     :param cap_data: capacitance data from the characterization for this fit section.
@@ -2306,10 +2354,13 @@ def get_depletion_fit(cap_data: np.ndarray, cap_error_data: np.ndarray, voltage_
     :param voltage_data: data of the applied HV voltages for this fit section.
     :param fit_reference: identifying the fit section for which the fit is performed.
     :key fit_description_text: text describing the fit performed for usage within the plot handler of the fits.
-    :key use_kafe2: boolean, False, indicates whether kafe2 is used for the fit.
-    :key apply_contours: boolean, indicates whether to determine the contours and try to plot them.
-    :key plot: boolean, False, indicates whether to plot the data. AN output PDF object could be submitted here
-         instead of an explicitly created one.
+    :key use_kafe2: indicates whether kafe2 is used for the fit. (default: False)
+    :type use_kafe2: bool
+    :key apply_contours: indicates whether to determine the contours and try to plot them. (default: False)
+    :type apply_contours: bool
+    :key plot: indicates whether to plot the data. An output PDF object could be submitted here
+         instead of an explicitly created one. (default: False)
+    :type plot: bool
     :key fit_plot_pdf: PDF object to save the fit figures to.
     :return: covariance_matrix, fit parameter errors, fit parameter values
     """
@@ -2492,27 +2543,40 @@ def analyze_capacitance_distribution_delegate(analysis_group: Optional[tb.Group]
     """
     analyse_capacitance_distribution_delegate
 
+    @author: Dominik Fischer
+    @date: 2026-08-11
+
     Implementation of the investigation in the distribution of the capacitance on the chip.
-    It should predominantly be used to determine the intrinsic and parasitic capacitance of a bare pix cap chip.
-    To achieve the distribution the data is first binned and presented into a histogram.
+    It should predominantly be used to determine the intrinsic and parasitic capacitance of a bare PixCap65 chip.
+    To achieve the distribution, the data is first binned and presented into a histogram.
     Next, a gaussian shape is fitted to the histogram to match its shape.
+    This fit is either performed by the `iminuit` or the `kafe2` framework.
 
     Last the main results are written back to the analysis group as an attribute.
 
     :param analysis_group: hdf file's group where to find the capacitance to be analysed.
     :param output_pdf: PDF object to write the created figures to for long-term saving.
-    :key use_kafe2: boolean, False, indicates whether kafe2 is used for the fit.
-    :key apply_contours: boolean, indicates whether to determine the contours and try to plot them.
-    :key fit_plot_pdf: PDF object to save the fit figures to.
-    :key mask_pixel: iterable of pixel positions on the grid to ignore for evaluations.
-    :key mask_lower: float, threshold to mask all pixels below this value.
-    :key mask_upper: float, threshold to mask all pixels above this value.
-    :key test_cap_exclusion: boolean, whether to exclude the test capacitator row from the histograms.
-    :key hist_bins: integer, number of bins to use for the histogram.
     :key capacitance: histogram of the capacitance to use instead of those extracted from the provided hdf files group.
     :key set_parasitic: boolean, whether to set the parasitic capacitance for this data set.
+    :type set_parasitic: bool
     :key no_plot: boolean, whether to supress (interactive) plotting of the distribution of the capacitance.
     :key convert: boolean, whether to convert the capacitance to fF, or not (default: True)
+    :key use_kafe2: indicates whether kafe2 is used for the fit. (default: False)
+    :type use_kafe2: bool
+    :key apply_contours: indicates whether to determine the contours and try to plot them. (default: False)
+    :type apply_contours: bool
+    :key fit_plot_pdf: PDF object to save the fit figures to.
+    :key test_cap_exclusion: whether to exclude row 0 completely. (default: False)
+    :type test_cap_exclusion: bool
+    :key mask_pixel: array/iterable of tuple of pixel positions to be masked and therefore ignored for evaluation. [array-like]
+    :key mask_lower: threshold to mask all pixels below this value.
+    :type mask_lower: float
+    :key mask_upper: threshold to mask all pixels above this value.
+    :type mask_upper: float
+    :key hist_bins: integer, number of bins to use for the histogram. (default: 50)
+    :type hist_bins: int
+    :return tuple of (capacitance data used, mean value, mean parameter error, std parameter value, std parameter error)
+    :rtype tuple
     """
     # none to expect, as these function runs fine without leaks when not called from an mp processing pool!
     from pixcap65.plotting import DEFAULT_BIN_NUMBER, COUNTS_HIST_LABEL, HIST_PIX_CAP_LABEL

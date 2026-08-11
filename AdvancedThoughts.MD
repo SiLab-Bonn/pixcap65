@@ -64,4 +64,22 @@ And the same after processing the data
 | 0V (unbiased) |
 | - 40.0 V      |
 
+# Helper for the different keyword arguments which could be encountered
 
+* fit_description_text: text describing the fit performed for usage within the plot handler of the fits.
+* use_kafe2: indicates whether kafe2 is used for the fit. (default: False) [boolean]
+* apply_contours: indicates whether to determine the contours and try to plot them. (default: False) [boolean]
+* plot: indicates whether to plot the data. An output PDF object could be submitted here instead of an explicitly created one. (Default: False) [boolean]
+* fit_plot_pdf: PDF object to save the fit figures to.
+* test_cap_exclusion: whether to exclude row 0 completely. (default: False) [boolean]
+* mask_pixel: array/iterable of tuple of pixel positions to be masked and therefore ignored for evaluation. [array-like]
+* mask_lower: threshold to mask all pixels below this value. [float]
+* mask_upper: threshold to mask all pixels above this value. [float]
+* distribution: boolean, indicating whether to investigate the capacitance distribution over the whole sensor. (default: False) [boolean]
+* use_corrected: boolean, indicating whether to use the corrected capacitance for plotting. (data corrected for parasitic capacitances of PixCap65, default: False) [boolean]
+* hist_bins: integer, number of bins to use for the histogram. (default: 50) [int]
+* plotting_lock: synchronization primitve/"lock" to make sure only one **process** is able to create a new figure
+  at the same time as matplotlib is not necessarily thread-safe.
+* lock: synchronization object to prevent multiple overlapping accesses to the pytables api and simultaneously
+  write/read operations on the same file.
+* unit: unit of the capacities presented within the plot. [str]

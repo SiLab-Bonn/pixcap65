@@ -6,7 +6,6 @@ Plotting of Pixcap65 data.
 #  SiLab, Institute of Physics, University of Bonn
 # ----------------------------------------------------------
 
-# TODO: update the documentation of the implementations
 
 import os.path
 
@@ -70,8 +69,10 @@ REFERENCE_TEST_FILE = "packaged/Reference_Demo.h5"
 CV_DATA_FOR_ = "CV Data for {}"
 NEW_PLOT_FILE_MODE = True
 GENERATE_THESIS_PLOTS = False
-# CHECK: maybe use a different font-size when this option here is not set at all?
 CV_USE_SEPARATE_PAGES = True
+SENSOR_ITERABLE = Union[List[tb.Group], Tuple[tb.Group, ...], np.ndarray[tb.Group]]
+IS_PRESENTATION = False
+IS_THESIS = False
 
 global_interactive_lock = threading.RLock()
 
@@ -92,43 +93,53 @@ atexit.register(release_lock)
 replacement_order = {}
 exclusion_list = ["Scan", "Full"]
 
-# FIXME: for the exclusion of the test capacitances there are multiple keywords used!
-# e.g. the plotting handlers are using 'exclude_test_cap' while the pixel masking helper function uses 'test_cap_exclusion'
-# some of the functions also call 'exclude_cap_test'
+
 def evaluate_pixel_mask(hist, perform_filter=False, **kwargs):
     """
     evaluate_pixel_mask
 
     @author Dominik Fischer
     @date 2026-05-11
+    last updated: 2026-08-11
+
+    Helper function to evaluate the provided pixel mask and select only those pixels for further analysis or plotting
+    which are not "deactivated" by the mask.
+    This function could also handle upper and lower thresholds on the pixel capacitance' values to generate a mask on
+    its own.
+
 
     :param hist: histogram/data set to be masked for 'defect' pixels
     :param perform_filter: boolean, indicating whether the generated mask should be applied and only the filtered data
-        returned.
+        returned. (default: False)
+    :type perform_filter: bool
     :param kwargs: further keyword arguments
-    :key test_cap_exclusion: whether to exclude row 0 completely.
+    :key test_cap_exclusion: whether to exclude row 0 completely. (default: False)
+    :type test_cap_exclusion: bool
     :key mask_pixel: array of tuple of pixel positions to be masked.
     :key mask_lower: float, threshold to mask all pixels below this value.
+    :type mask_lower: float
     :key mask_upper: float, threshold to mask all pixels above this value.
-    :return: masked histogram/data set (masked pixels values are replaced by np.nan)
+    :type mask_upper: float
+    :return: masked histogram/data set (masked pixels values are replaced by np.nan). If `perform_filter` is True, the mask is already applied and the masked values are no longer included.
     """
     result_hist = hist.copy()
     kargs = kwargs.copy()
+    warn_level = 2
     if "exclude_cap_hist" in kargs:
         from warnings import warn
-        warn("Found the unexpected keyword-argument 'exclude_cap_hist'. The correct keyword should be 'test_cap_exclusion', but that might change again. If both are provided the first one will be ignored.", UserWarning, stacklevel=2)
+        warn("Found the unexpected keyword-argument 'exclude_cap_hist'. The correct keyword should be 'test_cap_exclusion', but that might change again. If both are provided the first one will be ignored.", UserWarning, stacklevel=warn_level)
         kargs.setdefault("test_cap_exclusion", kargs.pop("exclude_cap_hist"))
     if "exclude_test_cap" in kargs:
         from warnings import warn
         warn(
             "Found the unexpected keyword-argument 'exclude_test_cap'. The correct keyword should be 'test_cap_exclusion', but that might change again. If both are provided the first one will be ignored.",
-            UserWarning, stacklevel=2)
+            UserWarning, stacklevel=warn_level)
         kargs.setdefault("test_cap_exclusion", kargs.pop("exclude_test_cap"))
     if "exclude_cap_test" in kargs:
         from warnings import warn
         warn(
             "Found the unexpected keyword-argument 'exclude_cap_test'. The correct keyword should be 'test_cap_exclusion', but that might change again. If both are provided the first one will be ignored.",
-            UserWarning, stacklevel=2)
+            UserWarning, stacklevel=warn_level)
         kargs.setdefault("test_cap_exclusion", kargs.pop("exclude_cap_test"))
     test_cap_exclusion = kargs.pop("test_cap_exclusion", DEFAULT_TEST_CAP_EXCLUSION)
     pixel_mask = np.asarray(kargs.pop("mask_pixel", []))
@@ -141,6 +152,8 @@ def evaluate_pixel_mask(hist, perform_filter=False, **kwargs):
         result_hist[masks] = np.nan
     if test_cap_exclusion:
         result_hist[:, 0] = np.nan
+
+    # mask further pixels by their capacitance thresholds
     if mask_lower:
         assert isinstance(mask_lower, float)
         result_hist[result_hist < mask_lower] = np.nan
@@ -148,6 +161,7 @@ def evaluate_pixel_mask(hist, perform_filter=False, **kwargs):
         assert isinstance(mask_upper, float)
         result_hist[result_hist > mask_upper] = np.nan
 
+    # apply the mask selection immediately if requested instead of setting the values only to NaN.
     if perform_filter:
         return result_hist[np.isfinite(result_hist)]
     return result_hist
@@ -157,12 +171,25 @@ def get_pdf_name(base_path, interpreted_data, suffix: str, use_group: bool) -> s
     """
     get_pdf_name
 
+    @author: Dominik Fischer
+    @date 2026-08-11
+
     Helper function to generate a PDF name for a given hdf file to export the created figures to.
+    Within the current implementation there is global flag to distinguish two modes when constructing the name of output pdf files.
+    With the new mode the sensor part in the naming of the files will be separated to put the pdf into a subdirectory.
+    For 3D-Sensors the filenames should start with '3D_'.
+    In general the different parts of the filenames should be separated by '_'.
+    Except for 3D-Sensors the first component is considered to determine the actual sensor.
+
+    When using the old naming scheme the file name is given SOURCEFILE_SUFFIX_GROUP.pdf.
+    If group is not present, this part of the output file will be left out.
 
     :param base_path: basic group descriptor for the analysis and measurements within the hdf file.
     :param interpreted_data: path to the hdf file used for measurement and analysis.
     :param suffix: actual suffix to use to identify the PDF file.
-    :param use_group: boolean, False, indicates whether to append the group name to the PDF name.
+    :type suffix: str
+    :param use_group: boolean, indicates whether to append the group name to the PDF name. (default: False)
+    :type use_group: bool
     :return: name of the PDF file to use
     """
     if NEW_PLOT_FILE_MODE:
@@ -192,8 +219,24 @@ def get_pdf_name(base_path, interpreted_data, suffix: str, use_group: bool) -> s
         pdf_name = "{file}_{s}.pdf".format(s=suffix, file=file_mode)
     return pdf_name
 
+
 @contextmanager
 def advanced_figure_provider(lock, output=None, **kwargs):
+    """
+    advanced_figure_provider
+
+    @author: Dominik Fischer
+    @date 2026-08-11
+
+    Context manager helper function to create plots/figures using matplotlib and destroy/close them appropriately afterwards.
+    The context manager will yield a tuple of a matplotlib.Figure and a matplotlib.Axes object.
+
+    :param lock: synchronization primitve/"lock" to make sure only one **process** is able to create a new figure at
+        the same time as matplotlib is not necessarily thread-safe.
+    :param output: (optional) pdf object to write the figure to before closing it. Figure will only be saved when
+        this argument is not `None`(default: None)
+    :param kwargs: further (keyword) arguments (directly) propagated when saving the figure.
+    """
     from pixcap65.utility.homogenize_plots import close_figure
     with lock:
         fig = Figure()
@@ -205,8 +248,32 @@ def advanced_figure_provider(lock, output=None, **kwargs):
     with lock:
         close_figure(fig)
 
+
 @contextmanager
 def figure_provider(lock, *args, separate_plots=False, output=None, callback=None, **kwargs):
+    """
+    figure_provider
+
+    @author: Dominik Fischer
+    @date 2026-08-11
+
+    Context manager helper function to create plots/figures using matplotlib.
+    The context manager will yield a tuple of a matplotlib.Figure and a matplotlib.Axes object.
+    Instead of an matplotlib.Axes object an iterable could yielded instead if creation of multiple axes within the
+    figure is specified.
+
+
+    :param lock: synchronization primitve/"lock" to make sure only one **process** is able to create a new figure at
+        the same time as matplotlib is not necessarily thread-safe.
+    :param args: positional arguments to propagete to the matplotlib.pyplot handler to create new (sub-) figures.
+    :param separate_plots: indicates whether the different axes should constructed within different matplotlib.Figure objects. (default: False)
+    :type separate_plots: bool
+    :param output: (optional) pdf object to write the figure to before closing it. Figure will only be saved when
+        this argument is not `None`(default: None)
+    :param callback: function reference (callback) which takes a matplotlib.Figure object as the only argument 'to do'
+        something with the figure objects
+    :param kwargs: further keyword arguments (directly) propagated when saving the figure or its creation.
+    """
     from pixcap65.utility.homogenize_plots import close_figure
     call_all = kwargs.pop("call_all", False)
     back_inform = {'output': True}
@@ -252,25 +319,57 @@ def figure_provider(lock, *args, separate_plots=False, output=None, callback=Non
     with lock:
         close_figure(fig)
 
+
 def plot_data(interpreted_data, base_path=None, suffix="general_data", use_group=False, **kwargs):
     """
     plot_data
 
-    Helper function to graphical present/plot the analysis results of a simple pixel capacitance scan.
+    @author: Dominik Fischer
+    @date 2026-08-11
+
+
+    Graphical present/plot the analysis results of a simple pixel capacitance scan.
     The plotting is only performed for the pixels which contribute a usable capacitance measurement.
     In Addition to the fits for estimating the capacitance also the capacitance distribution and frequency is plotted.
     The name of the resulting PDF is derived from the file name with the measurement data.
 
     :param interpreted_data: path to the hdf file which holds the raw data and the analysis results.
+    :type interpreted_data: str
     :param base_path: path to the base group in the hdf files hierarchy.
+    :type base_path: str
     :param suffix: additional suffix to use for naming the PDF containing the plots.
-    :param use_group: boolean, whether to append the group name of the measurements to the PDF name.
-    :key use_corrected: boolean, False, indicating whether to use the corrected capacitance for plotting.
-    :key exclude_test_cap: boolean, whether to exclude the test capacitator row from the histograms.
-    :key hist_bins: integer, number of bins to use for the histogram.
-    :key mask_pixel: iterable of pixel positions on the grid to ignore for evaluations.
-    :key extract_pixel: iterable of pixel positions on the grid to extract the figures from.
-    :key distribution: boolean, indicating whether to investigate the capacitance distribution over the whole sensor.
+    :type suffix: str
+    :param use_group: whether to append the group name of the measurements to the PDF name.
+    :type use_group: bool
+    :key use_corrected: boolean, indicating whether to use the corrected capacitance for plotting.
+        (data corrected for parasitic capacitances of PixCap65, default: False)
+    :type use_corrected: bool
+    :key test_cap_exclusion: boolean, whether to exclude the test capacitator row from the histograms. (default: False)
+    :type test_cap_exclusion: bool
+    :key hist_bins: integer, number of bins to use for the histogram. (default: 50)
+    :type hist_bins: int
+    :key mask_pixel: array/iterable of tuple of pixel positions to be masked and therefore ignored for evaluation.
+    :key mask_lower: float, threshold to mask all pixels below this value.
+    :type mask_lower: float
+    :key mask_upper: float, threshold to mask all pixels above this value.
+    :type mask_upper: float
+    :key distribution: boolean, indicating whether to investigate the capacitance distribution over the whole sensor. (default: False)
+    :type distribution: bool
+    :key lock: synchronization object to prevent multiple overlapping accesses to the pytables api and simultaneously write/read operations on the same file.
+    :key plotting_lock: synchronization primitve/"lock" to make sure only one **process** is able to create a new figure at
+        the same time as matplotlib is not necessarily thread-safe.
+    :key unit: unit of the capacities presented within the plot.
+    :type unit: str
+    :key capacitance: histogram of the capacitance to use instead of those extracted from the provided hdf files group.
+    :key no_plot: boolean, whether to supress (interactive) plotting of the distribution of the capacitance.
+        When investigating the capacitance distribution.
+    :key use_kafe2: indicates whether kafe2 is used for the fit. (default: False)
+    :type use_kafe2: bool
+    :key apply_contours: indicates whether to determine the contours and try to plot them. (default: False)
+    :type apply_contours: bool
+    :key fit_plot_pdf: PDF object to save the fit figures to.
+
+
     """
     lock = kwargs.pop("lock", None)
 
@@ -284,8 +383,26 @@ def plot_data(interpreted_data, base_path=None, suffix="general_data", use_group
             plot_data_delegate(base_group.total_cap.measurements, get_analysis_group(base_group.total_cap, **kwargs),
                                output_pdf, **kwargs)
 
+
 @contextmanager
 def inter_pix_data_fetch(path, group, lock, active_file: tb.File, type_name: str='total_cap'):
+    """
+    inter_pix_data_fetch
+
+    @author Dominik Fischer
+    @date 2026-08-11
+
+    Utility function to fetch total-pixel-capacitance measurements reference data for plotting not only the 'in-pix' capacitance's but also the estimation for the inter-pixel capacitances'.
+
+    :param path: path to h5 file containing the measurement data for the total-pix measurement.
+    :type path: str
+    :param group: hierarchical group of the total-pix measurement within the file.
+    :type group: str
+    :param lock: synchronization object to prevent multiple overlapping accesses to the pytables api and simultaneously
+  write/read operations on the same file.
+    :param active_file: active hdf file by the ongoing plotting handlers
+    :param type_name: type of analysis results to be fetched, e.g. 'total_cap'
+    """
     if path is None or not os.path.exists(path):
         yield None
     elif os.path.abspath(path) == os.path.abspath(active_file.filename):
@@ -301,7 +418,10 @@ def inter_pix_data_fetch(path, group, lock, active_file: tb.File, type_name: str
 def plot_inter_pix_data(interpreted_data, base_path=None, suffix="general_inter_pix_data", use_group=False,
                         total_path=None, total_data=None, inter_path=None, inter_data=None, **kwargs):
     """
-    plot_data
+    plot_inter_pix_data
+
+    @author Dominik Fischer
+    @date 2026-08-11
 
     Helper function to graphical present/plot the analysis results of an inter-pixel capacitance scan.
     The plotting is only performed for the pixels which contribute a usable capacitance measurement.
@@ -326,18 +446,33 @@ def plot_inter_pix_data(interpreted_data, base_path=None, suffix="general_inter_
     :param total_path: hdf group path inside the hdf file containing the total cap analysis results.
     :param inter_data: path to the hdf file which holds the in-pix measurement
     :param inter_path: hdf group path inside the hdf file containing the in-pix measurement
-    :key exclude_test_cap: boolean, whether to exclude the test capacitator row from the histograms.
-    :key hist_bins: integer, number of bins to use for the histogram.
-    :key mask_pixel: iterable of pixel positions on the grid to ignore for evaluations.
-    :key extract_pixel: iterable of pixel positions on the grid to extract the figures from.
+    :key lock: synchronization object to prevent multiple overlapping accesses to the pytables api and simultaneously
+        write/read operations on the same file.
+    :key plotting_lock: synchronization primitve/"lock" to make sure only one **process** is able to create a new figure
+        at the same time as matplotlib is not necessarily thread-safe.
+    :key distribution: boolean, indicating whether to investigate the capacitance distribution over the whole sensor. (default: False) [boolean]
+    :type distribution: bool
+    :key hist_bins: integer, number of bins to use for the histogram. (default: 50)
+    :type hist_bins: int
+    :key test_cap_exclusion: whether to exclude row 0 completely. (default: False)
+    :type test_cap_exclusion: bool
+    :key mask_pixel: array of tuple of pixel positions to be masked.
+    :key mask_lower: float, threshold to mask all pixels below this value.
+    :type mask_lower: float
+    :key mask_upper: float, threshold to mask all pixels above this value.
+    :type mask_upper: float
+    :key no_plot: boolean, whether to supress (interactive) plotting of the distribution of the capacitance.
+    :key use_kafe2: indicates whether kafe2 is used for the fit. (default: False)
+    :type use_kafe2: bool
+    :key apply_contours: indicates whether to determine the contours and try to plot them. (default: False)
+    :type apply_contours: bool
+    :key fit_plot_pdf: PDF object to save the fit figures to.
+    :key use_corrected: boolean, whether to use the corrected capacitance's for plotting.
+    :key apply_correction: boolean, whether to use the corrected capacitance's for plotting/extraction.
     """
     lock = kwargs.pop("lock", None)
     # determine the pdf file
     pdf_name = get_pdf_name(base_path, interpreted_data, suffix, use_group)
-    if 'exclude_cap_test' in kwargs and not 'exclude_test_cap' in kwargs:
-        kwargs['exclude_test_cap'] = kwargs['exclude_cap_test']
-        from warnings import warn
-        warn("Found the deprecated keyword 'exclude_cap_test' and transformed it to the new keyword 'exclude_test_cap'.", stacklevel=2)
 
     with PdfPages(pdf_name) as output_pdf:
         with synchronized_process_open_file(interpreted_data, mode='r', lock=lock) as in_file_h5:
@@ -353,8 +488,28 @@ def plot_inter_pix_data(interpreted_data, base_path=None, suffix="general_inter_
 
 @contextmanager
 def multi_sensor_file_handler_simple(interpreted_data, base_path, **kwargs):
+    """
+    multi_sensor_file_handler_simple
+
+    @author: Dominik Fischer
+    @date: 2026-08-11
+
+    Utility function and context manager to get the file handles to the files containing the measurements and analysis
+    data for a multiple sensors.
+    In Addition to handling the access to the data files also the output pdf object managed by this functions
+    context manager.
+
+    This context manager yields a tuple of list of hdf files hierarchy groups and pdf object.
+
+    :param interpreted_data: paths to the files containing the data to plot. (Iterable)
+    :param base_path: hdf files hierarchy groups paths (Iterable)
+    :key pdf_name: file name for the output pdf file.
+    :key lock: synchronization object to prevent multiple overlapping accesses to the pytables api and simultaneously
+        write/read operations on the same file.
+    """
     pdf_name = kwargs.pop("pdf_name", "I-V-Collection.pdf")
     file_lock = kwargs.pop("lock", None)
+
     # to simplify the operation we need a mapping of a file to all the group_mapping it should be used for,
     # and we need a mapping to the opened files
     group_mapping = {}
@@ -379,10 +534,33 @@ def multi_sensor_file_handler_simple(interpreted_data, base_path, **kwargs):
             file.flush()
             file.close()
 
+
 @contextmanager
 def multi_sensor_file_handler_advanced(interpreted_data, base_path, **kwargs):
+    """
+    multi_sensor_file_handler_advanced
+
+    @author: Dominik Fischer
+    @date: 2026-08-11
+
+    Utility function and context manager to get the file handles to the files containing the measurements and analysis
+    data for a multiple sensors.
+    In Addition to handling the access to the data files also the output pdf object managed by this functions
+    context manager.
+
+    This context manager yields a tuple of list of hdf files hierarchy groups and pdf object.
+
+    In contrast to the simple implementation the yielded tuple contains at index 1 the analysis groups of the different sensors.
+
+    :param interpreted_data: paths to the files containing the data to plot. (Iterable)
+    :param base_path: hdf files hierarchy groups paths (Iterable)
+    :key pdf_name: file name for the output pdf file.
+    :key lock: synchronization object to prevent multiple overlapping accesses to the pytables api and simultaneously
+        write/read operations on the same file.
+    """
     pdf_name = kwargs.pop("pdf_name", "I-V-Collection.pdf")
     file_lock = kwargs.pop("lock", None)
+
     # to simplify the operation we need a mapping of a file to all the group_mapping it should be used for,
     # and we need a mapping to the opened files
     group_mapping = {}
@@ -409,9 +587,13 @@ def multi_sensor_file_handler_advanced(interpreted_data, base_path, **kwargs):
             file.flush()
             file.close()
 
+
 def plot_bias_data(interpreted_data, base_path=None, suffix="bias_curve", use_group=False, **kwargs):
     """
     plot_bias_data
+
+    @author: Dominik Fischer
+    @date: 2026-08-11
 
     Plot the data acquired for the pixel-diodes I-V characterization.
 
@@ -419,7 +601,12 @@ def plot_bias_data(interpreted_data, base_path=None, suffix="bias_curve", use_gr
     :param base_path: path within the files hierarchy for the base group.
     :param suffix: additional suffix to use for naming the PDF containing the plots.
     :param use_group: boolean, whether to append the group name of the measurements to the PDF name.
-    :key lock: locking object used to synchronize the access to the file handles by the pytables library. It is highly encouraged to provide an explicit lock here.
+    :key lock: locking object used to synchronize the access to the file handles by the pytables library. It is highly
+        encouraged to provide an explicit lock here.
+    :key plotting_lock: synchronization primitve/"lock" to make sure only one **process** is able to create a new figure
+        at the same time as matplotlib is not necessarily thread-safe.
+    :key labels: required for multi-sensor plotting to label the plots from the different sensors correctly such that these could be identified. (Iterable)
+    :key area_normalisation: areas of the individual pixel summed over all contributiong pixels. (Iterable)
     """
     lock = kwargs.pop("lock", None)
     if isinstance(interpreted_data, Union[List, Tuple, np.ndarray]):
@@ -437,21 +624,43 @@ def plot_cv_data(interpreted_data, base_path=None, suffix="C_V_characteristic", 
     """
     plot_cv_data
 
+    @author: Dominik Fischer
+    @date: 2026-08-11
+
     Plot the results of the C-V characterization of the scanned pixels.
     To achieve this we need the different c-v-data.
     Then the C-V curve is plotted for every pixel.
-    If requested also fits to the boundary regions of the c-v-curve are performed to determine
-    the depletion voltage of the pixel.
+    If requested also fits to the boundary regions of the c-v-curve to determine
+    the depletion voltage of the pixel are plotted.
     To do so, two fit ranges for the two boundaries with physically distinct behaviour needs to be supplied.
+
+    On request also the doping profile, estimated from the differential capacitance and the depletion width (their dependence onto the applied voltage) is presented.
+    In this case the estimated doping profile across the sensors thickness is plotted in dependence of the applied
+    bias voltage and the depletion width.
+    In Addition the corresponding fits to model these profiles are presented if their parameters are estimated before.
+    Also the resistivity profile will be plotted.
 
 
     :param interpreted_data: path to the hdf file which holds the raw data and the analysis results.
     :param base_path: path to the base group in the hdf files hierarchy.
     :param suffix:  additional suffix to use for naming the PDF containing the plots.
     :param use_group:   boolean, whether to append the group name of the measurements to the PDF name.
+    :key lock: synchronization object to prevent multiple overlapping accesses to the pytables api and simultaneously
+        write/read operations on the same file.
+    :key pdf_name: file name for the output pdf file.
+    :key use_corrected: boolean, whether to use the corrected capacitance's for plotting.
+    :type use_corrected: bool
+    :key apply_correction: boolean, whether to use the corrected capacitance's for plotting/extraction.
+    :type apply_correction: bool
     :key verbose: boolean, indicating whether to use verbose output for depletion voltages
     :key distribution: boolean, indicating whether also the capacitance distribution of the whole sensor
         should be investigated.
+    :key plotting_lock: synchronization primitve/"lock" to make sure only one **process** is able to create a new figure
+        at the same time as matplotlib is not necessarily thread-safe.
+    :key labels: required for multi-sensor plotting to label the plots from the different sensors correctly such that these could be identified. (Iterable)
+    :key mask_pixel: array/iterable of tuple of pixel positions to be masked and therefore ignored for evaluation.
+    :key hist_bins: integer, number of bins to use for the histogram. (default: 50)
+    :type hist_bins: int
     """
     file_lock = kwargs.get("lock", None)
     if isinstance(interpreted_data, Iterable) and not isinstance(interpreted_data, str):
@@ -471,6 +680,9 @@ def plot_combined_data(interpreted_data, base_path=None, suffix="combined_bias_c
     """
     plot_combined_data
 
+    @author: Dominik Fischer
+    @date: 2026-08-11
+
     Plot the data acquired for the pixel-diodes I-V characterization and the C-V characterization of the pixels.
     Plot the results of the C-V characterization of the scanned pixels.
     To achieve this we need the different c-v-data.
@@ -479,14 +691,34 @@ def plot_combined_data(interpreted_data, base_path=None, suffix="combined_bias_c
     depletion voltage of the pixel.
     To do so, two fit ranges for the two boundaries with physically distinct behaviour needs to be supplied.
 
+    On request also the doping profile, estimated from the differential capacitance and the depletion width (their dependence onto the applied voltage) is presented.
+    In this case the estimated doping profile across the sensors thickness is plotted in dependence of the applied
+    bias voltage and the depletion width.
+    In Addition the corresponding fits to model these profiles are presented if their parameters are estimated before.
+    Also the resistivity profile will be plotted.
+
     :param interpreted_data: path to the hdf file which holds the raw data and the analysis results.
     :param base_path: path to the base group in the hdf files hierarchy.
     :param suffix: additional suffix to use for naming the PDF containing the plots.
     :param use_group: boolean, whether to append the group name of the measurements to the PDF name.
-    :key use_corrected: boolean, whether to use corrected data
+    :key lock: synchronization object to prevent multiple overlapping accesses to the pytables api and simultaneously
+        write/read operations on the same file.
+    :key pdf_name: file name for the output pdf file.
+    :key use_corrected: boolean, whether to use the corrected capacitance's for plotting.
+    :type use_corrected: bool
+    :key apply_correction: boolean, whether to use the corrected capacitance's for plotting/extraction.
+    :type apply_correction: bool
     :key verbose: boolean, indicating whether to use verbose output for depletion voltages
     :key distribution: boolean, indicating whether also the capacitance distribution of the whole sensor
         should be investigated.
+    :key plotting_lock: synchronization primitve/"lock" to make sure only one **process** is able to create a new figure
+        at the same time as matplotlib is not necessarily thread-safe.
+    :key labels: required for multi-sensor plotting to label the plots from the different sensors correctly such that these could be identified. (Iterable)
+    :key mask_pixel: array/iterable of tuple of pixel positions to be masked and therefore ignored for evaluation.
+    :key hist_bins: integer, number of bins to use for the histogram. (default: 50)
+    :type hist_bins: int
+    :key labels: required for multi-sensor plotting to label the plots from the different sensors correctly such that these could be identified. (Iterable)
+    :key area_normalisation: areas of the individual pixel summed over all contributiong pixels. (Iterable)
     """
     if kwargs.get("use_corrected", False):
         suffix = "{}_corrected".format(suffix)
@@ -505,11 +737,18 @@ def plot_bias_delegate(data_group, output_pdf: PdfPages, **kwargs):
     """
     plot_bias_delegate
 
+    @author: Dominik Fischer
+    @date: 2026-08-11
+
     Actual implementation for presenting the results of the I-V characterization.
     It's just a simple plot with error bars for the different quantities.
 
     :param data_group: hdf file's hierarchy group containing the raw data.
     :param output_pdf: PDF object to write the plots to.
+    :key plotting_lock: synchronization primitve/"lock" to make sure only one **process** is able to create a new figure
+        at the same time as matplotlib is not necessarily thread-safe.
+    :key labels: required for multi-sensor plotting to label the plots from the different sensors correctly such that these could be identified. (Iterable)
+    :key area_normalisation: areas of the individual pixel summed over all contributiong pixels. (Iterable)
     """
     interactive_lock = kwargs.get("plotting_lock", global_interactive_lock)
     with figure_provider(interactive_lock) as (fig, ax, _):
@@ -532,6 +771,27 @@ def plot_bias_delegate(data_group, output_pdf: PdfPages, **kwargs):
 
 
 def _bias_voltage_plotter(ax, tabular: tb.Table, label, norm=1, apply_norm=False):
+    """
+    bias_voltage
+
+    @author Dominik Fischer
+    @date: 2026-08-11
+
+    Internal utility function handling the actual plotting of single sensors i-v characteristics.
+    The applied voltages and the corresponding leakage currents are to be extracted from the summary table, containing
+    the set/design voltage, measured voltage and the measured leakage current.
+
+    If not uncertainties for the leakage current are present, these will be recalculated assuming a Keithley 2410 SMU
+    operating at the 1 kV sourcing range.
+
+    :param ax: matplotlib.Axes object into which to plot the i-v-curve.
+    :param tabular: pytables.Table object storing the leakage-current dependence from the scan.
+    :param label: label of this measurement series within the figure. (only necessary when a correct legend is
+        required.)
+    :param norm: normalization factor for the currents (1 = no normalisation applied), to normalise the leakage current
+        onto the sensors/pixel area.
+    :param apply_norm: boolean, whether to apply area normalisation at all. (This parameter seems to be unused)
+    """
     voltage_data = np.abs(tabular.col("U"))
     current_data = np.abs(tabular.col("I"))
     current_errors = tabular.col("DI")
@@ -545,11 +805,12 @@ def _bias_voltage_plotter(ax, tabular: tb.Table, label, norm=1, apply_norm=False
     if not GENERATE_THESIS_PLOTS:
         ax.set_title("Bias data from the measurement")
     ax.set(xlabel=BIAS_CURVE_X_LABEL, ylabel=BIAS_CURVE_Y_LABEL)
+
     # currently we could not use the correct voltage range, but we assume the errors to be within
     normalized_errors = None if current_errors is None else current_errors / norm
     if current_errors is None:
         from warnings import warn
-        warn("The current sensor seems to be missing measurement uncertainties for the leakage current!")
+        warn(f"The current sensor seems to be missing measurement uncertainties for the leakage current! The sensor is labeld by {label}")
     enhanced_error_bar(ax, voltage_data, current_data * CURRENT_CONVERSION_FACTOR / norm, xerr=voltage_error,
                        yerr=normalized_errors, label=label)
     # ax.errorbar(voltage_data, current_data * CURRENT_CONVERSION_FACTOR / norm, xerr=voltage_error,
@@ -559,10 +820,6 @@ def _bias_voltage_plotter(ax, tabular: tb.Table, label, norm=1, apply_norm=False
         ax.set_ylabel("I in \\unit{{\\nano\\ampere\\per\\centi\\meter\\squared}}")
 
 
-
-SENSOR_ITERABLE = Union[List[tb.Group], Tuple[tb.Group, ...], np.ndarray[tb.Group]]
-
-
 def __process_voltage_set(group: tb.Group):
     temp_hist = check_leaf_unit(group.BiasVoltageHist, HIST_BIAS_MEAS_UNIT)
     if len(temp_hist.shape) > 1:
@@ -570,11 +827,15 @@ def __process_voltage_set(group: tb.Group):
     else:
         return temp_hist
 
+
 def plot_cv_data_delegate(data_group: Union[tb.Group, SENSOR_ITERABLE],
                           analysis_group: Union[tb.Group, SENSOR_ITERABLE], output_pdf,
                           apply_doping=False, **kwargs):
     """
     plot_cv_data_delegate
+
+    @author: Dominik Fischer
+    @date: 2026-08-11
 
     Actual implementation for presenting the results of the C-V characterization and if necessary the determination of
     the full depletion voltage. For each with a successful capacitance measurement for each bias voltage in use
@@ -583,13 +844,25 @@ def plot_cv_data_delegate(data_group: Union[tb.Group, SENSOR_ITERABLE],
     the necessary fits be plotted. If the analysis results provided already contain the necessary data sets for the
     estimation of the full depletion voltage, these will be used and the fit will be plotted, as well.
 
+    For generating the plots of the C-V characterization for particular pixels, there are two modes available.
+    Both plots (c-v and 1/c^2 - v) could be put into the same figure or into two different ones.
+    The actual behaviour is controlled by the global flag 'CV_USE_SEPARATE_PAGES'
+
     :param data_group: hdf files hierarchy group containing the raw measurement data.
     :param analysis_group: HDF files hierarchy group containing the analysis results.
     :param output_pdf: PDF object to write the created figures to for long-term saving.
     :param apply_doping: boolean, False, indicates whether to plot the depletion data.
+    :key plotting_lock: synchronization primitve/"lock" to make sure only one **process** is able to create a new figure
+        at the same time as matplotlib is not necessarily thread-safe.
+    :key labels: required for multi-sensor plotting to label the plots from the different sensors correctly such that these could be identified. (Iterable)
+    :key mask_pixel: array/iterable of tuple of pixel positions to be masked and therefore ignored for evaluation.
     :key verbose: boolean, indicating whether to use verbose output for depletion voltages.
     :key distribution: boolean, indicating whether also the capacitance distribution of the whole sensor
         should be investigated.
+    :key hist_bins: integer, number of bins to use for the histogram. (default: 50)
+    :type hist_bins: int
+    :key use_corrected: boolean, indicating whether to use the corrected capacitance for plotting. (data corrected for parasitic capacitances of PixCap65, default: False)
+    :type use_corrected: bool
     """
     interactive_lock = kwargs.get('plotting_lock', global_interactive_lock)
     # extract the bias data
@@ -597,7 +870,12 @@ def plot_cv_data_delegate(data_group: Union[tb.Group, SENSOR_ITERABLE],
     approx_depletion = isinstance(data_group, tb.Node)
 
     labels = kwargs.pop('labels', [])
-    masked_pixels = kwargs.get('pixel_mask', [])
+    if "pixel_mask" in kwargs:
+        from warnings import warn
+        warn("Found a deprecated keyword argument 'pixel_mask' which will be removed in a future version.")
+        kwargs.set_default('mask_pixel', kwargs.pop("pixel_mask"))
+    masked_pixels = kwargs.get('mask_pixel', [])
+
     # investigate all the pixel for plotting
     for ii, jj in np.ndindex(GENERAL_PIXCAP_SHAPE):
         if (ii, jj) in masked_pixels:
@@ -619,10 +897,6 @@ def plot_cv_data_delegate(data_group: Union[tb.Group, SENSOR_ITERABLE],
             if kwargs.get("use_log", False):
                 ax[0].set_yscale('log')
                 ax[1].set_yscale('log')
-
-        # if len(plt.get_fignums()) > 0:
-        #     from warnings import warn
-        #     warn("Unexpectetly there are {} opened figures for {}".format(len(plt.get_fignums()), np.atleast_1d(analysis_group)[0]._v_pathname), stacklevel=1)
 
         # Plot the doping analysis only for single-sensor samplings.
         if apply_doping:
@@ -656,26 +930,6 @@ def plot_cv_data_delegate(data_group: Union[tb.Group, SENSOR_ITERABLE],
                     view_bias_voltages = view_origin_bias_voltages[:, :, voltage_collection_idx]
                 else:
                     view_bias_voltages = view_origin_bias_voltages
-
-
-            # TODO: Refactor this part to support plotting for multiple sensors/data sets (UNDER INVESTIATION).
-            # What about taking the pixel mask into account here?
-            # depletion_width_plate = check_leaf_unit(analysis_group.DepletionWidth, "um")
-            # depletion_width_plate_error = check_leaf_unit(analysis_group.DepletionWidthErr, "um")
-            # effective_doping_table = check_leaf_unit(analysis_group.DepletionEffDoping, "cm^-3")
-            # resistivity_table = check_leaf_unit(analysis_group.DepletionResitivity, "Ocm")
-            # origin_bias_voltages = check_leaf_unit(data_group.BiasVoltageHist, HIST_BIAS_MEAS_UNIT)
-            # if len(origin_bias_voltages.shape) > 1:
-            #     bias_voltages = origin_bias_voltages[:, voltage_collection_idx]
-            # else:
-            #     bias_voltages = origin_bias_voltages
-            # table = analysis_group.DepletionParamTable
-            # view_bias_voltages = np.atleast_2d(bias_voltages)
-            # view_depletion_width_plate = depletion_width_plate[None, :]
-            # view_depletion_width_plate_error = depletion_width_plate_error[None, :]
-            # view_effective_doping_table = effective_doping_table[None, :]
-            # view_effective_resistivity_table = resistivity_table[None, :]
-            # view_table = [table]
             plot_depletion_pixel_delegate(view_bias_voltages, ii, view_depletion_width_plate, view_depletion_width_plate_error,
                                           view_effective_doping_table, output_pdf, jj, view_table, view_effective_resistivity_table)
 
@@ -729,7 +983,30 @@ def plot_cv_data_delegate(data_group: Union[tb.Group, SENSOR_ITERABLE],
         else:
             back_pipe["output"] = False
 
+
 def _plot_cv_distribution(group: tb.Group, ax, x_limits=None, y_limits=None, **kwargs) -> Tuple[Optional[Tuple], Optional[Tuple], str]:
+    """
+    _plot_cv_distribution
+
+    @author: Dominik Fischer
+    @date: 2026-08-11
+
+    (Internal) Utility Function.
+    Fetches the results from the c-v characteriztation averaged/distributed accross the sensor and plots the analysis
+    results for this case. (Including the C-V-curve and the estimation of the depletion voltage)
+
+    Only if a single-sensor is processed also error-bands are drawn for the fits.
+
+    :param group: hdf file group under which the analysis results are stored for the C-V characterization.
+    :param ax: axes object(s) to use for plotting
+    :param x_limits: tuple defining the x-axis plotting limits from the data points of the C-V-Curve.
+    :param y_limits:tuple defining the y-axis plotting limits from the data points of the C-V-Curve.
+    :key use_corrected: boolean, indicating whether to use the corrected capacitance for plotting. (data corrected for parasitic capacitances of PixCap65, default: False)
+    :type use_corrected: bool
+    :key is_combining: boolean, indicates whether multiple sensors are to be combined into a single figure. (default: False)
+    :type is_combining: bool
+    :return: tuple of the drawing limits for both axis and the final title string for the figure.
+    """
     title_str = ""
     corrected_data = kwargs.pop("use_corrected", False)
     is_combining = kwargs.pop("is_combining", False)
@@ -887,6 +1164,24 @@ def __plot_depletion_estimation(analysis_group: Union[tb.Group, SENSOR_ITERABLE]
     return title_str
 
 def _cv_plotter(analysis, row, col, ax, voltage_data_sets, labels, **kwargs):
+    """
+    _cv_plotter
+
+    @author: Dominik Fischer
+    @date: 2026-08-11
+
+    (Internal) utility function handling the plotting of the c-v-curve of a single sensor for a particular pixel!
+
+    :param analysis: hdf files group(s) containing the analysis results of the c-v-characterization for multiple sensors.
+    :param row: row on the PixCap65 for which the c-v-curve should be plotted.
+    :param col: column on the PixCap65 for which the c-v-curve should be plotted.
+    :param ax: matplotlib.axes.Axes objects to plot into.
+    :param voltage_data_sets: datasets of the applied bias voltages for (different) sensors. (could also contain the data for only a single sensor)
+    :param labels: identifying names for the different sensors to use in the legend, when plotting for multiple sensors.
+    :key is_distribution_plot: indicates wether we plot for the averaged sensor instead of a particular pixel (default: False)
+    :type is_distribution_plot: bool
+    :return:
+    """
     title_format = "pixel ({col},{row})".format(col=col, row=row)
     # it should be quite simply to combine this two implementation branches into just a single one!
     # first get data iterators from the group iterators!
@@ -931,7 +1226,6 @@ def _cv_plotter(analysis, row, col, ax, voltage_data_sets, labels, **kwargs):
     return True
 
 
-
 def __cv_plot_instance(ax, voltage_data: np.ndarray, cap_data: np.ndarray, cap_data_errors: np.ndarray, label: str,
                        title_format, x_limits, y_limits) -> tuple[Iterable, Iterable]:
     effective_capacitance_error_data = np.reciprocal(cap_data * CAPACITANCE_CONVERSION_FACTOR) ** 3 * cap_data_errors * CAPACITANCE_CONVERSION_FACTOR if np.all(np.isfinite(cap_data_errors)) else None
@@ -945,7 +1239,7 @@ def __cv_plot_instance(ax, voltage_data: np.ndarray, cap_data: np.ndarray, cap_d
     enhanced_error_bar(ax[0], -voltage_data, cap_data * CAPACITANCE_CONVERSION_FACTOR, yerr=eff_cap_errors, label=label)
     ax[1].set(xlabel=BIAS_CURVE_X_LABEL, ylabel="$1 / C^2$ / \\unit{{\\per\\femto\\farad\\squared}}")
     enhanced_error_bar(ax[1], -voltage_data, adjusted_cap_data, yerr=np.abs(effective_capacitance_error_data), label=label, alpha=0.5)
-    x_limits = get_x_limits(voltage_data, x_limits)
+    x_limits = __get_x_limits(voltage_data, x_limits)
     y_limits = __get_y_limits(cap_data, y_limits)
     return x_limits, y_limits
 
@@ -966,7 +1260,7 @@ def __get_y_limits(cap_data: np.ndarray, y_limits: Optional[Iterable], col=None,
     return y_limits
 
 
-def get_x_limits(voltage_data, x_limits: Optional[Iterable]) -> Iterable:
+def __get_x_limits(voltage_data, x_limits: Optional[Iterable]) -> Iterable:
     if x_limits is None:
         x_limits = [np.min(voltage_data) - 10, 5 + np.max(voltage_data)]
     else:
@@ -981,6 +1275,50 @@ def get_x_limits(voltage_data, x_limits: Optional[Iterable]) -> Iterable:
 
 # CHECK: Should we use such helper functions everywhere?
 def plot_1d_distribution(data: np.ndarray, label: str, bias_code: int, table: Optional[tb.Table], pdf, group: tb.Group, **kwargs):
+    """
+    plot_1d_distribution
+
+    @author: Dominik Fischer
+    @date 2026-08-11
+
+    Utility function to plot/graphically present the histogram of the capacitance distribution of a sensor.
+    If a distribution plot is requested by the corresponding keyword argument, the necessary fits will be
+    explicitly performed/re-performed.
+
+    :param data: capacitance data from which the histogram will be plotted.
+    :param label: label/title of the plot when it gets saved.
+    :param bias_code: integer, determining which kind of measurement will be evaluated, a list of possible values is shipped with inter-pixel analysis functions within the source code (commented lines).
+    :param table: pytables.Table containing the fit parameters and other results from the analysis of the capacitance's distribution.
+    :type table: pytables.Table or numpy.ndarray
+    :param pdf:
+    :param group:
+    :param kwargs: further keyword arguments to be propagated to sub-calls.
+    :key plotting_lock: synchronization primitve/"lock" to make sure only one **process** is able to create a new figure at
+        the same time as matplotlib is not necessarily thread-safe.
+    :key hist_bins: integer, number of bins to use for the histogram. (default: 50)
+    :type hist_bins: int
+    :key unit: unit of the capacities presented within the plot.
+    :type unit: str
+    :key distribution: boolean, indicating whether to investigate the capacitance distribution over the whole sensor. (default: False)
+    :type distribution: bool
+    :key test_cap_exclusion: whether to exclude row 0 completely. (default: False)
+    :type test_cap_exclusion: bool
+    :key mask_pixel: array/iterable of tuple of pixel positions to be masked and therefore ignored for evaluation.
+    :key mask_lower: float, threshold to mask all pixels below this value.
+    :type mask_lower: float
+    :key mask_upper: float, threshold to mask all pixels above this value.
+    :type mask_upper: float
+    :key capacitance: histogram of the capacitance to use instead of those extracted from the provided hdf files group.
+    :key set_parasitic: boolean, whether to set the parasitic capacitance for this data set.
+    :type set_parasitic: bool
+    :key no_plot: boolean, whether to supress (interactive) plotting of the distribution of the capacitance.
+    :key convert: boolean, whether to convert the capacitance to fF, or not (default: True)
+    :key use_kafe2: indicates whether kafe2 is used for the fit. (default: False)
+    :type use_kafe2: bool
+    :key apply_contours: indicates whether to determine the contours and try to plot them. (default: False)
+    :type apply_contours: bool
+    :key fit_plot_pdf: PDF object to save the fit figures to.
+    """
     unit = kwargs.pop("unit", "\\farad")
     interactive_lock = kwargs.get('plotting_lock', global_interactive_lock)
     with advanced_figure_provider(interactive_lock) as (fig, ax):
@@ -998,9 +1336,14 @@ def plot_1d_distribution(data: np.ndarray, label: str, bias_code: int, table: Op
 
         analyze_capacitance_distribution_delegate(group, pdf, set_parasitic=False, **kwargs)
 
+
 def plot_data_delegate(data_group: tb.Group, analysis_group: tb.Group, output_pdf: PdfPages, **kwargs):
     """
     plot_data_delegate
+
+    @authors: Dominik Fischer
+    @date: 2026-08-11
+
 
     Actual implementation to plot the results of the analysis of simple pixel capacitance scan (total capacitance).
     Besides the naming it is not just plotting but also a bit of analysis as the distribution of the capacitance is
@@ -1011,14 +1354,35 @@ def plot_data_delegate(data_group: tb.Group, analysis_group: tb.Group, output_pd
     :param data_group: hdf files hierarchy group containing the raw measurement data.
     :param analysis_group: hdf files hierarchy group containing the analysis results.
     :param output_pdf: PDF object to write the created figures to for long-term saving.
-    :key test_cap_exclusion: boolean, whether to exclude the test capacitator row from the histograms.
-    :key hist_bins: integer, number of bins to use for the histogram.
-    :key mask_pixel: iterable of pixel positions on the grid to ignore for evaluations.
-    :key extract_pixel: iterable of pixel positions on the grid to extract the figures from.
-    :key distribution: boolean, indicating whether to investigate the capacitance distribution over the whole sensor.
+    :key plotting_lock: synchronization primitve/"lock" to make sure only one **process** is able to create a new figure at
+        the same time as matplotlib is not necessarily thread-safe.
+    :key hist_bins: integer, number of bins to use for the histogram. (default: 50)
+    :type hist_bins: int
+    :key test_cap_exclusion: whether to exclude row 0 completely. (default: False)
+    :type test_cap_exclusion: bool
+    :key mask_pixel: array/iterable of tuple of pixel positions to be masked and therefore ignored for evaluation.
+    :key mask_lower: float, threshold to mask all pixels below this value.
+    :type mask_lower: float
+    :key mask_upper: float, threshold to mask all pixels above this value.
+    :type mask_upper: float
+    :key distribution: boolean, indicating whether to investigate the capacitance distribution over the whole sensor. (default: False)
+    :type distribution: bool
+    :key unit: unit of the capacities presented within the plot.
+    :type unit: str
+    :key capacitance: histogram of the capacitance to use instead of those extracted from the provided hdf files group.
+    :key set_parasitic: boolean, whether to set the parasitic capacitance for this data set.
+    :type set_parasitic: bool
+    :key no_plot: boolean, whether to supress (interactive) plotting of the distribution of the capacitance.
+    :key convert: boolean, whether to convert the capacitance to fF, or not (default: True)
+    :key use_kafe2: indicates whether kafe2 is used for the fit. (default: False)
+    :type use_kafe2: bool
+    :key apply_contours: indicates whether to determine the contours and try to plot them. (default: False)
+    :type apply_contours: bool
+    :key fit_plot_pdf: PDF object to save the fit figures to.
     """
     interactive_lock = kwargs.get('plotting_lock', global_interactive_lock)
-    # Read pixel map
+
+    # Read pixel map and verify units
     current_hist = check_leaf_unit(data_group.HistCurr, HIST_CURRENT_MEAS_UNIT)
     current_err_hist = check_leaf_unit(data_group.HistCurrErr, HIST_CURRENT_MEAS_UNIT)
     cap_hist = check_leaf_unit(analysis_group.HistCap, HIST_CAP_UNIT)
@@ -1080,6 +1444,7 @@ def plot_data_delegate(data_group: tb.Group, analysis_group: tb.Group, output_pd
                 ax[1].grid()
                 output_pdf.savefig(fig, bbox_inches='tight')
 
+
 def __get_1d_hist_label(bias_code: int, label: str, table: Optional[tb.Table], unit="F"):
     from matplotlib import rcParams
     if table is not None:
@@ -1127,7 +1492,31 @@ def __get_1d_hist_label(bias_code: int, label: str, table: Optional[tb.Table], u
         corrected_label = ""
     return "{}{}{}".format(label, uncorrected_label, corrected_label)
 
+
 def plot_2d_capacitance(data, label, pdf, **kwargs):
+    """
+    plot_2d_capacitance
+
+    @author: Dominik Fischer
+    @date: 2026-08-11
+
+    Utility function to plot the distribution of the capacitance's over a sensor matrix.
+
+    :param data: capacitance data to plot.
+    :type data: numpy.ndarray
+    :param label: label/title of the plot/figure when saving it.
+    :type label: str
+    :param pdf: pdf object to save the final figure to.
+    :key plotting_lock: synchronization primitve/"lock" to make sure only one **process** is able to create a new figure
+        at the same time as matplotlib is not necessarily thread-safe.
+    :key test_cap_exclusion: whether to exclude row 0 completely. (default: False)
+    :type test_cap_exclusion: bool
+    :key mask_pixel: array of tuple of pixel positions to be masked.
+    :key mask_lower: float, threshold to mask all pixels below this value.
+    :type mask_lower: float
+    :key mask_upper: float, threshold to mask all pixels above this value.
+    :type mask_upper: float
+    """
     interactive_lock = kwargs.get("plotting_lock", global_interactive_lock)
     assert isinstance(data, np.ndarray)
     masked_cap_hist = evaluate_pixel_mask(data.copy(), **kwargs)
@@ -1150,9 +1539,12 @@ def plot_inter_pix_data_delegate(data_group: tb.Group, analysis_group: tb.Group,
     """
     plot_inter_pix_data_delegate
 
+    @author: Dominik Fischer
+    @date 2026-08-11
+
     Actual implementation to plot the results of the analysis of the inter-pixel capacitance scan.
     Besides the naming it is not just plotting but also a bit of analysis as the distribution of the capacitance
-    over the pixel and in general for all three currents is investigated, as well.
+    over the sensor and in general for all three currents is investigated, as well.
     The current-frequency dependency will plotted for each scanned pixel with finite currents.
     Also the capacitance distribution over the whole sensor and the frequency of capacitance values are plotted for all
     three current measurements. Besides the naming of the plots the capacitance are not directly the inter-pixel or
@@ -1166,16 +1558,32 @@ def plot_inter_pix_data_delegate(data_group: tb.Group, analysis_group: tb.Group,
     :param analysis_group: hdf files hierarchy group containing the analysis results.
     :param output_pdf: PDF object to write the created figures to for long-term saving.
     :param total_group: hdf files hierarchy group containing the total cap measurements (results).
-    :key exclude_test_cap: boolean, whether to exclude the test capacitator row from the histograms.
-    :key hist_bins: integer, number of bins to use for the histogram.
-    :key mask_pixel: iterable of pixel positions on the grid to ignore for evaluations.
-    :key extract_pixel: iterable of pixel positions on the grid to extract the figures from.
-    :key distribution: boolean, indicating whether to analyze also the capacitance distribution.
+    :param inter_group: hdf files hierarchy group containing another inter-pixel measurements (results) for reference when extracting the individual contributions to the inter-pixel-capacitance. (default: None)
+    :key plotting_lock: synchronization primitve/"lock" to make sure only one **process** is able to create a new figure
+        at the same time as matplotlib is not necessarily thread-safe.
+    :key distribution: boolean, indicating whether to investigate the capacitance distribution over the whole sensor. (default: False) [boolean]
+    :type distribution: bool
+    :key hist_bins: integer, number of bins to use for the histogram. (default: 50)
+    :type hist_bins: int
+    :key test_cap_exclusion: whether to exclude row 0 completely. (default: False)
+    :type test_cap_exclusion: bool
+    :key mask_pixel: array of tuple of pixel positions to be masked.
+    :key mask_lower: float, threshold to mask all pixels below this value.
+    :type mask_lower: float
+    :key mask_upper: float, threshold to mask all pixels above this value.
+    :type mask_upper: float
+    :key no_plot: boolean, whether to supress (interactive) plotting of the distribution of the capacitance.
+    :key use_kafe2: indicates whether kafe2 is used for the fit. (default: False)
+    :type use_kafe2: bool
+    :key apply_contours: indicates whether to determine the contours and try to plot them. (default: False)
+    :type apply_contours: bool
+    :key fit_plot_pdf: PDF object to save the fit figures to.
     """
     interactive_lock = kwargs.get("plotting_lock", global_interactive_lock)
     need_distribution = kwargs.get("distribution", False)
     lockless_propagation = {key: value for key, value in kwargs.items() if "lock" not in key }
-    # Read pixel map
+
+    # Read pixel map and verify that the assumed units are correct
     total_current_hist = check_leaf_unit(data_group.TotalHistCurr, HIST_CURRENT_MEAS_UNIT)
     total_current_err_hist = check_leaf_unit(data_group.TotalHistCurrErr, HIST_CURRENT_MEAS_UNIT)
     total_cap_hist = check_leaf_unit(analysis_group.HistCap, HIST_CAP_UNIT)
@@ -1191,7 +1599,6 @@ def plot_inter_pix_data_delegate(data_group: tb.Group, analysis_group: tb.Group,
 
     total_ref_cap_hist = None if total_group is None else check_leaf_unit(total_group.HistCap, HIST_CAP_UNIT)
     in_ref_cap_hist = None if inter_group is None else check_leaf_unit(inter_group.HistCap, HIST_CAP_UNIT)
-
 
     # Read scan parameters
     scan_parameters = data_group.scan_params[:]
@@ -1381,11 +1788,28 @@ def plot_current_data(ax: Axes, col, row, scan_parameters, current_hist, current
 
 def get_model_prediction(col, row, analysis_group: tb.Group, actual_cap: Any, total_leak_hist, f: np.ndarray=None,
                          resistor_name="HistRes", **plot_args):
+    """
+    get_model_prediction
+
+    @author: Dominik Fischer
+    @date: 2026-08-11
+
+
+    Utility function to compute the model predictions for capacitances depending on the used frequency for the measurement.
+
+    :param col: PixCap65 measurement column for which to predict.
+    :param row: PixCap65 measurement row for which to predict.
+    :param analysis_group: hdf files group of the analysis results used for fetching the models parameter in order to compute the prediction.
+    :param actual_cap:
+    :param total_leak_hist: matrix of the estimated leakage currents by fitting the corresponding model.
+    :param f: array of the frequencies for which a prediction is to be computed.
+    :param resistor_name: name of the dataset containing the on-resistance estimators if such a dataset is present at all.
+    :param plot_args: further keywords arguments to be propagated to a plotting utility function (unused?)
+    :key parasitic_correction: parasitic capacitance for which the input values are already corrected (this needs to be accounted for by the model as the currents are not corrected at all).
+    :return:
+    """
     parasitic_correction = plot_args.pop('parasitic_correction', 0.0)
     assert "parasitic_correction" not in plot_args
-    # if no frequencies given, calculate them from the model
-    if f is None:
-        pass
 
     # noinspection PyUnresolvedReferences
     if resistor_name in analysis_group and np.isfinite(analysis_group[resistor_name][col, row]):
@@ -1400,6 +1824,7 @@ def get_model_prediction(col, row, analysis_group: tb.Group, actual_cap: Any, to
 
     else:
         return f, (actual_cap + parasitic_correction) * f + total_leak_hist[col, row]
+
 
 def plot_current_model(ax: Axes, col, row, analysis_group: tb.Group, actual_cap: Any, total_leak_hist, f: np.ndarray,
                        resistor_name="HistRes", prefix="", color=0.6, **plot_args):
@@ -1514,10 +1939,28 @@ def plot_depletion_pixel_delegate(bias_voltages: Iterable[TABLES_LEAF_COMPAT_TYP
                                   depletion_width_plates: Iterable[TABLES_LEAF_COMPAT_TYPE],
                                   depletion_width_plates_error: Iterable[TABLES_LEAF_COMPAT_TYPE],
                                   effective_doping_tables: Iterable[TABLES_LEAF_COMPAT_TYPE], output_pdf: PdfPages, i_row, tables, resistivities):
+    """
+    plot_depletion_pixel_delegate
+
+    @author: Dominik Fischer
+    @date: 2026-08-11
+
+    Utility function to plot the dependence of the estimated resistivities and the doping-profile onto the applied
+    bias voltage (reversed bias).
+
+    :param bias_voltages: array of the applied bias voltages to use for plotting and investigation.
+    :param i_col: column of the PixCap65 chip for which to perform the plotting of depletion data.
+    :param depletion_width_plates: matrix of depletion widths for the measurement using PixCap65 and the connected sensor.
+    :param depletion_width_plates_error: matrix of the uncertainties of the depletion widths.
+    :param effective_doping_tables:
+    :param output_pdf: matplotlib pdf object to write the (final) figures to.
+    :param i_row: row of the PixCap65 chip for which to perform the plotting of depletion data.
+    :param tables:
+    :param resistivities:
+    """
     # will need to perform this step for every sensor/depletion object provided.
     # How to transform this check here
     if np.any(np.array([np.all(entry[i_col, i_row]) for entry in depletion_width_plates], dtype=bool)):
-    # if np.all(np.isfinite(depletion_width_plate[i_col, i_row])):
         temp_depletion_fit_propagate_parameters = []
         effective_dopings = []
         effective_resistivities = []
@@ -1589,10 +2032,19 @@ def plot_depletion_pixel_delegate(bias_voltages: Iterable[TABLES_LEAF_COMPAT_TYP
             ax[1].set_yscale('log')
 
 
-IS_PRESENTATION = False
-IS_THESIS = False
-
 def mp_plotting_init(backend, has_latex):
+    """
+    mp_plotting_init
+
+    @author: Dominik Fischer
+    @date: 2026-08-11
+
+    Helper function to initialize process for plotting when using multiprocessing to accelerate things.
+    :param backend: matplotlib backend to use for plotting.
+    :type backend: str
+    :param has_latex: whether to use LaTeX for plotting (axis and plot labels etc.).
+    :type has_latex: bool
+    """
     from pixcap65.utility.homogenize_plots import set_params
     import matplotlib
     import locale
@@ -1623,6 +2075,15 @@ def mp_plotting_init(backend, has_latex):
 
 
 def error_handler(exc):
+    """
+    error_handler
+
+    @author: Dominik Fischer
+    @date: 2026-08-11
+
+    Callback function to log exceptions raised by functions within a multiprocessing worker pool when using multiprocessing.
+    :param exc: exception information to log
+    """
     logger.error("While performing the plotting in multiple processes an error occured.", exc_info=exc)
 
 if __name__ == '__main__':
@@ -1671,7 +2132,8 @@ if __name__ == '__main__':
     # use this attempt to achieve a better performance when generating the plots
     import multiprocessing as mp
     from full_analysis import presentation_plotter, \
-    bare_sample_plotter_second, x1_plotter, r13_plotter_second
+    bare_sample_plotter_second, x1_plotter, r13_plotter_second, x2_plotter_second, x5_plotter, x6_plotter, x7_plotter, \
+    e1_plotter_second, r1_plotter, x4_plotter
 
     print(mp.current_process().name)
     print(mp.cpu_count())
@@ -1683,14 +2145,14 @@ if __name__ == '__main__':
         process_handles = [
             bare_sample_plotter_second,
             x1_plotter,
-            # x2_plotter_second,
-            # x5_plotter,
-            # x6_plotter,
-            # x7_plotter,
+            x2_plotter_second,
+            x5_plotter,
+            x6_plotter,
+            x7_plotter,
             r13_plotter_second,
-            # e1_plotter_second,
-            # r1_plotter,
-            # x4_plotter,
+            e1_plotter_second,
+            r1_plotter,
+            x4_plotter,
         ]
         processes = [pool.apply_async(handle, (tables_lock,), error_callback=error_handler) for handle in process_handles]
 
