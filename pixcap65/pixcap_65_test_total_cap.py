@@ -1453,6 +1453,11 @@ class PixCap65TotalCap(PixCap65Measurement):
             for k, freq in enumerate(frequency_range):
                 self.pixcap.cvm_frequency = freq
                 self.verify_stable_current(self.pixcap.primary_smu_key)
+                # TODO: catch errors except for KeyboardInterupt during measurement
+                # the implementation might be dangerous!
+                # there should be some emergency handling in case we encounter an full breakdown.
+                # e.g. if the SMU restarts unexpectedly, we don't know how the serial will behave and we would need to
+                # reinit it anyway!
                 self.handle_measurement(i_col, i_row, k)
                 self.store_iteration_parameters(freq, k)
 
