@@ -38,7 +38,7 @@ from contextlib import contextmanager
 from matplotlib.backends.backend_pdf import PdfPages
 
 import pixcap65.data_constants as data_constants
-from full_analysis import r1_analysator, x4_analysator
+from examples.full_analysis import r1_analysator, x4_analysator
 from pixcap65.analysis import analyze_data
 from pixcap65.data_constants import E1_2_SCAN_FILE, R13_2_SCAN_FILE
 from pixcap65.data_constants import X1_SCAN_2_FILE, X2_SCAN_2_FILE
@@ -314,7 +314,7 @@ def e1_analysator_second(tb_lock, correction_args, **kwargs):
 
     analyze_data(raw_data=E1_2_SCAN_FILE, base_path=hdf(top_ref, name, 'C_V_Characteristic_refined'),
                  is_advanced=True, full_model=False, is_cv=True, use_corrected=True,
-                 lock=tb_lock, test_cap_exclusion=True, mask_pixel=data_constants.e1_pixel_mask,
+                 lock=tb_lock, test_cap_exclusion=True,
                  **e1_depletion_args)
 
     for type_name in data_constants.e1_pixel_groups.keys():

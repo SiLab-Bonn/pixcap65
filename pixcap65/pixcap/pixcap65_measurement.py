@@ -7,7 +7,13 @@
 
 from __future__ import annotations
 
-from importlib.resources import files, as_file
+try:
+    # python 3.7 and above implementations for these operations
+    from importlib.resources import files, as_file
+except ImportError:
+    # for python 2.x or python 3.x with x < 7 we need a backport here
+    from importlib_resources import files, as_file
+
 
 import logging
 import numpy as np
@@ -74,11 +80,74 @@ class MeasurementAbstract(object, metaclass=ABCMeta):
         """
         raise NotImplementedError("`scan` is abstract and therefore not implemented.")
 
-# TODO: ensure correct loading of configuration
-# TODO: ensure correct loading of firmware to the device
-# TODO: test implementations on the actial device
-# TODO: need a handler function capable of installing a explicit example configuration or the firmware to the location provided by the configuration file!
+
+# TODO: test implementations on the actual device
+def load_firmware(config=None):
+    """
+    load_firmware
+
+    @author: Dominik Fischer
+    @date: 2026-08-13
+    last update: 2026-08-13
+
+    Module function to load the firmware from modules resources and write to a file (if this file does not already exist)
+    to be loaded later on init of the measurement classes or the PixCap65 class itself.
+
+    :param config: configuration file or configuration mapping from which to determine the target location of the firmware.
+    """
+    with configuration_context(config=config) as safe_config:
+        # from here we need to extract the firmware location!
+        dut = Pixcap65(safe_config)
+        for transfer in dut._conf[BasilConfigKeys.TRANSFER_LAYER]:
+            if 'type' not in transfer or not transfer['type'] == 'SiUSB':
+                continue
+            if 'bit_file' not in transfer['init']:
+                continue
+
+            guess_path = transfer['init']['bit_file']
+            if not os.path.exists(guess_path):
+                resource_firmware = files("pixcap65").joinpath('device', 'ise', 'pixcap65.bit')
+                assert resource_firmware.is_file()
+                with open(guess_path, 'wb') as bit_file:
+                    with as_file(resource_firmware) as firmware:
+                        with open(firmware, 'rb') as guess_file:
+                            bit_file.write(guess_file.read())
+
+                break
+        del dut
+
+
+def load_configuration(target_path="pixcap65.yaml"):
+    """
+    load_configuration
+
+    @author: Dominik Fischer
+    @date: 2026-08-13
+    last update: 2026-08-13
+
+    Module function to load the default configuration from the module/package resources and write to a file. (on disk)
+    Such that it could be used for initializing the PixCap65 class or the corresponding measurement classes.
+
+    :param target_path: path where to write the default configuration to.
+    """
+    packaged_config = files("pixcap65").joinpath("pixcap65.yaml")
+    assert packaged_config.is_file()
+    with packaged_config.open('r') as pack:
+        data = pack.read()
+        with open(target_path, 'w') as target:
+            target.write(data)
+
+
 class Pixcap65BaseMeasurement(MeasurementAbstract, metaclass=ABCMeta):
+    """
+    Pixcap65BaseMeasurement
+
+    Some measurements methods and handlers for initializing the setup and stopping connection to the setup
+    appropriately when finished.
+    In particular it makes sure that the firmware and the configuration files are available to the measurement classes
+    when they are needed.
+    This base class also provides a context manager implementation for the actually implementing measurement subclasses.
+    """
     def __init__(self, pix_config=None, **kwargs):
         super(Pixcap65BaseMeasurement, self).__init__(**kwargs)
         with configuration_context(pix_config) as config:
@@ -272,12 +341,24 @@ class Pixcap65BaseMeasurement(MeasurementAbstract, metaclass=ABCMeta):
 
 @contextmanager
 def configuration_context(config):
+    """
+    configuration_context
+
+    @author: Dominik Fischer
+    last update: 2026-08-13
+
+    Utility to function to fetch and verify the correct configuration mapping for the setup to provide basil with correct information about the connected lab devices.
+    Will yield the final configuration mapping.
+
+    :param config: configuration Mapping or path to configuration file
+    """
     try:
+        # What about correct firmware entries here?
+        # perhaps we should better read the mapping up-front?
         if isinstance(config, Mapping) or hasattr(config, "read"):
             yield config
         elif config is None or os.path.exists(config):
-            logger.warning("The path to the pixcap firmware was recalculated from the package resources.")
-            packaged_config = files("pixcap65").joinpath("device", "ise", "pixcap65.bit")
+            packaged_config = files("pixcap65").joinpath("pixcap65.yaml")
             assert packaged_config.is_file()
             yield packaged_config.open('r')
         else:

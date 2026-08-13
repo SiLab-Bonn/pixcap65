@@ -77,6 +77,9 @@ And the same after processing the data
 * mask_upper: threshold to mask all pixels above this value. [float]
 * distribution: boolean, indicating whether to investigate the capacitance distribution over the whole sensor. (default: False) [boolean]
 * use_corrected: boolean, indicating whether to use the corrected capacitance for plotting. (data corrected for parasitic capacitances of PixCap65, default: False) [boolean]
+* apply_correction: boolean, apply_correction: boolean, indicates whether the measured capacitance should be corrected
+  immediately; Will require the presence of further arguments as information about the parasitic capacitance needs to be
+  submitted. (data corrected for parasitic capacitances of PixCap65, default: False) [boolean]
 * hist_bins: integer, number of bins to use for the histogram. (default: 50) [int]
 * plotting_lock: synchronization primitve/"lock" to make sure only one **process** is able to create a new figure
   at the same time as matplotlib is not necessarily thread-safe.

@@ -542,15 +542,13 @@ if __name__ == "__main__":
         # investigate_dependencies_fitting(final_summary, final_properties, third_model_mapper, x_log=True, y_log=True)
 
         # it is also necessary to get a ND-Fit of our model for the capacitance distribution!
-        # TODO: refine the selection procedure!
         upper_limit = 6
-        general_upper_selection = slice(0, -6)
-        assert np.shape(final_properties.implantation_area[:-upper_limit]) == np.shape(final_properties.implantation_area[general_upper_selection])
-        suited_implant_area = final_properties.implantation_area[:-upper_limit]
-        suited_depth = final_properties.implantation_depth[:-upper_limit]
-        suited_perimeter = final_properties.Perimeter[:-upper_limit]
-        suited_x_separation = final_properties.pixel_separation_x[:-upper_limit]
-        suited_y_separation = final_properties.pixel_separation_y[:-upper_limit]
+        general_upper_selection = slice(0, -upper_limit)
+        suited_implant_area = final_properties.implantation_area[general_upper_selection]
+        suited_depth = final_properties.implantation_depth[general_upper_selection]
+        suited_perimeter = final_properties.Perimeter[general_upper_selection]
+        suited_x_separation = final_properties.pixel_separation_x[general_upper_selection]
+        suited_y_separation = final_properties.pixel_separation_y[general_upper_selection]
 
         full_implant_area = final_properties.implantation_area
         full_depth = final_properties.implantation_depth
@@ -558,11 +556,10 @@ if __name__ == "__main__":
         full_x_separation = final_properties.pixel_separation_x
         full_y_separation = final_properties.pixel_separation_y
 
-        capacitance_data = final_summary.biased_capacitance.magnitude[:-upper_limit]
-        capacitance_errors = final_summary.biased_capacitance.systematic_dispersion[:-upper_limit]
-        # capacitance_errors = final_summary.biased_capacitance.stat_error[:-upper_limit]
-        inter_capacitance_data = final_summary.biased_inter_capacitance.magnitude[:-upper_limit]
-        inter_capacitance_errors = final_summary.biased_inter_capacitance.stat_error[:-upper_limit]
+        capacitance_data = final_summary.biased_capacitance.magnitude[general_upper_selection]
+        capacitance_errors = final_summary.biased_capacitance.systematic_dispersion[general_upper_selection]
+        inter_capacitance_data = final_summary.biased_inter_capacitance.magnitude[general_upper_selection]
+        inter_capacitance_errors = final_summary.biased_inter_capacitance.stat_error[general_upper_selection]
 
         full_capacitance_data = final_summary.biased_capacitance.magnitude
         full_capacitance_errors = final_summary.biased_capacitance.systematic_dispersion

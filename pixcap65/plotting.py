@@ -124,7 +124,7 @@ def evaluate_pixel_mask(hist, perform_filter=False, **kwargs):
     """
     result_hist = hist.copy()
     kargs = kwargs.copy()
-    warn_level = 2
+    warn_level = 5
     if "exclude_cap_hist" in kargs:
         from warnings import warn
         warn("Found the unexpected keyword-argument 'exclude_cap_hist'. The correct keyword should be 'test_cap_exclusion', but that might change again. If both are provided the first one will be ignored.", UserWarning, stacklevel=warn_level)
@@ -1040,7 +1040,6 @@ def _plot_cv_distribution(group: tb.Group, ax, x_limits=None, y_limits=None, **k
             if not is_combining:
                 try:
                     from jacobi import propagate
-                    # CHECK: would it now be present within the distribution data?
                     first_covariance = depletion_data["first_covariance"][dep_idx]
                     second_covariance = depletion_data["second_covariance"][dep_idx]
                     first_depletion_parameters = [depletion_fit_a[dep_idx], depletion_fit_b[dep_idx],]
@@ -1062,9 +1061,12 @@ def _plot_cv_distribution(group: tb.Group, ax, x_limits=None, y_limits=None, **k
                     ax[1].fill_between(-second_voltage_x, second_y - second_y_error_prop,
                                        second_y + second_y_error_prop,
                                        facecolor="C1", alpha=0.5)
-                except (ImportError, tb.exceptions.NoSuchNodeError, ValueError, KeyError):
+                except ImportError:
+                    pass
+                except (tb.exceptions.NoSuchNodeError, ValueError, KeyError) as e:
                     from warnings import warn
                     warn("Something went wrong with the error bands of the depletion analysis.", stacklevel=1)
+                    print("Found the exception:", e)
                     first_cap_calc = depletion_fit_a[dep_idx] * first_voltage_x + depletion_fit_b[dep_idx]
                     second_cap_calc = depletion_fit_c[dep_idx] * second_voltage_x + depletion_fit_d[dep_idx]
                     ax[1].plot(-first_voltage_x, first_cap_calc, '-', label="First section fit")
@@ -1147,16 +1149,18 @@ def __plot_depletion_estimation(analysis_group: Union[tb.Group, SENSOR_ITERABLE]
                 ax[1].fill_between(-first_voltage_x, first_y - first_y_error_prop, first_y + first_y_error_prop, facecolor="C1", alpha=0.5)
                 ax[1].fill_between(-second_voltage_x, second_y - second_y_error_prop, second_y + second_y_error_prop,
                                    facecolor="C1", alpha=0.5)
+            except ImportError:
+                pass
 
-            except (ImportError, tb.exceptions.NoSuchNodeError) as e:
+            except tb.exceptions.NoSuchNodeError as e:
                 first_cap_calc = first_dep_parameters[0] * first_voltage_x + first_dep_parameters[1]
                 second_cap_calc = second_dep_parameters[0] * second_voltage_x + second_dep_parameters[1]
                 ax[1].plot(-first_voltage_x, first_cap_calc, '-', label="First section fit")
                 ax[1].plot(-second_voltage_x, second_cap_calc, '-', label="Second section fit")
-                # CHECK: verify the new implementation!
+                # Implementations seems to be missing for the E1 general CV Data!
                 from warnings import warn
-                # warn("Something went wrong with the error bands of the depletion analysis.")
-                # print("handling the exception:", e)
+                warn("Something went wrong with the error bands of the depletion analysis.")
+                print("handling the exception:", e)
             finally:
                 ax[1].vlines(-dep_voltage_2, 0, 1, linestyles="dashed")
                 ax[1].vlines(-dep_voltage_2, 0, 1, linestyles="dashed")

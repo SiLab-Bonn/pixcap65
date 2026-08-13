@@ -29,6 +29,9 @@ def advanced_analysis_delegate(file: tb.File, group: tb.Group, current_hist: TAB
     """
     advanced_analysis_delegate
 
+    @author: Dominik Fischer
+    last update: 2026-08-12
+
     Implementation of the advanced analysis strategy for the capacitance measurement of a pixel sensor.
     For determination of the capacitance values non-linear fit algorithms are used.
     Depending on the choice of parameters either kafe2 or iminuit is used for least squares minimization.
@@ -44,11 +47,12 @@ def advanced_analysis_delegate(file: tb.File, group: tb.Group, current_hist: TAB
         Otherwise, the linear model is used.
     :key current_error_hist: 2D-Array for the errors of the current data. This keyword argument must be present
         for the advanced analysis strategy.
-    :key use_kafe2: boolean, indicates whether kafe2 is used for the fit.
-    :key plot: boolean, indicates whether to plot the data. AN output PDF object could be submitted here
-         instead of an explicitly created one.
-    :key apply_contour: boolean, indicates whether to determine the contours and try to plot them.
+    :key use_kafe2: boolean, indicates whether kafe2 is used for the fit. (default: False)
+    :key plot: boolean, indicates whether to plot the data. An output PDF object could be submitted here instead of an explicitly created one. (Default: False)
+    :key apply_contour: boolean, indicates whether to determine the contours and try to plot them. (default: False)
     :key fit_plot_pdf: PdfPages object, to save the fit plot figures to (will override the plot object if provided)
+    :key output_pdf: PdfPages object, to save the fit plot figures to (will override the plot object if provided)
+    :key is_inter_b: indicates whether this an analysis for the b-channel of the inter-pixel capacitances measurements, which would change the assumed voltage.
     """
     plot = kwargs.pop("plot", False)
     plot_fit = HandleFitterStubClass()
@@ -79,6 +83,29 @@ def advanced_analysis_delegate(file: tb.File, group: tb.Group, current_hist: TAB
 def _perform_advanced_fit(file: tb.File, group: tb.Group, current_hist: np.ndarray,
                           plot_fit: HandleFitterStubClass, scan_parameters: Union[tb.Table, np.ndarray],
                           **kwargs):
+    """
+    _perform_advanced_fit
+
+    @author: Dominik Fischer
+    last update: 2026-08-12
+
+    Performs the actual fits (delegates it) for every pixel which has reasonable current measurements and saves the results back.
+
+    :param file: .h5 file object containing the data to be analysed.
+    :param group: hdf files' group containing the measurement data.
+    :param current_hist: histogram/array-like of the measured currents.
+    :param plot_fit: object handling the control plots for the fit.
+    :param scan_parameters: mapping of scan-parameters used when measuring the capacitances'.
+    :key full_model: boolean, True, indicates whether the full model for extended frequency range is to be used.
+        Otherwise, the linear model is used.
+    :key current_error_hist: 2D-Array for the errors of the current data. This keyword argument must be present
+        for the advanced analysis strategy.
+        :key use_kafe2: boolean, indicates whether kafe2 is used for the fit. (default: False)
+    :key plot: boolean, indicates whether to plot the data. An output PDF object could be submitted here instead of an explicitly created one. (Default: False)
+    :key apply_contour: boolean, indicates whether to determine the contours and try to plot them. (default: False)
+    :key output_pdf: PdfPages object, to save the fit plot figures to (will override the plot object if provided)
+    :key is_inter_b: indicates whether this an analysis for the b-channel of the inter-pixel capacitances measurements, which would change the assumed voltage.
+    """
     # extract the additional keyword arguments
     full_model = kwargs.pop("full_model", True)
     assert "current_error_hist" in kwargs
@@ -100,11 +127,6 @@ def _perform_advanced_fit(file: tb.File, group: tb.Group, current_hist: np.ndarr
     (cov_array_limit, effective_model, effective_expression, effective_label,
      effective_parameter_dict, initial_guess) = __declare_fit_model(full_model)
 
-    # print("Investigate the effective parameter dict")
-    # print(effective_parameter_dict)
-    # print("Investigate the effective expression")
-    # print(initial_guess)
-
     fit_cov = np.full(shape=tuple([*GENERAL_PIXCAP_SHAPE, cov_array_limit + 1, cov_array_limit + 1]), fill_value=np.nan)
 
     # Fit pixel data in order to extract capacitance for each pixel
@@ -123,9 +145,6 @@ def _perform_advanced_fit(file: tb.File, group: tb.Group, current_hist: np.ndarr
         cap, cap_error, fit_cov_temp, fitter, leakage, leakage_error, resistor, resistor_error = __perform_pixel_fit(
             currents, current_errors, frequencies, effective_expression, effective_label, effective_model,
             effective_parameter_dict, full_model, initial_guess, use_kafe2, kwargs.get('is_inter_b', False))
-
-        # https://matplotlib.org/3.10.9/api/pyplot_api.html#matplotlib.pyplot.get_fignums
-        # https://matplotlib.org/3.10.9/api/_as_gen/matplotlib.pyplot.get_fignums.html
 
         plot_fit(fitter, apply_contour, ANALYSIS_FIT_X_LABEL, ANALYSIS_FIT_Y_LABEL,
                  ANALYSIS_FIT_PLOT_LEGEND.format(col=ii, row=jj), output_pdf,

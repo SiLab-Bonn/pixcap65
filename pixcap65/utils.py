@@ -13,6 +13,7 @@ logger = logging.getLogger(__name__)
 
 
 # FIXME: the location of the device directory for the firmware is difficult to handle when packaging!
+# TODO: file is missing some docstrings
 
 # general hierarchy to use:
 
