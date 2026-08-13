@@ -11,6 +11,9 @@ def analyze_data_delegate(file: tb.File, group: tb.Group, current_hist: TABLES_A
     """
     analyze_data_delegate
 
+    @author: Dominik Fischer
+    last update: 2026-08-12
+
     Implementation of the simple analysis strategy for the capacitance measurement of a pixel sensor.
     For determination of the capacitance values a simplified linear least-squares fit is used.
     The covariance information from the simplified fit is not trust worthy, as the even when the uncertainties/weights

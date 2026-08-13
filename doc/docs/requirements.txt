@@ -3,5 +3,5 @@ sphinx_rtd_theme
 bitarray 
 pyyaml
 setuptools
-pkg-resources-backport
+# pkg-resources-backport
 myst-parser

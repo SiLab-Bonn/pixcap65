@@ -1,7 +1,7 @@
 # commented configuration options are the result when using hatch instead of setuptool
 [project]
 name = "pixcap65_DOMI1279"
-version = "0.1.0-dev4"
+version = "1.0.0.dev1"
 description = "Host software for the PixCap65 chip control system based on MIO2 + GPAC hardware."
 authors = [
     { name = "Hans Krüger", email = "krueger@physik.uni-bonn.de" },
@@ -35,6 +35,7 @@ dependencies = [
     # "basil-daq @ git+https:////github.com/SiLab-Bonn/basil.git@502a999eb5075e04850f7a481d2668726583c290 ; python_version >= '3.9'",
     # "basil-daq==3.1.0; platform_system == 'Windows' or python_version < '3.9'",
     "tqdm",
+    "importlib-resources ; python_version < '3.7'",
 ]
 
 [project.urls]
@@ -42,6 +43,10 @@ Homepage = "https://github.com/SiLab-Bonn/pixcap65/"
 Issues = "https://github.com/SiLab-Bonn/pixcap65/issues/"
 source = "https://github.com/SiLab-Bonn/pixcap65/"
 # no documentation present.
+
+[project.scripts]
+save_firmware = "pixcap65.pixcap.pixcap65_measurement:load_firmware"
+load_example_configuration = "pixcap65.pixcap.pixcap65_measurement:load_configuration"
 
 [project.optional-dependencies]
 dut = [
@@ -139,10 +144,11 @@ exclude = [
 installer = "pip"
 
 [tool.uv]
-package = false
+package = true
 
 [tool.uv.sources]
-basil-daq = { path = "../basil-pixcap", editable = true }
+# basil-daq = { path = "../basil-pixcap", editable = true }
+basil-daq = { git = "https://github.com/SiLab-Bonn/basil", branch = "Ba-Pixcap-2026/python-compatibility" }
 smoda-fitter = { path = "../Smoda_2025_Final_Project_Temp", editable = true }
 
 [tool.uv.build-backend]
@@ -158,4 +164,39 @@ modelling = [
     "numdifftools>=0.9.41",
     "numpy>=1.16.6",
     "scikit-learn>=0.21.0",
+]
+dut = [
+    "pyserial",
+    "pyvisa ; python_version > '3.5'",
+    "pyusb",
+    "pysilibusb"
+]
+advanced = [
+    "iminuit>2.30.0; python_version >= '3.9'",
+    "iminuit ; python_version < '3.9'",
+    "kafe2>2.10.0; python_version >= '3.7'",
+    "kafe2 ; python_version < '3.7'",
+    "scipy>=1.15.0; python_version >= '3.10'",
+    "scipy ; python_version < '3.10'",
+    "jacobi ; python_version >= '3.6'",
+    "findiff",
+    "numba_stats ; python_version >= '3.6'",
+    "numba ; python_version > '3.9'"
+]
+visualization = [
+    "pyqt5",
+    "vitables",
+    "matplotlib>=3.11.1; python_version >= '3.11'",
+    "matplotlib<3.10.9; python_version < '3.11'",
+    "pycairo",
+    "mpld3"
+]
+docs = [
+    "sphinxcontrib-blockdiag",
+    "sphinx_rtd_theme",
+    "bitarray",
+    "pyyaml",
+    "setuptools",
+    "pkg-resources-backport ; python_version >= '3.9'",
+    "myst-parser ; python_version >= '3.6'",
 ]

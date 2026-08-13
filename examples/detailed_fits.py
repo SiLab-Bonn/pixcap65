@@ -180,16 +180,15 @@ def visualize_full(figures, axes, pdf1, pdf2, fitter: Iterable[Minuit], title, p
     pdf2.savefig(fig_combi, bbox_inches='tight')
 
 
-def detailed_fit(x, y, error, model, title, parameter, *args, model_gradient=None):
+def detailed_fit(x, y, error, model, title, parameter, *args, model_gradient=None, **kwargs):
     if model_gradient is not None and model_gradient == "numeric":
         # use numdifftools for accurate numeric derivatives
-        # FIXME: what about the presence of keyword arguments?
         import numdifftools as nd
         def __gradient_method(x, *args):
-            def __method(*args):
-                return model_gradient(x, *args)
+            def __method(*args, **keys):
+                return model_gradient(x, *args, **keys)
 
-            return nd.Gradient(__method)(args)
+            return nd.Gradient(__method)(args, **kwargs)
 
         model_gradient = __gradient_method
 
@@ -287,6 +286,8 @@ if __name__ == "__main__":
         dnw_3d_slice = slice(len(dnw_properties_raw)-4, len(dnw_properties_raw))
         dnw_data_raw = read_rec_array_sorted_where(h5_conclusion.root.GeneralSummaryTable, dnw_selection, 'sensor')
 
+        lf_selection_slice = slice(0, -6)
+
         dnw_properties = dnw_properties_raw[dnw_planar_slice]
         dnw_data = dnw_data_raw[dnw_planar_slice]
         d3_properties = dnw_properties_raw[dnw_3d_slice]
@@ -334,8 +335,6 @@ if __name__ == "__main__":
                 for k, (fit_m, cost_m, label) in enumerate(zip(fitter, cost, labels)):
                     assert isinstance(cost_m, LeastSquares)
                     assert isinstance(fit_m, Minuit)
-                    # TODO: this might not be the best choice
-                    # maybe use kwargs
                     cost_x = np.asarray(cost_m.x, dtype=np.float64)
                     actual_minimum = np.min(cost_x)
                     actual_maximum = np.max(cost_x)
@@ -628,8 +627,6 @@ if __name__ == "__main__":
             return (area_depth_poly_offset[1] + area_depth_poly_offset[0] * W + area_depth_poly_slope[1] * A + area_depth_poly_slope[0] * A * W) * np.exp(nw_m_p.values['b'] * (p - 4 * np.sqrt(A)))
 
         # calculate some residue for our model
-        # TODO: move the slice up!
-        lf_selection_slice = slice(0, -6)
         x_ref_data = (full_properties.implantation_area, full_properties.implantation_depth, full_properties.Perimeter, full_properties.pixel_separation_x, full_properties.pixel_separation_y)
         y_ref_data = full_data.biased_capacitance.magnitude
         predictions = active_model(x_ref_data)
@@ -640,15 +637,8 @@ if __name__ == "__main__":
         general_cost = np.sum(np.asarray(normed_residuals[lf_selection_slice]) ** 2)
         print("Cost information to share.")
         print(general_cost)
-        # CHECK: is the dof value still correct?
-        print(1 - chi2(general_cost, 5))
-
-
-
-
-        # TODO: perhaps generate fitted figures with all our measurement points in it; when doing so we could not use
-        # the visualize function which is usually provided by the minuit framework and we will need to provide all the data
-
+        # should not be used anymore!
+        print(1 - chi2(general_cost, 4))
 
         # investigate the inter-pix capacitance by the same means.
         # first we need to fetch a sample
