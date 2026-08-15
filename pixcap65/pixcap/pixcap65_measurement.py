@@ -80,6 +80,40 @@ class MeasurementAbstract(object, metaclass=ABCMeta):
         """
         raise NotImplementedError("`scan` is abstract and therefore not implemented.")
 
+def load_firmware_main():
+    """
+        load_firmware
+
+        @author: Dominik Fischer
+        @date: 2026-08-13
+        last update: 2026-08-13
+
+        Module function to load the firmware from modules resources and write to a file (if this file does not already exist)
+        to be loaded later on init of the measurement classes or the PixCap65 class itself.
+        """
+    from argparse import ArgumentParser
+    parser = ArgumentParser()
+    parser.add_argument("-c", "--config", action="store", default=None, help="configuration file or configuration mapping from which to determine the target location of the firmware.")
+
+    arguments = parser.parse_args()
+    load_firmware(arguments.config)
+
+def load_configuration_main():
+    """
+        load_configuration
+
+        @author: Dominik Fischer
+        @date: 2026-08-13
+        last update: 2026-08-13
+
+        Module function to load the default configuration from the module/package resources and write to a file. (on disk)
+        Such that it could be used for initializing the PixCap65 class or the corresponding measurement classes.
+        """
+    from argparse import ArgumentParser
+    parser = ArgumentParser()
+    parser.add_argument("-t", "--target", action="store", default=None, help="path where to write the default configuration to.")
+    arguments = parser.parse_args()
+    load_configuration(arguments.target)
 
 # TODO: test implementations on the actual device
 def load_firmware(config=None):
@@ -95,6 +129,7 @@ def load_firmware(config=None):
 
     :param config: configuration file or configuration mapping from which to determine the target location of the firmware.
     """
+    # when used as a script, we need to determine the parameters by some other means.
     with configuration_context(config=config) as safe_config:
         # from here we need to extract the firmware location!
         dut = Pixcap65(safe_config)
@@ -130,7 +165,7 @@ def load_configuration(target_path="pixcap65.yaml"):
 
     :param target_path: path where to write the default configuration to.
     """
-    packaged_config = files("pixcap65").joinpath("pixcap65.yaml")
+    packaged_config = files("pixcap65").joinpath("pixcap", "pixcap65.yaml")
     assert packaged_config.is_file()
     with packaged_config.open('r') as pack:
         data = pack.read()
@@ -357,10 +392,20 @@ def configuration_context(config):
         # perhaps we should better read the mapping up-front?
         if isinstance(config, Mapping) or hasattr(config, "read"):
             yield config
-        elif config is None or os.path.exists(config):
-            packaged_config = files("pixcap65").joinpath("pixcap65.yaml")
-            assert packaged_config.is_file()
-            yield packaged_config.open('r')
+        elif config is None or not os.path.exists(config):
+            if os.path.isdir("pixcap"):
+                new_path = os.path.join("pixcap", config)
+                assert os.path.exists(new_path)
+                yield new_path
+            elif os.path.dirname(config) == "pixcap":
+                new_path = os.path.join("../..", config)
+                new_path = os.path.normpath(new_path)
+                assert os.path.exists(new_path)
+                yield new_path
+            else:
+                packaged_config = files("pixcap65").joinpath("pixcap", "pixcap65.yaml")
+                assert packaged_config.is_file()
+                yield packaged_config.open('r')
         else:
             yield config
     except AssertionError, FileNotFoundError:
