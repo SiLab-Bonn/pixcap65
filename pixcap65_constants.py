@@ -1,4 +1,4 @@
-COL_NMAX = 39 
+COL_NMAX = 39
 PIX_NMAX = 40
 
 EN_CLK_0 = 1
