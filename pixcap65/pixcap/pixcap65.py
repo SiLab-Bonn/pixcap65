@@ -234,31 +234,48 @@ class Pixcap65(Dut):
             if "power" in list(self._hardware_layer.keys()):
                 # FIXME: type error (very static for the used psu)
                 power_driver = self._hardware_layer["power"]
-                from basil.HL.tti_ql355tp import ttiQl355tp
-                assert isinstance(power_driver, ttiQl355tp)
                 if not power_driver._intf.is_initialized:
                     power_driver._intf.init()
                 if power_driver.is_initialized:
                     power_driver.init()
 
-                power_driver.set_enable(0, channel=1)
-                # power_driver.set_enable(0, channel=2)
-                power_driver.set_enable(0, channel=3)
-                time.sleep(5)
-                power_driver.set_enable(1, channel=1)
-                # power_driver.set_enable(1, channel=2)
-                power_driver.set_enable(1, channel=3)
-
+                # it might be the case that this to specific for this one smu! for any other scpi controlled smu it
+                # might be suitable to add commands set_enable for this purpose requiring that the voltage and
+                # current outputs are already configured correctly!
+                power_config = power_driver._conf
                 try:
-                    power_driver.close()
-                except:
-                    power_driver.is_initialized = True
-
-                if power_driver._intf.is_initialized:
+                    if "mappings" in power_config:
+                        command_mappings = power_config["mappings"]
+                        # Or would separate on-off commands be the better choice?
+                        enable_command = getattr(power_driver, command_mappings["set_enable"])
+                        enable_command(0, channel=1)
+                        # enable_command(0, channel=2)
+                        enable_command(0, channel=3)
+                        time.sleep(5)
+                        enable_command(1, channel=1)
+                        # enable_command(1, channel=2)
+                        enable_command(1, channel=3)
+                    else:
+                        power_driver.set_enable(0, channel=1)
+                        # power_driver.set_enable(0, channel=2)
+                        power_driver.set_enable(0, channel=3)
+                        time.sleep(5)
+                        power_driver.set_enable(1, channel=1)
+                        # power_driver.set_enable(1, channel=2)
+                        power_driver.set_enable(1, channel=3)
+                except AttributeError:
+                    logger.exception("While trying to resolve the issue by a simple power-cycleing, it turns out that the PSU in use is not compatible.")
+                finally:
                     try:
-                        power_driver._intf.close()
+                        power_driver.close()
                     except:
-                        power_driver._intf.is_initialized = True
+                        power_driver.is_initialized = True
+
+                    if power_driver._intf.is_initialized:
+                        try:
+                            power_driver._intf.close()
+                        except:
+                            power_driver._intf.is_initialized = True
 
                 # now try the configuration of the board again.
                 time.sleep(7)
