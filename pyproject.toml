@@ -147,8 +147,8 @@ installer = "pip"
 package = true
 
 [tool.uv.sources]
-# basil-daq = { path = "../basil-pixcap", editable = true }
-basil-daq = { git = "https://github.com/SiLab-Bonn/basil", branch = "Ba-Pixcap-2026/python-compatibility" }
+basil-daq = { path = "../basil-pixcap", editable = true }
+# basil-daq = { git = "https://github.com/SiLab-Bonn/basil", branch = "Ba-Pixcap-2026/python-compatibility" }
 smoda-fitter = { path = "../Smoda_2025_Final_Project_Temp", editable = true }
 
 [tool.uv.build-backend]

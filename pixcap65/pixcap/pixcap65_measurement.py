@@ -130,21 +130,28 @@ def load_firmware(config=None):
     :param config: configuration file or configuration mapping from which to determine the target location of the firmware.
     """
     # when used as a script, we need to determine the parameters by some other means.
+    print("loading firmware")
     with configuration_context(config=config) as safe_config:
         # from here we need to extract the firmware location!
         dut = Pixcap65(safe_config)
         for transfer in dut._conf[BasilConfigKeys.TRANSFER_LAYER]:
-            if 'type' not in transfer or not transfer['type'] == 'SiUSB':
+            print("new entry")
+            print(type(transfer))
+            if 'type' not in transfer or not transfer['type'] == 'SiUsb':
                 continue
             if 'bit_file' not in transfer['init']:
                 continue
 
             guess_path = transfer['init']['bit_file']
+            print("What about the path to guess?", guess_path, os.path.abspath(guess_path))
             if not os.path.exists(guess_path):
                 resource_firmware = files("pixcap65").joinpath('device', 'ise', 'pixcap65.bit')
                 assert resource_firmware.is_file()
+                if not os.path.exists(os.path.dirname(guess_path)):
+                    os.makedirs(os.path.dirname(guess_path), exist_ok=True)
                 with open(guess_path, 'wb') as bit_file:
                     with as_file(resource_firmware) as firmware:
+                        print("Will write the firmware", firmware)
                         with open(firmware, 'rb') as guess_file:
                             bit_file.write(guess_file.read())
 
@@ -191,7 +198,7 @@ class Pixcap65BaseMeasurement(MeasurementAbstract, metaclass=ABCMeta):
 
         # need to intercept firmware loading for MIO right here.
         for transfer in self.dut._conf[BasilConfigKeys.TRANSFER_LAYER]:
-            if 'type' not in transfer or not transfer['type'] == 'SiUSB':
+            if 'type' not in transfer or not transfer['type'] == 'SiUsb':
                 continue
             if 'bit_file' not in transfer['init']:
                 continue
@@ -392,7 +399,8 @@ def configuration_context(config):
         # perhaps we should better read the mapping up-front?
         if isinstance(config, Mapping) or hasattr(config, "read"):
             yield config
-        elif config is None or not os.path.exists(config):
+        elif config is not None and not os.path.exists(config):
+            # FIXME: these here will require that config is not None!
             if os.path.isdir("pixcap"):
                 new_path = os.path.join("pixcap", config)
                 assert os.path.exists(new_path)
@@ -406,6 +414,10 @@ def configuration_context(config):
                 packaged_config = files("pixcap65").joinpath("pixcap", "pixcap65.yaml")
                 assert packaged_config.is_file()
                 yield packaged_config.open('r')
+        elif config is None:
+            packaged_config = files("pixcap65").joinpath("pixcap", "pixcap65.yaml")
+            assert packaged_config.is_file()
+            yield packaged_config.open('r')
         else:
             yield config
     except AssertionError, FileNotFoundError:
