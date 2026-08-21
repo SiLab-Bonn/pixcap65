@@ -796,6 +796,7 @@ def _bias_voltage_plotter(ax, tabular: tb.Table, label, norm=1, apply_norm=False
     current_data = np.abs(tabular.col("I"))
     current_errors = tabular.col("DI")
     # FIXME: R1/R11 seems to be missing i-v-errors!
+    # looks like there are no usable data points for the uncertainties of the leakage current.
     try:
         voltage_error = np.abs(tabular.col("DU"))
     except (AttributeError, KeyError):

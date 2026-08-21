@@ -1,7 +1,7 @@
 # commented configuration options are the result when using hatch instead of setuptool
 [project]
 name = "pixcap65_DOMI1279"
-version = "1.0.0.dev1"
+version = "1.0.0.dev2"
 description = "Host software for the PixCap65 chip control system based on MIO2 + GPAC hardware."
 authors = [
     { name = "Hans Krüger", email = "krueger@physik.uni-bonn.de" },
@@ -137,7 +137,11 @@ exclude = [
     "/dist-uv",
     "/Fit References",
     "/out",
-    "/.gitignore"
+    "/.gitignore",
+    "examples/**",
+    "results/**",
+    "data*",
+    "Data*",
 ]
 
 [tool.hatch.envs.hatch-build]
@@ -156,7 +160,23 @@ module-name = "pixcap65"
 module-root = ""
 namespace = true
 data = { data = "pixcap65/device" }
-source-exclude = ["doc", "Data", "data_local"]
+source-exclude = [
+    "doc",
+    "Data",
+    "data_local",
+    "dist",
+    "dist*",
+    "data*",
+    "Data*",
+    "*.egg-info",
+    "results",
+]
+
+[[tool.uv.index]]
+name = "testpypi"
+url = "https://test.pypi.org/simple/"
+publish-url = "https://test.pypi.org/legacy/"
+explicit = true
 
 [dependency-groups]
 modelling = [

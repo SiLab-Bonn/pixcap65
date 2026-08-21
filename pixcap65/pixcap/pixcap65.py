@@ -232,7 +232,6 @@ class Pixcap65(Dut):
             # ocured
             logger.error("A USB error occurred try to solve the issue by a power cycle.")
             if "power" in list(self._hardware_layer.keys()):
-                # FIXME: type error (very static for the used psu)
                 power_driver = self._hardware_layer["power"]
                 if not power_driver._intf.is_initialized:
                     power_driver._intf.init()
@@ -243,26 +242,26 @@ class Pixcap65(Dut):
                 # might be suitable to add commands set_enable for this purpose requiring that the voltage and
                 # current outputs are already configured correctly!
                 power_config = power_driver._conf
+                if "mappings" in power_config:
+                    command_mappings = power_config["mappings"]
+                    # Or would separate on-off commands be the better choice?
+                    enable_command = getattr(power_driver, command_mappings["set_enable"])
+                    disable_command = getattr(power_driver, command_mappings["set_disable"])
+                else:
+                    def enable_command(**kwargs):
+                        power_driver.set_enable(1, **kwargs)
+
+                    def disable_command(**kwargs):
+                        power_driver.set_enable(0, **kwargs)
+
                 try:
-                    if "mappings" in power_config:
-                        command_mappings = power_config["mappings"]
-                        # Or would separate on-off commands be the better choice?
-                        enable_command = getattr(power_driver, command_mappings["set_enable"])
-                        enable_command(0, channel=1)
-                        # enable_command(0, channel=2)
-                        enable_command(0, channel=3)
-                        time.sleep(5)
-                        enable_command(1, channel=1)
-                        # enable_command(1, channel=2)
-                        enable_command(1, channel=3)
-                    else:
-                        power_driver.set_enable(0, channel=1)
-                        # power_driver.set_enable(0, channel=2)
-                        power_driver.set_enable(0, channel=3)
-                        time.sleep(5)
-                        power_driver.set_enable(1, channel=1)
-                        # power_driver.set_enable(1, channel=2)
-                        power_driver.set_enable(1, channel=3)
+                    disable_command(channel=1)
+                    # disable_command(0, channel=2)
+                    disable_command(channel=3)
+                    time.sleep(5)
+                    enable_command(channel=1)
+                    # enable_command(1, channel=2)
+                    enable_command(channel=3)
                 except AttributeError:
                     logger.exception("While trying to resolve the issue by a simple power-cycleing, it turns out that the PSU in use is not compatible.")
                 finally:

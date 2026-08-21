@@ -400,7 +400,6 @@ def configuration_context(config):
         if isinstance(config, Mapping) or hasattr(config, "read"):
             yield config
         elif config is not None and not os.path.exists(config):
-            # FIXME: these here will require that config is not None!
             if os.path.isdir("pixcap"):
                 new_path = os.path.join("pixcap", config)
                 assert os.path.exists(new_path)
@@ -420,7 +419,7 @@ def configuration_context(config):
             yield packaged_config.open('r')
         else:
             yield config
-    except AssertionError, FileNotFoundError:
+    except (AssertionError, FileNotFoundError):
         logger.error("Could not find neither the default configuration file nor a configuration file with the provided name.")
         raise
 
