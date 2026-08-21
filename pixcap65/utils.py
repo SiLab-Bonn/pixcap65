@@ -30,11 +30,6 @@ from pixcap65.pixcap_65_test_total_cap import PixCap65Measurement
 from pixcap65.utility.basil_utils import extract_basil_layers
 
 logger = logging.getLogger(__name__)
-
-
-# FIXME: the location of the device directory for the firmware is difficult to handle when packaging!
-# TODO: file is missing some docstrings
-
 # general hierarchy to use:
 
 # for general total cap measurements
@@ -132,6 +127,134 @@ def extract_power_supply(adjusted_config: dict, environ_hl: list, hl_keys: list,
         hl_keys.append("power")
 
 
+def fetch_psu_commands(psu_driver):
+    """
+    fetch_psu_commands
+    :param psu_driver: hardware driver of the basil configuration to be used with the psu.
+    :return: gives a tuple of the some useful functions when using the power supplies in measurements.
+    """
+    power_config = psu_driver._conf
+    # when using the ttiQl355tp, there is no mapping necessary!
+    # on the other hand creating a mapping for the iseg shq series seems to be quite difficult;
+    if "mappings" in power_config:
+        command_mappings = power_config["mappings"]
+        if command_mappings.get("need_channel_select", False):
+            _enable_command = getattr(psu_driver, command_mappings["set_enable"])
+            _disable_command = getattr(psu_driver, command_mappings["set_disable"])
+            _psu_set_voltage = getattr(psu_driver, command_mappings["set_voltage"])
+            _psu_set_current_limit = getattr(psu_driver, command_mappings["set_current_limit"])
+            _psu_get_current = getattr(psu_driver, command_mappings["get_current"])
+            _psu_set_channel = getattr(psu_driver, command_mappings["set_channel"])
+
+            def enable_command(**kwargs):
+                """
+                Explizit command to enable the output of the power supply!
+                The command is directly propagated to basil and thus only a limited set of devices could use this implementation!
+                The output to be controlled needs to be specified explicitly by keywords.
+                :param kwargs: further keyword arguments to be propagated to basil.
+                """
+                _psu_set_channel(kwargs.get("channel", 1))
+                _enable_command()
+
+            def disable_command(**kwargs):
+                """
+                Explizit command to disable the output of the power supply!
+                The command is directly propagated to basil and thus only a limited set of devices could use this implementation!
+                The output to be controlled needs to be specified explicitly by keywords.
+                :param kwargs: further keyword arguments to be propagated to basil.
+                """
+                _psu_set_channel(kwargs.get("channel", 1))
+                _disable_command()
+
+            def psu_set_voltage(value, **kwargs):
+                """
+                Explizit command to set the output of the power supply!
+                The command is directly propagated to basil and thus only a limited set of devices could use this implementation!
+                The output to be controlled needs to be specified explicitly by keywords.
+                :param kwargs: further keyword arguments to be propagated to basil.
+                """
+                _psu_set_channel(kwargs.get("channel", 1))
+                _psu_set_voltage(value)
+
+            def psu_set_current_limit(value, **kwargs):
+                """
+                Explizit command to the set current limiter of the power supply for a particular output.
+                The command is directly propagated to basil and thus only a limited set of devices could use this implementation!
+                The output to be controlled needs to be specified explicitly by keywords.
+                :param kwargs: further keyword arguments to be propagated to basil.
+                """
+                _psu_set_channel(kwargs.get("channel", 1))
+                _psu_set_current_limit(value)
+
+            def psu_get_current(**kwargs):
+                """
+                Explizit command to fetch the acutal output current of the power supply.
+                The command is directly propagated to basil and thus only a limited set of devices could use this implementation!
+                The output to be controlled needs to be specified explicitly by keywords.
+                :param kwargs: further keyword arguments to be propagated to basil.
+                :return: current output of the power supply
+                """
+                _psu_set_channel(kwargs.get("channel", 1))
+                return _psu_get_current()
+        else:
+            # Or would separate on-off commands be the better choice?
+            enable_command = getattr(psu_driver, command_mappings["set_enable"])
+            disable_command = getattr(psu_driver, command_mappings["set_disable"])
+            psu_set_voltage = getattr(psu_driver, command_mappings["set_voltage"])
+            psu_set_current_limit = getattr(psu_driver, command_mappings["set_current_limit"])
+            psu_get_current = getattr(psu_driver, command_mappings["get_current"])
+            # but what 'to do' if there is no explicit disable command for the provided device?
+            # for scpi devices this wont matter.
+    else:
+        def enable_command(**kwargs):
+            """
+            Explizit command to enable the output of the power supply!
+            The command is directly propagated to basil and thus only a limited set of devices could use this implementation!
+            The output to be controlled needs to be specified explicitly by keywords.
+            :param kwargs: further keyword arguments to be propagated to basil.
+            """
+            psu_driver.set_enable(1, **kwargs)
+
+        def disable_command(**kwargs):
+            """
+            Explizit command to disable the output of the power supply!
+            The command is directly propagated to basil and thus only a limited set of devices could use this implementation!
+            The output to be controlled needs to be specified explicitly by keywords.
+            :param kwargs: further keyword arguments to be propagated to basil.
+            """
+            psu_driver.set_enable(0, **kwargs)
+
+        def psu_set_voltage(value, **kwargs):
+            """
+            Explizit command to set the output of the power supply!
+            The command is directly propagated to basil and thus only a limited set of devices could use this implementation!
+            The output to be controlled needs to be specified explicitly by keywords.
+            :param kwargs: further keyword arguments to be propagated to basil.
+            """
+            psu_driver.set_voltage(value, **kwargs)
+
+        def psu_set_current_limit(value, **kwargs):
+            """
+            Explizit command to the set current limiter of the power supply for a particular output.
+            The command is directly propagated to basil and thus only a limited set of devices could use this implementation!
+            The output to be controlled needs to be specified explicitly by keywords.
+            :param kwargs: further keyword arguments to be propagated to basil.
+            """
+            psu_driver.set_current_limit(value, **kwargs)
+
+        def psu_get_current(**kwargs):
+            """
+            Explizit command to fetch the acutal output current of the power supply.
+            The command is directly propagated to basil and thus only a limited set of devices could use this implementation!
+            The output to be controlled needs to be specified explicitly by keywords.
+            :param kwargs: further keyword arguments to be propagated to basil.
+            :return: current output of the power supply
+            """
+            return psu_driver.get_current(**kwargs)
+
+    return enable_command, disable_command, psu_set_voltage, psu_set_current_limit, psu_get_current
+
+
 class PixCapSetup(Dut):
     """
     Outer Wrapper class to separate power supply of the setup (and therefore preparing of the setup itself) from the
@@ -139,10 +262,17 @@ class PixCapSetup(Dut):
 
     Will act like a context manager of the requested measurement type/class.
     """
-    # TODO: remove this here in favour of an property.
-    pixcap: Optional[PixCap65Measurement]
+
+    @property
+    def pixcap(self) -> Optional[PixCap65Measurement]:
+        return self.__pixcap
+
+    @pixcap.setter
+    def pixcap(self, value):
+        self.__pixcap = value
 
     def __init__(self, scan_config, output_file, config="pixcap65.yaml", name="PixcapSetup", measurement: Union[str, type, None] = None, hl_keys=None, tl_keys=None, rl_keys=None):
+        self.__pixcap = None
         if measurement is None:
             measurement = PixcapMeasurements.TOTAL_CAPACITANCE
         assert isinstance(measurement, PixcapMeasurements) or isinstance(measurement, str) or (
@@ -154,7 +284,6 @@ class PixCapSetup(Dut):
 
         from pixcap65.pixcap.pixcap65_measurement import configuration_context
         with configuration_context(config) as context:
-            # CHECK: should the configuration be updated right here for further usage?
             adjusted_config = self.init_environment(context, hl_keys, name, rl_keys, tl_keys)
         logger.debug("For the handling of the setup, we'll use the config:\n %s", str(self._environ_config))
         super(PixCapSetup, self).__init__(conf=self._environ_config)
@@ -329,25 +458,145 @@ class PixCapSetup(Dut):
 
     def __enter__(self):
         Dut.init(self)
-        from basil.HL.tti_ql355tp import ttiQl355tp
-        assert isinstance(self["power"], ttiQl355tp)
+
+        # CHECK: maybe use a special function to handle this?
+        # this here may not be present in other implementations!
         self["power"].identify_device()
+
+        power_config = self["power"]._conf
+        # when using the ttiQl355tp, there is no mapping necessary!
+        # on the other hand creating a mapping for the iseg shq series seems to be quite difficult;
+        if "mappings" in power_config:
+            command_mappings = power_config["mappings"]
+            if command_mappings.get("need_channel_select", False):
+                _enable_command = getattr(self["power"], command_mappings["set_enable"])
+                _disable_command = getattr(self["power"], command_mappings["set_disable"])
+                _psu_set_voltage = getattr(self["power"], command_mappings["set_voltage"])
+                _psu_set_current_limit = getattr(self["power"], command_mappings["set_current_limit"])
+                _psu_get_current = getattr(self["power"], command_mappings["get_current"])
+                _psu_set_channel = getattr(self["power"], command_mappings["set_channel"])
+
+                def enable_command(**kwargs):
+                    """
+                    Explizit command to enable the output of the power supply!
+                    The command is directly propagated to basil and thus only a limited set of devices could use this implementation!
+                    The output to be controlled needs to be specified explicitly by keywords.
+                    :param kwargs: further keyword arguments to be propagated to basil.
+                    """
+                    _psu_set_channel(kwargs.get("channel", 1))
+                    _enable_command()
+
+                def disable_command(**kwargs):
+                    """
+                    Explizit command to disable the output of the power supply!
+                    The command is directly propagated to basil and thus only a limited set of devices could use this implementation!
+                    The output to be controlled needs to be specified explicitly by keywords.
+                    :param kwargs: further keyword arguments to be propagated to basil.
+                    """
+                    _psu_set_channel(kwargs.get("channel", 1))
+                    _disable_command()
+
+                def psu_set_voltage(value, **kwargs):
+                    """
+                    Explizit command to set the output of the power supply!
+                    The command is directly propagated to basil and thus only a limited set of devices could use this implementation!
+                    The output to be controlled needs to be specified explicitly by keywords.
+                    :param kwargs: further keyword arguments to be propagated to basil.
+                    """
+                    _psu_set_channel(kwargs.get("channel", 1))
+                    _psu_set_voltage(value)
+
+                def psu_set_current_limit(value, **kwargs):
+                    """
+                    Explizit command to the set current limiter of the power supply for a particular output.
+                    The command is directly propagated to basil and thus only a limited set of devices could use this implementation!
+                    The output to be controlled needs to be specified explicitly by keywords.
+                    :param kwargs: further keyword arguments to be propagated to basil.
+                    """
+                    _psu_set_channel(kwargs.get("channel", 1))
+                    _psu_set_current_limit(value)
+
+                def psu_get_current(**kwargs):
+                    """
+                    Explizit command to fetch the acutal output current of the power supply.
+                    The command is directly propagated to basil and thus only a limited set of devices could use this implementation!
+                    The output to be controlled needs to be specified explicitly by keywords.
+                    :param kwargs: further keyword arguments to be propagated to basil.
+                    :return: current output of the power supply
+                    """
+                    _psu_set_channel(kwargs.get("channel", 1))
+                    return _psu_get_current()
+            else:
+                # Or would separate on-off commands be the better choice?
+                enable_command = getattr(self["power"], command_mappings["set_enable"])
+                disable_command = getattr(self["power"], command_mappings["set_disable"])
+                psu_set_voltage = getattr(self["power"], command_mappings["set_voltage"])
+                psu_set_current_limit = getattr(self["power"], command_mappings["set_current_limit"])
+                psu_get_current = getattr(self["power"], command_mappings["get_current"])
+                # but what 'to do' if there is no explicit disable command for the provided device?
+                # for scpi devices this wont matter.
+        else:
+            def enable_command(**kwargs):
+                """
+                Explizit command to enable the output of the power supply!
+                The command is directly propagated to basil and thus only a limited set of devices could use this implementation!
+                The output to be controlled needs to be specified explicitly by keywords.
+                :param kwargs: further keyword arguments to be propagated to basil.
+                """
+                self["power"].set_enable(1, **kwargs)
+
+            def disable_command(**kwargs):
+                """
+                Explizit command to disable the output of the power supply!
+                The command is directly propagated to basil and thus only a limited set of devices could use this implementation!
+                The output to be controlled needs to be specified explicitly by keywords.
+                :param kwargs: further keyword arguments to be propagated to basil.
+                """
+                self["power"].set_enable(0, **kwargs)
+
+            def psu_set_voltage(value, **kwargs):
+                """
+                Explizit command to set the output of the power supply!
+                The command is directly propagated to basil and thus only a limited set of devices could use this implementation!
+                The output to be controlled needs to be specified explicitly by keywords.
+                :param kwargs: further keyword arguments to be propagated to basil.
+                """
+                self["power"].set_voltage(value, **kwargs)
+
+            def psu_set_current_limit(value, **kwargs):
+                """
+                Explizit command to the set current limiter of the power supply for a particular output.
+                The command is directly propagated to basil and thus only a limited set of devices could use this implementation!
+                The output to be controlled needs to be specified explicitly by keywords.
+                :param kwargs: further keyword arguments to be propagated to basil.
+                """
+                self["power"].set_current_limit(value, **kwargs)
+
+            def psu_get_current(**kwargs):
+                """
+                Explizit command to fetch the acutal output current of the power supply.
+                The command is directly propagated to basil and thus only a limited set of devices could use this implementation!
+                The output to be controlled needs to be specified explicitly by keywords.
+                :param kwargs: further keyword arguments to be propagated to basil.
+                :return: current output of the power supply
+                """
+                return self["power"].get_current(**kwargs)
 
         try:
             # RESET the power distribution and therefore the boards
-            self["power"].set_enable(0, channel=1)
-            self["power"].set_enable(0, channel=2)
-            self["power"].set_enable(0, channel=3)
-            self["power"].set_voltage(5.0, channel=1)
-            self["power"].set_voltage(1.0, channel=2)
-            self["power"].set_current_limit(0.800, channel=1)
-            self["power"].set_current_limit(0.001, channel=2)
+            disable_command(channel=1)
+            disable_command(channel=2)
+            disable_command(channel=3)
+            psu_set_voltage(5.0, channel=1)
+            psu_set_voltage(1.0, channel=2)
+            psu_set_current_limit(0.800, channel=1)
+            psu_set_current_limit(0.001, channel=2)
             time.sleep(5)
-            self["power"].set_enable(1, channel=1)
-            self["power"].set_enable(1, channel=2)
-            self["power"].set_enable(1, channel=3)
+            enable_command(channel=1)
+            enable_command(channel=2)
+            enable_command(channel=3)
             time.sleep(7)
-            print(self["power"].get_current(channel=1))
+            print(psu_get_current(channel=1))
 
             # init the pixcap system
             if "out_file" in self.measurement_arguments and "output_file" not in self.measurement_arguments:
@@ -361,22 +610,25 @@ class PixCapSetup(Dut):
                 logger.error(self.measurement_arguments)
                 logger.error(self.measurement_arguments.keys())
                 raise
-            assert self.pixcap is not None
-            self.pixcap.configure()
-            return self.pixcap
+            pixcap = self.pixcap
+            assert pixcap is not None
+            pixcap.configure()
+            return pixcap
         except:
-            logger.error("Failed to switch the Pixcap setup on.", exc_info=True)
+            logger.exception("Failed to switch the Pixcap setup on.", exc_info=True)
             try:
-                if self.pixcap is not None:
-                    self.pixcap.close()
+                pixcap = self.pixcap
+                if pixcap is not None:
+                    pixcap.close()
                     self.pixcap = None
             finally:
                 self.close()
             raise
 
     def __exit__(self, exc_type, exc_val, exc_tb):
-        assert self.pixcap is not None
-        self.pixcap.close()
+        pixcap = self.pixcap
+        assert pixcap is not None
+        pixcap.close()
         self.pixcap = None
         self.close()
         return False
