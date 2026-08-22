@@ -38,7 +38,7 @@ from contextlib import contextmanager
 from matplotlib.backends.backend_pdf import PdfPages
 
 import pixcap65.data_constants as data_constants
-from examples.full_analysis import r1_analysator, x4_analysator
+from examples.full_analysis import r1_analysator
 from pixcap65.analysis import analyze_data
 from pixcap65.data_constants import E1_2_SCAN_FILE, R13_2_SCAN_FILE
 from pixcap65.data_constants import X1_SCAN_2_FILE, X2_SCAN_2_FILE
@@ -1132,15 +1132,15 @@ if __name__ == "__main__":
     start_time = time.time()
 
     process_handles = [
-        x1_analysator,
-        x2_analysator,
-        x5_analysator,
-        x6_analysator,
-        x7_analysator,
-        e1_analysator_second,
-        r13_analysator_second,
+        # x1_analysator,
+        # x2_analysator,
+        # x5_analysator,
+        # x6_analysator,
+        # x7_analysator,
+        # e1_analysator_second,
+        # r13_analysator_second,
         r1_analysator,
-        x4_analysator,
+        # x4_analysator,
     ]
 
 

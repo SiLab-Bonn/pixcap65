@@ -1,4 +1,8 @@
-from importlib.resources import files
+try:
+    from importlib.resources import files, open_text
+except ImportError:
+    # for python 2.x or python 3.x with x < 7 we need a backport here
+    from importlib_resources import files, open_text
 
 import logging
 import numpy as np
@@ -8,13 +12,13 @@ import yaml
 
 from pixcap65 import data_constants
 from pixcap65.analysis_util.utility import HIST_BIAS_MEAS_UNIT, HIST_CURRENT_MEAS_UNIT, GLOBAL_FILTERS
-from pixcap65.configs.config_handler import extract_smu_voltage_error
+from pixcap65.configs.config_handler import extract_smu_voltage_error, extract_smu_current_error
 from pixcap65.data_constants import R11_SCAN_FILE
 from pixcap65.pixcap.pixcap65_measurement import ScanConfigurationKeys
 from pixcap65.pixcap_65_test_total_cap import BiasTable
 from pixcap65.utility.tables_util import set_group_attribute, group_get_file, get_groups, list_group_attributes, \
     get_group_attribute
-from pixcap65.utility.utils_2 import UNITS_ATTRIBUTE_KEY, create_carray, prevent_group_mix_up
+from pixcap65.utility.utils_2 import UNITS_ATTRIBUTE_KEY, prevent_group_mix_up
 
 logger = logging.getLogger(__name__)
 
@@ -35,9 +39,9 @@ def adjust_i_v_measurement(group, has_values=False):
 
 # FIXME: look here for the missing, untrusted current uncertainties
 def regenerate_i_v_errors(group):
+    print("regenerate_i_v_errors")
     if "HistCurrValues" not in group and "HistCurr" in group:
-        from pixcap65.configs.config_handler import extract_smu_current_error
-        import yaml
+        print("No enhanced values!")
         with open("pixcap65/configs/keithley_2410_range.yaml") as f:
             config = yaml.safe_load(f)
             data = group.HistCurr[:]
@@ -48,12 +52,22 @@ def regenerate_i_v_errors(group):
                                                     filters=tb.Filters(complib='blosc', fletcher32=False, complevel=5))
             else:
                 group.HistCurrErr[:] = errors
-    if "HistCurrValues" in group and "HistCurrErr" not in group:
+    if "HistCurrValues" in group:
+        print("using enhanced values!")
         average = np.nanmean(group.HistCurrValues, axis=1, keepdims=True)
         uncertainty = np.nanstd(group.HistCurrValues, mean=average, axis=1)
+        if np.count_nonzero(uncertainty) == 0:
+            with open("pixcap65/configs/keithley_2410_range.yaml") as f:
+                config = yaml.safe_load(f)
+                data = group.HistCurr[:]
+                uncertainty = np.where(np.isfinite(data), extract_smu_current_error(config, data, 0.000001), np.nan)
         group.HistCurr[:] = average[:, 0]
-        create_carray(group_get_file(group), where=group, name="HistCurrErr", obj=uncertainty,
-                      filters=tb.Filters(complib='blosc', fletcher32=False, ), unit=HIST_CURRENT_MEAS_UNIT)
+        if "HistCurrErr" not in group:
+            group_get_file(group).create_carray(where=group, name="HistCurrErr", obj=uncertainty,
+                                                filters=tb.Filters(complib='blosc', fletcher32=False,
+                                                                   complevel=5))
+        else:
+            group.HistCurrErr[:] = uncertainty
 
 
 def regenerate_c_v_errors(group):
@@ -142,13 +156,18 @@ def regenerate_basi_table(group):
     except (KeyError, tb.exceptions.NoSuchNodeError):
         internal_parameters = group.scan_params[:]
     voltages = internal_parameters["hv_voltage"]
+
+    # characteristic is here 'to do' the determination of the voltage uncertainties every time.
     try:
-        with open("pixcap65/configs/keithley_2410_range.yaml", "r") as conf_file:
+        device_name = "keithley_2410"
+        config_file = files("pixcap65.configs").joinpath(
+            "{name}_range.yaml".format(name=device_name))
+        with config_file.open('r') as conf_file:
             scan_range_config = yaml.safe_load(conf_file)
 
         voltage_errors = extract_smu_voltage_error(scan_range_config, voltages, 1000)
     except:
-        logging.warn("Could not extract voltage errors from keithley_2410_range.yaml", exc_info=True)
+        logging.warning("Could not extract voltage errors from keithley_2410_range.yaml", exc_info=True)
         voltage_errors = np.full_like(voltages, np.nan)
 
     scan_configuration = {}
@@ -159,7 +178,11 @@ def regenerate_basi_table(group):
     print(scan_configuration)
     scan_configuration[ScanConfigurationKeys.BIAS_VOLTAGE_RANGE] = -1 * np.arange(1, 350, 0.25)
 
+    # seems to be more or less the same for both implementations; except for discussions about the voltage_settings, voltages and voltage_erros arrays in the alternative implementation.
+    # for the voltage settings a different parameters is fetched, as here we manually recreate the whole procedure!
+    # equals the bias_currents array of the alternative implementation!
     hist_bias_current = group.HistCurr[:]
+    # equals the bias_errors array of the alternative implementation!
     hist_bias_current_errors = group.HistCurrErr[:]
     for set_voltage, leak_current, current_error, meas_voltage, meas_voltage_error in zip(
             scan_configuration[ScanConfigurationKeys.BIAS_VOLTAGE_RANGE], hist_bias_current,
@@ -181,6 +204,8 @@ def regenerate_basi_table(group):
             logging.info(hist_bias_current_errors.shape)
             logging.info(current_error)
             raise e
+
+    # transformation to the new api seems to be missing here!
 
 
 def combine_cv_measurements(first_group: tb.Group, second_group: tb.Group):
@@ -301,48 +326,64 @@ def combine_cv_measurements(first_group: tb.Group, second_group: tb.Group):
     for attribute in list_group_attributes(first_group):
         target_group._f_setattr(attribute, get_group_attribute(first_group, attribute))
 
-
-def generate_bias_table(group, **kwargs):
-    file = group_get_file(group)
+def full_regenerate_bias_table(group: tb.Group, **kwargs):
+    out_file = group_get_file(group)
     if "BiasTable" in group:
         group.BiasTable._f_remove()
         time.sleep(5)
 
-    table = file.create_table(group, name="BiasTable", description=BiasTable,
-                                          filters=tb.Filters(complib='blosc', fletcher32=False, complevel=5))
+    table = out_file.create_table(group, name="BiasTable", description=BiasTable,
+                              filters=GLOBAL_FILTERS)
     entry = table.row
 
-    # need to handle the actually measured voltages.
-    internal_parameters = group.scan_params[:]
+    try:
+        internal_parameters = group.scan_parameters[:]
+    except (KeyError, tb.exceptions.NoSuchNodeError):
+        internal_parameters = group.scan_params[:]
+
+    # fetch the voltage parameters
+    voltages = internal_parameters["hv_voltage"]
     try:
         hist_parameters = group.BiasVoltageHist[:]
+        need_bias_table_hist = False
     except (KeyError, tb.exceptions.NoSuchNodeError):
-        hist_parameters = np.full(internal_parameters["hv_voltage"].shape[0], np.nan)
-    bias_currents = group.HistCurr[:]
-    bias_errors = group.HistCurrErr[:]
-    new_voltage_hist_data = np.full(shape=(hist_parameters.shape[0], 3,), fill_value=np.nan)
+        hist_parameters = np.full(voltages.shape[0], np.nan)
+        need_bias_table_hist = True
     if np.any(np.isfinite(hist_parameters)):
         if len(hist_parameters.shape) > 1:
             voltages = hist_parameters[:, 1]
             voltage_errors = hist_parameters[:, 2]
             voltage_settings = hist_parameters[:, 0]
         else:
+            # extract from old-style api!
             voltages = hist_parameters
             voltage_errors = np.full_like(voltages, np.nan)
             voltage_settings = voltages.copy()
     else:
         # What 'to do' if this argument does not exist. We only started catching this lately.
-        voltages = internal_parameters["hv_voltage"]
+        # we'll still need to fetch this errors here correctly!
         voltage_errors = np.full_like(voltages, np.nan)
-    if np.all(~np.isfinite(voltage_errors)):
+
+    if np.all(~np.isfinite(voltage_errors)) or kwargs.get("force_recalculation", False):
         try:
-            voltage_settings = internal_parameters["bias_voltage"]
-            with open("pixcap65/configs/keithley_2410_range.yaml") as f:
-                range_config = yaml.safe_load(f)
+            voltage_settings = internal_parameters['bias_voltage']
+            device_name = "keithley_2410"
+            config_file = files("pixcap65.configs").joinpath(
+                "{name}_range.yaml".format(name=device_name))
+            with config_file.open('r') as conf_file:
+                range_config = yaml.safe_load(conf_file)
                 voltage_errors = extract_smu_voltage_error(range_config, voltages, 1000)
         except:
+            logging.warning("Could not extract voltage errors from keithley_2410_range.yaml", exc_info=True)
             voltage_errors = np.full_like(voltages, np.nan)
 
+
+
+
+    # generate the new/renew table
+    bias_currents = group.HistCurr[:]
+    bias_errors = group.HistCurrErr[:]
+    new_voltage_hist_data = np.full(shape=(hist_parameters.shape[0], 3,), fill_value=np.nan)
     for set_voltage, leak_current, current_error, meas_voltage, meas_voltage_error in zip(
             voltage_settings, bias_currents,
             bias_errors, voltages, voltage_errors):
@@ -364,6 +405,97 @@ def generate_bias_table(group, **kwargs):
             logger.info(current_error)
             raise e
 
+    if need_bias_table_hist and kwargs.pop("transform_api", False):
+        # FIXME: maybe this here breaks the BiasTableHist access?
+        new_voltage_hist_data[:, 0] = voltage_settings
+        new_voltage_hist_data[:, 1] = voltages
+        new_voltage_hist_data[:, 2] = voltage_errors
+        if "BiasVoltageHist" in group:
+            temp = group.BiasVoltageHist
+            assert isinstance(temp, tb.CArray)
+            temp._f_remove()
+            time.sleep(30)
+        out_file.create_carray(group, "BiasVoltageHist", obj=new_voltage_hist_data,
+                           filters=GLOBAL_FILTERS)
+
+
+def generate_bias_table(group, **kwargs):
+    file = group_get_file(group)
+    if "BiasTable" in group:
+        group.BiasTable._f_remove()
+        time.sleep(5)
+
+    table = file.create_table(group, name="BiasTable", description=BiasTable,
+                                          filters=GLOBAL_FILTERS)
+    entry = table.row
+
+    # need to handle the actually measured voltages.
+    try:
+        internal_parameters = group.scan_parameters[:]
+    except (KeyError, tb.exceptions.NoSuchNodeError):
+        internal_parameters = group.scan_params[:]
+    try:
+        hist_parameters = group.BiasVoltageHist[:]
+        # we will expect here in the first column the 'bias_range' data
+        # we will expect here in the second column the 'hv_voltage' data
+        # we will expect here in the third column the measurement uncertainties. (for the voltages)
+    except (KeyError, tb.exceptions.NoSuchNodeError):
+        hist_parameters = np.full(internal_parameters["hv_voltage"].shape[0], np.nan)
+
+
+    bias_currents = group.HistCurr[:]
+    bias_errors = group.HistCurrErr[:]
+    new_voltage_hist_data = np.full(shape=(hist_parameters.shape[0], 3,), fill_value=np.nan)
+    # if the BiasVoltageHist was initialized correctly, this should yield the same voltages array as the alternative implementation!
+    if np.any(np.isfinite(hist_parameters)):
+        if len(hist_parameters.shape) > 1:
+            voltages = hist_parameters[:, 1]
+            voltage_errors = hist_parameters[:, 2]
+            voltage_settings = hist_parameters[:, 0]
+        else:
+            # extract from old-style api!
+            voltages = hist_parameters
+            voltage_errors = np.full_like(voltages, np.nan)
+            voltage_settings = voltages.copy()
+    else:
+        # What 'to do' if this argument does not exist. We only started catching this lately.
+        voltages = internal_parameters["hv_voltage"]
+        voltage_errors = np.full_like(voltages, np.nan)
+    if np.all(~np.isfinite(voltage_errors)):
+        try:
+            voltage_settings = internal_parameters['bias_voltage']
+            device_name = "keithley_2410"
+            config_file = files("pixcap65.configs").joinpath(
+                "{name}_range.yaml".format(name=device_name))
+            with config_file.open('r') as conf_file:
+                range_config = yaml.safe_load(conf_file)
+                voltage_errors = extract_smu_voltage_error(range_config, voltages, 1000)
+        except:
+            logging.warning("Could not extract voltage errors from keithley_2410_range.yaml", exc_info=True)
+            voltage_errors = np.full_like(voltages, np.nan)
+    # seems to be more or less the same for both implementations; except for discussions about the voltage_settings, voltages and voltage_erros arrays.
+    for set_voltage, leak_current, current_error, meas_voltage, meas_voltage_error in zip(
+            voltage_settings, bias_currents,
+            bias_errors, voltages, voltage_errors):
+        try:
+            entry['Us'] = set_voltage
+            entry['U'] = meas_voltage
+            entry['I'] = leak_current
+            entry['DI'] = current_error
+            entry['DU'] = meas_voltage_error
+            entry.append()
+        except ValueError as e:
+            logger.info("scan parameters")
+            logger.info(set_voltage)
+            logger.info("currents")
+            logger.info(bias_currents.shape)
+            logger.info(leak_current)
+            logger.info("Errors")
+            logger.info(bias_errors.shape)
+            logger.info(current_error)
+            raise e
+
+    # this transformation is not present within the other implementation.
     # when the old api for the bias voltage hist is used we should transform it to the new one
     if len(hist_parameters) <= 1 and kwargs.pop("transform_api", False):
         new_voltage_hist_data[:, 0] = voltage_settings
@@ -597,10 +729,9 @@ if __name__ == "__main__":
         physical_dimensions[:, 0] = np.nan
         h5_file.root.Reference.R1.sensor.PhysicalDimensions[:] = physical_dimensions
         h5_file.root.Reference.R1.sensor.PhysicalDimensions.flush()
-        # TODO: add a part which corrects for the missing current errors!
-        regenerate_i_v_errors(h5_file.root.Reference.R1.I_V_Characteristic)
-
-
+        regenerate_i_v_errors(h5_file.root.Reference.R1.I_V_Characteristic.biasing.measurements)
+        full_regenerate_bias_table(h5_file.root.Reference.R1.I_V_Characteristic.biasing.measurements,
+                                   force_recalculation=True)
     # with tb.open_file("packaged/data/R13_2_Scan.h5", "a") as h5_file:
     #     h5_file.copy_children(h5_file.root.ATLAS_ITk.X2, h5_file.root.Reference.R13, recursive=True, overwrite=True)
     #     h5_file.flush()

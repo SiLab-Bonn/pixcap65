@@ -86,3 +86,12 @@ And the same after processing the data
 * lock: synchronization object to prevent multiple overlapping accesses to the pytables api and simultaneously
   write/read operations on the same file.
 * unit: unit of the capacities presented within the plot. [str]
+
+
+
+# Data structures used for now
+## BiasTableHist
+
+* first column: 'bias_range' data from scan parameters. What are these for data?
+* second column: 'hv_voltage' data from scan parameters. What are these for data?
+* third column: measurement uncertainties of the measured/applied bias voltages.

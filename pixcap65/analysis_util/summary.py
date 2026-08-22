@@ -12,7 +12,7 @@ import time
 from collections.abc import Iterable
 
 from pixcap65.analysis import get_test_capacitance_data
-from pixcap65.analysis_util.data_store import SummaryTable
+from pixcap65.analysis_util.modelling.data_store import SummaryTable
 from pixcap65.data_constants import R11_SCAN_FILE, R13_2_SCAN_FILE, E1_2_SCAN_FILE, X4_SCAN_FILE
 from pixcap65.data_constants import X1_SCAN_2_FILE, X2_SCAN_2_FILE
 from pixcap65.data_constants import X5_SCAN_FILE, X6_SCAN_FILE, X7_SCAN_FILE

@@ -6,6 +6,7 @@ from pixcap65.analysis_util.utility import TABLES_ARRAY_TYPE, TABLES_TABLE_TYPE,
     transform_covariance
 
 
+# TODO: missing here an update of commands compared to other files. Also we are missing here the usage of some constants.
 def analyze_data_delegate(file: tb.File, group: tb.Group, current_hist: TABLES_ARRAY_TYPE,
                           scan_parameters: TABLES_TABLE_TYPE, **kwargs):
     """

@@ -17,9 +17,10 @@ from tqdm import tqdm
 from typing import Optional, Tuple, Union, Callable, Any, List
 from warnings import warn, filterwarnings
 
-from pixcap65.analysis_util.data_store import DepletionDataStore, DepletionTableStore, DepletionArrayStore, \
+from pixcap65.analysis_util.modelling.data_store import DepletionDataStore, DepletionTableStore, DepletionArrayStore, \
     DopingArrayStore, DepletionNumpyStore
-from pixcap65.analysis_util.physics_modelling import SILICON_V_BIAS, depletion_model, model_depletion, EPS_SILICON, \
+from pixcap65.analysis_util.modelling.physics_modelling import SILICON_V_BIAS, depletion_model, model_depletion, \
+    EPS_SILICON, \
     gauss_model, \
     extended_gauss_integral
 from pixcap65.analysis_util.utility import check_leaf_unit, str_join, ANALYSIS_CORRECTED_GROUP_NAME, \
