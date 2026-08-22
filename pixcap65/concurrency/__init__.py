@@ -11,7 +11,7 @@ import sys
 from contextlib import contextmanager
 from multiprocessing.managers import SyncManager, BaseManager
 
-from pixcap65.analysis_util.data_store import DepletionArrayStoreMP
+from pixcap65.analysis_util.modelling.data_store import DepletionArrayStoreMP
 from pixcap65.concurrency import manager
 from pixcap65.concurrency import proxy
 from pixcap65.concurrency.manager import ExtendedSyncManager, DepletionMPManager

@@ -17,7 +17,7 @@ from matplotlib.axes import Axes
 from types import NoneType
 from typing import Any, Optional, Union, List, Tuple
 
-from pixcap65.analysis_util.physics_modelling import model_depletion
+from pixcap65.analysis_util.modelling.physics_modelling import model_depletion
 from pixcap65.utility import synchronized_process_open_file
 from pixcap65.utility.tables_util import group_get_file
 
@@ -795,7 +795,7 @@ def _bias_voltage_plotter(ax, tabular: tb.Table, label, norm=1, apply_norm=False
     voltage_data = np.abs(tabular.col("U"))
     current_data = np.abs(tabular.col("I"))
     current_errors = tabular.col("DI")
-    # FIXME: R1/R11 seems to be missing i-v-errors!
+    # FIXME: R1/R11 seems to be missing i-v-errors! (Under investigation, will need a plotting test-run)
     # looks like there are no usable data points for the uncertainties of the leakage current.
     try:
         voltage_error = np.abs(tabular.col("DU"))
@@ -1819,7 +1819,7 @@ def get_model_prediction(col, row, analysis_group: tb.Group, actual_cap: Any, to
     # noinspection PyUnresolvedReferences
     if resistor_name in analysis_group and np.isfinite(analysis_group[resistor_name][col, row]):
         hist_resistance = analysis_group[resistor_name]
-        from pixcap65.analysis_util.physics_modelling import full_capacitance_model
+        from pixcap65.analysis_util.modelling.physics_modelling import full_capacitance_model
         assert isinstance(hist_resistance, tb.Array) or isinstance(hist_resistance, np.ndarray)
         y = full_capacitance_model(f,
                                    c=(actual_cap + parasitic_correction) * ADVANCED_CAPACITANCE_CONVERSION_FACTOR,
@@ -2136,9 +2136,7 @@ if __name__ == '__main__':
 
     # use this attempt to achieve a better performance when generating the plots
     import multiprocessing as mp
-    from examples.full_analysis import presentation_plotter, \
-    bare_sample_plotter_second, x1_plotter, r13_plotter_second, x2_plotter_second, x5_plotter, x6_plotter, x7_plotter, \
-    e1_plotter_second, r1_plotter, x4_plotter
+    from examples.full_analysis import r1_plotter
 
     print(mp.current_process().name)
     print(mp.cpu_count())
@@ -2146,18 +2144,18 @@ if __name__ == '__main__':
     start = time.time()
     with mp.Manager() as manager, mp.Pool(initializer=mp_plotting_init, initargs=("PDF", has_latex,)) as pool:
         tables_lock = manager.RLock()
-        presentation_plotter(tables_lock)
+        # presentation_plotter(tables_lock)
         process_handles = [
-            bare_sample_plotter_second,
-            x1_plotter,
-            x2_plotter_second,
-            x5_plotter,
-            x6_plotter,
-            x7_plotter,
-            r13_plotter_second,
-            e1_plotter_second,
+            # bare_sample_plotter_second,
+            # x1_plotter,
+            # x2_plotter_second,
+            # x5_plotter,
+            # x6_plotter,
+            # x7_plotter,
+            # r13_plotter_second,
+            # e1_plotter_second,
             r1_plotter,
-            x4_plotter,
+            # x4_plotter,
         ]
         processes = [pool.apply_async(handle, (tables_lock,), error_callback=error_handler) for handle in process_handles]
 

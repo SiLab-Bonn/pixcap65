@@ -3,9 +3,10 @@ import tables as tb
 from matplotlib.backends.backend_pdf import PdfPages
 from typing import Any, Callable, Union
 
-from pixcap65.analysis_util.configuration_constants import ANALYSIS_INITIAL_CAPACITANCE, ANALYSIS_INITIAL_LEAKAGE, \
+from pixcap65.analysis_util.modelling.configuration_constants import ANALYSIS_INITIAL_CAPACITANCE, \
+    ANALYSIS_INITIAL_LEAKAGE, \
     ANALYSIS_INITIAL_RESISTANCE, ANALYSIS_REFERENCE_VOLTAGE
-from pixcap65.analysis_util.physics_modelling import full_capacitance_model, simple_capacitance_model, \
+from pixcap65.analysis_util.modelling.physics_modelling import full_capacitance_model, simple_capacitance_model, \
     extended_full_capacitance_model, enhanced_full_capacitance_model
 from pixcap65.analysis_util.utility import HandleFitterStubClass, HandleFitterGeneral, HIST_CAP_UNIT, \
     HIST_LEAK_CURRENT_UNIT
