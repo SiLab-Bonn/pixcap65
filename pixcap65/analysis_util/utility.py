@@ -1,5 +1,6 @@
 """
 This file contains some utilities needed for the analysis and the plotting.
+In particular it should help with defining constants of values used quite often.
 """
 # ----------------------------------------------------------
 #  Copyright (c) 2026. SiLab, Institute of Physics, University of Bonn.
@@ -34,7 +35,8 @@ logger = logging.getLogger(__name__)
 GENERAL_TRANSFORMATION_MATRIX = np.array(
     [[1.e-12, 1.e-6, 1.e3, 1.e-6], [1.e-6, 1, 1.e9, 1], [1.e3, 1.e9, 1.e18, 1.e9], [1.e-6, 1, 1.e9, 1]])
 GENERAL_TRANSFORMATION_MATRIX_TAU = np.array(
-    [[1.e-12, 1.e-6, 1.e3, 1.e-6, 1e-6], [1.e-6, 1, 1.e9, 1, 1], [1.e3, 1.e9, 1.e18, 1.e9, 1e9], [1.e-6, 1, 1.e9, 1, 1], [1e-6, 1, 1.e9, 1, 1]])
+    [[1.e-12, 1.e-6, 1.e3, 1.e-6, 1e-6], [1.e-6, 1, 1.e9, 1, 1], [1.e3, 1.e9, 1.e18, 1.e9, 1e9], [1.e-6, 1, 1.e9, 1, 1],
+     [1e-6, 1, 1.e9, 1, 1]])
 ANALYSIS_GROUP_NAME = "analysis"
 ANALYSIS_CORRECTED_GROUP_NAME = "analysis_correction"
 TABLES_ARRAY_TYPE = Union[np.ndarray, tb.CArray]
@@ -103,8 +105,9 @@ def transform_covariance(cov):
         case (5, 5):
             assert cov.shape == (5, 5)
             # here it is necessary to reduce the parts from the covariance of u0 to
-            mask = np.array([[True, True, True, False, True], [True, True, True, False, True], [True, True, True, False, True],
-                             [False, False, False, False, False], [True, True, True, False, True]])
+            mask = np.array(
+                [[True, True, True, False, True], [True, True, True, False, True], [True, True, True, False, True],
+                 [False, False, False, False, False], [True, True, True, False, True]])
             return cov[mask].reshape((4, 4)) * GENERAL_TRANSFORMATION_MATRIX_TAU[mask].reshape((4, 4))
         case _:
             raise ValueError(
@@ -149,12 +152,49 @@ def check_leaf_unit(leaf: TABLES_LEAF_TYPE, unit: str) -> np.ndarray:
 
 # noinspection PyUnusedLocal
 def handle_fitter_stub(fit_object, apply_contour, x_label, y_label, title, pdf, contours_title=None, fig_title=None):
+    """
+    handle_fitter_stub
+
+    @author Dominik Fischer
+    last update: 2026-08-24
+
+    For the non-linear fitting frameworks are some further options available to directly plot the results or perform
+    profiling.
+    This is just a stub function, necessary to define the signature for all related functions.
+    :param fit_object: object of the already performed fit.
+    :param apply_contour: boolean, whether to apply contour profiling around the found optimum.
+    :param x_label: label of the x-axis.
+    :param y_label: label of the y-axis.
+    :param title: title of the plot.
+    :param pdf: PdfPages object to save the fit plots to.
+    :param contours_title: title of the contour plot.
+    :param fig_title: If provided, the super-title of the fit plot figures.
+    """
     # This is just a stub method for simplifying the fit plotting
     pass
 
 
 def handle_fitter_advanced_options(fit_object, apply_contour, x_label, y_label, title, pdf, contours_title=None,
                                    fig_title=None):
+    """
+    handle_fitter_advanced_options
+
+    @author Dominik Fischer
+    last update: 2026-08-24
+
+    For the non-linear fitting frameworks are some further options available to directly plot the results or perform
+    profiling.
+    This is only a wrapper implementation as it will delegate immediately to the implementations specific for a
+    particular fitting framework like `iminuit` or `kafe2`.
+    :param fit_object: object of the already performed fit.
+    :param apply_contour: boolean, whether to apply contour profiling around the found optimum.
+    :param x_label: label of the x-axis.
+    :param y_label: label of the y-axis.
+    :param title: title of the plot.
+    :param pdf: PdfPages object to save the fit plots to.
+    :param contours_title: title of the contour plot.
+    :param fig_title: If provided, the super-title of the fit plot figures.
+    """
     from kafe2 import FitBase
     from iminuit import Minuit
     if isinstance(fit_object, FitBase):
@@ -220,6 +260,11 @@ def handle_kafe2_advanced_options(fit_object, apply_contour, x_label, y_label, t
 
 # noinspection PyProtectedMember
 def extract_iminuit_cost_object(fit):
+    """
+    Get the cost functions object from a `iminuit` framework `Minuit` instance.
+    :param fit: `Minuit` instances from which to fetch the applied cost function.
+    :return: cost function object.
+    """
     from iminuit import Minuit
     assert isinstance(fit, Minuit)
     return fit.fcn._fcn
@@ -332,25 +377,77 @@ def handle_minuit_advanced_options(fit_object, apply_contour, x_label, y_label, 
 
 
 def investigate_fit_convergence(fitter):
-    from kafe2 import FitBase
-    from iminuit import Minuit
+    """
+    investigate_fit_convergence(fitter)
+
+    @author: Dominik Fischer
+    last update: 2026-08-24
+
+    Utility function to check convergence of the fit and calculate some GoF quantities.
+    This function must not be used if neither the package `kafe2` nor the package `iminuit` is installed.
+
+    In anyway the chi^2 estimator are fetched from the corresponding fitting object and written back into a dedicated
+    mapping.
+    If possible also the p-value for statistical hypothesis tests is calculated for the result of the fit and put
+    into the mapping.
+    If it is not possible to calculate the p-value, it will be set to -1.
+
+
+    :param fitter: fitting object from a suitable framework.
+    :return: convergence mapping of d.o.f. of the fit, chi2, reduced chi2 and p-Value.
+    """
+    try:
+        from kafe2 import FitBase
+    except ImportError:
+        class FitBase(object):
+            """
+            Stub class in case kafe2 is not installed.
+            """
+
+            def __getattr__(self, name):
+                def method(*args, **kwargs):
+                    logger.warning(
+                        "The package `kafe2` is not installed or at least the `kafe2.FitBase` class could not be imported. So no call to `%s` is possible.",
+                        name)
+
+                return method
+    try:
+        from iminuit import Minuit
+    except ImportError:
+        class Minuit(object):
+            """
+            Stub class in case iminuit is not installed.
+            """
+
+            def __getattr__(self, name):
+                def method(*args, **kwargs):
+                    logger.warning(
+                        "The package `iminuit` is not installed or at least the `iminuit.Minuit` class could not be imported. So no call to `%s` is possible.",
+                        name)
+
+                return method
     if isinstance(fitter, Minuit):
-        # print(fitter.fval, fitter.fmin.fval, fitter.fmin.reduced_chi2)
+        logger.debug("Fitter minimum found %f;%f and the reduced chi2 is %f",
+                     fitter.fval, fitter.fmin.fval, fitter.fmin.reduced_chi2)
         cost_value = fitter.fval
         ndf = fitter.ndof
     elif isinstance(fitter, FitBase):
         cost_value = fitter.goodness_of_fit
         ndf = fitter.ndf
-        # print(fitter.chi2_probability)
+        logger.debug(fitter.chi2_probability)
     else:
         raise TypeError("Fitter must be either a Minuit or XYFit object.")
-    from scipy.stats.distributions import chi2
+
     if ndf == 0:
         ndf = -1
     regular_cost = cost_value / ndf if cost_value is not None else -1
-    p_value = 1 - chi2.cdf(regular_cost, df=ndf)
+
+    try:
+        from scipy.stats.distributions import chi2
+        p_value = 1 - chi2.cdf(regular_cost, df=ndf)
+    except ImportError:
+        p_value = -1
     convergence = dict(x=cost_value, xn=regular_cost, ndf=ndf, p=p_value)
-    # print(convergence)
     return convergence
 
 
@@ -425,23 +522,60 @@ def get_analysis_group(base_group, **kwargs):
 
 
 class HandleFitterStubClass:
+    """
+    Handler/Wrapper class to implement the post-processing of further options to perform additional investigations on
+    completed fits for different fitting frameworks like `kafe2` or `iminuit` following the same signature in the
+    analysis code.
+
+    For the non-linear fitting frameworks are some further options available to directly plot the results or perform
+    profiling.
+    But this is just a stub class (it is not abstract as it was necessary that this class instantiated).
+    """
+
     def __call__(self, fit_object, apply_contour, x_label, y_label, title, pdf, contours_title=None, fig_title=None):
+        """
+        For the non-linear fitting frameworks are some further options available to directly plot the results or perform
+        profiling.
+        :param fit_object: object of the already performed fit.
+        :param apply_contour: boolean, whether to apply contour profiling around the found optimum.
+        :param x_label: label of the x-axis.
+        :param y_label: label of the y-axis.
+        :param title: title of the plot.
+        :param pdf: PdfPages object to save the fit plots to.
+        :param contours_title: title of the contour plot.
+        :param fig_title: If provided, the super-title of the fit plot figures.
+        """
         handle_fitter_stub(fit_object, apply_contour, x_label, y_label, title, pdf, contours_title, fig_title)
 
 
 class HandleFitterGeneral(HandleFitterStubClass):
+    """
+    Explicit implementation of :class:`pixcap65.analysis_util.utility.HandleFitterStubClass` for a general case.
+    It will decide appropropriately between `kafe2` and `iminuit`.
+    """
+
     def __call__(self, fit_object, apply_contour, x_label, y_label, title, pdf, contours_title=None, fig_title=None):
         handle_fitter_advanced_options(fit_object, apply_contour, x_label, y_label, title, pdf, contours_title,
                                        fig_title)
 
 
 class HandleFitterKafe2(HandleFitterStubClass):
+    """
+    Explicit implementation of :class:`pixcap65.analysis_util.utility.HandleFitterStubClass` for handling fits
+    performed by the `kafe2` framework.
+    """
+
     def __call__(self, fit_object, apply_contour, x_label, y_label, title, pdf, contours_title=None, fig_title=None):
         handle_kafe2_advanced_options(fit_object, apply_contour, x_label, y_label, title, pdf, contours_title,
                                       fig_title)
 
 
 class HandleFitterMinuit(HandleFitterStubClass):
+    """
+    Explicit implementation of :class:`pixcap65.analysis_util.utility.HandleFitterStubClass` for handling fits
+    performed by the `iminuit` framework.
+    """
+
     def __call__(self, fit_object, apply_contour, x_label, y_label, title, pdf, contours_title=None, fig_title=None):
         handle_minuit_advanced_options(fit_object, apply_contour, x_label, y_label, title, pdf, contours_title,
                                        fig_title)
@@ -469,6 +603,20 @@ default_analysis_keyword_arguments = {
 
 
 class DepletionWidthData(tb.IsDescription):
+    """
+    :class:`pytables.IsDescription` data structure to store the results of the modelling of the depletion width profile
+    for individual pixel on a sensor in a :class:`pytables.Table` object.
+
+    Class variable are to be understand as fields/entries of the table.
+    :cvar col: column coordinate of the investigated pixel.
+    :cvar row: row coordinate of the investigated pixel.
+    :cvar V: ??
+    :cvar NAD: effective combined acceptor-donator density (defined like the reduced mass of the two)
+    :cvar dep: estimated full depletion voltage
+    :cvar sat: estimated saturation value for the full depletion width.
+
+    For further general information see :py:class:`pytables.IsDescription`.
+    """
     col = tb.Int64Col(pos=0)
     row = tb.Int64Col(pos=1)
     V = tb.Float32Col(pos=2)
@@ -478,6 +626,30 @@ class DepletionWidthData(tb.IsDescription):
 
 
 class CVDistributionSimpleData(tb.IsDescription):
+    """
+    :py:class:`pytables.IsDescription` data structure to store the (averaged) fitting parameters of a sensor for a
+    particular applied bias voltage in a :class:`pytables.Table` object.
+    The bias voltage entry may also indicate a special kind of measurement.
+
+    Class variable are to be understand as fields/entries of the table.
+    :cvar bias: bias voltage used for this measurement (or the kind of the measurement).
+    :cvar n_pixel: number of pixels which have contributed to these average values.
+    :cvar capacitance: measured/averaged capacitance of the sensor at the given bias voltage.
+    :cvar cap_err: uncertainty on the mean capacitance parameter of the sensor at the given bias voltage.
+    :cvar cap_std: spread of the capacitance over the sensor at the given bias voltage.
+    :cvar cap_std_err: uncertainty of the capacitance spread parameter at the given bias voltage.
+    :cvar r_on: averaged/measured on-resistance of the measurement circuits.
+    :cvar r_on_err: uncertainty of the on-resistance's mean parameter.
+    :cvar r_on_std: spread of the on-resistance over the available measurement circuits/channels.
+    :cvar r_on_std_err: uncertainty of the on-resistance spread parameter over the available measurement
+    circuits/channels.
+    :cvar cap_systematic_general: general systematic uncertainty of the capacitance measurement. Given by the spread of
+    parasitic capacitance and the way the investigation/analysis is performed.
+    :cvar cap_systematic_dispersion: systematic uncertainty of the capacitance measurement given by the dispersion of
+    the parasitic capacitance of the measurement circuit between different pixcap65 chips.
+
+    For further general information see :py:class:`pytables.IsDescription`.
+    """
     bias = tb.Float64Col(pos=0)
     n_pixel = tb.Int64Col(pos=1)
     capacitance = tb.Float64Col(pos=2)
@@ -491,7 +663,44 @@ class CVDistributionSimpleData(tb.IsDescription):
     cap_systematic_general = tb.Float64Col(pos=10)
     cap_systematic_dispersion = tb.Float64Col(pos=11)
 
+
 class CVDistributionData(tb.IsDescription):
+    """
+    :py:class:`pytables.IsDescription` data structure to store the (averaged) fitting parameters of a sensor for a
+    particular applied bias voltage in a :class:`pytables.Table` object.
+    The bias voltage entry may also indicate a special kind of measurement.
+    In Addition to the implementation by :py:class:`pixcap65.analysis_util.utility.CVDistributionSimpleData`, this
+    data structure also provides information about the corrected capacitance and the corresponding systematic
+    uncertainties.
+
+    Class variable are to be understand as fields/entries of the table.
+    :cvar bias: bias voltage used for this measurement (or the kind of the measurement).
+    :cvar n_pixel: number of pixels which have contributed to these average values.
+    :cvar capacitance: measured/averaged capacitance of the sensor at the given bias voltage.
+    :cvar cap_err: uncertainty on the mean capacitance parameter of the sensor at the given bias voltage.
+    :cvar cap_std: spread of the capacitance over the sensor at the given bias voltage.
+    :cvar cap_std_err: uncertainty of the capacitance spread parameter at the given bias voltage.
+    :cvar r_on: averaged/measured on-resistance of the measurement circuits.
+    :cvar r_on_err: uncertainty of the on-resistance's mean parameter.
+    :cvar r_on_std: spread of the on-resistance over the available measurement circuits/channels.
+    :cvar r_on_std_err: uncertainty of the on-resistance spread parameter over the available measurement
+    circuits/channels.
+    :cvar cap_corrected: measured/averaged capacitance of the sensor at the given bias voltage (based on the corrected
+    capacitances).
+    :cvar cap_corrected_err: spread of the capacitance over the sensor at the given bias voltage. (based on the corrected
+    capacitances).
+    :cvar cap_parasitic: value of the averaged parasitic capacitance used here.
+    :cvar cap_systematic_error: general systematic uncertainty of the capacitance measurement. Given by the spread of
+    parasitic capacitance and the way the investigation/analysis is performed.
+    :cvar cap_corrected_est_error: uncertainty on the mean capacitance parameter of the sensor at the given
+    bias voltage. (based on the corrected capacitances).
+    :cvar cap_corrected_std_error: uncertainty of the capacitance spread parameter at the given bias voltage.
+    (based on the corrected capacitances).
+    :cvar cap_systematic_dispersion: systematic uncertainty of the capacitance measurement given by the dispersion of
+    the parasitic capacitance of the measurement circuit between different pixcap65 chips.
+
+    For further general information see :py:class:`pytables.IsDescription`.
+    """
     bias = tb.Float64Col(pos=0)
     n_pixel = tb.Int64Col(pos=1)
     capacitance = tb.Float64Col(pos=2)
@@ -510,6 +719,7 @@ class CVDistributionData(tb.IsDescription):
     cap_corrected_std_error = tb.Float64Col(pos=15)
     cap_systematic_dispersion = tb.Float64Col(pos=16)
 
+
 depletion_atomic_type = np.dtype([
     ("Ubi", np.float64),
     ("Ubi_error", np.float64),
@@ -523,33 +733,65 @@ depletion_atomic_type = np.dtype([
     ("d_error", np.float64),
 ])
 
-class DepletionAtomicData(tb.IsDescription):
-    Ubi = tb.Float64Col(pos=0)
-    Ubi_error = tb.Float64Col(pos=1)
-    a = tb.Float64Col(pos=2)
-    a_error = tb.Float64Col(pos=3)
-    b = tb.Float64Col(pos=4)
-    b_error = tb.Float64Col(pos=5)
-    c = tb.Float64Col(pos=6)
-    c_error = tb.Float64Col(pos=7)
-    d = tb.Float64Col(pos=8)
-    d_error = tb.Float64Col(pos=9)
-
-class DepletionSimpleData(tb.IsDescription):
-    Ubi = tb.Float64Col(pos=0)
-    Ubi_error = tb.Float64Col(pos=1)
-    a = tb.Float64Col(pos=2)
-    a_error = tb.Float64Col(pos=3)
-    b = tb.Float64Col(pos=4)
-    b_error = tb.Float64Col(pos=5)
-    c = tb.Float64Col(pos=6)
-    c_error = tb.Float64Col(pos=7)
-    d = tb.Float64Col(pos=8)
-    d_error = tb.Float64Col(pos=9)
-    Ubi_systematic = tb.Float64Col(pos=10)
-    Ubi_dispersion = tb.Float64Col(pos=11)
 
 class DepletionData(tb.IsDescription):
+    """
+    :py:class:`pytables.IsDescription` data structure to store the results of the depletion analysis in a
+    :py:class:`pytables.Table` object.
+    This will include in particular the results for the depletion voltage and their statistical and systematic
+    uncertainties.
+
+    As all fits are performed individually for corrected and uncorrected capacities, this data structure contains
+    separate fields/entries for results based on uncorrected and corrected capacities.
+    So not only the depletion voltage field is present twice but also the results for the fit parameters and their errors
+    and the covariance matrix.
+
+    Class variables are here to understand as the fields of the table.
+    :cvar Ubi: estimation of the depletion voltage based on the uncorrected capacities.
+    :cvar Ubi_error: (statistical) uncertainty of the depletion voltage based on the uncorrected capacities.
+    :cvar a: slope parameter of the linear fit to the high voltage limit to estimate the depletion voltage.
+    :cvar a_error: uncertainty of the slope parameter of the linear fit to the high voltage limit to estimate the
+    depletion voltage.
+    :cvar b: offset parameter of the linear fit to the high voltage limit to estimate the depletion voltage.
+    :cvar b_error: uncertainty of the offset parameter of the linear fit to the high voltage limit to estimate the
+    depletion voltage.
+    :cvar c: slope parameter of the linear fit to the low voltage limit to estimate the depletion voltage.
+    :cvar c_error: uncertainty of the slope parameter of the linear fit to the high voltage limit to estimate the
+    depletion voltage.
+    :cvar d: offset parameter of the linear fit to the low voltage limit to estimate the depletion voltage.
+    :cvar d_error: uncertainty of the offset parameter of the linear fit to the low voltage limit to estimate the
+    depletion voltage.
+    :cvar Ubi_corrected: estimation of the depletion voltage based on the corrected capacities.
+    :cvar Ubi_corrected_error: (statistical) uncertainty of the depletion voltage based on the corrected capacities.
+    :cvar a_corrected: slope parameter of the linear fit to the high voltage limit to estimate the depletion voltage.
+    :cvar a_corrected_error: uncertainty of the slope parameter of the linear fit to the high voltage limit to estimate the
+    depletion voltage.
+    :cvar b_corrected: offset parameter of the linear fit to the high voltage limit to estimate the depletion voltage.
+    :cvar b_corrected_error: uncertainty of the offset parameter of the linear fit to the high voltage limit to estimate the
+    depletion voltage.
+    :cvar c_corrected: slope parameter of the linear fit to the low voltage limit to estimate the depletion voltage.
+    :cvar c_corrected_error: uncertainty of the slope parameter of the linear fit to the high voltage limit to estimate the
+    depletion voltage.
+    :cvar d_corrected: offset parameter of the linear fit to the low voltage limit to estimate the depletion voltage.
+    :cvar d_corrected_error: uncertainty of the offset parameter of the linear fit to the low voltage limit to estimate the
+    depletion voltage.
+    :cvar Ubi_systematic: systematic error of the (uncorrected) depletion voltage by the spread of the capacitances over
+    the sensor and by the systematic effects of the analysis procedure like e.g. the fit ranges.
+    :cvar Ubi_systematic_corrected: systematic error of the (corrected) depletion voltage by the spread of the capacitances over
+    the sensor and by the systematic effects of the analysis procedure like e.g. the fit ranges.
+    :cvar Ubi_systematic_dispersion: systematic error of the (uncorrected) depletion voltage by the dispersion of the
+    parasitic capacitances' of the measurement circuit between multiple pixcap65 chips.
+    :cvar Ubi_systematic_dispersion_corrected_error: systematic error of the (corrected) depletion voltage by tthe dispersion of the
+    parasitic capacitances' of the measurement circuit between multiple pixcap65 chips.
+    :cvar rho: estimation for the substrates specific resistivity
+    :cvar rho_error: (statistical) uncertainty on the estimation of the substrates specific resistivity.
+    :cvar rho_corrected: estimation for the substrates specific resistivity
+    :cvar rho_corrected_error: (statistical) uncertainty on the estimation of the substrates specific resistivity.
+    :cvar first_covariance: covariance matrix of the first fit region (high voltage limit)
+    :cvar second_covariance: covariance matrix of the second fit region (low voltage limit)
+
+    For further general information see :py:class:`pytables.IsDescription`.
+    """
     Ubi = tb.Float64Col(pos=0)
     Ubi_error = tb.Float64Col(pos=1)
     a = tb.Float64Col(pos=2)
@@ -578,13 +820,12 @@ class DepletionData(tb.IsDescription):
     rho_error = tb.Float64Col(pos=25)
     rho_corrected = tb.Float64Col(pos=26)
     rho_corrected_error = tb.Float64Col(pos=27)
-    first_covariance = tb.Float64Col(pos=28, shape=(2,2))
+    first_covariance = tb.Float64Col(pos=28, shape=(2, 2))
     second_covariance = tb.Float64Col(pos=28, shape=(2, 2))
 
     def __new__(cls, classname: str, bases: Sequence, classdict: dict[str, Any]):
         print("Called new!")
         return tb.IsDescription.__new__(cls, classname, bases, classdict)
-
 
     def __init__(self):
         print("Called __init__!")
@@ -592,6 +833,53 @@ class DepletionData(tb.IsDescription):
 
 
 class CVDepletionCapacitanceData(tb.IsDescription):
+    """
+    :py:class:`pytables.IsDescription` data structure to store the results of the depletion analysis in a
+    :py:class:`pytables.Table` object.
+    This will include in particular the results for the depletion voltage and their statistical and systematic
+    uncertainties.
+
+    As all fits are performed individually for corrected and uncorrected capacities, this data structure contains
+    separate fields/entries for results based on uncorrected and corrected capacities.
+    So not only the depletion voltage field is present twice but also the results for the fit parameters and their errors
+    and the covariance matrix.
+
+    Class variables are here to understand as the fields of the table.
+    :cvar Ubi: estimation of the depletion voltage based on the uncorrected capacities.
+    :cvar Ubi_error: (statistical) uncertainty of the depletion voltage based on the uncorrected capacities.
+    :cvar a: slope parameter of the linear fit to the high voltage limit to estimate the depletion voltage.
+    :cvar a_error: uncertainty of the slope parameter of the linear fit to the high voltage limit to estimate the
+    depletion voltage.
+    :cvar b: offset parameter of the linear fit to the high voltage limit to estimate the depletion voltage.
+    :cvar b_error: uncertainty of the offset parameter of the linear fit to the high voltage limit to estimate the
+    depletion voltage.
+    :cvar c: slope parameter of the linear fit to the low voltage limit to estimate the depletion voltage.
+    :cvar c_error: uncertainty of the slope parameter of the linear fit to the high voltage limit to estimate the
+    depletion voltage.
+    :cvar d: offset parameter of the linear fit to the low voltage limit to estimate the depletion voltage.
+    :cvar d_error: uncertainty of the offset parameter of the linear fit to the low voltage limit to estimate the
+    depletion voltage.
+    :cvar bias: bias voltage used for this measurement (or the kind of the measurement).
+    :cvar n_pixel: number of pixels which have contributed to these average values.
+    :cvar capacitance: measured/averaged capacitance of the sensor at the given bias voltage.
+    :cvar cap_err: uncertainty on the mean capacitance parameter of the sensor at the given bias voltage.
+    :cvar cap_std: spread of the capacitance over the sensor at the given bias voltage.
+    :cvar cap_std_err: uncertainty of the capacitance spread parameter at the given bias voltage.
+    :cvar r_on: averaged/measured on-resistance of the measurement circuits.
+    :cvar r_on_err: uncertainty of the on-resistance's mean parameter.
+    :cvar r_on_std: spread of the on-resistance over the available measurement circuits/channels.
+    :cvar r_on_std_err: uncertainty of the on-resistance spread parameter over the available measurement
+    circuits/channels.
+    :cvar cap_corrected: measured/averaged capacitance of the sensor at the given bias voltage (based on the corrected
+    capacitances).
+    :cvar cap_corrected_err: spread of the capacitance over the sensor at the given bias voltage. (based on the corrected
+    capacitances).
+    :cvar cap_parasitic: value of the averaged parasitic capacitance used here.
+    :cvar cap_systematic_error: general systematic uncertainty of the capacitance measurement. Given by the spread of
+    parasitic capacitance and the way the investigation/analysis is performed.
+
+    For further general information see :py:class:`pytables.IsDescription`.
+    """
     bias = tb.Float64Col(pos=0)
     n_pixel = tb.Int64Col(pos=1)
     capacitance = tb.Float64Col(pos=2)

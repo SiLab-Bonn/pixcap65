@@ -1,3 +1,7 @@
+"""
+Analysis module to summarize the main/major results of the analysis for multiple sensors (at least one sensor) into a
+single file, such that these results could be easily post processed.
+"""
 # ----------------------------------------------------------
 #  Copyright (c) .
 #   All rights reserved
@@ -29,6 +33,8 @@ demo_type_a = np.dtype([
     ("str3", np.str_, 32),
 ])
 
+
+# TODO: here is some general clean-up required.
 class DemoDescription(tb.IsDescription):
     str1 = tb.StringCol(itemsize=8)
     str2 = tb.StringCol(itemsize=16)
@@ -85,18 +91,26 @@ field_design_values = {
     "39 w_o bump": 0
 }
 
-test_design_values = {name.replace(" ", "_") : field_design_values[name] for name in [
-"0 w_o bump", "1 w_o bump", "2 w_o bump", "3 w_o bump", "4 w_o bump", "5",
-"6", "7", "8", "9", "10", "11", "12", "13", "14", "15", "17",
-"18", "19", "20", "21", "22", "23", "24", "25", "26", "27 w_ bump",
-"28 w_ bump", "29 w_ bump", "30 w_ bump", "31 w_ bump", "32 w_ bump", "33 w_ bump",
-"34 w_ bump", "35 w_o bump", "36 w_o bump", "37 w_o bump", "38 w_o bump", "39 w_o bump"] }
+test_design_values = {name.replace(" ", "_"): field_design_values[name] for name in [
+    "0 w_o bump", "1 w_o bump", "2 w_o bump", "3 w_o bump", "4 w_o bump", "5",
+    "6", "7", "8", "9", "10", "11", "12", "13", "14", "15", "17",
+    "18", "19", "20", "21", "22", "23", "24", "25", "26", "27 w_ bump",
+    "28 w_ bump", "29 w_ bump", "30 w_ bump", "31 w_ bump", "32 w_ bump", "33 w_ bump",
+    "34 w_ bump", "35 w_o bump", "36 w_o bump", "37 w_o bump", "38 w_o bump", "39 w_o bump"]}
 
 spatial_identifier = ["X{}".format(i) for i in range(3, 9)]
 
 
-
-def generate_test_summary(files: Iterable[PathLike], groups: Iterable[PathLike], sensors: Iterable[str], summary_file: PathLike) -> None:
+def generate_test_summary(files: Iterable[PathLike], groups: Iterable[PathLike], sensors: Iterable[str],
+                          summary_file: PathLike) -> None:
+    """
+    Collects the test capacitances from the different sensors and writes them into a single table, such that these could
+    easily compared by a human.
+    :param files: hdf-file from which to fetch the test capacitances
+    :param groups: hdf files hierarchy groups where the measurements of the test capacitances are stored.
+    :param sensors: iterable of sensor names such that the test capacitances could be mapped to a particular sensor.
+    :param summary_file: path to the hdf (.h5) file where to store the summarized data of the test capacitances.
+    """
     with synchronized_process_open_file(summary_file, mode='a') as summary_file:
         table_description = [("Sensor", 'S16'), ]
         for name in field_names:
@@ -119,7 +133,6 @@ def generate_test_summary(files: Iterable[PathLike], groups: Iterable[PathLike],
                 test_cap, test_cap_err = get_test_capacitance_data(group, print_result=False)
                 assert isinstance(sensor, str)
                 result_data = [sensor.encode()]
-                # result_data = [int(sensor.encode().hex(), base=16)]
                 for cap, cap_err in zip(test_cap, test_cap_err):
                     result_data.append(cap)
                     result_data.append(cap_err)
@@ -128,66 +141,11 @@ def generate_test_summary(files: Iterable[PathLike], groups: Iterable[PathLike],
         table.cols.Sensor.create_csindex()
         table.flush()
 
-        if "DemoTableDescription" in summary_file.root:
-            summary_file.root.DemoTableDescription.remove()
-            summary_file.root.DemoTableRecArray.remove()
-            time.sleep(10)
-
-        table = summary_file.create_table(where=summary_file.root, name="DemoTableDescription", description=DemoDescription)
-        entry = table.row
-        entry['str1'] = "E1_dnw_15_50_abcdefghijklm"
-        entry['str2'] = "E1_dnw_15_50_abcdefghijklm"
-        entry['str3'] = "E1_dnw_15_50_abcdefghijklm"
-        entry.append()
-        entry['str1'] = "E1_dnw_20_50_abcdefghijklm"
-        entry['str2'] = "E1_dnw_20_50_abcdefghijklm"
-        entry['str3'] = "E1_dnw_20_50_abcdefghijklm"
-        entry.append()
-        entry['str1'] = "E1_dnw_25_50_abcdefghijklm"
-        entry['str2'] = "E1_dnw_25_50_abcdefghijklm"
-        entry['str3'] = "E1_dnw_25_50_abcdefghijklm"
-        entry.append()
-        entry['str1'] = "E1_dnw_30_50_abcdefghijklm"
-        entry['str2'] = "E1_dnw_30_50_abcdefghijklm"
-        entry['str3'] = "E1_dnw_30_50_abcdefghijklm"
-        entry.append()
-        table.flush()
-
-        print(table)
-
-        rec_array_sample = np.rec.array([
-            ("E1_dnw_15_50_abcdefghijklm", "E1_dnw_15_50_abcdefghijklm", "E1_dnw_15_50_abcdefghijklm"),
-            ("E1_dnw_20_50_abcdefghijklm", "E1_dnw_20_50_abcdefghijklm", "E1_dnw_20_50_abcdefghijklm"),
-            ("E1_dnw_25_50_abcdefghijklm", "E1_dnw_25_50_abcdefghijklm", "E1_dnw_25_50_abcdefghijklm"),
-            ("E1_dnw_30_50_abcdefghijklm", "E1_dnw_30_50_abcdefghijklm", "E1_dnw_30_50_abcdefghijklm"),
-        ], dtype=demo_type_a)
-        print(rec_array_sample)
-        print(hasattr(rec_array_sample, "dtype"))
-        try:
-            summary_file.create_table(where=summary_file.root, name="DemoTableRecArray",obj=rec_array_sample).flush()
-        except:
-            eff_table = summary_file.root.DemoTableRecArray
-            print(eff_table.description._v_is_nested)
-            print(rec_array_sample.dtype == eff_table.dtype)
-            print(eff_table.dtype)
-            print(rec_array_sample.dtype)
-            print(eff_table._v_dtype)
-            print(tb.descr_from_dtype(demo_type_a))
-            # np.rec.array(rec_array_sample, dtype=eff_table.dtype)
-        print(rec_array_sample)
-        print("Type")
-        print(demo_type_a)
-        print(rec_array_sample.dtype)
-        print(table.dtype)
-        print(tb.dtype_from_descr(DemoDescription))
-        print(DemoDescription)
-        print(tb.descr_from_dtype(demo_type_a))
-        print(DemoDescription().columns)
-
 
 if __name__ == "__main__":
     logging.basicConfig(level=logging.DEBUG)
-    summary_files = ["packaged/data/Bare_Sample_05_Extended_Scan.h5", R13_2_SCAN_FILE, R11_SCAN_FILE, X1_SCAN_2_FILE, X2_SCAN_2_FILE, X5_SCAN_FILE, X6_SCAN_FILE,
+    summary_files = ["packaged/data/Bare_Sample_05_Extended_Scan.h5", R13_2_SCAN_FILE, R11_SCAN_FILE, X1_SCAN_2_FILE,
+                     X2_SCAN_2_FILE, X5_SCAN_FILE, X6_SCAN_FILE,
                      X7_SCAN_FILE, E1_2_SCAN_FILE, X4_SCAN_FILE]
     summary_groups = [
         "Reference/Bare/unbiased_full_model/total_cap/analysis",
@@ -213,24 +171,28 @@ if __name__ == "__main__":
     # but how to format such a table?
     # we will need a master table 'to do' so.
     class MasterTableResultEntry(tb.IsDescription):
+        """
+        General structure of result entry in the summary table for all sensors.
+        This is a general form of an entry consisting of the physical magnitude, a statistical uncertainty and two
+        systematic uncertainty to tread the dispersion effects between different pixcap65 chips separately.
+
+        The full data structure is given by :class:`pixcap65.analysis_util.summary.MasterExtractionTable`.
+        """
         magnitude = tb.Float64Col(pos=0)
         stat_error = tb.Float64Col(pos=1)
         systematic_general = tb.Float64Col(pos=2)
         systematic_dispersion = tb.Float64Col(pos=3)
 
-    class MasterTableCapacitanceEntry(tb.IsDescription):
-        capacitance = tb.Float64Col(pos=0)
-        capacitance_err = tb.Float64Col(pos=1)
-        capacitance_systematic_general = tb.Float64Col(pos=2)
-        capacitance_systematic_dispersion = tb.Float64Col(pos=3)
-
-    class MasterTableVoltageEntry(tb.IsDescription):
-        dep_voltage = tb.Float64Col(pos=0)
-        dep_voltage_err = tb.Float64Col(pos=1)
-        dep_voltage_systematic_general = tb.Float64Col(pos=2)
-        dep_voltage_systematic_dispersion = tb.Float64Col(pos=3)
 
     class MasterExtractionTable(tb.IsDescription):
+        """
+        Data structure of the general summary table for all sensors.
+        It maps the name of a sensor against the individual averaged results like total-pixel capacitance,
+        inter-pixel capacitance or depletion voltage of the sensor.
+
+        The individual result entries follow the scheme given by
+        :class:`pixcap65.analysis_util.summary.MasterTableResultEntry`.
+        """
         sensor = tb.StringCol(pos=0, itemsize=16)
         unbiased_capacitance = MasterTableResultEntry()
         unbiased_inter_capacitance = MasterTableResultEntry()
@@ -242,7 +204,13 @@ if __name__ == "__main__":
         biased_back_capacitance = MasterTableResultEntry()
         depletion_voltage = MasterTableResultEntry()
 
+
     class GroupProviderScheme(tb.IsDescription):
+        """
+        Structure of how to provide where the data which should be summarised could be found.
+        It contains one file per sensor and the path of the corresponding hdf hierarchy groups for the different entries
+        within this file.
+        """
         file = tb.StringCol(itemsize=220, pos=0)
         unbiased_group = tb.StringCol(itemsize=100, pos=1)
         unbiased_inter_pix_group = tb.StringCol(itemsize=100, pos=2)
@@ -256,12 +224,22 @@ if __name__ == "__main__":
     # generate the table with summarieses all the data!
     DEFAULT_ENTRY = (np.nan, np.nan, np.nan, np.nan)
 
+
     def generate_ba_summary(extraction: np.recarray, target_file):
+        """
+        Generate a summary table for the sensors specified by the `extraction` parameter.
+        The newly created table will follow the structure given by
+        :class:`pixcap65.analysis_util.summary.MasterExtractionTable` and will have the name `GeneralSummaryTable`.
+        If such a table already exists in the `target_file`, it will be removed/deleted first.
+        :param extraction:
+        :param target_file: .h5-file (path to it) where the summary table should be saved.
+        :return:
+        """
         # here we need to access the distribution tables from the data sets
         # for the inter-pix: Which of the different distribution tables should be used in the end?
         # nevertheless we need to iterate the recarray
 
-        def generate_cap_entry(res_table):
+        def _generate_cap_entry(res_table):
             return (res_table.cap_corrected[0],
                     res_table.cap_corrected_err[0],
                     res_table.cap_systematic_error[0],
@@ -283,7 +261,7 @@ if __name__ == "__main__":
                             result_table = np.rec.array(group.DistResultfF.read(), dtype=group.DistResultfF.dtype)
                             assert isinstance(result_table, np.recarray)
                             if result_table.shape[0] > 0:
-                                current_entry = generate_cap_entry(result_table)
+                                current_entry = _generate_cap_entry(result_table)
 
                     current_row['unbiased_capacitance'] = current_entry
                     current_entry = DEFAULT_ENTRY
@@ -294,7 +272,7 @@ if __name__ == "__main__":
                             result_table = np.rec.array(group.DistResultfF.read(), dtype=group.DistResultfF.dtype)
                             assert isinstance(result_table, np.recarray)
                             if result_table.shape[0] > 0:
-                                current_entry = generate_cap_entry(result_table)
+                                current_entry = _generate_cap_entry(result_table)
 
                     current_row['biased_capacitance'] = current_entry
                     current_entry = DEFAULT_ENTRY
@@ -307,7 +285,7 @@ if __name__ == "__main__":
                                                         dtype=group.DistResultfF.dtype)
                             assert isinstance(result_table, np.recarray)
                             if result_table.shape[0] > 0:
-                                current_entry = generate_cap_entry(result_table)
+                                current_entry = _generate_cap_entry(result_table)
 
                     current_row["unbiased_inter_capacitance"] = current_entry
                     current_entry = DEFAULT_ENTRY
@@ -321,7 +299,7 @@ if __name__ == "__main__":
                                                         dtype=group.DistResultfF.dtype)
                             assert isinstance(result_table, np.recarray)
                             if result_table.shape[0] > 0:
-                                current_entry = generate_cap_entry(result_table)
+                                current_entry = _generate_cap_entry(result_table)
                         current_row["biased_back_capacitance"] = current_entry
                         current_entry = DEFAULT_ENTRY
 
@@ -331,7 +309,7 @@ if __name__ == "__main__":
                                                         dtype=group.DistResultfF.dtype)
                             assert isinstance(result_table, np.recarray)
                             if result_table.shape[0] > 0:
-                                current_entry = generate_cap_entry(result_table)
+                                current_entry = _generate_cap_entry(result_table)
 
                     else:
                         current_row["biased_inter_capacitance"] = current_entry
@@ -356,7 +334,8 @@ if __name__ == "__main__":
 
                             assert isinstance(result_table, np.recarray)
                             if result_table.shape[0] > 0:
-                                current_entry = tuple(np.asarray(generate_cap_entry(result_table), dtype=np.float64) / correct_implant)
+                                current_entry = tuple(
+                                    np.asarray(_generate_cap_entry(result_table), dtype=np.float64) / correct_implant)
                     current_row["biased_inter_capacitance_side"] = current_entry
                     current_entry = DEFAULT_ENTRY
                     if entry.biased_inter_pix_group_tops is not None and 'None' not in entry.biased_inter_pix_group_tops:
@@ -375,10 +354,10 @@ if __name__ == "__main__":
 
                             assert isinstance(result_table, np.recarray)
                             if result_table.shape[0] > 0:
-                                current_entry = tuple(np.asarray(generate_cap_entry(result_table), dtype=np.float64) / correct_implant)
+                                current_entry = tuple(
+                                    np.asarray(_generate_cap_entry(result_table), dtype=np.float64) / correct_implant)
                     current_row["biased_inter_capacitance_top"] = current_entry
                     current_entry = DEFAULT_ENTRY
-
 
                     # handle the C-V-Parameterisation
                     if entry.cv_group is not None and 'None' not in entry.cv_group:
@@ -390,9 +369,9 @@ if __name__ == "__main__":
                             if result_table.shape[0] > 0:
                                 idx = np.argmin(result_table.Ubi_corrected)
                                 current_entry = (result_table.Ubi_corrected[idx],
-                                                                    result_table.Ubi_corrected_error[idx],
-                                                                    result_table.Ubi_systematic_corrected[idx],
-                                                                    result_table.Ubi_systematic_dispersion_corrected_error[idx])
+                                                 result_table.Ubi_corrected_error[idx],
+                                                 result_table.Ubi_systematic_corrected[idx],
+                                                 result_table.Ubi_systematic_dispersion_corrected_error[idx])
 
                     current_row["depletion_voltage"] = current_entry
 
@@ -404,12 +383,13 @@ if __name__ == "__main__":
             table.cols.sensor.create_csindex()
             table.flush()
 
+
     group_provider_dtype = np.dtype([('file', str, 220), ('unbiased_group', str, 100),
                                      ('unbiased_inter_pix_group', str, 100), ('biased_group', str, 100),
                                      ('biased_inter_pix_group', str, 100), ('cv_group', str, 100),
                                      ('sensor', str, 100), ('biasing', np.float64),
                                      ('biased_inter_pix_group_tops', str, 100),
-                                     ('biased_inter_pix_group_sides', str, 100),])
+                                     ('biased_inter_pix_group_sides', str, 100), ])
     extraction_files = [
         X1_SCAN_2_FILE,
         R13_2_SCAN_FILE,
@@ -704,18 +684,18 @@ if __name__ == "__main__":
         if sensor_record.sensor.decode() not in spatial_identifier:
             continue
 
-
         print("Cross check the spatial parameters!")
         print(np.mean((sensor_record.pitch_x, sensor_record.pitch_y)))
         print(sensor_record.implantation_size_x)
         print(sensor_record.implantation_size_y)
-        sensor_properties.implantation_area[k] = sensor_record.implantation_size_x * sensor_record.implantation_size_y * np.pi
-        sensor_properties.pixel_separation_x[k] = np.mean((sensor_record.pitch_x, sensor_record.pitch_y)) - sensor_record.implantation_size_y
-        sensor_properties.pixel_separation_y[k] = np.mean((sensor_record.pitch_x, sensor_record.pitch_y)) - sensor_record.implantation_size_y
-        sensor_properties.pixel_separation_area[k] = sensor_record.pixel_area - np.pi * (sensor_record.implantation_size_y / 2) ** 2
-
-
-
+        sensor_properties.implantation_area[
+            k] = sensor_record.implantation_size_x * sensor_record.implantation_size_y * np.pi
+        sensor_properties.pixel_separation_x[k] = np.mean(
+            (sensor_record.pitch_x, sensor_record.pitch_y)) - sensor_record.implantation_size_y
+        sensor_properties.pixel_separation_y[k] = np.mean(
+            (sensor_record.pitch_x, sensor_record.pitch_y)) - sensor_record.implantation_size_y
+        sensor_properties.pixel_separation_area[k] = sensor_record.pixel_area - np.pi * (
+                sensor_record.implantation_size_y / 2) ** 2
 
     with tb.open_file(SUMMARY_FILE, mode='a') as h5_conslusion:
         if "SensorTypes" in h5_conslusion.root:
@@ -728,6 +708,7 @@ if __name__ == "__main__":
     # correct all the test capacitance's for the parasitic capacitance of the measurement circuit!
     from examples.plot_dependencies import read_rec_array
     from pixcap65.plotting import CAPACITANCE_CONVERSION_FACTOR
+
     with tb.open_file('conclude_summary.h5', mode='a') as summary_file:
         test_data = read_rec_array(summary_file.root.TestCap)
         test_cap_intrinsic_names = ["test_{}_w__bump".format(it) for it in range(27, 35)]
@@ -760,6 +741,7 @@ if __name__ == "__main__":
         if "TestCapCorrected" in summary_file.root:
             summary_file.root.TestCapCorrected._f_remove()
         table = summary_file.create_table(where=summary_file.root, name='TestCapCorrected',
-                                  title="Corrected Values of the test capacitances", description=corrected_test_data,)
+                                          title="Corrected Values of the test capacitances",
+                                          description=corrected_test_data, )
         table.cols.Sensor.create_csindex()
         table.flush()

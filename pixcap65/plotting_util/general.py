@@ -1,7 +1,3 @@
-"""
-Implements the enhanced analysis strategy by using non-linerar fitting algorithms to also estimate the parameter
-uncertainties correctly.
-"""
 # ----------------------------------------------------------
 #  Copyright (c) 2026. SiLab, Institute of Physics, University of Bonn.
 #

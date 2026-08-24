@@ -723,7 +723,6 @@ def r1_plotter(tb_lock):
     print("Plotting", display_name)
     plot_data(interpreted_data=R11_SCAN_FILE, base_path=hdf(top_ref, name, 'unbiased_full'), use_group=True,
               test_cap_exclusion=True, distribution=True, lock=tb_lock, mask_pixel=data_constants.r1_pixel_mask)
-    print("Finished the first plot")
     plot_data(interpreted_data=R11_SCAN_FILE, base_path=hdf(top_ref, name, 'unbiased_full'), use_group=True,
               use_corrected=True, test_cap_exclusion=True, distribution=True, lock=tb_lock,
               mask_pixel=data_constants.r1_pixel_mask)

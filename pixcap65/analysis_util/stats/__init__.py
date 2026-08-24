@@ -1,3 +1,10 @@
+"""
+Utility module to simplify the access to the different statistics functions depending on the presence of installed
+modules.
+It makes sure that if `numba_stats` is installed these optimized functions will be used instead of the `scipy`
+implementation.
+But one of these two must be installed.
+"""
 # ----------------------------------------------------------
 #  Copyright (c) .
 #   All rights reserved

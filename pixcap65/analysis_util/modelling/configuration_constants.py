@@ -1,3 +1,9 @@
+"""
+Collection of configuration constants to define the behaviour and some of the value transformations/conversions
+properly when analyzing the data.
+These constants are also used to declare the initial values of the fit parameters when using non-linear fitting
+algorithms.
+"""
 # ----------------------------------------------------------
 #  Copyright (c) 2026. SiLab, Institute of Physics, University of Bonn.
 #
