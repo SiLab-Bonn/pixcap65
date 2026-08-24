@@ -40,16 +40,17 @@ def adjust_i_v_measurement(group, has_values=False):
 # FIXME: look here for the missing, untrusted current uncertainties
 def regenerate_i_v_errors(group):
     print("regenerate_i_v_errors")
+    config_file = files("pixcap65.configs").joinpath("keithley_2410_range.yaml")
     if "HistCurrValues" not in group and "HistCurr" in group:
         print("No enhanced values!")
-        with open("pixcap65/configs/keithley_2410_range.yaml") as f:
+        with config_file.open('r') as f:
             config = yaml.safe_load(f)
             data = group.HistCurr[:]
             errors = np.where(np.isfinite(data), extract_smu_current_error(config, data, 0.000001), np.nan)
             # maybe the error comes from not executing this part here probably?
             if "HistCurrErr" not in group:
                 group_get_file(group).create_carray(where=group, name="HistCurrErr", obj=errors,
-                                                    filters=tb.Filters(complib='blosc', fletcher32=False, complevel=5))
+                                                    filters=GLOBAL_FILTERS)
             else:
                 group.HistCurrErr[:] = errors
     if "HistCurrValues" in group:
@@ -57,15 +58,14 @@ def regenerate_i_v_errors(group):
         average = np.nanmean(group.HistCurrValues, axis=1, keepdims=True)
         uncertainty = np.nanstd(group.HistCurrValues, mean=average, axis=1)
         if np.count_nonzero(uncertainty) == 0:
-            with open("pixcap65/configs/keithley_2410_range.yaml") as f:
+            with config_file.open('r') as f:
                 config = yaml.safe_load(f)
                 data = group.HistCurr[:]
                 uncertainty = np.where(np.isfinite(data), extract_smu_current_error(config, data, 0.000001), np.nan)
         group.HistCurr[:] = average[:, 0]
         if "HistCurrErr" not in group:
             group_get_file(group).create_carray(where=group, name="HistCurrErr", obj=uncertainty,
-                                                filters=tb.Filters(complib='blosc', fletcher32=False,
-                                                                   complevel=5))
+                                                filters=GLOBAL_FILTERS)
         else:
             group.HistCurrErr[:] = uncertainty
 
@@ -342,6 +342,7 @@ def full_regenerate_bias_table(group: tb.Group, **kwargs):
         internal_parameters = group.scan_params[:]
 
     # fetch the voltage parameters
+    # FIXME: What to do if the field 'hv_voltage' does not yet exist?
     voltages = internal_parameters["hv_voltage"]
     try:
         hist_parameters = group.BiasVoltageHist[:]
@@ -730,7 +731,13 @@ if __name__ == "__main__":
         h5_file.root.Reference.R1.sensor.PhysicalDimensions[:] = physical_dimensions
         h5_file.root.Reference.R1.sensor.PhysicalDimensions.flush()
         regenerate_i_v_errors(h5_file.root.Reference.R1.I_V_Characteristic.biasing.measurements)
+        regenerate_i_v_errors(h5_file.root.Reference.R1.C_V_Characteristic.biasing.measurements)
+        regenerate_i_v_errors(h5_file.root.Reference.R1.C_V_Characteristic_refined.biasing.measurements)
         full_regenerate_bias_table(h5_file.root.Reference.R1.I_V_Characteristic.biasing.measurements,
+                                   force_recalculation=True)
+        full_regenerate_bias_table(h5_file.root.Reference.R1.C_V_Characteristic.biasing.measurements,
+                                   force_recalculation=True)
+        full_regenerate_bias_table(h5_file.root.Reference.R1.C_V_Characteristic_refined.biasing.measurements,
                                    force_recalculation=True)
     # with tb.open_file("packaged/data/R13_2_Scan.h5", "a") as h5_file:
     #     h5_file.copy_children(h5_file.root.ATLAS_ITk.X2, h5_file.root.Reference.R13, recursive=True, overwrite=True)

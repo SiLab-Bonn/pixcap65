@@ -855,6 +855,8 @@ def perform_inter_pix_fetch(path, group, active_file, target: str, lock=None):
             with synchronized_process_open_file(path, mode='a', lock=lock) as total_h5_file:
                 yield group, total_h5_file, True
         else:
+            from warnings import warn
+            warn("Failed to load the referenced cap data files. It looks like the provided path does not exist.")
             yield None, None, False
     else:
         yield None, None, False
@@ -933,9 +935,15 @@ def perform_inter_pix_deep_dive(reference_group, get_total_cap_group: Optional[s
                                                                                                          total_temp), \
             perform_inter_pix_fetch(get_inter_cap_file, get_inter_cap_group, in_file_h5, 'inter_cap', lock=lock) as (
                     inter_h5_group, inter_h5_file, inter_temp):
-        total_node, inter_node = __perform_inter_pix_deeper(apply_correction_arg, total_h5_group, in_file_h5, parasitic,
-                                                            parasitic_error, reference_group, total_h5_file,
-                                                            inter_h5_file, inter_h5_group)
+        try:
+            total_node, inter_node = __perform_inter_pix_deeper(apply_correction_arg, total_h5_group, in_file_h5, parasitic,
+                                                                parasitic_error, reference_group, total_h5_file,
+                                                                inter_h5_file, inter_h5_group)
+        except:
+            print("Test the information about the provided arguments")
+            print(get_total_cap_file)
+            print(total_h5_file)
+            raise
         if any((total_temp, inter_temp)):
             if 'temporary' not in in_file_h5.root:
                 in_file_h5.create_group(in_file_h5.root, name="temporary")
@@ -956,6 +964,7 @@ def __perform_inter_pix_deeper(apply_correction_arg, get_total_cap_group: str, i
                                inter_h5_group: Optional[str] = None) -> tb.Group:
     # this reference implementation has the drawback that always the uncorrected data is used.
     # this should not make any difference as we are taking the differences (BUT: the in-pix capacitances are still effected).
+    # FIXME: Why is there no escape channel in the case there is no total_cap data provided
     total_cap_data, _ = walk_to_node(total_h5_file.root, get_total_cap_group, create=False, verify_create=True)
     # Why going here to the root layer?
     inter_cap_data, _ = (None, None) if inter_h5_file is None or inter_h5_group is None else walk_to_node(
@@ -1990,7 +1999,7 @@ def analyze_depletion_delegate(data_group: tb.Group, analysis_group: tb.Group,
             second_lower, second_upper = second_boundaries
             # fit_result_storage = DepletionArrayStore()
             number_depletions = 1
-            fit_result_storage = manager.DepletionArrayStorage(**manager_keywords)
+            fit_result_storage = manager.DepletionArrayStorage()
             depletion_delegation_impl(cap_data, cap_error_data, first_lower, first_upper, second_lower, second_upper,
                                       fit_result_storage, voltage_data, **kwargs)
 

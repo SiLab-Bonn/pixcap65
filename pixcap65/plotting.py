@@ -795,12 +795,11 @@ def _bias_voltage_plotter(ax, tabular: tb.Table, label, norm=1, apply_norm=False
     voltage_data = np.abs(tabular.col("U"))
     current_data = np.abs(tabular.col("I"))
     current_errors = tabular.col("DI")
-    # FIXME: R1/R11 seems to be missing i-v-errors! (Under investigation, will need a plotting test-run)
     # looks like there are no usable data points for the uncertainties of the leakage current.
     try:
         voltage_error = np.abs(tabular.col("DU"))
     except (AttributeError, KeyError):
-        voltage_error = voltage_data * 0.0002 + 0.1
+        voltage_error = np.abs(voltage_data) * 0.0002 + 0.1
     if not np.all(np.isfinite(voltage_data)):
         current_errors = None
     if not GENERATE_THESIS_PLOTS:
@@ -808,7 +807,7 @@ def _bias_voltage_plotter(ax, tabular: tb.Table, label, norm=1, apply_norm=False
     ax.set(xlabel=BIAS_CURVE_X_LABEL, ylabel=BIAS_CURVE_Y_LABEL)
 
     # currently we could not use the correct voltage range, but we assume the errors to be within
-    normalized_errors = None if current_errors is None else current_errors / norm
+    normalized_errors = None if current_errors is None else current_errors * CURRENT_CONVERSION_FACTOR / norm
     if current_errors is None:
         from warnings import warn
         warn(f"The current sensor seems to be missing measurement uncertainties for the leakage current! The sensor is labeld by {label}")
@@ -2136,7 +2135,8 @@ if __name__ == '__main__':
 
     # use this attempt to achieve a better performance when generating the plots
     import multiprocessing as mp
-    from examples.full_analysis import r1_plotter
+    from examples.full_analysis import r1_plotter, bare_sample_plotter_second, x1_plotter, x2_plotter_second, x5_plotter, \
+    x6_plotter, x7_plotter, r13_plotter_second, e1_plotter_second, x4_plotter, presentation_plotter
 
     print(mp.current_process().name)
     print(mp.cpu_count())
@@ -2144,18 +2144,18 @@ if __name__ == '__main__':
     start = time.time()
     with mp.Manager() as manager, mp.Pool(initializer=mp_plotting_init, initargs=("PDF", has_latex,)) as pool:
         tables_lock = manager.RLock()
-        # presentation_plotter(tables_lock)
+        presentation_plotter(tables_lock)
         process_handles = [
-            # bare_sample_plotter_second,
-            # x1_plotter,
-            # x2_plotter_second,
-            # x5_plotter,
-            # x6_plotter,
-            # x7_plotter,
-            # r13_plotter_second,
-            # e1_plotter_second,
+            bare_sample_plotter_second,
+            x1_plotter,
+            x2_plotter_second,
+            x5_plotter,
+            x6_plotter,
+            x7_plotter,
+            r13_plotter_second,
+            e1_plotter_second,
             r1_plotter,
-            # x4_plotter,
+            x4_plotter,
         ]
         processes = [pool.apply_async(handle, (tables_lock,), error_callback=error_handler) for handle in process_handles]
 

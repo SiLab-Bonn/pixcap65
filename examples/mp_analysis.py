@@ -38,7 +38,7 @@ from contextlib import contextmanager
 from matplotlib.backends.backend_pdf import PdfPages
 
 import pixcap65.data_constants as data_constants
-from examples.full_analysis import r1_analysator
+from examples.full_analysis import r1_analysator, x4_analysator
 from pixcap65.analysis import analyze_data
 from pixcap65.data_constants import E1_2_SCAN_FILE, R13_2_SCAN_FILE
 from pixcap65.data_constants import X1_SCAN_2_FILE, X2_SCAN_2_FILE
@@ -515,7 +515,7 @@ def x1_analysator(tb_lock, correction_args, **kwargs):
                  is_advanced=True, full_model=False, is_inter_pixel=True,
                  distribution=True, test_cap_exclusion=True, mask_pixel=data_constants.x1_second_pixel_mask,
                  lock=tb_lock,
-                 total_cap_file="../packaged/data/X1_12_Renew_Scan.h5",
+                 total_cap_file="packaged/data/X1_12_Renew_Scan.h5",
                  total_cap_group=hdf(top_ref, name, 'biased_200_V_full_model/total_cap'),
                  **correction_args)
     analyze_data(raw_data="packaged/data/X1_12_Renew_Scan.h5",
@@ -523,7 +523,7 @@ def x1_analysator(tb_lock, correction_args, **kwargs):
                  is_advanced=True, full_model=True, is_inter_pixel=True,
                  distribution=True, test_cap_exclusion=True, mask_pixel=data_constants.x1_second_pixel_mask,
                  lock=tb_lock,
-                 total_cap_file="../packaged/data/X1_12_Renew_Scan.h5",
+                 total_cap_file="packaged/data/X1_12_Renew_Scan.h5",
                  total_cap_group=hdf(top_ref, name, 'biased_200_V_full_model/total_cap'),
                  **correction_args)
 
@@ -677,7 +677,7 @@ def x1_analysator(tb_lock, correction_args, **kwargs):
         "apply_doping": True
     }
     x1_depletion_args.update(**correction_args)
-    with PdfPages("../Fit References/X1/Combined_reference_fits_Extended_combined.pdf") as cv_pdf:
+    with PdfPages("Fit References/X1/Combined_reference_fits_Extended_combined.pdf") as cv_pdf:
         analyze_data(raw_data=X1_SCAN_2_FILE,
                      base_path=hdf(top_ref, name, 'C_V_Characteristic_refined_Extended_Combined'),
                      is_advanced=True, full_model=False, is_inter_pixel=False, is_cv=True, use_corrected=True,
@@ -767,7 +767,7 @@ def x2_analysator(tb_lock, correction_args, **kwargs):
     analyze_data(raw_data=X2_SCAN_2_FILE, base_path=hdf(top_ref, name, 'C_V_Characteristic_refined'),
                  is_advanced=True, full_model=False, is_cv=True, use_corrected=True, lock=tb_lock,
                  **x2_depletion_args)
-    with PdfPages("../Fit References/X2/Scan_extended_reference_fits.pdf") as cv_pdf:
+    with PdfPages("Fit References/X2/Scan_extended_reference_fits.pdf") as cv_pdf:
         analyze_data(raw_data=X2_SCAN_2_FILE,
                      base_path=hdf(top_ref, name, 'C_V_Characteristic_refined_extended_renew_retry'),
                      is_advanced=True, full_model=False, is_cv=True, use_corrected=True, lock=tb_lock,
@@ -1132,15 +1132,15 @@ if __name__ == "__main__":
     start_time = time.time()
 
     process_handles = [
-        # x1_analysator,
-        # x2_analysator,
-        # x5_analysator,
-        # x6_analysator,
-        # x7_analysator,
-        # e1_analysator_second,
-        # r13_analysator_second,
+        x1_analysator,
+        x2_analysator,
+        x5_analysator,
+        x6_analysator,
+        x7_analysator,
+        e1_analysator_second,
+        r13_analysator_second,
         r1_analysator,
-        # x4_analysator,
+        x4_analysator,
     ]
 
 

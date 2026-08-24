@@ -180,12 +180,13 @@ def extract_smu_range_error(smu_config: dict, data, range_spec: float, kind: str
     else:
         raise ValueError(f"Could not find range {range_spec} in SMU configuration")
 
+    # this could be simplified a bit!
     if isinstance(data, np.ndarray):
-        return reading_error * data + absolute_error
+        return reading_error * np.abs(data) + absolute_error
     elif isinstance(data, Iterable):
-        return np.array([reading_error * value + absolute_error for value in data])
+        return np.array([reading_error * value + absolute_error for value in np.abs(data)])
     elif isinstance(data, float) or isinstance(data, int) or isinstance(data, np.float64):
-        return reading_error * data + absolute_error
+        return reading_error * np.abs(data) + absolute_error
     else:
         raise TypeError(f"Unsupported data type: {type(data)}")
 
