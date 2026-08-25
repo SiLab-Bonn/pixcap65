@@ -14,13 +14,14 @@ import numpy as np
 import sys
 from contextlib import contextmanager
 from multiprocessing.managers import SyncManager, BaseManager
+from typing import Optional
 
 from pixcap65.analysis_util.modelling.data_store import DepletionArrayStoreMP
 from pixcap65.concurrency import manager
 from pixcap65.concurrency import proxy
 from pixcap65.concurrency.manager import ExtendedSyncManager, DepletionMPManager
 
-__manager = None
+__manager: Optional[BaseManager] = None
 # What about about doing such things here directly within the Extended manager in the concurrency module?
 __depletion_manager = None
 
@@ -58,6 +59,7 @@ def get_manager(**kwargs):
             __manager = ExtendedSyncManager()
             if "address" in kwargs:
                 if __manager.address is None:
+                    # noinspection unresolved-references
                     __manager._address = kwargs["address"]
                 __manager.connect()
                 __started_manager = False

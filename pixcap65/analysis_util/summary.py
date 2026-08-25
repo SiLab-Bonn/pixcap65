@@ -16,7 +16,6 @@ import time
 from collections.abc import Iterable
 
 from pixcap65.analysis import get_test_capacitance_data
-from pixcap65.analysis_util.modelling.data_store import SummaryTable
 from pixcap65.data_constants import R11_SCAN_FILE, R13_2_SCAN_FILE, E1_2_SCAN_FILE, X4_SCAN_FILE
 from pixcap65.data_constants import X1_SCAN_2_FILE, X2_SCAN_2_FILE
 from pixcap65.data_constants import X5_SCAN_FILE, X6_SCAN_FILE, X7_SCAN_FILE
@@ -176,7 +175,15 @@ if __name__ == "__main__":
         This is a general form of an entry consisting of the physical magnitude, a statistical uncertainty and two
         systematic uncertainty to tread the dispersion effects between different pixcap65 chips separately.
 
-        The full data structure is given by :class:`pixcap65.analysis_util.summary.MasterExtractionTable`.
+        The following class variable are to be understand as fields/entries of the table:
+        :cvar magnitude: magnitude of the stored physical quantity.
+        :cvar stat_error: statistical uncertainty of the stored physical quantity.
+        :cvar systematic_general: systematic uncertainty of the physical quantity (general one: systematic effects from
+            theory uncertainty, modelling, systematic of the analysis, failure to exactly reproduce conditions).
+        :cvar systematic_dispersion: systematic uncertainty of the physical quantity by dispersion effects of systematical
+            offsets between different setups/module/chips.
+
+        The full data structure is given by :py:class:`pixcap65.analysis_util.summary.MasterExtractionTable`.
         """
         magnitude = tb.Float64Col(pos=0)
         stat_error = tb.Float64Col(pos=1)
@@ -190,8 +197,30 @@ if __name__ == "__main__":
         It maps the name of a sensor against the individual averaged results like total-pixel capacitance,
         inter-pixel capacitance or depletion voltage of the sensor.
 
+        The following class variables are to be understand as fields/entries of the table:
+        :cvar sensor: name of the sensor for which this table row will summarize results.
+        :cvar unbiased_capacitance: sensor average of the measured total-pixel capacitance when the sensor is not biased
+            at all.
+        :cvar unbiased_inter_capacitance: sensor average of the measured inter-pixel capacitance when the sensor is not
+            biased at all. The single contributions are all summed up for the eight neighbouring pixels here.
+        :cvar biased_capacitance: sensor average of the measured total-pixel capacitance when the sensor is biased.
+        :cvar bias_voltage: applied reversed bias voltage to perform the biased measurement. This is not necessisarily
+            the depletion voltage.
+        :cvar biased_inter_capacitance: sensor average of the measured inter-pixel capacitance when the sensor is
+            biased. The single contributions are all summed up for the eight neighbouring pixels here.
+        :cvar biased_inter_capacitance_side: sensor average of the measured inter-pixel capacitance when the sensor is
+            biased. The single contributions from the neighbouring pixels lighing to the sides are summed up here, all
+            other neighbors are ignored.
+        :cvar biased_inter_capacitance_top: sensor average of the measured inter-pixel capacitance when the sensor is
+            biased. The single contributions from the neighbouring pixels lighing to the top and bottom are summed up
+            here, all other neighbors are ignored.
+        :cvar biased_back_capacitance: sensor average for the estimation of the in-pixel or backplane capacitance.
+            The sensor is (completely) biased for this measurement.
+        :cvar depletion_voltage: determined depletion voltage for this sensor. For some sensors it might not be the full
+        depletion voltage but the surface depletion voltage.
+
         The individual result entries follow the scheme given by
-        :class:`pixcap65.analysis_util.summary.MasterTableResultEntry`.
+        :py:class:`pixcap65.analysis_util.summary.MasterTableResultEntry`.
         """
         sensor = tb.StringCol(pos=0, itemsize=16)
         unbiased_capacitance = MasterTableResultEntry()
@@ -210,6 +239,23 @@ if __name__ == "__main__":
         Structure of how to provide where the data which should be summarised could be found.
         It contains one file per sensor and the path of the corresponding hdf hierarchy groups for the different entries
         within this file.
+
+        Class variables are to be understand as the fields/entries of the tabel.
+
+        :cvar file: path to the file on disk where the measurements for this particular sensor are stored.
+        :cvar unbiased_group: path to hdf files group storing the measurements for the unbiased total-pixel capacitance
+            estimation.
+        :cvar unbiased_inter_pix_group: path to the hdf files group storing the measurements for the inter-pixel capacitance
+            estimation of the unbiased sensor.
+        :cvar biased_group: path to hdf files group storing the measurements for the biased total-pixel capacitance
+            estimation.
+        :cvar biased_inter_pix_group: path to the hdf files group storing the measurements for the inter-pixel capacitance
+            estimation of the biased sensor.
+        :cvar cv_group: path to the hdf files group storing the data for the cv characterization of the sensor.
+        :cvar biased_inter_pix_group_sides: path to the hdf files group storing the measurements for the inter-pixel capacitance
+            estimation of the biased sensor. Here, only the neighbours to the sides are considered.
+        :cvar biased_inter_pix_group_tops: path to the hdf files group storing the measurements for the inter-pixel capacitance
+            estimation of the biased sensor. Here only the neighbours above and below the measured pixel are considered.
         """
         file = tb.StringCol(itemsize=220, pos=0)
         unbiased_group = tb.StringCol(itemsize=100, pos=1)

@@ -1,8 +1,28 @@
+"""
+Implementations to normalize and load configuration files containing information about the range specs of the lab
+devices used and their measurement accuracy which is necessary to estimate the uncertainties (statistical) of the
+performed measurements.
+"""
+# ----------------------------------------------------------
+#  Copyright (c) 2026. SiLab, Institute of Physics, University of Bonn.
+#
+#  Licensed under the Apache License, Version 2.0 (the "License");
+#  you may not use this file except in compliance with the License.
+#  You may obtain a copy of the License at
+#
+#     http://www.apache.org/licenses/LICENSE-2.0
+#
+#  Unless required by applicable law or agreed to in writing, software
+#  distributed under the License is distributed on an "AS IS" BASIS,
+#  WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
+#  See the License for the specific language governing permissions and
+#  limitations under the License.
+# ----------------------------------------------------------
+
 import enum
 import logging.config
 import logging.handlers
 import os
-
 import sys
 
 try:
@@ -48,6 +68,9 @@ def update_smu_range_configuration(configuration_file):
     """
     update_smu_range_configuration
 
+    @author: Dominik Fischer
+    last update: 2025-08-25
+
     This will take a prepared configuration file and add or update the values for the normalized range values,
     which are the ones used for the communication with the Lab device. The changed config will replace the old one.
     The configuration file will be overwritten in the end.
@@ -69,6 +92,9 @@ def update_smu_range_configuration(configuration_file):
 def handle_range_configuration(key_spec: str, range_config, config_precision=2):
     """
     handle_range_configuration
+
+    @author: Dominik Fischer
+    last update: 2025-08-25
 
     Helper function to handle the range configuration for a particular kind of measurement. It will verify the
     existence of the range prefixes and range quantifiers convert all string representations to float values.
@@ -105,12 +131,30 @@ def handle_range_configuration(key_spec: str, range_config, config_precision=2):
 
 
 def check_config_float(idx: int, key_spec: str, range_config, element) -> bool:
+    """
+    check_config_float
+
+    @author: Dominik Fischer
+    last update: 2025-08-25
+
+    Verifies that the configuration value extracted is really a floating-point number and not e.g. a string.
+
+    :param idx: identifier of the range in the range configuration
+    :param key_spec: kind of measurement (current or voltage)
+    :param range_config: range-configuration mapping
+    :param element: string specifiying which configuration element should be extracted for the check.
+    :return: boolean, indicating whether the extracted configuration is really a floating-point number.
+    :rtype: bool
+    """
     return isinstance(range_config[key_spec][idx][element], float)
 
 
 def verify_range_prefix(idx: int, key_spec: str, range_config) -> float:
     """
     verify_range_prefix
+
+    @author: Dominik Fischer
+    last update: 2025-08-25
 
     Helper function to verify the existence of a range prefix and convert it to a float value.
     Will correct the types in the range mapping if necessary.
@@ -132,6 +176,9 @@ def smu_handler(smu_file: str, handler: Callable, **kwargs):
     """
     smu_handler
 
+    @author: Domminik Fischer
+    last upate: 2025-08-25
+
     Wrapper to read the SMU configuration file containing information about the available measurement ranges and
     their resolution and applies the provided delegation handler onto it, to retrieve the requested transformation of
     the supplied data.
@@ -142,7 +189,7 @@ def smu_handler(smu_file: str, handler: Callable, **kwargs):
     :return: result of handler application.
     """
     if not os.path.exists(smu_file):
-        raise FileNotFoundError(f"The SMU configuration file {smu_file} does not exist")
+        raise FileNotFoundError("The SMU configuration file {} does not exist".format(smu_file))
     with open(smu_file, 'r') as f:
         smu_config = yaml.safe_load(f)
         return handler(smu_config, **kwargs)
@@ -151,6 +198,9 @@ def smu_handler(smu_file: str, handler: Callable, **kwargs):
 def extract_smu_range_error(smu_config: dict, data, range_spec: float, kind: str):
     """
     extract_smu_range_error
+
+    @author: Domminik Fischer
+    last update: 2025-08-25
 
     Extract the measurement error of the supplied SMU measurement (current or voltage) for the given range.
     To get the correct error for the given range a comparison to values in the SMU configuration is performed.
@@ -178,7 +228,7 @@ def extract_smu_range_error(smu_config: dict, data, range_spec: float, kind: str
             ) * result_floating_type(entry[ConfigElements.UNIT_PREFIX_VALUE])
             break
     else:
-        raise ValueError(f"Could not find range {range_spec} in SMU configuration")
+        raise ValueError("Could not find range {range_spec} in SMU configuration".format(range_spec=range_spec))
 
     # this could be simplified a bit!
     if isinstance(data, np.ndarray):
@@ -195,6 +245,9 @@ def extract_smu_current_error(smu_config: dict, current_data, range_spec: float)
     """
     extract_smu_current_error
 
+    @author: Domminik Fischer
+    last update: 2025-08-25
+
     Convenience function to extract the current measurement error for the given range.
     For further information see the documentation of extract_smu_range_error.
     :see: extract_smu_range_error
@@ -210,6 +263,9 @@ def extract_smu_current_error(smu_config: dict, current_data, range_spec: float)
 def extract_smu_voltage_error(smu_config: dict, voltage_data, range_spec: float):
     """
     extract_smu_voltage_error
+
+    @author: Domminik Fischer
+    last update: 2025-08-25
 
     Convenience function to extract the voltage measurement error for the given range.
     For further information see the documentation of extract_smu_range_error.

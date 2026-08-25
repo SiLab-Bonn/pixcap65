@@ -1,11 +1,31 @@
-import argparse
-import os
-from argparse import ArgumentParser
-from typing import Iterable
+"""
+Convenience module providing a cli.
+Could be used to generate basil scpi configuration files for lab devices with multiple equivalent outputs from the
+commands for just a single-output by duplicating the commands and inserting appropriate prefixes.
+"""
+# ----------------------------------------------------------
+#  Copyright (c) 2026. SiLab, Institute of Physics, University of Bonn.
+#
+#  Licensed under the Apache License, Version 2.0 (the "License");
+#  you may not use this file except in compliance with the License.
+#  You may obtain a copy of the License at
+#
+#     http://www.apache.org/licenses/LICENSE-2.0
+#
+#  Unless required by applicable law or agreed to in writing, software
+#  distributed under the License is distributed on an "AS IS" BASIS,
+#  WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
+#  See the License for the specific language governing permissions and
+#  limitations under the License.
+# ----------------------------------------------------------
 
+import argparse
 import numpy as np
+import os
 import ruamel.yaml
+from argparse import ArgumentParser
 from ruamel.yaml.comments import CommentedMap
+from typing import Iterable
 
 yml = ruamel.yaml.YAML()
 
@@ -15,6 +35,15 @@ smu_numbering = np.arange(101)
 
 
 def path_type(string):
+    """
+    type checker to make sure that paths provided by cli-calls as arguments point to already existing paths.
+
+    @author: Dominik Fischer
+    last update: 2025-08-25
+
+    :param string: path to check
+    :return: path, but only if it exists, otherwise a ArgumentTypeError is raised.
+    """
     if os.path.exists(string):
         return string
     else:
