@@ -1,3 +1,7 @@
+"""
+Implementations to simplify the usage of pythons concurrency features in particular concering multiple processes,
+shared resources and synchronization between different processes.
+"""
 # ----------------------------------------------------------
 #  Copyright (c) .
 #   All rights reserved
@@ -122,6 +126,18 @@ try:
     ExtendedSyncManager.register("PdfPages", PdfPages, PdfPagesProxy)
 
     class ThreadedPdfPages:
+        """
+        Multi-Threading capable version of :py:class:`~matplotlib.backends.backend_pdf.PdfPages`.
+        (I'm not 100% sure whether this implementation is actually/really thread-safe.
+        Nevertheless even if it is completely thread-safe there could be made no promise w.r.t. the ordering of the
+        individual figures/pages of the output pdf document.
+        The implementation is directly based upon the matplotlib backends implementation, except for the affect that
+        `transactions` are protected by synchronization primitives.
+
+        For information on the arguments and keyword arguments/attributes of this class see
+        :py:class:`matplotlib.backends.backend_pdf.PdfPages` as any positional and keyword argument is propagate to the
+        backend instance.
+        """
         def __init__(self, *args, **kwargs):
             self.lock = get_manager().RLock()
             self.pdf = get_manager().PdfPages(*args, **kwargs)
@@ -147,6 +163,13 @@ try:
                 return pdf_attr
 
     class ThreadedPdfPagesProxy(mp.managers.BaseProxy):
+        """
+        Proxy class to enable threaded PdfPages objects handled by a multiprocessing.Manager object.
+        Here only a minimal set of functionality will be exposed to the calling to enable saving for figures in a
+        multiprocessing context.
+
+        Effectively only the context manager implementation is exposed at all.
+        """
         _exposed_ = ('__enter__', '__exit__', '__getattr__')
 
         def __exit__(self, *args):
@@ -160,17 +183,41 @@ except ImportError:
     pass
 
 def initialize_worker_manager(**kwargs):
+    """
+    Alternative to instantiate a manager object within this module than
+    :py:func:`pixcap65.concurrency.get_manager`.
+    In opposite to that implementation this here is not intended to actually fetch a manager object but to create own at
+    process initialization and remember it at the module level as a global constant such that certain manager arguments
+    do not need to be propagated through all the following code.
+
+    @author: Dominik Fischer
+    last update: 2026-08-25
+
+    :param kwargs: further arguments to connect to a already running manager or create a new one with well-defined parameters. For this keywords you may also take a look at :py:func:`pixcap65.analysis.get_manager_keywords`.
+    :key address: address of the socket of the multiprocessing.Manager object we want to connect to.
+    :key authkey: authentication key necessary to connect to the socket. (It is recommended not to use this parameter as
+        it is not pickable)
+    """
     _ = get_manager(**kwargs)
 
 # we need to make sure that also our primary manager could be equipped with the relevant data store objects to only
-# start a single manager when to perform all our tasks
-# from pixcap65.analysis_util.data_store import NumpyProxy, DepletionArrayStore, DepletionArrayStoreProxy, register_proxy
-# import numpy as np
-# ExtendedSyncManager.register('full', np.full, NumpyProxy)
-# register_proxy("DepletionArrayStorage", DepletionArrayStore, DepletionArrayStoreProxy,
-#                ExtendedSyncManager)
+# start a single manager when to perform all our tasks.
 
 def register_proxy(name, cls, proxy, manager_cls=manager.DepletionMPManager):
+    """
+    More specialized function to register a new data type and corresponding proxy into a multiprocessing.Manager object
+    like by the classmethod :py:meth:`multiprocessing.manager.BaseManager.register`.
+
+    @author: Dominik Fischer
+    last update: 2026-08-25
+
+    :param name: typeid, name under which to register the proxy and which could be used to init a new object from the
+        manager object
+    :param cls: class of the object which should be registered to be managed as a shared resource. This could also
+        a callable which implements initialization of such an object.
+    :param proxy: proxy class to use for this python type (after registration). The proxy will be exposed.
+    :param manager_cls: class of the manager to which it should be registered.
+    """
     setattr(proxy, name, proxy)
     for attr in dir(cls):
         if "lock" in attr.lower():
