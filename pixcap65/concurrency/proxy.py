@@ -1,4 +1,7 @@
-
+"""
+Definitions of proxies to be used to access data store types of the :py:mod:`pixcap6` framework as shared resources
+managed by a multiprocessing.manager process.
+"""
 # ----------------------------------------------------------
 #  Copyright (c) 2026. SiLab, Institute of Physics, University of Bonn.
 #
@@ -20,10 +23,22 @@ from multiprocessing.managers import BaseProxy
 
 
 class ProxyBase(mp.managers.NamespaceProxy):
+    """
+    Base class to proxy types defined within the :py:mod:`pixcap6` package.
+    These proxies should in general behave like a namespace to access their properties. (properties could not be called
+    like functions)
+    """
     _exposed_ = ('__getattribute__', '__setattr__', '__delattr__')
 
 
 class NumpyProxy(BaseProxy):
+    """
+    :py:class:`multiprocessing.managers.BaseProxy` implementation to expose a
+    :py:class:`numpy.ndarray` managed as a shared
+    resource by a multiprocessing.manager process.
+    It should expose most of the python array api to make it usable like a real python array.
+    The proxied :py:class:`numpy.ndarray` may be slower than a 'real' one.
+    """
     _exposed_ = ('__getattr__', '__setattr__', '__delattr__', '__getitem__', '__setitem__', 'shape', )
 
     def __getitem__(self, *args):
@@ -33,6 +48,15 @@ class NumpyProxy(BaseProxy):
         self._callmethod('__setitem__', args)
 
     def shape(self):
+        """
+        Return the shape of the proxied array.
+
+        @author: Dominik Fischer
+        last update: 2026-08-25
+
+        :return: shape of the array.
+        :rtype: tuple
+        """
         self._callmethod('shape')
 
     def __len__(self):
@@ -58,8 +82,10 @@ class NumpyProxy(BaseProxy):
 
     def __ge__(self, other):
         return self._callmethod('__ge__', other)
+
     def __eq__(self, other):
         return self._callmethod('__eq__', other)
+
     def __ne__(self, other):
         return self._callmethod('__ne__', other)
 
