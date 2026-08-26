@@ -1,3 +1,9 @@
+"""
+Implementation of the Pixcap65 Chip as a DUT for usage with the `basil` framework.
+
+Original by Hans Krüger.
+The measurement capabilities are enhanced by Dominik Fischer.
+"""
 #
 # ------------------------------------------------------------
 # Copyright (c) SILAB , Physics Institute of Bonn University
@@ -14,7 +20,7 @@ import time
 from basil.RL.FunctionalRegister import FunctionalRegister
 from basil.dut import Dut
 from numpy import ndarray
-from typing import Any
+from typing import Any, Optional
 
 from pixcap65.utility import pixcap65_constants as c
 
@@ -27,8 +33,16 @@ float_initialiser = np.float32
 logger = logging.getLogger(__name__)
 logger.setLevel(logging.INFO)
 
-
+# have skipped providing doc-strings for property setters here.
 class Pixcap65(Dut):
+    """
+    Pixcap65 device under test (DUT).
+    Controlls the communication with the pixcap65 chip itself by utilizing a MIO 3 board.
+    For correct initialization a valid configuration yaml defining all the components needed for `basil` is required.
+
+    :ivar binary_active: boolean, indicating whether binary readout of the SMU should be used if the SMU support this
+        feature.
+    """
     __slots__ = ["binary_active"]
 
     def __init__(self, conf):
@@ -88,22 +102,34 @@ class Pixcap65(Dut):
 
     @property
     def primary_smu_key(self):
-        """Get the dut device key for the primary smu."""
+        """
+        Get the dut device key for the primary smu.
+        This is required to select the right smu to tell basil query it.
+        """
         return self.__primary_smu_key
 
     @property
     def vm1_smu_key(self):
-        """Get the dut device key for the SMU supplying the VM1 connector."""
+        """
+        Get the dut device key for the SMU supplying the VM1 connector.
+        This is required to select the right smu to tell basil query it.
+        """
         return self.__vm1_smu_key
 
     @property
     def vm2_smu_key(self):
-        """Get the dut device key for the SMU supplying the VM2 connector."""
+        """
+        Get the dut device key for the SMU supplying the VM2 connector.
+        This is required to select the right smu to tell basil query it.
+        """
         return self.__vm2_smu_key
 
     @property
     def vm3_smu_key(self):
-        """Get the dut device key for the SMU supplying the VM3 connector."""
+        """
+        Get the dut device key for the SMU supplying the VM3 connector.
+        This is required to select the right smu to tell basil query it.
+        """
         return self.__vm3_smu_key
 
     @property
@@ -135,7 +161,9 @@ class Pixcap65(Dut):
 
     @property
     def source_settling_time(self):
-        """Get the settling time for the voltage supplies in case of changes at the source."""
+        """
+        Get the settling time for the voltage supplies in case of changes at the source.
+        """
         return self.__source_settling_time
 
     @source_settling_time.setter
@@ -144,7 +172,7 @@ class Pixcap65(Dut):
 
     @property
     def has_smu(self):
-        """Get the mapping of the sums to the state whether they are active and connected by the configuration file."""
+        """Get the mapping of the smus to the state whether they are active and connected by the configuration file."""
         return self.__has_smu
 
     # general properties!
@@ -154,11 +182,13 @@ class Pixcap65(Dut):
         return 10
 
     # Handle the implementation of the SMU config
+    # CHECK: is this property obsolete by now?
     @property
     def smu_kwargs(self):
         """Gets the primary SMUs additional keyword arguments."""
         return self.__smu_kwargs
 
+    # CHECK: is this property obsolete by now?
     @property
     def smu_bias_kwargs(self):
         """Gets the HV SMUs additional keyword arguments."""
@@ -181,7 +211,10 @@ class Pixcap65(Dut):
 
     @property
     def bias_smu_key(self):
-        """Gets the dut key for the HV SMU."""
+        """
+        Gets the dut key for the HV SMU.
+        This is required to select the right smu to tell basil query it.
+        """
         return self.__bias_smu_key
 
     @property
@@ -223,6 +256,17 @@ class Pixcap65(Dut):
     # endregion
 
     def init(self, init_conf=None, **kwargs):
+        """
+        Explicit initializer for the pixcap65 DUT.
+
+        Explicit initializer in addition to the types initializer is required by basil to allow changes/adjustments of
+        the duts configuration between creation of the object and the actual initialization of the lab components.
+
+        In case the USB connection to the MIO board fails and the configuration consists information about the lab
+        power supply a full power cycle of the pixcap65 chip is performed, as well.
+        :param init_conf: initial configuration mapping be used instead of those provided on __init__.
+        :param kwargs: further keyword arguments. These will be forwarded to basil.
+        """
         # fallback handler in case there are issues with siusb.
         from usb.core import USBTimeoutError
         try:
@@ -534,6 +578,9 @@ class Pixcap65(Dut):
         """
         smu_init
 
+        @author: Dominik Fischer
+        last update: 2026-08-25
+
         Performs the initial setup for the specified smu.
         The setup could only be performed when the SMU is connected and active.
         This setup is designed only for sourcing voltage and measuring currents.
@@ -546,7 +593,8 @@ class Pixcap65(Dut):
         :param current_range: current measurement range/maximum current intended to be measured in A.
         :param plc: number of power supply cycles to be averaged over when measuring.
         :param src_u: sourcing voltage for the SMU.
-        :param voltage_range:
+        :param voltage_range: voltage sourcing range to be selected for the SMU. Possible values may depend on the
+            SMU in use.
         :param kwargs: further keyword arguments to be forwarded to the call of the lab device by basil
         """
 
@@ -558,11 +606,11 @@ class Pixcap65(Dut):
         self[smu].off(**kwargs)
         try:
             if self[smu].get_buffer2_mode(**kwargs).startswith("NEXT"):
-                print("Buffer 1 is still in data taking mode. Need to clear it.")
+                logger.info("Buffer 1 is still in data taking mode. Need to clear it.")
                 self[smu].disable_buffer(**kwargs)
                 time.sleep(10)
             if self[smu].get_buffer2_mode(**kwargs).startswith("NEXT"):
-                print("Buffer 2 is still in data taking mode. Need to clear it.")
+                logger.info("Buffer 2 is still in data taking mode. Need to clear it.")
                 self[smu].disable_buffer(**kwargs)
                 time.sleep(10)
             self[smu].set_number_trigger_points(1)
@@ -591,6 +639,9 @@ class Pixcap65(Dut):
         """
         smu_source_volt
 
+        @author: Dominik Fischer
+        last update: 2026-08-25
+
         Sets the mode of the SMUs source to sourcing voltage.
         A call to the SMU is only performed when the SMU is connected and active.
 
@@ -600,13 +651,14 @@ class Pixcap65(Dut):
         if not self.has_configured_smu(smu):
             logger.debug("The sourcing mode could only be set for an active smu but '%s' is inactive.", smu)
             return
-        if kwargs is None:
-            kwargs = {}
         self[smu].source_volt(**kwargs)
 
     def smu_source_current(self, smu: str, **kwargs):
         """
         smu_source_current
+
+        @author: Dominik Fischer
+        last update: 2026-08-25
 
         Sets the mode of the SMUs source to sourcing current.
         A call to the SMU is only performed when the SMU is connected and active.
@@ -617,13 +669,15 @@ class Pixcap65(Dut):
         if not self.has_configured_smu(smu):
             logger.debug("The sourcing mode could only be set for an active smu but '%s' is inactive.", smu)
             return
-        if kwargs is None:
-            kwargs = {}
+
         self[smu].source_current(**kwargs)
 
     def set_smu_source_voltage(self, smu: str, voltage: float, kwargs=None):
         """
         set_smu_source_voltage
+
+        @author: Dominik Fischer
+        last update: 2026-08-25
 
         Sets the voltage to be sourced by the SMU (constant voltage mode of the SMU).
         The call to the SMU is only performed when the SMU is connected and active.
@@ -645,17 +699,20 @@ class Pixcap65(Dut):
 
     def set_smu_source_current(self, smu: str, current: float, kwargs=None):
         """
-            set_smu_source_current
+        set_smu_source_current
 
-            Sets the current to be sourced by the SMU (constant current mode of the SMU).
-            The call to the SMU is only performed when the SMU is connected and active.
-            After changing the configuration, the settling of the smu will be taken into account to make sure that no
-            measurement is performed within the settling interval of the current source.
+        @author: Dominik Fischer
+        last update: 2026-08-25
 
-            :param smu: smu dut key of the SMU to configure
-            :param current: float, current to be sourced by the SMU
-            :param kwargs: further keyword arguments to be forwarded to the call of the lab device by basil
-            """
+        Sets the current to be sourced by the SMU (constant current mode of the SMU).
+        The call to the SMU is only performed when the SMU is connected and active.
+        After changing the configuration, the settling of the smu will be taken into account to make sure that no
+        measurement is performed within the settling interval of the current source.
+
+        :param smu: smu dut key of the SMU to configure
+        :param current: float, current to be sourced by the SMU
+        :param kwargs: further keyword arguments to be forwarded to the call of the lab device by basil
+        """
         if not self.has_configured_smu(smu):
             logger.debug("The source current could only be set for an active SMU but '%s' is inactive.", smu)
             return
@@ -668,6 +725,9 @@ class Pixcap65(Dut):
         """
         get_smu_source_voltage
 
+        @author: Dominik Fischer
+        last update: 2026-08-25
+
         Fetches the source voltage set for the SMUs voltage source (applies to constant voltage mode of the SMU)
         This is not the actually applied voltage by the SMU.
         The call to the SMU is only performed when the SMU is connected and active.
@@ -679,8 +739,6 @@ class Pixcap65(Dut):
         if not self.has_configured_smu(smu):
             logger.debug("The source voltage setting could only be read for an active SMU but '%s' is inactive.", smu)
             return np.nan
-        if kwargs is None:
-            kwargs = {}
         try:
             name = self[self.smu_setup_devices[smu]].get_name()
         except ValueError:
@@ -690,26 +748,30 @@ class Pixcap65(Dut):
 
     def get_smu_source_current(self, smu: str, **kwargs):
         """
-            get_smu_source_current
+        get_smu_source_current
 
-            Fetches the source current set for the SMUs current source (applies to constant current mode of the SMU)
-            This is not the actually applied current by the SMU.
-            The call to the SMU is only performed when the SMU is connected and active.
+        @author: Dominik Fischer
+        last update: 2026-08-25
 
-            :param smu: smu dut key of the SMU to configure
-            :param kwargs: further keyword arguments to be forwarded to the call of the lab device by basil
-            :return: source current set in A
-            """
+        Fetches the source current set for the SMUs current source (applies to constant current mode of the SMU)
+        This is not the actually applied current by the SMU.
+        The call to the SMU is only performed when the SMU is connected and active.
+
+        :param smu: smu dut key of the SMU to configure
+        :param kwargs: further keyword arguments to be forwarded to the call of the lab device by basil
+        :return: source current set in A
+        """
         if not self.has_configured_smu(smu):
             logger.debug("The source current setting could only be read for an active SMU but '%s' is inactive.", smu)
             return np.nan
-        if kwargs is None:
-            kwargs = {}
         return self[smu].get_source_current(**kwargs)
 
     def smu_measure_current(self, smu: str, kwargs=None) -> Any:
         """
         smu_measure_current
+
+        @author: Dominik Fischer
+        last update: 2026-08-25
 
         Read the current through the SMU. (Performs a current measurement in constant voltage mode.)
         The call to the SMU is only performed when the SMU is connected and active.
@@ -746,6 +808,9 @@ class Pixcap65(Dut):
         """
         smu_measure_voltage
 
+        @author: Dominik Fischer
+        last update: 2026-08-25
+
         Read the voltage over the SMU contacts. (Performs a voltage measurement in constant current mode.)
         The call to the SMU is only performed when the SMU is connected and active.
 
@@ -776,6 +841,27 @@ class Pixcap65(Dut):
         return voltage
 
     def smu_initiate_multiple_current(self, n: int, smu: str, kwargs=None):
+        """
+        smu_initiate_multiple_current
+
+        @author: Dominik Fischer
+        last update: 2026-08-25
+
+        Performs a current measurement by reading multiple current values from the SMU.
+        In contrast to :py:meth:`pixcap65.pixcap.pixcap65.Pixcap65.smu_advanced_current_multiple` the measurement is
+        only initiated.
+        The measurement results are not fetched immediately.
+        The call to the SMU is only performed when the SMU is connected and active.
+        If no number of measurements is explicitly specified the number of measurements properties for the specified
+        smu is used.
+
+
+        This is the fast implementation for this purpose using directly dedicated functions of the SMU.
+        :param n: number of measurements to be performed or None when the property should be used to determine the
+            number of measurements to perform.
+        :param smu: smu dut key of the SMU to configure.
+        :param kwargs: further keyword arguments to be forwarded to the call to the lab device by basil.
+        """
         if not self.has_configured_smu(smu):
             logger.debug(SMU_DISABLED_CURRENT_MSG, smu)
             return
@@ -793,6 +879,26 @@ class Pixcap65(Dut):
         self[smu].multi_current_measurement(**kwargs)
 
     def smu_initiate_multiple_voltage(self, n: int, smu: str, kwargs=None):
+        """
+        smu_initiate_multiple_voltage
+
+        @author: Dominik Fischer
+        last update: 2026-08-25
+
+        Performs a voltage measurement by reading multiple voltage values from the SMU.
+        In contrast to :py:meth:`pixcap65.pixcap.pixcap65.Pixcap65.smu_advanced_voltage_multiple` the measurement is
+        only initiated.
+        The call to the SMU is only performed when the SMU is connected and active.
+        If no number of measurements is explicitly specified the number of measurements properties for the specified
+        smu is used.
+
+
+        This is the fast implementation for this purpose using directly dedicated functions of the SMU.
+        :param n: umber of measurements to be performed or None when the property should be used to determine the
+            number of measurements to perform.
+        :param smu: smu dut key of the SMU to configure.
+        :param kwargs: further keyword arguments to be forwarded to the call to the lab device by basil.
+        """
         if not self.has_configured_smu(smu):
             logger.debug(SMU_DISABLED_MSG, smu)
             return
@@ -810,6 +916,28 @@ class Pixcap65(Dut):
         self[smu].multi_voltage_measurement(**kwargs)
 
     def smu_read_multiple_current(self, n: int, smu: str, kwargs=None) -> np.ndarray:
+        """
+        smu_read_multiple_current
+
+        @author: Dominik Fischer
+        last update: 2026-08-25
+
+        Performs a current measurement by reading multiple current values from the SMU.
+        In contrast to :py:meth:`pixcap65.pixcap.pixcap65.Pixcap65.smu_advanced_current_multiple` only the measurement
+        result is fetched from the SMU, but the measurement must be done before callling this method.
+        The call to the SMU is only performed when the SMU is connected and active.
+        If no number of measurements is explicitly specified the number of measurements properties for the specified
+        smu is used.
+
+
+        This is the fast implementation for this purpose using directly dedicated functions of the SMU.
+        :param n: number of measurements performed or None when the property should be used to determine the
+            number of measurements to perform.
+        :param smu: smu dut key of the SMU to configure.
+        :param kwargs: further keyword arguments to be forwarded to the call to the lab device by basil.
+        :return: array of the measured currents in A; If the SMU is not active only NaN will be returned within the
+            array.
+        """
         if not self.has_configured_smu(smu):
             logger.debug(SMU_DISABLED_CURRENT_MSG, smu)
             if n is not None and self.__n_measurements[smu] != n:
@@ -831,6 +959,28 @@ class Pixcap65(Dut):
         return np.array(result.split(','), dtype=float_initialiser)
 
     def smu_read_multiple_voltage(self, n: int, smu: str, kwargs = None) -> np.ndarray:
+        """
+        smu_read_multiple_voltage
+
+        @author: Dominik Fischer
+        last update: 2026-08-25
+
+        Performs a voltage measurement by reading multiple voltage values from the SMU.
+        In contrast to :py:meth:`pixcap65.pixcap.pixcap65.Pixcap65.smu_advanced_voltage_multiple` only the measurement
+        result is fetched from the SMU, but the measurement must be done before callling this method.
+        The call to the SMU is only performed when the SMU is connected and active.
+        If no number of measurements is explicitly specified the number of measurements properties for the specified
+        smu is used.
+
+
+        This is the fast implementation for this purpose using directly dedicated functions of the SMU.
+        :param n: umber of measurements to be performed or None when the property should be used to determine the
+            number of measurements to perform.
+        :param smu: smu dut key of the SMU to configure.
+        :param kwargs: further keyword arguments to be forwarded to the call to the lab device by basil.
+        :return: array of the measured voltages in V; If the SMU is not active only NaN will be returned within the
+            array.
+        """
         if not self.has_configured_smu(smu):
             logger.debug(SMU_DISABLED_CURRENT_MSG, smu)
             if n is not None and self.__n_measurements[smu] != n:
@@ -854,6 +1004,9 @@ class Pixcap65(Dut):
     def smu_averaged_current(self, n: int, smu: str, kwargs=None) -> tuple[float, ...]:
         """
         smu_averaged_current
+
+        @author: Dominik Fischer
+        last update: 2026-08-25
 
         Will perform a current measurement by measuring multiple times and read only the averaged value.
         If no number of measurements is explicitly specified the number of measurements properties for the specified
@@ -889,6 +1042,9 @@ class Pixcap65(Dut):
         """
         smu_averaged_voltage
 
+        @author: Dominik Fischer
+        last update: 2026-08-25
+
         Will perform a voltage measurement by measuring multiple times and read only the averaged value.
         If no number of measurements is explicitly specified the number of measurements properties for the specified
         smu is used.
@@ -922,6 +1078,9 @@ class Pixcap65(Dut):
     def smu_advanced_current_multiple(self, n: int | None, smu: str, kwargs=None) -> ndarray:
         """
         smu_advanced_current_multiple
+
+        @author: Dominik Fischer
+        last update: 2026-08-25
 
         Performs a current measurement by reading multiple current values from the SMU. The full dataset of
         measurements will be returned.
@@ -970,6 +1129,9 @@ class Pixcap65(Dut):
         """
         smu_advanced_voltage_multiple
 
+        @author: Dominik Fischer
+        last update: 2026-08-25
+
         Performs a voltage measurement by reading multiple voltage values from the SMU. The full dataset of
         measurements will be returned.
         The call to the SMU is only performed when the SMU is connected and active.
@@ -1016,6 +1178,9 @@ class Pixcap65(Dut):
         """
         general_smu_current_multiple
 
+        @author: Dominik Fischer
+        last update: 2026-08-25
+
         Performs a current measurement by reading multiple current values from the SMU. The full dataset of
         measurements will be returned.
         The call to the SMU is only performed when the SMU is connected and active.
@@ -1056,6 +1221,9 @@ class Pixcap65(Dut):
     def general_smu_voltage_multiple(self, smu: str, n: int, kwargs=None) -> ndarray:
         """
         general_smu_voltage_multiple
+
+        @author: Dominik Fischer
+        last update: 2026-08-25
 
         Performs a voltage measurement by reading multiple voltage values from the SMU. The full dataset of
         measurements will be returned.
@@ -1099,6 +1267,9 @@ class Pixcap65(Dut):
         """
         smu_output_on
 
+        @author: Dominik Fischer
+        last update: 2026-08-25
+
         Turns the output of the specified SMU on.
         The call to the SMU is only performed when the SMU is connected and active.
 
@@ -1116,6 +1287,9 @@ class Pixcap65(Dut):
         """
         smu_output_off
 
+        @author: Dominik Fischer
+        last update: 2026-08-25
+
         Turns the output of the specified SMU off.
         The call to the SMU is only performed when the SMU is connected and active.
 
@@ -1132,6 +1306,9 @@ class Pixcap65(Dut):
     def set_smu_measurements(self, smu: str, value: int, kwargs=None):
         """
         set_smu_measurements
+
+        @author: Dominik Fischer
+        last update: 2026-08-25
 
         Configures the number of measurements to be performed on reading (using reading buffer) for the specific SMU.
         The call to the SMU is only performed when the SMU is connected and active.
@@ -1169,6 +1346,9 @@ class Pixcap65(Dut):
         """
         init_smu
 
+        @author: Dominik Fischer
+        last update: 2026-08-25
+
         Performs the initial setup for primary SMU usually supplying the VM3 connector
         The setup could only be performed when the SMU is connected and active.
         This setup is designed only for sourcing voltage and measuring currents.
@@ -1180,7 +1360,8 @@ class Pixcap65(Dut):
         :param current_range: current measurement range/maximum current intended to be measured in A
         :param plc: number of power supply cycles to be averaged over when measuring
         :param src_u: sourcing voltage for the SMU
-        :param voltage_range:
+        :param voltage_range: voltage sourcing range to be selected for the SMU. Possible values may depend on the
+            SMU in use.
         :param kwargs: further keyword arguments to be forwarded to the call of the lab device by basil
         :keyword smu: smu dut key of the SMU to configure
         """
@@ -1191,6 +1372,9 @@ class Pixcap65(Dut):
         """
         smu_on
 
+        @author: Dominik Fischer
+        last update: 2026-08-25
+
         Turns the output of the primary SMU on.
         The call to the SMU is only performed when the SMU is connected and active.
         """
@@ -1199,6 +1383,9 @@ class Pixcap65(Dut):
     def smu_off(self):
         """
         smu_off
+
+        @author: Dominik Fischer
+        last update: 2026-08-25
 
         Turns the output of the primary SMU off.
         The call to the SMU is only performed when the SMU is connected and active.
@@ -1209,6 +1396,9 @@ class Pixcap65(Dut):
         """
         smu_set_current_source
 
+        @author: Dominik Fischer
+        last update: 2026-08-25
+
         Sets the mode of the primary (VM3) SMUs source to sourcing current.
         A call to the SMU is only performed when the SMU is connected and active.
         """
@@ -1217,6 +1407,9 @@ class Pixcap65(Dut):
     def smu_set_voltage_source(self):
         """
         smu_set_voltage_source
+
+        @author: Dominik Fischer
+        last update: 2026-08-25
 
         Sets the mode of the primary SMUs source to sourcing voltage.
         A call to the SMU is only performed when the SMU is connected and active.
@@ -1263,6 +1456,9 @@ class Pixcap65(Dut):
         """
         smu_measure_volts
 
+        @author: Dominik Fischer
+        last update: 2026-08-25
+
         Read the voltage over the primary SMU contacts. (Performs a voltage measurement in constant current mode.)
         The call to the primary SMU is only performed when the SMU is connected and active.
         """
@@ -1272,7 +1468,11 @@ class Pixcap65(Dut):
         """
         averaged_current
 
-        Will perform a current measurement at the primary SMU by measuring multiple times and read only the averaged value.
+        @author: Dominik Fischer
+        last update: 2026-08-25
+
+        Will perform a current measurement at the primary SMU by measuring multiple times and read only
+        the averaged value.
         If no number of measurements is explicitly specified the number of measurements properties for the
         smu is used.
         The call to the SMU is only performed when the SMU is connected and active.
@@ -1287,7 +1487,11 @@ class Pixcap65(Dut):
         """
         averaged_voltage
 
-        Will perform a voltage measurement at the primary SMU by measuring multiple times and read only the averaged value.
+        @author: Dominik Fischer
+        last update: 2026-08-25
+
+        Will perform a voltage measurement at the primary SMU by measuring multiple times and read only
+        the averaged value.
         If no number of measurements is explicitly specified the number of measurements properties for the
         smu is used.
         The call to the SMU is only performed when the SMU is connected and active.
@@ -1301,6 +1505,9 @@ class Pixcap65(Dut):
     def get_source_current_multiple(self, n: int):
         """
         get_source_current_multiple
+
+        @author: Dominik Fischer
+        last update: 2026-08-25
 
         Performs a current measurement by reading multiple current values from the primary SMU. The full dataset of
         measurements will be returned.
@@ -1322,6 +1529,9 @@ class Pixcap65(Dut):
         """
         get_source_voltage_multiple
 
+        @author: Dominik Fischer
+        last update: 2026-08-25
+
         Performs a voltage measurement by reading multiple voltage values from the primary SMU. The full dataset of
         measurements will be returned.
         The call to the SMU is only performed when the SMU is connected and active.
@@ -1341,6 +1551,9 @@ class Pixcap65(Dut):
     def get_advanced_current_multiple(self, n: int):
         """
         get_advanced_current_multiple
+
+        @author: Dominik Fischer
+        last update: 2026-08-25
 
         Performs a current measurement by reading multiple current values from the primary SMU. The full dataset of
         measurements will be returned.
@@ -1385,15 +1598,96 @@ class Pixcap65(Dut):
         return self.smu_advanced_voltage_multiple(n, self.__primary_smu_key, kwargs=kargs)
 
     def initiate_multiple_current(self, n: int, kwargs=None):
+        """
+        initiate_multiple_current
+
+        @author: Dominik Fischer
+        last update: 2026-08-25
+
+        Performs a current measurement by reading multiple current values from the primary SMU.
+        In contrast to :py:meth:`pixcap65.pixcap.pixcap65.Pixcap65.get_advanced_current_multiple` the measurement is
+        only initiated.
+        The measurement results are not fetched immediately.
+        The call to the SMU is only performed when the SMU is connected and active.
+        If no number of measurements is explicitly specified the number of measurements properties for the specified
+        smu is used.
+
+
+        This is the fast implementation for this purpose using directly dedicated functions of the SMU.
+        :param n: number of measurements to be performed or None when the property should be used to determine the
+            number of measurements to perform.
+        :param kwargs: further keyword arguments to be forwarded to the call to the lab device by basil.
+        """
         self.smu_initiate_multiple_current(n, self.primary_smu_key, kwargs=kwargs)
 
     def initiate_multiple_voltage(self, n: int, kwargs=None):
+        """
+        initiate_multiple_voltage
+
+        @author: Dominik Fischer
+        last update: 2026-08-25
+
+        Performs a voltage measurement by reading multiple voltage values from the SMU.
+        In contrast to :py:meth:`pixcap65.pixcap.pixcap65.Pixcap65.get_advanced_voltage_multiple` the measurement is
+        only initiated.
+        The call to the SMU is only performed when the SMU is connected and active.
+        If no number of measurements is explicitly specified the number of measurements properties for the specified
+        smu is used.
+
+
+        This is the fast implementation for this purpose using directly dedicated functions of the SMU.
+        :param n: umber of measurements to be performed or None when the property should be used to determine the
+            number of measurements to perform.
+        :param kwargs: further keyword arguments to be forwarded to the call to the lab device by basil.
+        """
         self.smu_initiate_multiple_voltage(n, self.primary_smu_key, kwargs)
 
     def get_read_multiple_current(self, n: int, kwargs=None) -> np.ndarray:
+        """
+        get_read_multiple_current
+
+        @author: Dominik Fischer
+        last update: 2026-08-25
+
+        Performs a current measurement by reading multiple current values from the primary SMU.
+        In contrast to :py:meth:`pixcap65.pixcap.pixcap65.Pixcap65.get_advanced_current_multiple` only the measurement
+        result is fetched from the SMU, but the measurement must be done before callling this method.
+        The call to the SMU is only performed when the SMU is connected and active.
+        If no number of measurements is explicitly specified the number of measurements properties for the specified
+        smu is used.
+
+
+        This is the fast implementation for this purpose using directly dedicated functions of the SMU.
+        :param n: number of measurements performed or None when the property should be used to determine the
+            number of measurements to perform.
+        :param kwargs: further keyword arguments to be forwarded to the call to the lab device by basil.
+        :return: array of the measured currents in A; If the SMU is not active only NaN will be returned within the
+            array.
+        """
         return self.smu_read_multiple_current(n, self.primary_smu_key, kwargs=kwargs)
 
     def get_read_multiple_voltage(self, n: int, kwargs=None) -> np.ndarray:
+        """
+        get_read_multiple_voltage
+
+        @author: Dominik Fischer
+        last update: 2026-08-25
+
+        Performs a voltage measurement by reading multiple voltage values from the SMU.
+        In contrast to :py:meth:`pixcap65.pixcap.pixcap65.Pixcap65.get_advanced_voltage_multiple` only the measurement
+        result is fetched from the SMU, but the measurement must be done before callling this method.
+        The call to the SMU is only performed when the SMU is connected and active.
+        If no number of measurements is explicitly specified the number of measurements properties for the specified
+        smu is used.
+
+
+        This is the fast implementation for this purpose using directly dedicated functions of the SMU.
+        :param n: umber of measurements to be performed or None when the property should be used to determine the
+            number of measurements to perform.
+        :param kwargs: further keyword arguments to be forwarded to the call to the lab device by basil.
+        :return: array of the measured voltages in V; If the SMU is not active only NaN will be returned within the
+            array.
+        """
         return self.smu_read_multiple_voltage(n, self.primary_smu_key, kwargs)
 
     # endregion
@@ -1403,6 +1697,9 @@ class Pixcap65(Dut):
     def init_bias(self, voltage, current_range, voltage_range=1.5, current_limit=0.001, plc=10):
         """
         init_bias
+
+        @author: Dominik Fischer
+        last update: 2026-08-25
 
         Performs the initial setup for HV SMU.
         The setup could only be performed when the SMU is connected and active.
@@ -1425,6 +1722,9 @@ class Pixcap65(Dut):
         """
         bias_on
 
+        @author: Dominik Fischer
+        last update: 2026-08-25
+
         Turns the output of the HV SMU on.
         The call to the SMU is only performed when the SMU is connected and active.
         """
@@ -1434,6 +1734,9 @@ class Pixcap65(Dut):
     def bias_off(self):
         """
         bias_off
+
+        @author: Dominik Fischer
+        last update: 2026-08-25
 
         Turns the output of the HV SMU off.
         The call to the SMU is only performed when the SMU is connected and active.
@@ -1445,6 +1748,9 @@ class Pixcap65(Dut):
         """
         bias_current_source
 
+        @author: Dominik Fischer
+        last update: 2026-08-25
+
         Sets the mode of the HV SMUs source to sourcing current.
         A call to the SMU is only performed when the SMU is connected and active.
         """
@@ -1454,6 +1760,9 @@ class Pixcap65(Dut):
     def bias_voltage_source(self):
         """
         bias_voltage_source
+
+        @author: Dominik Fischer
+        last update: 2026-08-25
 
         Sets the mode of the HV SMUs source to sourcing voltage.
         A call to the SMU is only performed when the SMU is connected and active.
@@ -1502,6 +1811,9 @@ class Pixcap65(Dut):
         """
         bias_measure_current
 
+        @author: Dominik Fischer
+        last update: 2026-08-25
+
         Read the current through the HV SMU. (Performs a current measurement in constant voltage mode.)
         The call to the HV SMU is only performed when the SMU is connected and active.
         """
@@ -1513,6 +1825,9 @@ class Pixcap65(Dut):
         """
         bias_measure_volts
 
+        @author: Dominik Fischer
+        last update: 2026-08-25
+
         Read the voltage over the HV SMU contacts. (Performs a voltage measurement in constant current mode.)
         The call to the HV SMU is only performed when the SMU is connected and active.
         """
@@ -1520,9 +1835,12 @@ class Pixcap65(Dut):
             return self.smu_measure_voltage(self.__bias_smu_key, kwargs=self.smu_bias_kwargs)
         return np.nan
 
-    def bias_averaged_current(self, n: int = 10):
+    def bias_averaged_current(self, n: Optional[int] = 10):
         """
         bias_averaged_current
+
+        @author: Dominik Fischer
+        last update: 2026-08-25
 
         Will perform a current measurement at the HV SMU by measuring multiple times and read only the averaged value.
         If no number of measurements is explicitly specified the number of measurements properties for the
@@ -1539,9 +1857,12 @@ class Pixcap65(Dut):
             return np.full(10, fill_value=np.nan)
         return np.full(n, fill_value=np.nan)
 
-    def bias_averaged_voltage(self, n: int = 10):
+    def bias_averaged_voltage(self, n: Optional[int] = 10):
         """
         bias_averaged_voltage
+
+        @author: Dominik Fischer
+        last update: 2026-08-25
 
         Will perform a voltage measurement at the HV SMU by measuring multiple times and read only the averaged value.
         If no number of measurements is explicitly specified the number of measurements properties for the
@@ -1558,9 +1879,12 @@ class Pixcap65(Dut):
             return np.full(10, fill_value=np.nan)
         return np.full(n, fill_value=np.nan)
 
-    def bias_current_multiple(self, n: int):
+    def bias_current_multiple(self, n: Optional[int]):
         """
         bias_current_multiple
+
+        @author: Dominik Fischer
+        last update: 2026-08-25
 
         Performs a current measurement by reading multiple current values from the HV SMU. The full dataset of
         measurements will be returned.
@@ -1582,9 +1906,11 @@ class Pixcap65(Dut):
             return np.full(10, fill_value=np.nan)
         return np.full(n, fill_value=np.nan)
 
-    def bias_voltage_multiple(self, n: int):
+    def bias_voltage_multiple(self, n: Optional[int]):
         """
         bias_voltage_multiple
+
+        @author: Dominik Fischer
 
         Performs a voltage measurement by reading multiple voltage values from the HV SMU. The full dataset of
         measurements will be returned.
@@ -1606,9 +1932,12 @@ class Pixcap65(Dut):
             return np.full(10, fill_value=np.nan)
         return np.full(n, fill_value=np.nan)
 
-    def bias_advanced_current_multiple(self, n: int):
+    def bias_advanced_current_multiple(self, n: Optional[int]):
         """
         bias_advanced_current_multiple
+
+        @author: Dominik Fischer
+        last update: 2026-08-25
 
         Performs a current measurement by reading multiple current values from the HV SMU. The full dataset of
         measurements will be returned.
@@ -1634,9 +1963,12 @@ class Pixcap65(Dut):
             return np.full(10, fill_value=np.nan)
         return np.full(n, fill_value=np.nan)
 
-    def bias_advanced_voltage_multiple(self, n: int):
+    def bias_advanced_voltage_multiple(self, n: Optional[int]):
         """
         bias_advanced_voltage_multiple
+
+        @author: Dominik Fischer
+        last update: 2026-08-25
 
         Performs a voltage measurement by reading multiple voltage values from the HV SMU. The full dataset of
         measurements will be returned.
@@ -1659,15 +1991,96 @@ class Pixcap65(Dut):
         return np.full(n, fill_value=np.nan)
 
     def bias_initiate_multiple_current(self, n: int, kwargs=None):
+        """
+        bias_initiate_multiple_current
+
+        @author: Dominik Fischer
+        last update: 2026-08-25
+
+        Performs a current measurement by reading multiple current values from the HV SMU.
+        In contrast to :py:meth:`pixcap65.pixcap.pixcap65.Pixcap65.bias_advanced_current_multiple` the measurement is
+        only initiated.
+        The measurement results are not fetched immediately.
+        The call to the SMU is only performed when the SMU is connected and active.
+        If no number of measurements is explicitly specified the number of measurements properties for the specified
+        smu is used.
+
+
+        This is the fast implementation for this purpose using directly dedicated functions of the SMU.
+        :param n: number of measurements to be performed or None when the property should be used to determine the
+            number of measurements to perform.
+        :param kwargs: further keyword arguments to be forwarded to the call to the lab device by basil.
+        """
         self.smu_initiate_multiple_current(n, self.bias_smu_key, kwargs=kwargs)
 
     def bias_initiate_multiple_voltage(self, n: int, kwargs=None):
+        """
+        bias_initiate_multiple_voltage
+
+        @author: Dominik Fischer
+        last update: 2026-08-25
+
+        Performs a voltage measurement by reading multiple voltage values from the HV SMU.
+        In contrast to :py:meth:`pixcap65.pixcap.pixcap65.Pixcap65.bias_advanced_voltage_multiple` the measurement is
+        only initiated.
+        The call to the SMU is only performed when the SMU is connected and active.
+        If no number of measurements is explicitly specified the number of measurements properties for the specified
+        smu is used.
+
+
+        This is the fast implementation for this purpose using directly dedicated functions of the SMU.
+        :param n: umber of measurements to be performed or None when the property should be used to determine the
+            number of measurements to perform.
+        :param kwargs: further keyword arguments to be forwarded to the call to the lab device by basil.
+        """
         self.smu_initiate_multiple_voltage(n, self.bias_smu_key, kwargs=kwargs)
 
     def bias_read_multiple_current(self, n: int, kwargs=None) -> np.ndarray:
+        """
+        bias_read_multiple_current
+
+        @author: Dominik Fischer
+        last update: 2026-08-25
+
+        Performs a current measurement by reading multiple current values from the HV SMU.
+        In contrast to :py:meth:`pixcap65.pixcap.pixcap65.Pixcap65.bias_advanced_current_multiple` only the measurement
+        result is fetched from the SMU, but the measurement must be done before callling this method.
+        The call to the SMU is only performed when the SMU is connected and active.
+        If no number of measurements is explicitly specified the number of measurements properties for the specified
+        smu is used.
+
+
+        This is the fast implementation for this purpose using directly dedicated functions of the SMU.
+        :param n: number of measurements performed or None when the property should be used to determine the
+            number of measurements to perform.
+        :param kwargs: further keyword arguments to be forwarded to the call to the lab device by basil.
+        :return: array of the measured currents in A; If the SMU is not active only NaN will be returned within the
+            array.
+        """
         return self.smu_read_multiple_current(n, self.bias_smu_key, kwargs=kwargs)
 
     def bias_read_multiple_voltage(self, n: int, kwargs=None) -> np.ndarray:
+        """
+        bias_read_multiple_voltage
+
+        @author: Dominik Fischer
+        last update: 2026-08-25
+
+        Performs a voltage measurement by reading multiple voltage values from the HV SMU.
+        In contrast to :py:meth:`pixcap65.pixcap.pixcap65.Pixcap65.bias_advanced_voltage_multiple` only the measurement
+        result is fetched from the SMU, but the measurement must be done before callling this method.
+        The call to the SMU is only performed when the SMU is connected and active.
+        If no number of measurements is explicitly specified the number of measurements properties for the specified
+        smu is used.
+
+
+        This is the fast implementation for this purpose using directly dedicated functions of the SMU.
+        :param n: umber of measurements to be performed or None when the property should be used to determine the
+            number of measurements to perform.
+        :param kwargs: further keyword arguments to be forwarded to the call to the lab device by basil.
+        :return: array of the measured voltages in V; If the SMU is not active only NaN will be returned within the
+            array.
+        """
         return self.smu_read_multiple_voltage(n, self.bias_smu_key, kwargs=kwargs)
 
     # endregion
@@ -1676,6 +2089,9 @@ class Pixcap65(Dut):
     def init_vm1(self, src_u, current_range, voltage_range=1.5, current_limit=0.001, plc=10):
         """
         init_vm1
+
+        @author: Dominik Fischer
+        last update: 2026-08-25
 
         Performs the initial setup for SMU connected to the VM1 PCB port.
         The setup could only be performed when the SMU is connected and active.
@@ -1697,6 +2113,9 @@ class Pixcap65(Dut):
         """
         vm1_on
 
+        @author: Dominik Fischer
+        last update: 2026-08-25
+
         Turns the output of the SMU connected to the PCBs VM1 port on.
         The call to the SMU is only performed when the SMU is connected and active.
         """
@@ -1706,7 +2125,10 @@ class Pixcap65(Dut):
         """
         vm1_off
 
-        Turns the output of the SMU connected to the PCBS VM1 port off.
+        @author: Dominik Fischer
+        last update: 2026-08-25
+
+        Turns the output of the SMU connected to the PCBs VM1 port off.
         The call to the SMU is only performed when the SMU is connected and active.
         """
         self.smu_output_off(self.__vm1_smu_key, kwargs=self.smu_vm1_kwargs)
@@ -1714,6 +2136,9 @@ class Pixcap65(Dut):
     def vm1_current_source(self):
         """
         vm1_current_source
+
+        @author: Dominik Fischer
+        last update: 2026-08-25
 
         Sets the mode of the SMUs source connected to the PCBs VM1 port to sourcing current.
         A call to the SMU is only performed when the SMU is connected and active.
@@ -1723,6 +2148,9 @@ class Pixcap65(Dut):
     def vm1_voltage_source(self):
         """
         vm1_voltage_source
+
+        @author: Dominik Fischer
+        last update: 2026-08-25
 
         Sets the mode of the SMUs source connected to the PCBs VM1 port to sourcing voltage.
         A call to the SMU is only performed when the SMU is connected and active.
@@ -1761,6 +2189,9 @@ class Pixcap65(Dut):
         """
         vm1_measure_current
 
+        @author: Dominik Fischer
+        last update: 2026-08-25
+
         Read the current through the SMU connected to the PCBs VM1 port. (Performs a current measurement in constant voltage mode.)
         The call to the SMU is only performed when the SMU is connected and active.
         """
@@ -1770,14 +2201,21 @@ class Pixcap65(Dut):
         """
         vm1_measure_volts
 
+        @author: Dominik Fischer
+        last update: 2026-08-25
+
         Read the voltage over the SMU contacts connected to the PCBs VM1 port. (Performs a voltage measurement in constant current mode.)
         The call to the SMU is only performed when the SMU is connected and active.
+        :return: result of the measurement in V.
         """
         return self.smu_measure_voltage(self.__vm1_smu_key, kwargs=self.smu_vm1_kwargs)
 
     def vm1_averaged_current(self, n: int = 10):
         """
         vm1_averaged_current
+
+        @author: Dominik Fischer
+        last update: 2026-08-25
 
         Will perform a current measurement at the SMU connected to the PCBs VM1 port by measuring multiple times and read only the averaged value.
         If no number of measurements is explicitly specified the number of measurements properties for the
@@ -1794,6 +2232,9 @@ class Pixcap65(Dut):
         """
         vm1_averaged_voltage
 
+        @author: Dominik Fischer
+        last update: 2026-08-25
+
         Will perform a voltage measurement at the SMU connected to the PCBs VM1 port by measuring multiple times and read only the averaged value.
         If no number of measurements is explicitly specified the number of measurements properties for the
         smu is used.
@@ -1808,6 +2249,9 @@ class Pixcap65(Dut):
     def vm1_current_multiple(self, n: int):
         """
         vm1_current_multiple
+
+        @author: Dominik Fischer
+        last update: 2026-08-25
 
         Performs a current measurement by reading multiple current values from the SMU connected to the PCBs VM1 port. The full dataset of
         measurements will be returned.
@@ -1829,7 +2273,11 @@ class Pixcap65(Dut):
         """
         vm1_voltage_multiple
 
-        Performs a voltage measurement by reading multiple voltage values from the SMU connected to the PCBs VM1 port. The full dataset of
+        @author: Dominik Fischer
+        last update: 2026-08-25
+
+        Performs a voltage measurement by reading multiple voltage values from the SMU connected to the PCBs VM1 port.
+        The full dataset of
         measurements will be returned.
         The call to the SMU is only performed when the SMU is connected and active.
         If no number of measurements is explicitly specified the number of measurements properties for the
@@ -1848,6 +2296,9 @@ class Pixcap65(Dut):
     def vm1_advanced_current_multiple(self, n: int):
         """
         vm1_advanced_current_multiple
+
+        @author: Dominik Fischer
+        last update: 2026-08-25
 
         Performs a current measurement by reading multiple current values from the SMU connected to the PCBs VM1 port. The full dataset of
         measurements will be returned.
@@ -1869,6 +2320,9 @@ class Pixcap65(Dut):
         """
         vm1_advanced_voltage_multiple
 
+        @author: Dominik Fischer
+        last update: 2026-08-25
+
         Performs a voltage measurement by reading multiple voltage values from the SMU connected to the PCBs VM1 port. The full dataset of
         measurements will be returned.
         The call to the SMU is only performed when the SMU is connected and active.
@@ -1886,15 +2340,96 @@ class Pixcap65(Dut):
         return self.smu_advanced_voltage_multiple(n, self.__vm1_smu_key, kwargs=self.smu_vm1_kwargs)
 
     def vm1_initiate_multiple_current(self, n: int, kwargs=None):
+        """
+        vm1_initiate_multiple_current
+
+        @author: Dominik Fischer
+        last update: 2026-08-25
+
+        Performs a current measurement by reading multiple current values from the SMU connected to the PCBs VM1 port.
+        In contrast to :py:meth:`pixcap65.pixcap.pixcap65.Pixcap65.vm1_advanced_current_multiple` the measurement is
+        only initiated.
+        The measurement results are not fetched immediately.
+        The call to the SMU is only performed when the SMU is connected and active.
+        If no number of measurements is explicitly specified the number of measurements properties for the specified
+        smu is used.
+
+
+        This is the fast implementation for this purpose using directly dedicated functions of the SMU.
+        :param n: number of measurements to be performed or None when the property should be used to determine the
+            number of measurements to perform.
+        :param kwargs: further keyword arguments to be forwarded to the call to the lab device by basil.
+        """
         self.smu_initiate_multiple_current(n, self.vm1_smu_key, kwargs=kwargs)
 
     def vm1_initiate_multiple_voltage(self, n: int, kwargs=None):
+        """
+        vm1_initiate_multiple_voltage
+
+        @author: Dominik Fischer
+        last update: 2026-08-25
+
+        Performs a voltage measurement by reading multiple voltage values from the SMU connected to the PCBs VM1 port.
+        In contrast to :py:meth:`pixcap65.pixcap.pixcap65.Pixcap65.vm1_advanced_voltage_multiple` the measurement is
+        only initiated.
+        The call to the SMU is only performed when the SMU is connected and active.
+        If no number of measurements is explicitly specified the number of measurements properties for the specified
+        smu is used.
+
+
+        This is the fast implementation for this purpose using directly dedicated functions of the SMU.
+        :param n: umber of measurements to be performed or None when the property should be used to determine the
+            number of measurements to perform.
+        :param kwargs: further keyword arguments to be forwarded to the call to the lab device by basil.
+        """
         self.smu_initiate_multiple_voltage(n, self.vm1_smu_key, kwargs=kwargs)
 
     def vm1_read_multiple_current(self, n: int, kwargs=None) -> np.ndarray:
+        """
+        vm1_read_multiple_current
+
+        @author: Dominik Fischer
+        last update: 2026-08-25
+
+        Performs a current measurement by reading multiple current values from the SMU connected to the PCBs VM1 port.
+        In contrast to :py:meth:`pixcap65.pixcap.pixcap65.Pixcap65.vm1_advanced_current_multiple` only the measurement
+        result is fetched from the SMU, but the measurement must be done before callling this method.
+        The call to the SMU is only performed when the SMU is connected and active.
+        If no number of measurements is explicitly specified the number of measurements properties for the specified
+        smu is used.
+
+
+        This is the fast implementation for this purpose using directly dedicated functions of the SMU.
+        :param n: number of measurements performed or None when the property should be used to determine the
+            number of measurements to perform.
+        :param kwargs: further keyword arguments to be forwarded to the call to the lab device by basil.
+        :return: array of the measured currents in A; If the SMU is not active only NaN will be returned within the
+            array.
+        """
         return self.smu_read_multiple_current(n, self.vm1_smu_key, kwargs=kwargs)
 
     def vm1_read_multiple_voltage(self, n: int, kwargs=None) -> np.ndarray:
+        """
+        vm1_read_multiple_voltage
+
+        @author: Dominik Fischer
+        last update: 2026-08-25
+
+        Performs a voltage measurement by reading multiple voltage values from the SMU connected to the PCBs VM1 port.
+        In contrast to :py:meth:`pixcap65.pixcap.pixcap65.Pixcap65.vm1_advanced_voltage_multiple` only the measurement
+        result is fetched from the SMU, but the measurement must be done before callling this method.
+        The call to the SMU is only performed when the SMU is connected and active.
+        If no number of measurements is explicitly specified the number of measurements properties for the specified
+        smu is used.
+
+
+        This is the fast implementation for this purpose using directly dedicated functions of the SMU.
+        :param n: umber of measurements to be performed or None when the property should be used to determine the
+            number of measurements to perform.
+        :param kwargs: further keyword arguments to be forwarded to the call to the lab device by basil.
+        :return: array of the measured voltages in V; If the SMU is not active only NaN will be returned within the
+            array.
+        """
         return self.smu_read_multiple_voltage(n, self.vm1_smu_key, kwargs=kwargs)
 
     # endregion
@@ -1903,6 +2438,9 @@ class Pixcap65(Dut):
     def init_vm2(self, src_u, current_range, voltage_range=1.5, current_limit=0.001, plc=10):
         """
         init_vm2
+
+        @author: Dominik Fischer
+        last update: 2026-08-25
 
         Performs the initial setup for SMU connected to the VM2 PCB port.
         The setup could only be performed when the SMU is connected and active.
@@ -1924,6 +2462,9 @@ class Pixcap65(Dut):
         """
         vm2_on
 
+        @author: Dominik Fischer
+        last update: 2026-08-25
+
         Turns the output of the SMU connected to the PCBs VM2 port on.
         The call to the SMU is only performed when the SMU is connected and active.
         """
@@ -1932,6 +2473,9 @@ class Pixcap65(Dut):
     def vm2_off(self):
         """
         vm2_off
+
+        @author: Dominik Fischer
+        last update: 2026-08-25
 
         Turns the output of the SMU connected to the PCBS VM2 port off.
         The call to the SMU is only performed when the SMU is connected and active.
@@ -1942,6 +2486,9 @@ class Pixcap65(Dut):
         """
         vm2_current_source
 
+        @author: Dominik Fischer
+        last update: 2026-08-25
+
         Sets the mode of the SMUs source connected to the PCBs VM2 port to sourcing current.
         A call to the SMU is only performed when the SMU is connected and active.
         """
@@ -1950,6 +2497,9 @@ class Pixcap65(Dut):
     def vm2_voltage_source(self):
         """
         vm2_voltage_source
+
+        @author: Dominik Fischer
+        last update: 2026-08-25
 
         Sets the mode of the SMUs source connected to the PCBs VM2 port to sourcing voltage.
         A call to the SMU is only performed when the SMU is connected and active.
@@ -1988,8 +2538,13 @@ class Pixcap65(Dut):
         """
         vm2_measure_current
 
+        @author: Dominik Fischer
+        last update: 2026-08-25
+
         Read the current through the SMU connected to the PCBs VM2 port. (Performs a current measurement in constant voltage mode.)
         The call to the SMU is only performed when the SMU is connected and active.
+
+        :return: measured current in A.
         """
         return self.smu_measure_current(self.__vm2_smu_key, kwargs=self.smu_vm2_kwargs)
 
@@ -1997,14 +2552,21 @@ class Pixcap65(Dut):
         """
         vm2_measure_volts
 
+        @author: Dominik Fischer
+        last update: 2026-08-25
+
         Read the voltage over the SMU contacts connected to the PCBs VM2 port. (Performs a voltage measurement in constant current mode.)
         The call to the SMU is only performed when the SMU is connected and active.
+        :return: measured voltage in V.
         """
         return self.smu_measure_voltage(self.__vm2_smu_key, kwargs=self.smu_vm2_kwargs)
 
     def vm2_averaged_current(self, n: int = 10):
         """
         vm2_averaged_current
+
+        @author: Dominik Fischer
+        last update: 2026-08-25
 
         Will perform a current measurement at the SMU connected to the PCBs VM2 port by measuring multiple times and read only the averaged value.
         If no number of measurements is explicitly specified the number of measurements properties for the
@@ -2021,6 +2583,9 @@ class Pixcap65(Dut):
         """
         vm2_averaged_voltage
 
+        @author: Dominik Fischer
+        last update: 2026-08-25
+
         Will perform a voltage measurement at the SMU connected to the PCBs VM2 port by measuring multiple times and read only the averaged value.
         If no number of measurements is explicitly specified the number of measurements properties for the
         smu is used.
@@ -2035,6 +2600,9 @@ class Pixcap65(Dut):
     def vm2_current_multiple(self, n: int):
         """
         vm2_current_multiple
+
+        @author: Dominik Fischer
+        last update: 2026-08-25
 
         Performs a current measurement by reading multiple current values from the SMU connected to the PCBs VM2 port. The full dataset of
         measurements will be returned.
@@ -2056,6 +2624,9 @@ class Pixcap65(Dut):
         """
         vm2_voltage_multiple
 
+        @author: Dominik Fischer
+        last update: Dominik Fischer
+
         Performs a voltage measurement by reading multiple voltage values from the SMU connected to the PCBs VM2 port. The full dataset of
         measurements will be returned.
         The call to the SMU is only performed when the SMU is connected and active.
@@ -2075,6 +2646,9 @@ class Pixcap65(Dut):
     def vm2_advanced_current_multiple(self, n: int):
         """
         vm2_advanced_current_multiple
+
+        @author: Dominik Fischer
+        last update: 2026-08-25
 
         Performs a current measurement by reading multiple current values from the SMU connected to the PCBs VM2 port. The full dataset of
         measurements will be returned.
@@ -2096,6 +2670,9 @@ class Pixcap65(Dut):
         """
         vm2_advanced_voltage_multiple
 
+        @author: Dominik Fischer
+        last update: 2026-08-25
+
         Performs a voltage measurement by reading multiple voltage values from the SMU connected to the PCBs VM2 port. The full dataset of
         measurements will be returned.
         The call to the SMU is only performed when the SMU is connected and active.
@@ -2113,15 +2690,96 @@ class Pixcap65(Dut):
         return self.smu_advanced_voltage_multiple(n, self.__vm2_smu_key, kwargs=self.smu_vm2_kwargs)
 
     def vm2_initiate_multiple_current(self, n: int, kwargs=None):
+        """
+        vm2_initiate_multiple_current
+
+        @author: Dominik Fischer
+        last update: 2026-08-25
+
+        Performs a current measurement by reading multiple current values from the SMU connected to the PCBs VM2 port.
+        In contrast to :py:meth:`pixcap65.pixcap.pixcap65.Pixcap65.vm2_advanced_current_multiple` the measurement is
+        only initiated.
+        The measurement results are not fetched immediately.
+        The call to the SMU is only performed when the SMU is connected and active.
+        If no number of measurements is explicitly specified the number of measurements properties for the specified
+        smu is used.
+
+
+        This is the fast implementation for this purpose using directly dedicated functions of the SMU.
+        :param n: number of measurements to be performed or None when the property should be used to determine the
+            number of measurements to perform.
+        :param kwargs: further keyword arguments to be forwarded to the call to the lab device by basil.
+        """
         self.smu_initiate_multiple_current(n, self.vm2_smu_key, kwargs=kwargs)
 
     def vm2_initiate_multiple_voltage(self, n: int, kwargs=None):
+        """
+        vm2_initiate_multiple_voltage
+
+        @author: Dominik Fischer
+        last update: 2026-08-25
+
+        Performs a voltage measurement by reading multiple voltage values from the SMU connected to the PCBs VM2 port.
+        In contrast to :py:meth:`pixcap65.pixcap.pixcap65.Pixcap65.vm2_advanced_voltage_multiple` the measurement is
+        only initiated.
+        The call to the SMU is only performed when the SMU is connected and active.
+        If no number of measurements is explicitly specified the number of measurements properties for the specified
+        smu is used.
+
+
+        This is the fast implementation for this purpose using directly dedicated functions of the SMU.
+        :param n: umber of measurements to be performed or None when the property should be used to determine the
+            number of measurements to perform.
+        :param kwargs: further keyword arguments to be forwarded to the call to the lab device by basil.
+        """
         self.smu_initiate_multiple_voltage(n, self.vm2_smu_key, kwargs=kwargs)
 
     def vm2_read_multiple_current(self, n: int, kwargs=None) -> np.ndarray:
+        """
+        vm2_read_multiple_current
+
+        @author: Dominik Fischer
+        last update: 2026-08-25
+
+        Performs a current measurement by reading multiple current values from the SMU connected to the PCBs VM2 port.
+        In contrast to :py:meth:`pixcap65.pixcap.pixcap65.Pixcap65.vm2_advanced_current_multiple` only the measurement
+        result is fetched from the SMU, but the measurement must be done before callling this method.
+        The call to the SMU is only performed when the SMU is connected and active.
+        If no number of measurements is explicitly specified the number of measurements properties for the specified
+        smu is used.
+
+
+        This is the fast implementation for this purpose using directly dedicated functions of the SMU.
+        :param n: number of measurements performed or None when the property should be used to determine the
+            number of measurements to perform.
+        :param kwargs: further keyword arguments to be forwarded to the call to the lab device by basil.
+        :return: array of the measured currents in A; If the SMU is not active only NaN will be returned within the
+            array.
+        """
         return self.smu_read_multiple_current(n, self.vm2_smu_key, kwargs=kwargs)
 
     def vm2_read_multiple_voltage(self, n: int, kwargs=None) -> np.ndarray:
+        """
+        vm2_read_multiple_voltage
+
+        @author: Dominik Fischer
+        last update: 2026-08-25
+
+        Performs a voltage measurement by reading multiple voltage values from the SMU connected to the PCBs VM2 port.
+        In contrast to :py:meth:`pixcap65.pixcap.pixcap65.Pixcap65.vm2_advanced_voltage_multiple` only the measurement
+        result is fetched from the SMU, but the measurement must be done before callling this method.
+        The call to the SMU is only performed when the SMU is connected and active.
+        If no number of measurements is explicitly specified the number of measurements properties for the specified
+        smu is used.
+
+
+        This is the fast implementation for this purpose using directly dedicated functions of the SMU.
+        :param n: umber of measurements to be performed or None when the property should be used to determine the
+            number of measurements to perform.
+        :param kwargs: further keyword arguments to be forwarded to the call to the lab device by basil.
+        :return: array of the measured voltages in V; If the SMU is not active only NaN will be returned within the
+            array.
+        """
         return self.smu_read_multiple_voltage(n, self.vm2_smu_key, kwargs=kwargs)
     # endregion
 
@@ -2129,6 +2787,9 @@ class Pixcap65(Dut):
     def init_vm3(self, src_u, current_range, voltage_range=1.5, current_limit=0.001, plc=10):
         """
         init_vm3
+
+        @author: Dominik Fischer
+        last update: 2026-08-25
 
         Performs the initial setup for the SMU connected to the VM3 SMU port.
         The setup could only be performed when the SMU is connected and active.
@@ -2150,6 +2811,9 @@ class Pixcap65(Dut):
         """
         vm3_on
 
+        @author: Dominik Fischer
+        last update: 2026-08-25
+
         Turns the output of the SMU connected to the PCBs VM3 port on.
         The call to the SMU is only performed when the SMU is connected and active.
         """
@@ -2158,6 +2822,9 @@ class Pixcap65(Dut):
     def vm3_off(self):
         """
         vm3_off
+
+        @author: Dominik Fischer
+        last update: 2026-08-25
 
         Turns the output of the SMU connected to the PCBS VM3 port off.
         The call to the SMU is only performed when the SMU is connected and active.
@@ -2168,6 +2835,9 @@ class Pixcap65(Dut):
         """
         vm3_current_source
 
+        @author: Dominik Fischer
+        last update: 2026-08-25
+
         Sets the mode of the SMUs source connected to the PCBs VM3 port to sourcing current.
         A call to the SMU is only performed when the SMU is connected and active.
         """
@@ -2176,6 +2846,9 @@ class Pixcap65(Dut):
     def vm3_voltage_source(self):
         """
         vm3_voltage_source
+
+        @author: Dominik Fischer
+        last update: 2026-08-25
 
         Sets the mode of the SMUs source connect to the PCBs VM3 port to sourcing voltage.
         A call to the SMU is only performed when the SMU is connected and active.
@@ -2214,8 +2887,13 @@ class Pixcap65(Dut):
         """
         vm3_measure_current
 
+        @author: Dominik Fischer
+        last update: 2026-08-25
+
         Read the current through the SMU connected to the PCBs VM3 port. (Performs a current measurement in constant voltage mode.)
         The call to the SMU is only performed when the SMU is connected and active.
+        :return: measured current in A.
+        :rtype: float
         """
         return self.smu_measure_current(self.__vm3_smu_key, kwargs=self.smu_vm3_kwargs)
 
@@ -2223,14 +2901,23 @@ class Pixcap65(Dut):
         """
         vm3_measure_volts
 
+        @author: Dominik Fischer
+        last update: 2026-08-25
+
         Read the voltage over the SMU contacts connected to the PCBs VM3 port. (Performs a voltage measurement in constant current mode.)
         The call to the SMU is only performed when the SMU is connected and active.
+
+        :return: measured voltage in V.
+        :rtype: float
         """
         return self.smu_measure_voltage(self.__vm3_smu_key, kwargs=self.smu_vm3_kwargs)
 
     def vm3_averaged_current(self, n: int = 10):
         """
         vm3_averaged_current
+
+        @author: Dominik Fischer
+        last update: 2026-08-25
 
         Will perform a current measurement at the SMU connected to the PCBs VM3 port by measuring multiple times and read only the averaged value.
         If no number of measurements is explicitly specified the number of measurements properties for the
@@ -2247,6 +2934,9 @@ class Pixcap65(Dut):
         """
         vm3_averaged_voltage
 
+        @author: Dominik Fischer
+        last update: 2026-08-25
+
         Will perform a voltage measurement at the SMU connected to the PCBs VM3 port by measuring multiple times and read only the averaged value.
         If no number of measurements is explicitly specified the number of measurements properties for the
         smu is used.
@@ -2261,6 +2951,9 @@ class Pixcap65(Dut):
     def vm3_current_multiple(self, n: int):
         """
         vm3_current_multiple
+
+        @author: Dominik Fischer
+        last update: 2025-08-25
 
         Performs a current measurement by reading multiple current values from the SMU connected to the PCBs VM3 port. The full dataset of
         measurements will be returned.
@@ -2282,6 +2975,9 @@ class Pixcap65(Dut):
         """
         vm3_voltage_multiple
 
+        @author: Dominik Fischer
+        last update: 2025-08-25
+
         Performs a voltage measurement by reading multiple voltage values from the SMU connected to the PCBs VM3 port. The full dataset of
         measurements will be returned.
         The call to the SMU is only performed when the SMU is connected and active.
@@ -2301,6 +2997,9 @@ class Pixcap65(Dut):
     def vm3_advanced_current_multiple(self, n: int):
         """
         vm3_advanced_current_multiple
+
+        @author: Dominik Fischer
+        last update: 2026-08-25
 
         Performs a current measurement by reading multiple current values from the SMU connected to the PCBs VM3 port. The full dataset of
         measurements will be returned.
@@ -2322,6 +3021,9 @@ class Pixcap65(Dut):
         """
         vm3_advanced_voltage_multiple
 
+        @author: Dominik Fischer
+        last update: 2026-08-25
+
         Performs a voltage measurement by reading multiple voltage values from the SMU connected to the PCBs VM3 port.
         The full dataset of measurements will be returned.
         The call to the SMU is only performed when the SMU is connected and active.
@@ -2339,14 +3041,95 @@ class Pixcap65(Dut):
         return self.smu_advanced_voltage_multiple(n, self.__vm3_smu_key, kwargs=self.smu_vm3_kwargs)
 
     def vm3_initiate_multiple_current(self, n: int, kwargs=None):
+        """
+        vm3_initiate_multiple_current
+
+        @author: Dominik Fischer
+        last update: 2026-08-25
+
+        Performs a current measurement by reading multiple current values from the SMU connected to the PCBs VM3 port.
+        In contrast to :py:meth:`pixcap65.pixcap.pixcap65.Pixcap65.vm3_advanced_current_multiple` the measurement is
+        only initiated.
+        The measurement results are not fetched immediately.
+        The call to the SMU is only performed when the SMU is connected and active.
+        If no number of measurements is explicitly specified the number of measurements properties for the specified
+        smu is used.
+
+
+        This is the fast implementation for this purpose using directly dedicated functions of the SMU.
+        :param n: number of measurements to be performed or None when the property should be used to determine the
+            number of measurements to perform.
+        :param kwargs: further keyword arguments to be forwarded to the call to the lab device by basil.
+        """
         self.smu_initiate_multiple_current(n, self.vm3_smu_key, kwargs=kwargs)
 
     def vm3_initiate_multiple_voltage(self, n: int, kwargs=None):
+        """
+        vm3_initiate_multiple_voltage
+
+        @author: Dominik Fischer
+        last update: 2026-08-25
+
+        Performs a voltage measurement by reading multiple voltage values from the SMU connected to the PCBs VM3 port.
+        In contrast to :py:meth:`pixcap65.pixcap.pixcap65.Pixcap65.vm3_advanced_voltage_multiple` the measurement is
+        only initiated.
+        The call to the SMU is only performed when the SMU is connected and active.
+        If no number of measurements is explicitly specified the number of measurements properties for the specified
+        smu is used.
+
+
+        This is the fast implementation for this purpose using directly dedicated functions of the SMU.
+        :param n: umber of measurements to be performed or None when the property should be used to determine the
+            number of measurements to perform.
+        :param kwargs: further keyword arguments to be forwarded to the call to the lab device by basil.
+        """
         self.smu_initiate_multiple_voltage(n, self.vm3_smu_key, kwargs=kwargs)
 
     def vm3_read_multiple_current(self, n: int, kwargs=None) -> np.ndarray:
+        """
+        vm3_read_multiple_current
+
+        @author: Dominik Fischer
+        last update: 2026-08-25
+
+        Performs a current measurement by reading multiple current values from the SMU connected to the PCBs VM3 port.
+        In contrast to :py:meth:`pixcap65.pixcap.pixcap65.Pixcap65.vm3_advanced_current_multiple` only the measurement
+        result is fetched from the SMU, but the measurement must be done before callling this method.
+        The call to the SMU is only performed when the SMU is connected and active.
+        If no number of measurements is explicitly specified the number of measurements properties for the specified
+        smu is used.
+
+
+        This is the fast implementation for this purpose using directly dedicated functions of the SMU.
+        :param n: number of measurements performed or None when the property should be used to determine the
+            number of measurements to perform.
+        :param kwargs: further keyword arguments to be forwarded to the call to the lab device by basil.
+        :return: array of the measured currents in A; If the SMU is not active only NaN will be returned within the
+            array.
+        """
         return self.smu_read_multiple_current(n, self.vm3_smu_key, kwargs=kwargs)
 
     def vm3_read_multiple_voltage(self, n: int, kwargs=None) -> np.ndarray:
+        """
+        vm3_read_multiple_voltage
+
+        @author: Dominik Fischer
+        last update: 2026-08-25
+
+        Performs a voltage measurement by reading multiple voltage values from the SMU connected to the PCBs VM3 port.
+        In contrast to :py:meth:`pixcap65.pixcap.pixcap65.Pixcap65.vm3_advanced_voltage_multiple` only the measurement
+        result is fetched from the SMU, but the measurement must be done before callling this method.
+        The call to the SMU is only performed when the SMU is connected and active.
+        If no number of measurements is explicitly specified the number of measurements properties for the specified
+        smu is used.
+
+
+        This is the fast implementation for this purpose using directly dedicated functions of the SMU.
+        :param n: umber of measurements to be performed or None when the property should be used to determine the
+            number of measurements to perform.
+        :param kwargs: further keyword arguments to be forwarded to the call to the lab device by basil.
+        :return: array of the measured voltages in V; If the SMU is not active only NaN will be returned within the
+            array.
+        """
         return self.smu_read_multiple_voltage(n, self.vm3_smu_key, kwargs=kwargs)
     # endregion

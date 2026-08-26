@@ -1,13 +1,11 @@
-from typing import Any
-
 import time
 from bitarray import bitarray
+from typing import Any
 
 import pixcap65.utility.pixcap65_constants as c
 from pixcap65.pixcap.pixcap65 import Pixcap65
 
 if __name__ == "__main__":
-    # schedule this strange top-level script for removal! (for now it is uncommented)
     dut = Pixcap65("pixcap65.yaml")
     dut.init()
 
