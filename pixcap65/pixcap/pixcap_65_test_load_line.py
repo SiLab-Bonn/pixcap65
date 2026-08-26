@@ -4,8 +4,9 @@ Outputs in txt file the number of bits m that were set to 1 and the correspondin
 Calculate t_charge with t_charge = m/seq_size * 1/f_rep
 """
 
-import logging
+# TODO: implementation of this kind of measurement.
 
+import logging
 import numpy as np
 import time
 from bitarray import bitarray
@@ -39,6 +40,7 @@ class Pixcap65LoadLine(PixCap65Measurement):
         raise NotImplementedError("Pixcap65LoadLine.store_measurement_data")
 
     def __init__(self, scan_config, out_file):
+        # granularity of the clock sequencer must be set upfront.
         self.seq_size = LOAD_LINE_SEQ_SIZE
         super(Pixcap65LoadLine).__init__(scan_config, out_file)
 

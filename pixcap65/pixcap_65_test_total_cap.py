@@ -186,6 +186,9 @@ class PixCap65Measurement(Pixcap65BaseMeasurement, metaclass=ABCMeta):
 
     define the different measurement modes without implementating an actual measurement.
     Thus this class is abstract.
+
+    :ivar out_file_h5:
+    :vartype out_file_h5: tb.File
     """
 
     # instantiation

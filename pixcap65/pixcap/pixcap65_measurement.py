@@ -1,4 +1,3 @@
-
 # ----------------------------------------------------------
 #  Copyright (c) .
 #   All rights reserved
@@ -13,7 +12,6 @@ try:
 except ImportError:
     # for python 2.x or python 3.x with x < 7 we need a backport here
     from importlib_resources import files, as_file
-
 
 import logging
 import numpy as np
@@ -50,6 +48,9 @@ class MeasurementAbstract(object, metaclass=ABCMeta):
         """
         configure
 
+        @author: Dominik Fischer
+        last update: 2026-08-26
+
         Handling the configuration of the pixcap measurement object and the physical setup
         All information additionally required will be fetched from the scan configuration.
         Some of the configuration needs to be done subclass implementations as the different measurement types could
@@ -80,40 +81,45 @@ class MeasurementAbstract(object, metaclass=ABCMeta):
         """
         raise NotImplementedError("`scan` is abstract and therefore not implemented.")
 
+
 def load_firmware_main():
     """
-        load_firmware
+    load_firmware
 
-        @author: Dominik Fischer
-        @date: 2026-08-13
-        last update: 2026-08-13
+    @author: Dominik Fischer
+    @date: 2026-08-13
+    last update: 2026-08-13
 
-        Module function to load the firmware from modules resources and write to a file (if this file does not already exist)
-        to be loaded later on init of the measurement classes or the PixCap65 class itself.
-        """
+    Module function to load the firmware from modules resources and write to a file (if this file does not already exist)
+    to be loaded later on init of the measurement classes or the PixCap65 class itself.
+    """
     from argparse import ArgumentParser
     parser = ArgumentParser()
-    parser.add_argument("-c", "--config", action="store", default=None, help="configuration file or configuration mapping from which to determine the target location of the firmware.")
+    parser.add_argument("-c", "--config", action="store", default=None,
+                        help="configuration file or configuration mapping from which to determine the target location of the firmware.")
 
     arguments = parser.parse_args()
     load_firmware(arguments.config)
 
+
 def load_configuration_main():
     """
-        load_configuration
+    load_configuration
 
-        @author: Dominik Fischer
-        @date: 2026-08-13
-        last update: 2026-08-13
+    @author: Dominik Fischer
+    @date: 2026-08-13
+    last update: 2026-08-13
 
-        Module function to load the default configuration from the module/package resources and write to a file. (on disk)
-        Such that it could be used for initializing the PixCap65 class or the corresponding measurement classes.
-        """
+    Module function to load the default configuration from the module/package resources and write to a file. (on disk)
+    Such that it could be used for initializing the PixCap65 class or the corresponding measurement classes.
+    """
     from argparse import ArgumentParser
     parser = ArgumentParser()
-    parser.add_argument("-t", "--target", action="store", default=None, help="path where to write the default configuration to.")
+    parser.add_argument("-t", "--target", action="store", default=None,
+                        help="path where to write the default configuration to.")
     arguments = parser.parse_args()
     load_configuration(arguments.target)
+
 
 # TODO: test implementations on the actual device
 def load_firmware(config=None):
@@ -189,7 +195,17 @@ class Pixcap65BaseMeasurement(MeasurementAbstract, metaclass=ABCMeta):
     In particular it makes sure that the firmware and the configuration files are available to the measurement classes
     when they are needed.
     This base class also provides a context manager implementation for the actually implementing measurement subclasses.
+
+    :ivar dut: actual pixcap65 DUT in use
+    :vartype dut: Pixcap65
+    :ivar smu_range_config: mapping of the different smus connected to the PCBs ports to their
+        configuration mappings containing information about the specs of the measurement ranges and their uncertainties.
+    :ivar scan_config: mapping of the configuration of a scan over a sensor, including the pixel range to scan over.
+    :vartype scan_config: dict
+    :ivar out_file_h5: hdf file used to output the measurements.
+    :vartype out_file_h5: tb.File
     """
+
     def __init__(self, pix_config=None, **kwargs):
         super(Pixcap65BaseMeasurement, self).__init__(**kwargs)
         with configuration_context(pix_config) as config:
@@ -237,7 +253,6 @@ class Pixcap65BaseMeasurement(MeasurementAbstract, metaclass=ABCMeta):
         print("Exited from the pixcap chip!")
         return False
 
-
     # region Pixcap measurement properties
     @property
     def pixcap(self) -> Pixcap65:
@@ -265,6 +280,7 @@ class Pixcap65BaseMeasurement(MeasurementAbstract, metaclass=ABCMeta):
 
     @property
     def current_limit(self):
+        """Output current compliance limit to apply onto the primay measurement SMUs."""
         return self.scan_config.get(ScanConfigurationKeys.SMU_CURRENT_LIMIT, 0.0001)
 
     @property
@@ -274,6 +290,7 @@ class Pixcap65BaseMeasurement(MeasurementAbstract, metaclass=ABCMeta):
 
     @property
     def bias_limit(self):
+        """Output current compliance limit to apply onto the HV supply."""
         return self.scan_config.get(ScanConfigurationKeys.BIAS_CURRENT_LIMIT, 0.00000005)
 
     @property
@@ -357,7 +374,8 @@ class Pixcap65BaseMeasurement(MeasurementAbstract, metaclass=ABCMeta):
 
     @property
     def bias_averaging(self):
-        """Get whether leakage current measurement is in averaging mode.
+        """
+        Get whether leakage current measurement is in averaging mode.
         (Meaning: Whether multiple values are read per current measurement)
         """
         return ScanConfigurationKeys.BIAS_AVERAGE_MEASUREMENTS in self.scan_config and self.scan_config[
@@ -373,13 +391,22 @@ class Pixcap65BaseMeasurement(MeasurementAbstract, metaclass=ABCMeta):
     @property
     @abstractmethod
     def row_range(self):
+        """
+        Get the range of pixels within each pixcap measurement row for which a capacitance measurement should
+        be performed.
+        :return: range/iterable of pixel per column to be measured.
+        """
         raise NotImplementedError("`row_range` is abstract and therefore not implemented.")
 
     @property
     @abstractmethod
     def col_range(self):
+        """
+        Get the range of pixcap65 measurement columns on the chip for which pixel capacitance measurement are to be
+        performed.
+        :return: column range of the measurement.
+        """
         raise NotImplementedError("`col_range` is abstract and therefore not implemented.")
-
 
 @contextmanager
 def configuration_context(config):
@@ -393,6 +420,8 @@ def configuration_context(config):
     Will yield the final configuration mapping.
 
     :param config: configuration Mapping or path to configuration file
+    :return usable configuration for the basil to use a Pixcap65 setup.
+    :rtype str or pathlib.Path or Mapping
     """
     try:
         # What about correct firmware entries here?
@@ -420,10 +449,12 @@ def configuration_context(config):
         else:
             yield config
     except (AssertionError, FileNotFoundError):
-        logger.error("Could not find neither the default configuration file nor a configuration file with the provided name.")
+        logger.error(
+            "Could not find neither the default configuration file nor a configuration file with the provided name.")
         raise
 
 
+# TODO: looks like this enumeration of configuration keys is still incomplete.
 class ScanConfigurationKeys(StrEnum):
     """
     Enumeration object for type-safe access to the names of the scan configuration keys.
