@@ -115,7 +115,7 @@ def load_configuration_main():
     """
     from argparse import ArgumentParser
     parser = ArgumentParser()
-    parser.add_argument("-t", "--target", action="store", default=None,
+    parser.add_argument("-t", "--target", action="store", default="pixcap65.yaml",
                         help="path where to write the default configuration to.")
     arguments = parser.parse_args()
     load_configuration(arguments.target)
