@@ -20,7 +20,6 @@ uncertainties correctly.
 
 import numpy as np
 import tables as tb
-from matplotlib.backends.backend_pdf import PdfPages
 from typing import Union, Callable, Any
 
 from pixcap65.analysis_util import TABLES_ARRAY_TYPE, TABLES_TABLE_TYPE, GENERAL_PIXCAP_SHAPE, transform_covariance, \
@@ -66,12 +65,15 @@ def advanced_analysis_delegate(file: tb.File, group: tb.Group, current_hist: TAB
     plot = kwargs.pop("plot", False)
     plot_fit = HandleFitterStubClass()
     if plot:
+        from matplotlib.backends.backend_pdf import PdfPages
+
+        # it must be possible to load the analysis as well when not plotting engine is installed.
         plot_fit = HandleFitterGeneral()
-        output_pdf_name = f"{file.filename[:-3]}_{get_node_pathname(group).replace('/', '----')}_fit_results.pdf"
+        output_format = "{}_{}_fit_results.pdf"
+        output_pdf_name = output_format.format(file.filename[:-3],
+                                             get_node_pathname(group).replace('/', '----'))
         fit_plot_pdf = kwargs.pop("fit_plot_pdf", None)
-        if "output_pdf" in kwargs:
-            pass
-        elif fit_plot_pdf is not None and isinstance(fit_plot_pdf, PdfPages):
+        if fit_plot_pdf is not None and isinstance(fit_plot_pdf, PdfPages):
             kwargs['output_pdf'] = fit_plot_pdf
         elif isinstance(plot, PdfPages):
             kwargs['output_pdf'] = plot
@@ -98,7 +100,8 @@ def _perform_advanced_fit(file: tb.File, group: tb.Group, current_hist: np.ndarr
     @author: Dominik Fischer
     last update: 2026-08-12
 
-    Performs the actual fits (delegates it) for every pixel which has reasonable current measurements and saves the results back.
+    Performs the actual fits (delegates it) for every pixel which has reasonable current measurements and saves
+    the results back.
 
     :param file: .h5 file object containing the data to be analysed.
     :param group: hdf files' group containing the measurement data.
@@ -110,10 +113,12 @@ def _perform_advanced_fit(file: tb.File, group: tb.Group, current_hist: np.ndarr
     :key current_error_hist: 2D-Array for the errors of the current data. This keyword argument must be present
         for the advanced analysis strategy.
         :key use_kafe2: boolean, indicates whether kafe2 is used for the fit. (default: False)
-    :key plot: boolean, indicates whether to plot the data. An output PDF object could be submitted here instead of an explicitly created one. (Default: False)
+    :key plot: boolean, indicates whether to plot the data. An output PDF object could be submitted here instead of
+        an explicitly created one. (Default: False)
     :key apply_contour: boolean, indicates whether to determine the contours and try to plot them. (default: False)
     :key output_pdf: PdfPages object, to save the fit plot figures to (will override the plot object if provided)
-    :key is_inter_b: indicates whether this an analysis for the b-channel of the inter-pixel capacitances measurements, which would change the assumed voltage.
+    :key is_inter_b: indicates whether this an analysis for the b-channel of the inter-pixel capacitances measurements,
+        which would change the assumed voltage.
     """
     # extract the additional keyword arguments
     full_model = kwargs.pop("full_model", True)
@@ -199,6 +204,39 @@ def __perform_pixel_fit(currents: np.ndarray, current_errors: np.ndarray, freque
                         effective_label: str, effective_model: Callable[..., Any],
                         effective_parameter_dict: dict[str, str], full_model: bool, initial_guess: dict[str, float],
                         use_kafe2, inter_b=False) -> tuple[float, float, np.ndarray, Any, float, float, float, float]:
+    """
+    __perform_pixel_fit
+
+    @author: Dominik Fischer
+    last update: 2026-08-27
+
+    Perform the actual model fit to the measured currents for a single pixel.
+    To perform the actual fit either the `kafe2` framework or the `iminuit` framework is used.
+    When using the `kafe2` framework also the uncertainties of the settled frequencies by the stability of the MIOs PLL
+    are accounted for.
+
+    Besides the parameter estimators and their uncertainties, the full covariance matrix of the parameters is extracted.
+
+    :param currents: measured currents to perform the fit.
+    :param current_errors: uncertainties of the measured currents to perform the fit.
+    :param frequencies: frequencies corresponding to the measured currents to perform the fit.
+    :param effective_expression: latex expression of the model function.
+    :param effective_label: latex expression to label the model function.
+    :param effective_model: model function to be used for the fit.
+    :param effective_parameter_dict: mapping of all the parameter names to their latex expression
+        (soley for visualization).
+    :param full_model: Whether the full model is used. This information is necessary to decide whether to extract
+        the on-resistance estimator from the fit.
+    :type full_model: bool
+    :param initial_guess: mapping of the models parameter names to their initial guess, which is necessary to start the
+        iteration which fits the model.
+    :param use_kafe2: whether to use Kafe2 framework or not.
+    :type use_kafe2: bool
+    :param inter_b: whether this is analysis for the B channel of the inter-pixel analysis. In this case the voltage
+        over the capacitance is -2V instead of the usual +1V.
+    :return: tuple of determined capacitance, its uncertainty, the covariance matrix, the fitting object itself,
+        the leakage current estimator, its uncertainty, the on-resistance estimator and its uncertainty.
+    """
     resistor = np.nan
     resistor_error = np.nan
     if use_kafe2:

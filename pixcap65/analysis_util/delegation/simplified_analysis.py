@@ -42,7 +42,9 @@ def analyze_data_delegate(file: tb.File, group: tb.Group, current_hist: TABLES_A
     Therefore, the covariance matrix of these fits is not suitable to estimate the uncertainties of the capacitances.
 
     :param file: h5 file object containing the data to be analysed.
+    :type file: tb.File
     :param group: hierarchy group of the opened hdf file to write the analysis results to.
+    :type group: tb.Group
     :param current_hist: 2D-Array for the current data to fit the model to.
     :param scan_parameters: table of the scan parameters used for each measurement point within the frequency and/or
         voltage scan.
@@ -85,30 +87,24 @@ def analyze_data_delegate(file: tb.File, group: tb.Group, current_hist: TABLES_A
             fit_cov[col, row] = cov
 
     # Store capacitance values
-    create_carray(file, group,
-                                    name=kwargs.get("cap_name", "HistCap"),
-                                    title=kwargs.get("cap_title", "Capacitance Histogram"),
-                                    obj=cap_hist,
-                                    filters=GLOBAL_FILTERS, unit="F")
-    create_carray(file, group,
-                                    name=kwargs.get("cap_err_name", "HistCapErr"),
-                                    title=kwargs.get("cap_err_title", "Capacitance Error Histogram"),
-                                    obj=cap_error_hist,
-                                    filters=GLOBAL_FILTERS, unit="F")
+    create_carray(file, group, name=kwargs.get("cap_name", "HistCap"),
+                  title=kwargs.get("cap_title", "Capacitance Histogram"),
+                  obj=cap_hist,
+                  filters=GLOBAL_FILTERS, unit="F")
+    create_carray(file, group, name=kwargs.get("cap_err_name", "HistCapErr"),
+                  title=kwargs.get("cap_err_title", "Capacitance Error Histogram"),
+                  obj=cap_error_hist,
+                  filters=GLOBAL_FILTERS, unit="F")
 
-    create_carray(file, group,
-                                    name=kwargs.get("leak_name", "HistLeak"),
-                                    title=kwargs.get("leak_title", "Leakage Current Histogram"),
-                                    obj=leak_hist,
-                                    filters=GLOBAL_FILTERS, unit="nA")
-    create_carray(file, group,
-                                    name=kwargs.get("leak_error_name", "HistLeakErr"),
-                                    title=kwargs.get("leak_error_title", "Leakage Current Error Histogram"),
-                                    obj=leak_error_hist,
-                                    filters=GLOBAL_FILTERS, unit="nA")
+    create_carray(file, group, name=kwargs.get("leak_name", "HistLeak"),
+                  title=kwargs.get("leak_title", "Leakage Current Histogram"),
+                  obj=leak_hist,
+                  filters=GLOBAL_FILTERS, unit="nA")
+    create_carray(file, group, name=kwargs.get("leak_error_name", "HistLeakErr"),
+                  title=kwargs.get("leak_error_title", "Leakage Current Error Histogram"),
+                  obj=leak_error_hist,
+                  filters=GLOBAL_FILTERS, unit="nA")
 
-    create_carray(file, group,
-                                    name=kwargs.get("cov_name", "HistFitCov"),
-                                    title=kwargs.get("cov_title", 'Fit Covariance Matrix'),
-                                    obj=fit_cov, filters=GLOBAL_FILTERS, unit="{{F^2, F nA},{nA F, nA^2}}"
-                                    )
+    create_carray(file, group, name=kwargs.get("cov_name", "HistFitCov"),
+                  title=kwargs.get("cov_title", 'Fit Covariance Matrix'),
+                  obj=fit_cov, filters=GLOBAL_FILTERS, unit="{{F^2, F nA},{nA F, nA^2}}")
