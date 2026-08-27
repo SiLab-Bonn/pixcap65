@@ -1,3 +1,7 @@
+"""
+Module for delegation functions to perform the actual fits in order to determine the capacitances from current
+measurements.
+"""
 # ----------------------------------------------------------
 #  Copyright (c) 2026. SiLab, Institute of Physics, University of Bonn.
 #
@@ -36,6 +40,29 @@ PERFORM_PIXEL_TYPE = np.dtype([('C', np.float64), ('Cerr', np.float64),
 
 
 def __declare_fit_model(full_model) -> tuple[int, Callable[..., Any], str, str, dict[str, str], dict[str, float]]:
+    """
+    __declare_fit_model
+
+    @author: Dominik Fischer
+    last update: 2026-08-27
+
+    Select the implementation to model the dependency of the measured currents onto the switching-frequency and provide
+    parameter names for this model and their corresponding default/initial values.
+    Some special fit models could be requested by providing a str key to `full_model`.
+    By providing `extended`, the model which using the exponential approximation of the charging voltage at the
+    capacitance is used.
+    By providing `quad` a frequency behaviour like for a second-order low-pass filter is assumed for modelling of the
+    frequency dependence.
+
+
+    :param full_model: whether to apply the full capacitance model to the data. Instead of a boolean value also the
+        values `extended` and `quad` are allowed.
+    :type full_model: str | bool
+    :return: tuple of the target dimension of the covariance matrix, the fitting model, its latex expression, its label,
+        a mapping of the parameter names to their latex expressions and a mapping of the parameter names to their
+        initial guesses.
+    :rtype: tuple[int, Callable[..., Any], str, str, dict[str, str]]
+    """
     if isinstance(full_model, str) and full_model == "extended":
         effective_model = extended_full_capacitance_model
         effective_label = FULL_MODEL_LABEL

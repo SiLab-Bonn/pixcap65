@@ -23,6 +23,7 @@ try:
     import numba as nb
 except ImportError:
     class nb:
+        """Mimics parts of the `numba` package."""
         @classmethod
         def njit(cls, **kwargs):
             """Placeholder function for numba to not break code if numba is not installed"""
@@ -42,6 +43,7 @@ def full_capacitance_model(freq, c=1e-6, r=1e6, i=0, u0=1):
 
     Full model of the frequency dependence of the measured current in order to determine the capacitance.
     This model in particular should correct for a voltage-drop over the switching-transistors on-resistance.
+
     :param freq: switching frequency for which the current should be predicted.
     :param c: capacitance of the circuit tested.
     :param r: resistance of the circuit tested and the measurement circuit (most likely the on-resistance).
@@ -61,9 +63,10 @@ def extended_full_capacitance_model(freql, c=1e-6, r=1e6, i=0, u0=1, tau=1.0):
     last update: 2026-08-24
 
     Extension of the modelling implementation
-    :func:`pixcap65.analysis_util.modelling.physics_modelling.full_capacitance_model`.
+    :py:func:`pixcap65.analysis_util.modelling.physics_modelling.full_capacitance_model`.
     This particular model also accounts for the exponential dependence of the voltage over the capacitance
     depending on the charging time.
+
     :param freql: switching frequency for which the current should be predicted.
     :param c: capacitance of the circuit tested.
     :param r: resistance of the circuit tested and the measurement circuit (most likely the on-resistance).
@@ -84,7 +87,7 @@ def enhanced_full_capacitance_model(freq, c=1e-6, r=1e6, i=0, u0=1):
     last update: 2026-08-24
 
     Extension of the modelling implementation
-    :func:`pixcap65.analysis_util.modelling.physics_modelling.full_capacitance_model`.
+    :py:func:`pixcap65.analysis_util.modelling.physics_modelling.full_capacitance_model`.
     For this particular model it is assumed that the combination of the switching-transistors on-resistance and the
     RC-low pass filter on the PCB result in behaviour like a second-order low-pass filter.
 
@@ -103,10 +106,11 @@ def enhanced_full_capacitance_model(freq, c=1e-6, r=1e6, i=0, u0=1):
 def grad_full_capacitance_model(freq, c=1e-6, r=1e6, i=0, u0=1):
     """
     Utility to estimate the gradient of the full capacitance model
-    :func:`pixcap65.analysis_util.modelling.physics_modelling.full_capacitance_model`
+    :py:func:`pixcap65.analysis_util.modelling.physics_modelling.full_capacitance_model`
     in parameter space.
     This could be useful to boost fitting algorithms with an analytic expression for the gradient when using gradient
     based procedures.
+
     :param freq: switching frequency for which the current should be predicted.
     :param c: capacitance of the circuit tested.
     :param r: resistance of the circuit tested and the measurement circuit (most likely the on-resistance).
@@ -145,7 +149,7 @@ def simple_capacitance_model(freq, c=1e-6, i=0, u0=1):
 def grad_simple_capacitance_model(freq, c=1e-6, i=0, u0=1):
     """
     Utility to estimate the gradient of the simplified capacitance model
-    :func:`pixcap65.analysis_util.modelling.physics_modelling.simple_capacitance_model`
+    :py:func:`pixcap65.analysis_util.modelling.physics_modelling.simple_capacitance_model`
     in parameter space.
     This could be useful to boost fitting algorithms with an analytic expression for the gradient when using gradient
     based procedures.
@@ -192,6 +196,7 @@ def grad_depletion_model(x, a=1, b=0):
 def model_depletion(voltages, NAD=5e15, V=SILICON_V_BIAS, dep=-10, sat=1):
     """
     Modelling the dependence of the depletion width/depth in dependence on the bias voltage when applying reversed-bias.
+
     :param voltages: bias voltages
     :param NAD: combined donator-acceptor-density.
     :param V: bias voltage/threshold voltage of the semiconductor
@@ -208,6 +213,7 @@ def model_depletion(voltages, NAD=5e15, V=SILICON_V_BIAS, dep=-10, sat=1):
 def semi_bias_model(voltages, bias=SILICON_V_BIAS, thermic=1, i=1):
     """
     Implements the Shottky-Model for the current through a semiconducting diode
+
     :param voltages: voltage(s) used for biasing the sensor
     :param bias: bias voltage/threshold voltage of the semiconductor
     :param thermic: thermic energy at the time of the measurement (given by the room temperature and the boltzmann constant)
@@ -237,6 +243,7 @@ def gauss_model_s(x, u=0, s=1):
     Implementation of a normal distribution to model the histogram of the capacitance values over a (full) sensor in
     order to estimate the spread of the capacitances' over a sensor.
     This is particular implementation is for usage for normalized data.
+
     :param x: capacitance bin
     :param u: average value/central value of the capacitance of the sensor
     :param s: spread of the capacitance of the sensor
@@ -250,6 +257,7 @@ def log_gauss_model(x, u=0, s=1):
     """
     Implementation of a normal distribution (its natural logarithm) to model the histogram of the capacitance values over a (full) sensor in
     order to estimate the spread of the capacitances' over a sensor.
+
     :param x: capacitance bin
     :param u: average value/central value of the capacitance of the sensor
     :param s: spread of the capacitance of the sensor
@@ -264,6 +272,7 @@ def extended_gauss_model(x, b=1, u=0, s=1):
     Implementation of a normal distribution (its natural logarithm) to model the histogram of the capacitance values over a (full) sensor in
     order to estimate the spread of the capacitances' over a sensor.
     Parameterisation is intended for extended NLL fit.
+
     :param x: capacitance bin
     :param u: average value/central value of the capacitance of the sensor
     :param s: spread of the capacitance of the sensor
@@ -278,6 +287,7 @@ def extended_gauss_integral(xe, b=1, u=0, s=1):
     """
     implementation of the cumulative distribution of a normal distribution to model the histogram of the capacitance
     values over a (full) sensor by an extended NLL fit.
+
     :param xe: bin and lower edge for the cumulative distribution
     :param b: normalisation factor for the extended NLL fit.
     :param u: average value/central value of the capacitance of the sensor.
