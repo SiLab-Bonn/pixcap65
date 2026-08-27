@@ -1806,10 +1806,10 @@ def _get_analyze(is_advanced: bool) -> Callable[..., None]:
     :return: callable to delegate the analysis to
     """
     if is_advanced:
-        from pixcap65.advanced_analysis import advanced_analysis_delegate
+        from pixcap65.analysis_util.delegation.enhanced_analysis import advanced_analysis_delegate
         perform_analysis = advanced_analysis_delegate
     else:
-        from pixcap65.analysis_util import analyze_data_delegate
+        from pixcap65.analysis_util.delegation.simplified_analysis import analyze_data_delegate
         perform_analysis = analyze_data_delegate
     return perform_analysis
 
@@ -2775,7 +2775,7 @@ def get_depletion_fit(cap_data: np.ndarray, cap_error_data: np.ndarray, voltage_
             first_dep_errors = np.array([m.errors['a'], m.errors['b']])
             first_dep_cov = m.covariance
             if plot:
-                from pixcap65.threaded_plotting import threading_lock
+                from pixcap65.plotting_util.threaded_plotting import threading_lock
                 with threading_lock:
                     handle_minuit_advanced_options(m, apply_contours, "$U$ / \\unit{{\\volt}}",
                                                    "$\\frac{{1}}{{C^2}}$ / \\unit{{\\per\\femto\\farad\\squared}}",

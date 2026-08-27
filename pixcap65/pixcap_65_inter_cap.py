@@ -19,7 +19,7 @@ from pixcap65.analysis import analysis_data_handle
 from pixcap65.analysis_util import GENERAL_PIXCAP_SHAPE
 from pixcap65.analysis_util.utility import HIST_CURRENT_MEAS_UNIT, handle_analysis_mix_up
 from pixcap65.pixcap.pixcap65_measurement import ScanConfigurationKeys, declare_logger
-from pixcap65.pixcap_65_test_total_cap import PixCap65Measurement, MEASURING_PIXEL_TEXT, \
+from pixcap65.pixcap_65_total_cap import PixCap65Measurement, MEASURING_PIXEL_TEXT, \
     _store_scan_par_values
 from pixcap65.utility import pixcap65_constants as c
 from pixcap65.utility.tables_util import set_group_attribute

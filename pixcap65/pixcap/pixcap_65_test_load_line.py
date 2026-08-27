@@ -11,7 +11,7 @@ import numpy as np
 import time
 from bitarray import bitarray
 
-from pixcap65.pixcap_65_test_total_cap import PixCap65Measurement
+from pixcap65.pixcap_65_total_cap import PixCap65Measurement
 from pixcap65.utility import pixcap65_constants as c
 
 LOAD_LINE_SEQ_SIZE = 128

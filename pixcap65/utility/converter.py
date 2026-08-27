@@ -26,7 +26,7 @@ from examples.data_constants import R11_SCAN_FILE
 from pixcap65.analysis_util.utility import HIST_BIAS_MEAS_UNIT, HIST_CURRENT_MEAS_UNIT, GLOBAL_FILTERS
 from pixcap65.configs.config_handler import extract_smu_voltage_error, extract_smu_current_error
 from pixcap65.pixcap.pixcap65_measurement import ScanConfigurationKeys
-from pixcap65.pixcap_65_test_total_cap import BiasTable
+from pixcap65.pixcap_65_total_cap import BiasTable
 from pixcap65.utility.tables_util import set_group_attribute, group_get_file, get_groups, list_group_attributes, \
     get_group_attribute
 from pixcap65.utility.utils_2 import UNITS_ATTRIBUTE_KEY, prevent_group_mix_up

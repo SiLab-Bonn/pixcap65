@@ -15,7 +15,7 @@ from pixcap65.analysis import analyze_data
 from pixcap65.analysis_util import GENERAL_PIXCAP_SHAPE, CURRENT_CONVERSION_FACTOR
 from pixcap65.analysis_util.utility import get_base_group
 from pixcap65.pixcap.pixcap65_measurements import NUMBER_AVERAGE_MEASUREMENTS_KEY
-from pixcap65.pixcap_65_test_total_cap import scan_configuration, PixCap65TotalCap
+from pixcap65.pixcap_65_total_cap import scan_configuration, PixCap65TotalCap
 from pixcap65.utility.tqdm_logging_utils import logging_redirect_tqdm
 from pixcap65.utility.utils_2 import create_carray
 from pixcap65.utils import PixCapSetup
