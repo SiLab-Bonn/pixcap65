@@ -28,7 +28,7 @@ from basil.dut import Dut, Base
 from enum import StrEnum
 from typing import Optional, OrderedDict, Union
 
-from pixcap65.pixcap_65_test_total_cap import PixCap65Measurement
+from pixcap65.pixcap_65_total_cap import PixCap65Measurement
 from pixcap65.utility.basil_utils import extract_basil_layers
 
 logger = logging.getLogger(__name__)
@@ -302,10 +302,10 @@ class PixCapSetup(Dut):
             self.measurement_arguments = pix_args
             match measurement:
                 case PixcapMeasurements.TOTAL_CAPACITANCE:
-                    from pixcap65.pixcap_65_test_total_cap import PixCap65TotalCap
+                    from pixcap65.pixcap_65_total_cap import PixCap65TotalCap
                     self.measurement_class = PixCap65TotalCap
                 case PixcapMeasurements.INTER_CAPACITANCE:
-                    from pixcap65.pixcap_65_test_inter_cap import Pixcap65InterCap
+                    from pixcap65.pixcap_65_inter_cap import Pixcap65InterCap
                     self.measurement_class = Pixcap65InterCap
                 case _:
                     raise ValueError("provided measurement class does not exist.")
@@ -639,7 +639,7 @@ class PixCapSetup(Dut):
 
 
 if __name__ == "__main__":
-    from pixcap_65_test_total_cap import scan_configuration
+    from pixcap_65_total_cap import scan_configuration
 
     with PixCapSetup(scan_configuration, "Setup_Demonstration.h5",
                      measurement=PixcapMeasurements.TOTAL_CAPACITANCE) as setup:

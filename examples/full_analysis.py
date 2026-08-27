@@ -40,7 +40,7 @@ import threading
 from matplotlib.backends.backend_pdf import PdfPages
 
 import examples.data_constants as data_constants
-import pixcap65.threaded_plotting as threaded_plotting
+import pixcap65.plotting_util.threaded_plotting as threaded_plotting
 from examples.data_constants import E1_SCAN_FILE, E1_2_SCAN_FILE, R13_2_SCAN_FILE, R11_SCAN_FILE, X4_SCAN_FILE
 from examples.data_constants import X1_SCAN_2_FILE, X2_SCAN_2_FILE, X2_SCAN_FILE
 from examples.data_constants import X5_SCAN_FILE, X6_SCAN_FILE, X7_SCAN_FILE
