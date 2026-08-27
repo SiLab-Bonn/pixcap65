@@ -1,3 +1,8 @@
+"""
+Utility module to test some of the properties of the equipment and the actual measurement setup.
+These helper functions could also be used to determine and tune settling times after changeing parameters of the
+measurements like the frequency used to toggle the pixels.
+"""
 import numpy as np
 import tables as tb
 import time
@@ -7,6 +12,7 @@ from tqdm import tqdm
 from typing import Iterable
 
 from pixcap65.analysis import analyze_data
+from pixcap65.analysis_util import GENERAL_PIXCAP_SHAPE, CURRENT_CONVERSION_FACTOR
 from pixcap65.analysis_util.utility import get_base_group
 from pixcap65.pixcap.pixcap65_measurements import NUMBER_AVERAGE_MEASUREMENTS_KEY
 from pixcap65.pixcap_65_test_total_cap import scan_configuration, PixCap65TotalCap
@@ -16,6 +22,16 @@ from pixcap65.utils import PixCapSetup
 
 
 def test_frequency_settling_2(settling_range: Iterable, file_name: str):
+    """
+    Performs test measurements using the pixcap65 chip for different frequency settling times.
+    Using the results it should be possible to determine a suitable settling time for the measurements.
+
+    @author: Dominik Fischer
+    last update: 2026-08-26
+
+    :param settling_range: range of settling times to try.
+    :param file_name: name of the .h5 file to write the results to.
+    """
     configuration = {
         'start_column': 20,
         'stop_column': 24,
@@ -31,14 +47,14 @@ def test_frequency_settling_2(settling_range: Iterable, file_name: str):
     }
     settling_range = np.asarray(settling_range)
     settling_path = {}
-    # for settling_time in settling_range:
-    #     settling_path[settling_time] = "settling-time-{}".format(settling_time).replace('.', '_')
+
     with PixCapSetup(configuration, file_name) as pix, logging_redirect_tqdm():
         for settling_time in tqdm(settling_range, desc="Settling time"):
             pix.pixcap.frequency_settling = settling_time
             settling_path[settling_time] = "settling-time-{}".format(settling_time).replace('.', '_')
             try:
                 pix.pixcap.binary_active = True
+                # CHECK: verify whether this is using the correct api after all.
                 pix._smu_setup(pix.pixcap.primary_smu_key).binary_format()
                 pix.pixcap[pix.pixcap.primary_smu_key].set_current_nlpc(1)
                 pix.scan(data_group_spec=settling_path[settling_time])
@@ -50,13 +66,14 @@ def test_frequency_settling_2(settling_range: Iterable, file_name: str):
     # perform the analysis of these different paths.
     with PdfPages(file_name[:-3] + '.pdf') as output_pdf:
         for settling_time in settling_range:
-            print(f"processing the settling time {settling_time} s")
-            analyze_data(raw_data=file_name, base_path=configuration['data_path'] + "/" + settling_path[settling_time], is_advanced=True, full_model=False, plot=True, apply_contour=False, fit_plot_pdf=output_pdf)
+            print("processing the settling time {settling_time} s".format(settling_time=settling_time))
+            analyze_data(raw_data=file_name, base_path=configuration['data_path'] + "/" + settling_path[settling_time],
+                         is_advanced=True, full_model=False, plot=True, apply_contour=False, fit_plot_pdf=output_pdf)
             analyze_data(raw_data=file_name, base_path=configuration['data_path'] + settling_path[settling_time],
                          is_advanced=True, full_model=True, plot=True, apply_contour=True, fit_plot_pdf=output_pdf)
 
     # extract the dependencies for the chip from the measured error
-    error_data = np.full((40, 40, settling_range.shape[0]), fill_value=np.nan)
+    error_data = np.full((GENERAL_PIXCAP_SHAPE[0], GENERAL_PIXCAP_SHAPE[1], settling_range.shape[0]), fill_value=np.nan)
     with tb.open_file(file_name, 'a') as h5_file, PdfPages(file_name[:-3] + "comparison" + '.pdf') as output_pdf:
         create_carray(h5_file, h5_file.root, "HistSettlingTime", obj=settling_range)
         for k, settling_time in enumerate(settling_range):
@@ -67,12 +84,12 @@ def test_frequency_settling_2(settling_range: Iterable, file_name: str):
         create_carray(h5_file, h5_file.root, "HistErrSettling", obj=error_data)
 
         # last plot the dependency for every pixel
-        for ii, jj in np.ndindex((40, 40)):
+        for ii, jj in np.ndindex(GENERAL_PIXCAP_SHAPE):
             if np.all(~np.isfinite(error_data[ii, jj])):
                 continue
             fig, ax = plt.subplots()
             ax.plot(settling_range, error_data[ii, jj, :])
-            ax.set_title(f"Frequency settling results for pixel ({ii}, {jj}).")
+            ax.set_title("Frequency settling results for pixel ({ii}, {jj}).".format(ii=ii, jj=jj))
             ax.set_xlabel("Settling time in s")
             ax.set_ylabel("Error of C")
             output_pdf.savefig(fig, bbox_inches='tight')
@@ -80,6 +97,18 @@ def test_frequency_settling_2(settling_range: Iterable, file_name: str):
 
 
 def test_frequency_settling(settling_range: Iterable, file_name: str):
+    """
+    Performs test measurements using the pixcap65 chip for different frequency settling times.
+    Using the results it should be possible to determine a suitable settling time for the measurements.
+    How suited the choice of the settling time is could be estimated from the differences in capacitance estimation
+    between sweeping the frequencies up and sweeping them down.
+
+    @author: Dominik Fischer
+    last update: 2026-08-26
+
+    :param settling_range: range of settling times to try.
+    :param file_name: name of the .h5 file to write the results to.
+    """
     special_config = scan_configuration.copy()
     special_config["double_sweep"] = True
     special_config[NUMBER_AVERAGE_MEASUREMENTS_KEY] = 10
@@ -89,12 +118,13 @@ def test_frequency_settling(settling_range: Iterable, file_name: str):
         cmap = cm.get_cmap('viridis')
         with PdfPages("Settling_Measurement.pdf") as output_pdf:
             for t in settling_range:
-                settling_name = f"{t}_frequency_settling".replace(" ", "__").replace("-", "_")
+                settling_name = "{t}_frequency_settling".format(t=t).replace(" ", "__").replace("-", "_")
                 pix.pixcap.frequency_settling = t
                 pix.scan(data_group_spec=settling_name)
+
             for t in settling_range:
-                print(f"Testing the settling time for {t}")
-                settling_name = f"{t}_frequency_settling".replace(" ", "__").replace("-", "_")
+                print("Testing the settling time for", t)
+                settling_name = "{t}_frequency_settling".format(t=t).replace(" ", "__").replace("-", "_")
                 # prepare the plotting here
                 # Read pixel map
                 current_hist = pix.out_file_h5.root[settling_name].total_cap.measurements.HistCurr[:]
@@ -109,9 +139,9 @@ def test_frequency_settling(settling_range: Iterable, file_name: str):
                     for row in range(0, current_hist.shape[1]):
                         if np.isfinite(current_hist[col, row, 0]):
                             fig, ax = plt.subplots()
-                            ax.plot(first_frequencies, current_hist[col, row, :n_freq] * 1e9, marker='o', ls='',
+                            ax.plot(first_frequencies, current_hist[col, row, :n_freq] * CURRENT_CONVERSION_FACTOR, marker='o', ls='',
                                     label='Pixel({i_col},{i_row}) 1'.format(i_col=col, i_row=row), color=cmap(0.2))
-                            ax.plot(second_frequencies, current_hist[col, row, n_freq:] * 1e9, marker='o', ls='',
+                            ax.plot(second_frequencies, current_hist[col, row, n_freq:] * CURRENT_CONVERSION_FACTOR, marker='o', ls='',
                                     label='Pixel({i_col},{i_row}) 2'.format(i_col=col, i_row=row), color=cmap(0.6))
                             print("operating for pixel {i_col},{i_row}".format(i_col=col, i_row=row))
                             print(current_hist[col, row, :n_freq] - np.flip(current_hist[col, row, n_freq:]))
@@ -123,14 +153,28 @@ def test_frequency_settling(settling_range: Iterable, file_name: str):
                                     col, row, -2, :])
                             ax.set_ylabel('Current / nA')
                             ax.set_xlabel('Frequency / MHz')
-                            ax.set_title(f"Frequency settling test for currents and settling time {t}")
+                            ax.set_title("Frequency settling test for currents and settling time {t}".format(t=t))
                             ax.legend()
                             ax.grid()
                             output_pdf.savefig(fig, bbox_inches='tight')
 
 
 def test_source_settling(settling_range: Iterable, file_name: str):
+    """
+    Performs test measurements using the pixcap65 chip for different frequency settling times.
+    Using the results it should be possible to determine a suitable settling time for the measurements.
+    The goal of this implementation is to determine the settling time after changes of output voltage of the biasing HV
+    SMU.
+
+    @author: Dominik Fischer
+    last update: 2026-08-26
+
+    :param settling_range: range of settling times to try.
+    :param file_name: name of the .h5 file to write the results to.
+    :return:
+    """
     settling_times = np.asarray(settling_range)
+    # CHECK: is this API of the measurement classes still usable.
     with PixCap65TotalCap(scan_configuration, file_name) as pix:
         pix.pixcap.bias_voltage = -0.1
         pix.pixcap.bias_on()
@@ -149,7 +193,7 @@ def test_source_settling(settling_range: Iterable, file_name: str):
             pix.pixcap.bias_voltage = -20
             start = time.time()
             result = pix.pixcap.bias_advanced_current_multiple(10)[1::2]
-            print(f"It takes {time.time() - start} seconds.")
+            print("It takes {} seconds.".format(time.time() - start))
             print(result)
             pix.pixcap.bias_voltage = -0.1
             time.sleep(1)
@@ -168,6 +212,17 @@ def test_source_settling(settling_range: Iterable, file_name: str):
 
 
 def test_reading_speed(smu, file_name: str, config: dict, reading_range: Iterable, n_tests=10):
+    """
+    Utility function to investigate the reading speed of the SMUs.
+    Goal is to estimate how many current measurements are reasonable, compared to the increase in measurement time.
+
+
+    :param smu: key of the smu in the configuration file to access it by `basil`.
+    :param file_name: name of the .h5 file to write the results to.
+    :param config: configuration file for the pixcap65 dut for use with `basil`.
+    :param reading_range: iterable of voltages to set
+    :param n_tests: number of test measurements to take.
+    """
     reading_range = np.asarray(reading_range)
     with PixCap65TotalCap(config, file_name) as pix:
         try:
@@ -180,20 +235,32 @@ def test_reading_speed(smu, file_name: str, config: dict, reading_range: Iterabl
         start = time.time()
         pix.pixcap[smu].get_current()
         diff = time.time() - start
-        print(f"Single measurement takes {diff} seconds.")
+        print("Single measurement takes {diff} seconds.".format(diff=diff))
         for n_readings in reading_range:
-            print(f"Test for {n_readings} readings.")
+            print("Test for {n_readings} readings.".format(n_readings=n_readings))
             start = time.time()
             for _ in range(n_tests):
                 pix.pixcap.smu_advanced_current_multiple(n_readings, smu)
             diff = time.time() - start
-            print(f"{n_readings} take {diff / n_tests} seconds each.")
+            print("{} take {} seconds each.".format(n_readings, diff / n_tests))
 
         pix.pixcap[pix.pixcap.smu_setup_devices[smu]].drain_error_queue()
         pix.pixcap.bias_off()
 
 
 def test_reading_speed_adv(smu, file_name: str, config: dict, reading_range: Iterable, n_tests=10):
+    """
+    Utility function to investigate the reading speed of the SMUs.
+    Goal is to estimate how many current measurements are reasonable, compared to the increase in measurement time.
+    Here a binary readout of the SMU is attempted compare it to the usual string based readout.
+
+
+    :param smu: key of the smu in the configuration file to access it by `basil`.
+    :param file_name: name of the .h5 file to write the results to.
+    :param config: configuration file for the pixcap65 dut for use with `basil`.
+    :param reading_range: iterable of voltages to set
+    :param n_tests: number of test measurements to take.
+    """
     reading_range = np.asarray(reading_range)
     from basil.dut import Base
     basis = Base("pixcap65.yaml")
@@ -212,7 +279,7 @@ def test_reading_speed_adv(smu, file_name: str, config: dict, reading_range: Ite
             pix.pixcap[pix.pixcap.smu_setup_devices[smu]].binary_format()
             internal_smu.set_current_nlpc(1)
             for n_readings in reading_range:
-                print(f"Test for {n_readings} readings.")
+                print("Test for {n_readings} readings.".format(n_readings=n_readings))
                 internal_smu.set_number_measurements(n_readings)
                 try:
                     internal_smu.set_number_triggers(n_readings)
@@ -222,7 +289,7 @@ def test_reading_speed_adv(smu, file_name: str, config: dict, reading_range: Ite
                 for _ in range(n_tests):
                     internal_smu.get_advanced_current(binary_enabled=True, data_points=n_readings)
                 diff = time.time() - start
-                print(f"{n_readings} take {diff / n_tests} seconds each.")
+                print("{} take {} seconds each.".format(n_readings, diff / n_tests))
 
         finally:
             pix.pixcap[pix.pixcap.smu_setup_devices[smu]].text_format()

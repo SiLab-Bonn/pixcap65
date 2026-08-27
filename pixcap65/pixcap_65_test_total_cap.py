@@ -26,7 +26,13 @@ measurement accuracy.
 from __future__ import annotations
 
 from collections import OrderedDict
-from importlib.resources import files
+
+try:
+    # python 3.7 and above implementations for these operations
+    from importlib.resources import files
+except ImportError:
+    # for python 2.x or python 3.x with x < 7 we need a backport here
+    from importlib_resources import files
 
 import gc
 import logging
@@ -49,7 +55,7 @@ from pixcap65.analysis import analysis_data_handle
 from pixcap65.analysis_util.utility import HIST_CURRENT_MEAS_UNIT, HIST_BIAS_MEAS_UNIT, handle_analysis_mix_up
 from pixcap65.configs.config_handler import extract_smu_current_error, extract_smu_voltage_error
 from pixcap65.pixcap.pixcap65 import Pixcap65
-from pixcap65.pixcap.pixcap65_measurement import Pixcap65BaseMeasurement, ScanConfigurationKeys
+from pixcap65.pixcap.pixcap65_measurement import Pixcap65BaseMeasurement, ScanConfigurationKeys, declare_logger
 from pixcap65.pixcap.pixcap65_measurements import NUMBER_AVERAGE_MEASUREMENTS_KEY, \
     BIASING_NUMBER_AVERAGE_MEASUREMENTS_KEY
 from pixcap65.pixcap.pixcap_structure import BasilConfigKeys
@@ -79,17 +85,23 @@ HV_VOLTAGE_TOL = 1e-2
 HV_CURRENT_STABLE_TOL = 1e-2
 HV_CURRENT_LIMIT = 2.e-7
 
-logging.getLogger().setLevel(logging.INFO)
-logger = logging.getLogger(__name__)
-logger.setLevel(logging.INFO)
-log_handler = logging.FileHandler('pixcap_65_test.log')
-log_formater = logging.Formatter('%(asctime)s - %(name)s - [%(levelname)-8s] (%(threadName)-10s) %(message)s')
-log_handler.setFormatter(log_formater)
-logger.addHandler(log_handler)
-logger.propagate = True
+declare_logger()
 
 
 def _get_enumerate(iterator, **kwargs) -> Iterable:
+    """
+    _get_enumerate
+
+    :author: Dominik Fischer
+    last update: 2026-08-27
+
+    Provides a progress bar implementation for an iterator which could be disabled if needed and will still work
+    when the `tqdm` package is not installed.
+    In the latter case there would be simply no progress bars.
+    :param iterator: iterator to be enumerated and wrapped into a progress bar.
+    :param kwargs: further keyword arguments to be passed to `tqdm`.
+    :return: enumerating iterator.
+    """
     use_tqdm = kwargs.pop("pbar", False)
     try:
         from tqdm.contrib import tenumerate
@@ -108,17 +120,17 @@ def default_callback(group: tb.Group):
 
 def store_scan_par_values(scan_parameters, scan_param_id, **kwargs):
     """
-        Manually store the scan parameter values for the scan parameter id
-        This allows to reconstruct the scan parameter values for a given parameter state vector
+    Manually store the scan parameter values for the scan parameter id
+    This allows to reconstruct the scan parameter values for a given parameter state vector
     """
     if scan_parameters.get(scan_param_id) and scan_parameters.get(scan_param_id) != kwargs:
         raise ValueError('You cannot change the scan parameter value of a scan parameter id')
     scan_parameters[scan_param_id] = kwargs
 
 
-def _store_scan_par_values(h5_file, scan_parameters, group: tb.Group = None):
+def _store_scan_par_values(h5_file, scan_parameters, group: Optional[tb.Group] = None):
     """
-        Create scan_params table after a scan
+    Create scan_params table after a scan
     """
     if group is None:
         group = h5_file.root
@@ -173,6 +185,18 @@ scan_configuration = {
 
 
 class BiasTable(tb.IsDescription):
+    """
+    :py:class:`pytables.IsDescription` data structure to store the results of a biasing and leakage current measurements
+    for the current sensor.
+
+    Class variables are to be understand as fields/entries of the table.
+
+    :cvar Us: desired bias voltage to be sourced.
+    :cvar I: measured leakage current
+    :cvar DI: uncertainty (statistical) of the measured leakage current.
+    :cvar U: actually measured bias voltage.
+    :cvar DU: statistical uncertainty of the actually measured bias voltage.
+    """
     Us = tb.Float32Col()
     I = tb.Float32Col()
     DI = tb.Float32Col()
@@ -189,6 +213,12 @@ class PixCap65Measurement(Pixcap65BaseMeasurement, metaclass=ABCMeta):
 
     :ivar out_file_h5:
     :vartype out_file_h5: tb.File
+    :ivar output_file: name or path of the .h5 file where to write measurement results to.
+    :ivar hist_bias_current: array of the leakage current measurements for the different applied bias voltages.
+    :ivar hist_bias_current_errors: array of the leakage current measurements statistical uncertainties for the
+        different applied bias voltages.
+    :ivar hist_bias_individual_currents: if multiple leakage current measurements are performed for each bias voltage
+        applied these are stored in this extended matrix.
     """
 
     # instantiation
@@ -252,6 +282,7 @@ class PixCap65Measurement(Pixcap65BaseMeasurement, metaclass=ABCMeta):
         Some of the configuration needs to be done subclass implementations as the different measurement types could
         have different requirements onto the setup.
         """
+        global logger
         # change the output file if necessary
         if "output_file" in self.scan_config and os.path.exists(self.scan_config["output_file"]):
             self.out_file_h5.close()
@@ -304,6 +335,7 @@ class PixCap65Measurement(Pixcap65BaseMeasurement, metaclass=ABCMeta):
     # measurement interface
     @property
     def buffered_bias_voltage(self):
+        """Actual desired bias voltage with ability to approach it slowly when it changes by large values."""
         if self.has_bias_supply:
             return self.pixcap.get_smu_source_voltage(self.pixcap.bias_smu_key)
         return np.nan
@@ -326,6 +358,7 @@ class PixCap65Measurement(Pixcap65BaseMeasurement, metaclass=ABCMeta):
 
         :author: Dominik Fischer
         :date: 2026-05-14
+        last update: 2026-08-27
 
         Verify that a stable working point w.r.t. the leakage current through the sensor is reached for the HV by
         performing repeated current measurement and waiting for a sufficiently small variation between the
@@ -363,12 +396,13 @@ class PixCap65Measurement(Pixcap65BaseMeasurement, metaclass=ABCMeta):
 
         :author: Dominik Fischer
         :date: 2026-05-14
+        last update: 2026-08-27
 
         Verify that a stable working point w.r.t. the applied voltage is reached for the HV by
         performing repeated voltage measurement and waiting for a sufficiently small variation between the
         measurements. For these voltage measurements always single measurements are used without averaging.
 
-        :param hv_less: :ref: `pixcap65.pixcap.Pixcap65` object to perform the measurements with.
+        :param hv_less: :py:class:`pixcap65.pixcap.Pixcap65` object to perform the measurements with.
         :return: result from the last voltage measurement.
         """
         previous_measurement = hv_less.bias_measure_volts()
@@ -410,6 +444,7 @@ class PixCap65Measurement(Pixcap65BaseMeasurement, metaclass=ABCMeta):
 
         :author: Dominik Fischer
         :date: 2026-05-14
+        last update: 2026-08-27
 
         Helper function to extract the measurement uncertainties either from multiple measurements under the same
         conditions or from a single measurement, the selected measurement range and the SMU's manual.
@@ -426,6 +461,7 @@ class PixCap65Measurement(Pixcap65BaseMeasurement, metaclass=ABCMeta):
 
         :author: Dominik Fischer
         :date: 2026-05-14
+        last update: 2026-08-27
 
         Stores the measured data into a hdf file. The details will depend on the implementation.
 
@@ -461,14 +497,14 @@ class PixCap65Measurement(Pixcap65BaseMeasurement, metaclass=ABCMeta):
         create_carray
 
         Utility function to create the array with the measurement data, to store the data into it.
-
+        In the end it will use :py:func:`pixcap65.utility.utils_2.create_carray`.
 
         The array will always be created within the hdf file owned by the measurement object.
         :param where: group where to store the data in
         :param name: name of the data set; it should be unique and a valid python identifier
         :key input: specifies the device used for input
         :param unit: specifies the unit used for input
-        :param kwargs: further arguments for :ref: `pytables` implementation
+        :param kwargs: further arguments for :py:mod:`pytables` implementation
         :type unit: str
         :return: if the array/data set could be created, the created array, None otherwise.
         """
@@ -491,6 +527,7 @@ class PixCap65Measurement(Pixcap65BaseMeasurement, metaclass=ABCMeta):
 
         :author: Dominik Fischer
         :date: 2026-05-14
+        last update: 2026-08-27
 
         Stores the configuration keys and values in the provided group used for saving the measurement results, to be
         able to extract certain parameters from the data files on later analysis stages.
@@ -526,6 +563,7 @@ class PixCap65Measurement(Pixcap65BaseMeasurement, metaclass=ABCMeta):
 
         :author: Dominik Fischer
         :date: 2026-05-14
+        last update: 2026-08-27
 
         Controls the applied high voltage in measurement runs where the bias voltage is not scanned, e.g. the scan
         of a full sensor in the fully depleted state.
@@ -568,6 +606,7 @@ class PixCap65Measurement(Pixcap65BaseMeasurement, metaclass=ABCMeta):
 
         :author: Dominik Fischer
         :date: 2026-05-14
+        last update: 2026-08-27
 
         Get the hdf files group where the data should be stored from the additional path specific for this scan and the
         measurements objects base group extracted from the scan configuration on initialization.
@@ -600,6 +639,7 @@ class PixCap65Measurement(Pixcap65BaseMeasurement, metaclass=ABCMeta):
 
         :author: Dominik Fischer
         :date: 2026-05-14
+        last update: 2026-08-27
 
         Stores the parameters of the current iteration into the scan parameters mapping to be written later to disk.
         It distinguishes between a bias scan and a 'regular' scan without varying the bias voltage.
@@ -620,6 +660,7 @@ class PixCap65Measurement(Pixcap65BaseMeasurement, metaclass=ABCMeta):
 
         :author: Dominik Fischer
         :date: 2026-05-14
+        last update: 2026-08-27
 
         Determines the measurement uncertainty from reading, the measurement range and the SMU's manual.
 
@@ -646,6 +687,7 @@ class PixCap65Measurement(Pixcap65BaseMeasurement, metaclass=ABCMeta):
 
         :author: Dominik Fischer
         :date: 2026-05-14
+        last update: 2026-08-27
 
         Fetch all the biasing information and the capacitance measurement data and combine them such that only one
         large data set will remain to simplify the upcoming analysis.
@@ -675,6 +717,11 @@ class PixCap65Measurement(Pixcap65BaseMeasurement, metaclass=ABCMeta):
 
     @abstractmethod
     def storage_exception_handler(self, temp_id):
+        """
+        In case a measurement breaks down midway, before the results could finally be written to file,
+        temporary files may be created to dump all the data currently stored in memory.
+        This specifically applies if the error occurs while preparing or actually saving to .h5 files.
+        """
         pass
 
     def post_scan_handler(self, data_group, sequence_call=False, unit=None, saving_unit: Optional[str] = "regular",
@@ -720,6 +767,7 @@ class PixCap65Measurement(Pixcap65BaseMeasurement, metaclass=ABCMeta):
 
         :author: Dominik Fischer
         :date: 2026-05-14
+        last update: 2026-08-27
 
         If the current scan is not called from another scan procedure the scan configuration should be stored, where
         the data is stored, as well.
@@ -761,6 +809,17 @@ class PixCap65Measurement(Pixcap65BaseMeasurement, metaclass=ABCMeta):
 
     @contextmanager
     def enhanced_readout_mode(self):
+        """
+        enhanced_readout_mode
+
+        :author: Dominik Fischer
+        last update: 2026-05-14
+
+        Enter the enhanced readout mode, capable of distinguishing between single point or multiple point measurements.
+        If the number of measurements exceeds 5 and it is clear that these will be averaged afterwards, the averaging
+        time for each measurement will be reduced to 2s and restored afterwards.
+        :return: yields the measurement object itself again.
+        """
         try:
             if self.n_measurements > 5:
                 self.pixcap[self.pixcap.primary_smu_key].set_current_nlpc(2)
@@ -1011,6 +1070,7 @@ class PixCap65Measurement(Pixcap65BaseMeasurement, metaclass=ABCMeta):
 
         @author Dominik Fischer
         @date 2026-05-14
+        last update: 2026-08-27
 
         Measurement handler to generally initialize a SMU to the settings/state required for the measurement.
         Should only be called on measurement run configuration.
@@ -1020,7 +1080,7 @@ class PixCap65Measurement(Pixcap65BaseMeasurement, metaclass=ABCMeta):
         :param plc: number of power cycles to average the measured quantity over.
         :param kwargs: further keyword arguments to be propagated to the dut. (all not explicitly named keyword
         arguments are propagated to the dut SMU handler.)
-        :key plc_cycles: :ref: `plc`
+        :key plc_cycles: :ref:`plc`
         :key current_range: maximum current to be measured by the SMU.
         """
         if plc is None:
@@ -1056,6 +1116,7 @@ class PixCap65Measurement(Pixcap65BaseMeasurement, metaclass=ABCMeta):
 
         @author Dominik Fischer
         @date 2026-05-14
+        last update: 2026-08-27
 
         Measures the current by the primary SMU connected usually to PCB port VM3.
         Only to be used for acquiring a single measurement.
@@ -1112,7 +1173,7 @@ class PixCap65Measurement(Pixcap65BaseMeasurement, metaclass=ABCMeta):
         Turns the output of the HV SMU on.
         The call to the SMU is only performed when the SMU is connected and active.
 
-        For further information see :ref: `pixcap.pixcap65.Pixcap65.bias_on`.
+        For further information see :py:meth:`pixcap.pixcap65.Pixcap65.bias_on`.
         """
         self.pixcap.bias_on()
 
@@ -1123,14 +1184,14 @@ class PixCap65Measurement(Pixcap65BaseMeasurement, metaclass=ABCMeta):
         Turns the output of the HV SMU off.
         The call to the SMU is only performed when the SMU is connected and active.
 
-        For further information see :ref: `pixcap.pixcap65.Pixcap65.bias_off`.
+        For further information see :py:meth:`pixcap.pixcap65.Pixcap65.bias_off`.
         """
         self.pixcap.bias_off()
 
     @deprecated("Use directly Pixcap65.bias_voltage attribute instead.")
     def set_bias_voltage(self, voltage: float):
         """
-        See :ref: `pixcap.pixcap65.Pixcap65.bias_voltage`.
+        See :py:meth:`pixcap.pixcap65.Pixcap65.bias_voltage`.
         """
         self.pixcap.bias_voltage = voltage
 
@@ -1160,6 +1221,7 @@ class PixCap65Measurement(Pixcap65BaseMeasurement, metaclass=ABCMeta):
 
         :author: Dominik Fischer
         :date: 2026-05-14
+        last update: 2026-08-27
 
         Verify that a stable working point w.r.t. the leakage current through the sensor is reached for the primary SMU
         of this measurement by performing repeated current measurement and waiting for a
@@ -1220,6 +1282,7 @@ class PixCap65Measurement(Pixcap65BaseMeasurement, metaclass=ABCMeta):
 
         :author: Dominik Fischer
         :date: 2026-05-14
+        last update: 2026-08-27
 
         Actual implementation for presenting the results of the I-V characterization.
         It's just a simple plot with error bars for the different quantities.
@@ -1276,6 +1339,7 @@ class PixCap65Measurement(Pixcap65BaseMeasurement, metaclass=ABCMeta):
 
         :author: Dominik Fischer
         :date: 2026-05-14
+        last update: 2026-08-27
 
         Prepare the scan of the sensor and its capacitance when performing measurements of the C-V-Characteristics.
 
@@ -1364,6 +1428,18 @@ class PixCap65Measurement(Pixcap65BaseMeasurement, metaclass=ABCMeta):
 
 
 class PixCap65TotalCap(PixCap65Measurement):
+    """
+    Measurement class for the total-pixel capacitance measurement.
+    The implemented procedure will only actively measure the total-pix (to be more precise:
+    the currents for different frequencies in order to determine thus capacitance).
+
+    :ivar hist_current: matrix to store the current measurements for each pixel and frequency to determine the
+        capacitance.
+    :ivar hist_current_errors: matrix to store the statistical uncertainties of the current measurements to
+        determine the capacitance.
+    :ivar hist_individual_currents: matrix to store all the current measurements in case for each pixel and frequency
+        multiple are performed. These will be later averaged into `hist_current`.
+    """
     # instantiation
     def __init__(self, scan_config, output_file, **kwargs):
         super(PixCap65TotalCap, self).__init__(scan_config, output_file, **kwargs)
@@ -1390,7 +1466,8 @@ class PixCap65TotalCap(PixCap65Measurement):
         Handling the configuration of the pixcap measurement object and the physical setup
         All information additionally required will be fetched from the scan configuration.
         For configuration only one SMU is needed.
-        In Addition, also the sequence generator is configured for actual operation.
+        In Addition, also the sequence generator is configured for actual operation and some sample measurements are
+        performed to prevent initial oscillations from effecting the actual measurements.
         """
         super(PixCap65TotalCap, self).configure()
         self.pixcap.seq_init(clk_0='1000', clk_3='0010')
@@ -1422,6 +1499,9 @@ class PixCap65TotalCap(PixCap65Measurement):
     def scan(self, data_group_spec=None, sequence_call=False):
         """
         scan
+
+        :author: Dominik Fischer
+        last update: 2026-08-27
 
         Performs the scan over the pixels on the sensor and measures the requested quantities in dependence on some
         other quantities. Will scan the specified frequency range for each pixel specified by the scan configuration
@@ -1540,6 +1620,28 @@ class PixCap65TotalCap(PixCap65Measurement):
                                                                                        self.hist_bias_current)
 
     def store_measurement_data(self, data_group: tb.Group, sequence_call: bool, unit=None):
+        """
+        store_measurement_data
+
+        :author: Dominik Fischer
+        :date: 2026-05-14
+        last update: 2026-08-27
+
+        Stores the measured data into a hdf file.
+        There will be individual arrays/matrices for currents and their uncertainties.
+        In `regular` case (must be provided by `unit`) these are written directly from the measurement if no multiple
+        current measurements are available.
+        If multiple measurements are available the uncertainty is calculated from the standard deviation of the
+        measurements.
+
+        The other mode of operation is `bias`.
+        In this case not the current measurements for the capacitance are stored but the measurements of the leakage currents.
+
+
+        :param data_group: hdf file's group where the data should be stored.
+        :param sequence_call: boolean, indicating this is called from another scan.
+        :param unit: measurement mode used.
+        """
         try:
             if unit == "regular":
                 process_hist = self.hist_current
@@ -1594,6 +1696,7 @@ class PixCap65TotalCap(PixCap65Measurement):
 
         :author: Dominik Fischer
         :date: 2026-05-14
+        last update: 2026-08-27
 
         Fetch all the biasing information and the capacitance measurement data and combine them such that only one
         large data set will remain to simplify the upcoming analysis.

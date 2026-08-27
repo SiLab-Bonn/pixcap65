@@ -1,6 +1,8 @@
 """
 utils.py
 
+Utilities to control the whole setup including the power supply (psu) and initiating measurement class and their
+corresponding measurements.
 """
 # ----------------------------------------------------------
 #  Copyright (c) 2026. SiLab, Institute of Physics, University of Bonn.
@@ -44,7 +46,8 @@ logger = logging.getLogger(__name__)
 
 class PixcapMeasurements(StrEnum):
     """
-    Enumeration of possible values to choose the measurement type/measurement class to perform measurements with using PixCap65.
+    Enumeration of possible values to choose the measurement type/measurement class to perform measurements with
+    using PixCap65.
     """
     TOTAL_CAPACITANCE = "total capacitance"
     INTER_CAPACITANCE = "inter-pixel capacitance"
@@ -265,6 +268,7 @@ class PixCapSetup(Dut):
 
     @property
     def pixcap(self) -> Optional[PixCap65Measurement]:
+        """Fetches the actual measurement class used for measurements."""
         return self.__pixcap
 
     @pixcap.setter

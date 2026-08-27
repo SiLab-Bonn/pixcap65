@@ -1,3 +1,7 @@
+"""
+Homoegenize plots module from the bachelor's degree EDV module.
+Could be used to make all plots in e.g. a thesis the same.
+"""
 import atexit
 import matplotlib
 # from matplotlib.ticker import AutoMinorLocator
@@ -13,6 +17,7 @@ import threading
 ORIG_MATPLOTLIB_CONF = dict(matplotlib.rcParams)
 
 def get_error_cycler():
+    """property cycler for errorbar plots which cycles the usual marker symbols but no lines to be drawn."""
     from cycler import cycler
     standard_color = matplotlib.rcParams['axes.prop_cycle'].by_key()['color']
     return cycler(marker=['x', '*', 'v'], linestyle=['','','']) * cycler(color=standard_color)
@@ -152,18 +157,34 @@ def revert_params():
     # matplotlib.rcParams.update(ORIG_MATPLOTLIB_CONF)
 
 
+# added for the pixcap65 framework specifically.
 homo_lock = threading.RLock()
 current_cycle_data = {}
 enhanced_cycler =list(get_error_cycler())
 
 def release_locks():
+    """
+    Make sure that at the end of the process life time the locks used to protect the access to the plotting engine and
+    the cycler are released.
+    """
     global homo_lock
     del homo_lock
     atexit.unregister(release_locks)
 
+
 atexit.register(release_locks)
 
+
 def enhanced_error_bar(ax: matplotlib.axes.Axes, *args, **kwargs):
+    """
+    Modified version of :py:func:`matplotlib.pyplot.errorbar` that adds the specific property cycler which may be a
+    different from one used for other plots without errorbars.
+
+    :param ax: axes into which to plot
+    :param args: positional arguments passed to :py:func:`matplotlib.pyplot.errorbar`
+    :param kwargs: keyword arguments passed to :py:func:`matplotlib.pyplot.errorbar`
+    :return: same as for :py:func:`matplotlib.pyplot.errorbar`
+    """
     h = hash(ax)
     with homo_lock:
         current_cycle_idx = current_cycle_data.setdefault(h, 0)
@@ -178,7 +199,12 @@ def enhanced_error_bar(ax: matplotlib.axes.Axes, *args, **kwargs):
         current_cycle_data[h] = current_cycle_idx
     return result
 
+
 def close_figure(figs):
+    """
+    Close the provided figures if they are still open to free memory.
+    :param figs: :py:class:`matplotlib.figure.Figure` objects to be closed.
+    """
     from matplotlib import pyplot as plt
     import numpy as np
     figs = np.atleast_1d(figs)
