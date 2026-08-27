@@ -39,13 +39,13 @@ import tables as tb
 import threading
 from matplotlib.backends.backend_pdf import PdfPages
 
-import pixcap65.data_constants as data_constants
+import examples.data_constants as data_constants
 import pixcap65.threaded_plotting as threaded_plotting
+from examples.data_constants import E1_SCAN_FILE, E1_2_SCAN_FILE, R13_2_SCAN_FILE, R11_SCAN_FILE, X4_SCAN_FILE
+from examples.data_constants import X1_SCAN_2_FILE, X2_SCAN_2_FILE, X2_SCAN_FILE
+from examples.data_constants import X5_SCAN_FILE, X6_SCAN_FILE, X7_SCAN_FILE
 from pixcap65.analysis import analyze_data, analyze_capacitance_distribution
 from pixcap65.analysis_util.utility import get_base_group
-from pixcap65.data_constants import E1_SCAN_FILE, E1_2_SCAN_FILE, R13_2_SCAN_FILE, R11_SCAN_FILE, X4_SCAN_FILE
-from pixcap65.data_constants import X1_SCAN_2_FILE, X2_SCAN_2_FILE, X2_SCAN_FILE
-from pixcap65.data_constants import X5_SCAN_FILE, X6_SCAN_FILE, X7_SCAN_FILE
 from pixcap65.plotting import plot_data, plot_combined_data, plot_bias_data, plot_inter_pix_data, \
     plot_cv_data, CV_DATA_FOR_
 from pixcap65.utility import synchronized_process_open_file
@@ -1573,7 +1573,7 @@ def x1_plotter(tb_lock):
                         test_cap_exclusion=True, distribution=True, total_data=X1_SCAN_2_FILE,
                         total_path=hdf(top_ref, name, 'unbiased_61_full_model'),
                         mask_pixel=data_constants.x1_second_pixel_mask,
-                        lock=tb_lock,)
+                        lock=tb_lock, )
     plot_inter_pix_data(interpreted_data="packaged/data/X1_12_Renew_Scan.h5",
                         base_path=hdf(top_ref, name, 'inter_unbiased_full_model_renew_Extended'), use_group=True,
                         test_cap_exclusion=True, distribution=True, total_data=X1_SCAN_2_FILE,
@@ -1702,38 +1702,38 @@ def x1_plotter(tb_lock):
 
     print(display_name, "- CV")
     plot_combined_data(interpreted_data=X1_SCAN_2_FILE,
-                                         base_path=hdf(top_ref, name, 'C_V_Characteristic_refined'),
-                                         use_group=True, mask_pixel=data_constants.x1_second_pixel_mask,
-                                         distribution=True, apply_doping=False,
-                                         lock=tb_lock,)
+                       base_path=hdf(top_ref, name, 'C_V_Characteristic_refined'),
+                       use_group=True, mask_pixel=data_constants.x1_second_pixel_mask,
+                       distribution=True, apply_doping=False,
+                       lock=tb_lock, )
     plot_combined_data(interpreted_data=X1_SCAN_2_FILE,
-                                         base_path=hdf(top_ref, name, 'C_V_Characteristic_refined'),
-                                         use_group=True, use_corrected=True,
-                                         apply_doping=False, distribution=True,
-                                         mask_pixel=data_constants.x1_second_pixel_mask,
-                                         lock=tb_lock, )
+                       base_path=hdf(top_ref, name, 'C_V_Characteristic_refined'),
+                       use_group=True, use_corrected=True,
+                       apply_doping=False, distribution=True,
+                       mask_pixel=data_constants.x1_second_pixel_mask,
+                       lock=tb_lock, )
     plot_combined_data(interpreted_data=X1_SCAN_2_FILE,
-                                         base_path=hdf(top_ref, name, 'C_V_Characteristic_Second_Extended'),
-                                         use_group=True, mask_pixel=data_constants.x1_second_pixel_mask,
-                                         distribution=False, apply_doping=False,
-                                         lock=tb_lock, )
+                       base_path=hdf(top_ref, name, 'C_V_Characteristic_Second_Extended'),
+                       use_group=True, mask_pixel=data_constants.x1_second_pixel_mask,
+                       distribution=False, apply_doping=False,
+                       lock=tb_lock, )
     plot_combined_data(interpreted_data=X1_SCAN_2_FILE,
-                                         base_path=hdf(top_ref, name, 'C_V_Characteristic_Second_Extended'),
-                                         use_group=True, use_corrected=True,
-                                         apply_doping=False, distribution=False,
-                                         mask_pixel=data_constants.x1_second_pixel_mask,
-                                         lock=tb_lock, )
+                       base_path=hdf(top_ref, name, 'C_V_Characteristic_Second_Extended'),
+                       use_group=True, use_corrected=True,
+                       apply_doping=False, distribution=False,
+                       mask_pixel=data_constants.x1_second_pixel_mask,
+                       lock=tb_lock, )
     plot_combined_data(interpreted_data=X1_SCAN_2_FILE,
-                                         base_path=hdf(top_ref, name, 'C_V_Characteristic_refined_Extended_Combined'),
-                                         use_group=True, mask_pixel=data_constants.x1_second_pixel_mask,
-                                         distribution=True, apply_doping=False,
-                                         lock=tb_lock)
+                       base_path=hdf(top_ref, name, 'C_V_Characteristic_refined_Extended_Combined'),
+                       use_group=True, mask_pixel=data_constants.x1_second_pixel_mask,
+                       distribution=True, apply_doping=False,
+                       lock=tb_lock)
     plot_combined_data(interpreted_data=X1_SCAN_2_FILE,
-                                         base_path=hdf(top_ref, name, 'C_V_Characteristic_refined_Extended_Combined'),
-                                         use_group=True, use_corrected=True,
-                                         apply_doping=True, distribution=True,
-                                         mask_pixel=data_constants.x1_second_pixel_mask,
-                                         lock=tb_lock)
+                       base_path=hdf(top_ref, name, 'C_V_Characteristic_refined_Extended_Combined'),
+                       use_group=True, use_corrected=True,
+                       apply_doping=True, distribution=True,
+                       mask_pixel=data_constants.x1_second_pixel_mask,
+                       lock=tb_lock)
     # threaded_plotting.joint_plotting()
     print("Finished -", display_name)
 

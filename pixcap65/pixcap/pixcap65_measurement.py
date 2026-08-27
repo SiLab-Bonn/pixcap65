@@ -474,3 +474,23 @@ class ScanConfigurationKeys(StrEnum):
     BIAS_HV_CURRENT_LIMIT = "bias_hv_limit"
     SMU_CURRENT_RANGE = "pixcap_range"
     SMU_CURRENT_LIMIT = "pixcap_limit"
+
+
+def declare_logger():
+    """
+    declare_logger
+
+    @author: Dominik Fischer
+    last update: 2026-08-27
+
+    Declare a logger object for calling module and configure it correctly for the purpose of pixcap65 measurements.
+    """
+    global logger
+    logging.getLogger().setLevel(logging.INFO)
+    logger = logging.getLogger(__name__)
+    logger.setLevel(logging.INFO)
+    log_handler = logging.FileHandler('pixcap_65_test.log')
+    log_formater = logging.Formatter('%(asctime)s - %(name)s - [%(levelname)-8s] (%(threadName)-10s) %(message)s')
+    log_handler.setFormatter(log_formater)
+    logger.addHandler(log_handler)
+    logger.propagate = True

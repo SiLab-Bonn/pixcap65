@@ -1,6 +1,13 @@
 """
-Script for measuring Inter Pixel Capacitance 
+Script for measuring Inter Pixel Capacitance
+
+Defines a data structures and measurement classes specifically designed for inter-pixel capacitance measurements
+and if necessary their analysis.
+
+The form of the measurement class was derived from the original inter-pixel measurement script
+:py:mod:`legacy.pixcap_65_test_inter_cap`.
 """
+
 import logging
 import numpy as np
 import tables as tb
@@ -11,21 +18,14 @@ from contextlib import contextmanager
 from pixcap65.analysis import analysis_data_handle
 from pixcap65.analysis_util import GENERAL_PIXCAP_SHAPE
 from pixcap65.analysis_util.utility import HIST_CURRENT_MEAS_UNIT, handle_analysis_mix_up
-from pixcap65.pixcap.pixcap65_measurement import ScanConfigurationKeys
+from pixcap65.pixcap.pixcap65_measurement import ScanConfigurationKeys, declare_logger
 from pixcap65.pixcap_65_test_total_cap import PixCap65Measurement, MEASURING_PIXEL_TEXT, \
     _store_scan_par_values
 from pixcap65.utility import pixcap65_constants as c
 from pixcap65.utility.tables_util import set_group_attribute
 from pixcap65.utility.utils_2 import walk_to_node
 
-logging.getLogger().setLevel(logging.INFO)
-logger = logging.getLogger(__name__)
-logger.setLevel(logging.INFO)
-log_handler = logging.FileHandler('pixcap_65_test.log')
-log_formater = logging.Formatter('%(asctime)s - %(name)s - [%(levelname)-8s] (%(threadName)-10s) %(message)s')
-log_handler.setFormatter(log_formater)
-logger.addHandler(log_handler)
-logger.propagate = True
+declare_logger()
 
 scan_configuration = {
     'start_column': 1,
@@ -37,12 +37,36 @@ scan_configuration = {
     'frequency_range': np.arange(1.0, 6.1, 0.75),  # .astype(np.float) # [MHz]
     'bias': -80,
 
+    # TODO: choose a more suitable default value for the configuration here!
     'data_path': "Reference/R1",
     "out_file_mode": "append",
 }
 
 
 class InterCap(tb.IsDescription):
+    """
+    :py:class:`pytables.IsDescription` data structure to store the results of a inter-pixel capacitance measurement and
+    analysis in a :py:class:`pytables.Table` object with one row for each investigated pixel on the active sensor.
+
+    Class variables are to be understand as fields/entries of the table.
+
+    :cvar col: column coordinate of the investigated pixel.
+    :vartype col: int
+    :cvar row: row coordinate of the investigated pixel.
+    :vartype row: int
+    :cvar inter_cap_a: inter-pixel capacitance measurement on channel A (the capacitance)
+    :vartype inter_cap_a: float
+    :cvar inter_cap_b: inter-pixel capacitance measurement on channel B (the capacitance)
+    :vartype inter_cap_b: float
+    :cvar total_cap_b: total capacitance measurement (the capacitance)
+    :vartype total_cap_b: float
+    :cvar leakage_a: determined leakage current of channel A for this pixel
+    :vartype leakage_a: float
+    :cvar leakage_b: determined leakage current of channel B for this pixel
+    :vartype leakage_b: float
+    :cvar leakage_total: determined leakage current of the channels used for total cap estimation!
+    :vartype leakage_total: float
+    """
     col = tb.Int32Col(pos=0)
     row = tb.Int32Col(pos=1)
     inter_cap_a = tb.Float64Col(pos=2)
@@ -54,6 +78,33 @@ class InterCap(tb.IsDescription):
 
 
 class Pixcap65InterCap(PixCap65Measurement):
+    """
+    Measurement class for the inter-pixel capacitance measurement.
+    The implemented procedure will only actively measure the in-pix or backplane capacitance (to be more precise:
+    the currents for different frequencies in order to determine these capacitances).
+
+    :ivar inter_hist_current_1: matrix to store the current measurements for each pixel and frequency for channel A to
+        determine the inter-pixel capacitance.
+    :ivar inter_hist_current_2: matrix to store the current measurements for each pixel and frequency for channel B to
+        determine the inter-pixel capacitance.
+    :ivar total_hist_current: matrix to store the current measurements for each pixel and frequency to
+        determine the total capacitance.
+    :ivar inter_hist_current_1_error: matrix to store the statistical uncertainty of the  current measurements for
+        each pixel and frequency for channel A to determine the inter-pixel capacitance.
+    :ivar inter_hist_current_2_error: matrix to store the statistical uncertainty of the the current measurements
+        for each pixel and frequency for channel B to determine the inter-pixel capacitance.
+    :ivar total_hist_current_error: matrix to store the statistical uncertainty of the current measurements
+        for each pixel and frequency to determine the total capacitance.
+    :ivar inter_hist_individual_currents_1: matrix to store the current measurements for each pixel and frequency
+        for channel A to determine the inter-pixel capacitance. Only used when for each frequency and pixel multiple
+        current measurements are performed to store all the measurement results.
+    :ivar inter_hist_individual_currents_2: matrix to store the current measurements for each pixel and frequency
+        for channel B to determine the inter-pixel capacitance.  Only used when for each frequency and pixel multiple
+        current measurements are performed to store all the measurement results.
+    :ivar total_hist_individual_currents: matrix to store the current measurements for each pixel and frequency to
+        determine the total capacitance.  Only used when for each frequency and pixel multiple
+        current measurements are performed to store all the measurement results.
+    """
     def pre_scan_handler(self, unit=None):
         if self.averaging:
             self.n_measurements = self.scan_config[ScanConfigurationKeys.AVERAGE_MEASUREMENTS]
@@ -95,12 +146,28 @@ class Pixcap65InterCap(PixCap65Measurement):
         self.inter_hist_individual_currents_2 = np.full(shape=(40, 41, self.n_frequencies, 1), fill_value=np.nan)
         self.total_hist_individual_currents = np.full(shape=(40, 41, self.n_frequencies, 1), fill_value=np.nan)
 
-
         # this kind of setup is somewhat misplaced.
         self.pixcap.seq_size = 4
         self.handle_measurement = self._handle_single_measurement
 
+    # TODO: looks like there is no documentation on what do the configuration options actually.
     def configure(self):
+        """
+        configure
+
+        @author: Dominik Fischer
+        last update: 2026-08-27
+
+        Handling the configuration of the pixcap measurement object and the physical setup
+        All information additionally required will be fetched from the scan configuration.
+
+        In Addition to the basic configuration of the primary smu also the two additional SMUs are configured for the
+        measurement of inter-pixel capacitances.
+        For one of these SMUs a slightly higher current measurement range will be used.
+
+        As a last step some measurements are performed with the connected SMUs to make sure that we get correct current
+        values and prevent effects by initial oscillation effects of the SMU.
+        """
         # already done by super-class
         super(Pixcap65InterCap, self).configure()
         self.init_smu(smu=self.pixcap.vm2_smu_key, current_range=self.total_current_sense_range)
@@ -132,15 +199,18 @@ class Pixcap65InterCap(PixCap65Measurement):
     def scan(self, data_group_spec=None, sequence_call: bool = False):
         """
         scan
+
         Performs the scan over the pixels on the sensor and measures the requested quantities in dependence on some
         other quantities.
         Will scan the specified frequency range for each pixel specified by the scan configuration and measure the
         current at all three SMU channels to obtain information about the pixel capacitance and the inter-pixel
         capacitance.
 
+        CHECK: does this still match the definitions by the super classes?
         :param data_group_spec: specifier of the data group in hdf file where the measurements are stored.
         :param sequence_call: boolean to indicate whether this function is called in a sequence of scan calls from another scan procedure.
         """
+        global logger
         # some further setup to be done right before the measurement
         data_group = self.get_data_group(data_group_spec, "inter_cap")
         set_group_attribute(data_group, "frequencies", self.n_frequencies)
@@ -152,27 +222,7 @@ class Pixcap65InterCap(PixCap65Measurement):
             self.pixcap.disable_all_pixels()
             self.pixcap.disable_all_columns()
 
-            # enable columns of pixel under test and surrounding pixels
-            self.pixcap.enable_column(i_col, c.EN_EOC_1 | c.EN_EOC_2 | c.EN_EOC_3)
-            self.pixcap.enable_column(i_col + 1, c.EN_EOC_1 | c.EN_EOC_3)
-            self.pixcap.enable_column(i_col - 1, c.EN_EOC_1 | c.EN_EOC_3)
-
-            # enable pixel under test
-            self.pixcap.enable_pixel_clk(i_col, i_row, c.EN_CLK_2 | c.EN_CLK_0)
-
-            # enable pixels surrounding pixel under test
-            if self.scan_config.get("Inter_Pix_diagonals", True):
-                self.pixcap.enable_pixel_clk(i_col + 1, i_row + 1, c.EN_CLK_1 | c.EN_CLK_3)
-                self.pixcap.enable_pixel_clk(i_col + 1, i_row - 1, c.EN_CLK_1 | c.EN_CLK_3)
-                self.pixcap.enable_pixel_clk(i_col - 1, i_row - 1, c.EN_CLK_1 | c.EN_CLK_3)
-                self.pixcap.enable_pixel_clk(i_col - 1, i_row + 1, c.EN_CLK_1 | c.EN_CLK_3)
-            if self.scan_config.get("Inter_Pixel_Sides", True):
-                self.pixcap.enable_pixel_clk(i_col, i_row + 1, c.EN_CLK_1 | c.EN_CLK_3)
-                self.pixcap.enable_pixel_clk(i_col, i_row - 1, c.EN_CLK_1 | c.EN_CLK_3)
-            if self.scan_config.get("Inter_Pixel_Tops", True):
-                self.pixcap.enable_pixel_clk(i_col + 1, i_row, c.EN_CLK_1 | c.EN_CLK_3)
-                self.pixcap.enable_pixel_clk(i_col - 1, i_row, c.EN_CLK_1 | c.EN_CLK_3)
-
+            self.enable_measurement_pixels(i_col, i_row)
 
             # Which SMU takes which role here?
             for k, freq in enumerate(self.frequency_range):
@@ -186,7 +236,64 @@ class Pixcap65InterCap(PixCap65Measurement):
                 logger.info(self.pixcap[self.pixcap.vm2_smu_key].get_current_nlpc())
                 logger.info(self.pixcap[self.pixcap.vm3_smu_key].get_current_nlpc())
 
+    def enable_measurement_pixels(self, i_col: int, i_row: int):
+        """
+        enable_measurement_pixels
+
+        @author: Dominik Fischer
+        last update: 2026-08-27
+
+        Enable the pixels which should be measured.
+        These are in general the pixel to be measured for the in-pix measurement SMU (or its corresponding clock signal
+        CLK 2), and a selection of directly neighbouring pixels.
+        The selection of neighbouring pixels activated for CLK1 and CLK3 might depend on the actual implementation by
+        further subclasses.
+
+        :param i_col: column coordinate of the pixel we are interested in.
+        :param i_row: row coordinate of the pixel we are interested in.
+        """
+        # enable columns of pixel under test and surrounding pixels
+        self.pixcap.enable_column(i_col, c.EN_EOC_1 | c.EN_EOC_2 | c.EN_EOC_3)
+        self.pixcap.enable_column(i_col + 1, c.EN_EOC_1 | c.EN_EOC_3)
+        self.pixcap.enable_column(i_col - 1, c.EN_EOC_1 | c.EN_EOC_3)
+
+        # enable pixel under test
+        self.pixcap.enable_pixel_clk(i_col, i_row, c.EN_CLK_2 | c.EN_CLK_0)
+
+        # enable pixels surrounding pixel under test
+        if self.scan_config.get("Inter_Pix_diagonals", True):
+            self.pixcap.enable_pixel_clk(i_col + 1, i_row + 1, c.EN_CLK_1 | c.EN_CLK_3)
+            self.pixcap.enable_pixel_clk(i_col + 1, i_row - 1, c.EN_CLK_1 | c.EN_CLK_3)
+            self.pixcap.enable_pixel_clk(i_col - 1, i_row - 1, c.EN_CLK_1 | c.EN_CLK_3)
+            self.pixcap.enable_pixel_clk(i_col - 1, i_row + 1, c.EN_CLK_1 | c.EN_CLK_3)
+        if self.scan_config.get("Inter_Pixel_Sides", True):
+            self.pixcap.enable_pixel_clk(i_col, i_row + 1, c.EN_CLK_1 | c.EN_CLK_3)
+            self.pixcap.enable_pixel_clk(i_col, i_row - 1, c.EN_CLK_1 | c.EN_CLK_3)
+        if self.scan_config.get("Inter_Pixel_Tops", True):
+            self.pixcap.enable_pixel_clk(i_col + 1, i_row, c.EN_CLK_1 | c.EN_CLK_3)
+            self.pixcap.enable_pixel_clk(i_col - 1, i_row, c.EN_CLK_1 | c.EN_CLK_3)
+
     def store_measurement_data(self, data_group: tb.Group, sequence_call: bool, unit=None):
+        """
+        store_measurement_data
+
+        :author: Dominik Fischer
+        :date: 2026-05-14
+        last update: 2026-08-27
+
+        Stores the measured data into a hdf file.
+        There will be individual arrays/matrices for each channel and separated for currents and their uncertainties.
+        In `regular` case (must be provided by `unit`) these are written directly from the measurement if no multiple
+        current measurements are available.
+        If multiple measurements are available the uncertainty is calculated from the standard deviation of the
+        measurements.
+
+        There are no further implementations besides the regular one.
+
+        :param data_group: hdf file's group where the data should be stored.
+        :param sequence_call: boolean, indicating this is called from another scan.
+        :param unit: measurement mode used.
+        """
         try:
             if unit == "regular":
                 self.create_carray(data_group, name='TotalHistCurr',
@@ -385,18 +492,80 @@ class Pixcap65InterCap(PixCap65Measurement):
 
     @property
     def current_sense_range(self):
+        """Current sense range used for the inter-pixel capacitance measurement channels."""
         return 0.000010
     # endregion
 
     @property
     def total_current_sense_range(self):
+        """Current sense range used for the total-pixel capacitance measurement channels."""
         return 0.000001
+
+
+class Pixcap65InterCapSides(Pixcap65InterCap):
+    """
+    Implementation to measure the inter-pixel capacitance to the neighbour pixels to the sides.
+    This means along the `x-axis`.
+    Still only direct neighbours are considered.
+    """
+    def enable_measurement_pixels(self, i_col: int, i_row: int):
+        # enable columns of pixel under test and surrounding pixels
+        self.pixcap.enable_column(i_col, c.EN_EOC_1 | c.EN_EOC_2 | c.EN_EOC_3)
+
+        # enable pixel under test
+        self.pixcap.enable_pixel_clk(i_col, i_row, c.EN_CLK_2 | c.EN_CLK_0)
+
+        # enable pixels surrounding pixel under test
+        self.pixcap.enable_pixel_clk(i_col, i_row + 1, c.EN_CLK_1 | c.EN_CLK_3)
+        self.pixcap.enable_pixel_clk(i_col, i_row - 1, c.EN_CLK_1 | c.EN_CLK_3)
+
+
+class Pixcap65InterCapTops(Pixcap65InterCap):
+    """
+    Implementation to measure the inter-pixel capacitance to the neighbour pixels to the tops.
+    This means along the `y-axis`.
+    Still only direct neighbours are considered.
+    """
+    def enable_measurement_pixels(self, i_col: int, i_row: int):
+        # enable columns of pixel under test and surrounding pixels
+        self.pixcap.enable_column(i_col, c.EN_EOC_1 | c.EN_EOC_2 | c.EN_EOC_3)
+        self.pixcap.enable_column(i_col + 1, c.EN_EOC_1 | c.EN_EOC_3)
+        self.pixcap.enable_column(i_col - 1, c.EN_EOC_1 | c.EN_EOC_3)
+
+        # enable pixel under test
+        self.pixcap.enable_pixel_clk(i_col, i_row, c.EN_CLK_2 | c.EN_CLK_0)
+
+        # enable pixels surrounding pixel under test
+        self.pixcap.enable_pixel_clk(i_col + 1, i_row, c.EN_CLK_1 | c.EN_CLK_3)
+        self.pixcap.enable_pixel_clk(i_col - 1, i_row, c.EN_CLK_1 | c.EN_CLK_3)
+
+
+class Pixcap65InterCapDiagonals(Pixcap65InterCap):
+    """
+    Implementation to measure the inter-pixel capacitance to the neighbouring pixels along the diagonals of the grid.
+    Still only direct neighbours are considered.
+    """
+    def enable_measurement_pixels(self, i_col: int, i_row: int):
+        # enable columns of pixel under test and surrounding pixels
+        self.pixcap.enable_column(i_col, c.EN_EOC_1 | c.EN_EOC_2 | c.EN_EOC_3)
+        self.pixcap.enable_column(i_col + 1, c.EN_EOC_1 | c.EN_EOC_3)
+        self.pixcap.enable_column(i_col - 1, c.EN_EOC_1 | c.EN_EOC_3)
+
+        # enable pixel under test
+        self.pixcap.enable_pixel_clk(i_col, i_row, c.EN_CLK_2 | c.EN_CLK_0)
+
+        # enable pixels surrounding pixel under test
+        self.pixcap.enable_pixel_clk(i_col + 1, i_row + 1, c.EN_CLK_1 | c.EN_CLK_3)
+        self.pixcap.enable_pixel_clk(i_col + 1, i_row - 1, c.EN_CLK_1 | c.EN_CLK_3)
+        self.pixcap.enable_pixel_clk(i_col - 1, i_row - 1, c.EN_CLK_1 | c.EN_CLK_3)
+        self.pixcap.enable_pixel_clk(i_col - 1, i_row + 1, c.EN_CLK_1 | c.EN_CLK_3)
 
 
 if __name__ == "__main__":
     output_file = "../RX-Interpixel_Scan.h5"
     # with Pixcap65InterCap(scan_configuration, output_file) as pix:
     # pix.scan(data_group_spec="demo_measurement_1_80_V")
+    # TODO: prepare this main part for final submission!
     from pixcap65.utils import PixCapSetup
 
     del scan_configuration['bias']

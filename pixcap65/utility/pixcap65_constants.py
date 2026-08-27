@@ -1,3 +1,6 @@
+"""
+Constants necessary for the communication with the PixCap65 chip.
+"""
 # file: noinspection SpellCheckingInspection
 # noinspection SpellCheckingInspection
 COL_NMAX = 39

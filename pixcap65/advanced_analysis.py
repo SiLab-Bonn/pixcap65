@@ -1,3 +1,7 @@
+"""
+Skipping docstring for now, as this file will be removed by refactor of the analysis strategy.
+"""
+
 import numpy as np
 import tables as tb
 from matplotlib.backends.backend_pdf import PdfPages

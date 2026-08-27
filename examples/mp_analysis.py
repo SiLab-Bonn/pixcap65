@@ -37,12 +37,12 @@ import time
 from contextlib import contextmanager
 from matplotlib.backends.backend_pdf import PdfPages
 
-import pixcap65.data_constants as data_constants
+import examples.data_constants as data_constants
+from examples.data_constants import E1_2_SCAN_FILE, R13_2_SCAN_FILE
+from examples.data_constants import X1_SCAN_2_FILE, X2_SCAN_2_FILE
+from examples.data_constants import X6_SCAN_FILE, X7_SCAN_FILE, X5_SCAN_FILE
 from examples.full_analysis import r1_analysator, x4_analysator
 from pixcap65.analysis import analyze_data
-from pixcap65.data_constants import E1_2_SCAN_FILE, R13_2_SCAN_FILE
-from pixcap65.data_constants import X1_SCAN_2_FILE, X2_SCAN_2_FILE
-from pixcap65.data_constants import X6_SCAN_FILE, X7_SCAN_FILE, X5_SCAN_FILE
 from pixcap65.utility import synchronized_process_open_file
 
 AUTHKEY_OUTPUT = "Fetch new authkey:"
