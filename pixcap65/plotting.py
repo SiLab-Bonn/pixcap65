@@ -1205,7 +1205,7 @@ def _cv_plotter(analysis, row, col, ax, voltage_data_sets, labels, **kwargs):
     eff_cap_data = None
     y_limits = None
     x_limits = None
-    # TODO: document the different meanings of this array!
+    # TODO: document the different meanings of this array! (refers to the voltage_data array)
     for cap_data, cap_data_errors, voltage_data, label in zip(cap_data_sets, cap_data_errors_sets, voltage_data_sets, labels):
         if len(voltage_data.shape) > 1:
             # FIXME: this might lead to biased results!

@@ -34,10 +34,6 @@ demo_type_a = np.dtype([
 
 
 # TODO: here is some general clean-up required.
-class DemoDescription(tb.IsDescription):
-    str1 = tb.StringCol(itemsize=8)
-    str2 = tb.StringCol(itemsize=16)
-    str3 = tb.StringCol(itemsize=32)
 
 
 field_names = [name.replace(" ", "_") for name in [
@@ -125,7 +121,6 @@ def generate_test_summary(files: Iterable[PathLike], groups: Iterable[PathLike],
         table = summary_file.create_table(where=summary_file.root, name="TestCap",
                                           title="Test Capacitances from the different sensors",
                                           description=table_type)
-        summary_file.create_table(where=summary_file.root, name="DemoCao", description=SummaryTable)
         for file, group_path, sensor in zip(files, groups, sensors):
             with synchronized_process_open_file(file, mode='r') as h5_file:
                 group, _ = walk_to_node(h5_file.root, group_path, create=False, verify_create=True)

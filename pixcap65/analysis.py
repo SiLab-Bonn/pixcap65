@@ -96,6 +96,7 @@ def get_rng():
     """
     return global_rng.spawn(1)[0]
 
+
 filterwarnings("ignore", category=NaturalNameWarning)
 filterwarnings("ignore", category=IMinuitWarning)
 filterwarnings("ignore", category=np.exceptions.RankWarning, module="jacobi")

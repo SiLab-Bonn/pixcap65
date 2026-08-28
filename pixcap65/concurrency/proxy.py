@@ -90,4 +90,8 @@ class NumpyProxy(BaseProxy):
         return self._callmethod('__ne__', other)
 
 
-class DepletionArrayStoreProxy(ProxyBase) : pass
+class DepletionArrayStoreProxy(ProxyBase):
+    """
+    Proxy a shared Depletion analysis data store managed as a shared resource by a multiprocessing.manager process.
+    """
+    pass

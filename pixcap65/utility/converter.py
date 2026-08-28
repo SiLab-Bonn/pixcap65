@@ -61,7 +61,6 @@ def adjust_i_v_measurement(group, has_values=False):
     group.BiasVoltageHist.attrs[UNITS_ATTRIBUTE_KEY] = HIST_BIAS_MEAS_UNIT
 
 
-# FIXME: look here for the missing, untrusted current uncertainties
 def regenerate_i_v_errors(group):
     """
     Re-evaluates the measurement uncertainties of the leakage current measurements.
