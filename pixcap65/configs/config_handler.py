@@ -27,13 +27,12 @@ import sys
 
 try:
     # noinspection PyCompatibility
-    from collections.abc import Iterable
+    from collections.abc import Iterable, Callable
 except ImportError:
     # python 2.7 and < python 3.3
     # noinspection PyProtectedMember,PyUnresolvedReferences
     from collections import Iterable
-
-from typing import Callable
+    from typing import Callable
 
 import numpy as np
 import yaml

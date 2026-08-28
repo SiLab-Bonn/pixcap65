@@ -22,7 +22,13 @@ from abc import ABCMeta, abstractmethod
 from contextlib import contextmanager
 from enum import StrEnum
 from tqdm.contrib import DummyTqdmFile
-from typing import Mapping
+try:
+    # noinspection PyCompatibility
+    from collections.abc import Mapping
+except ImportError:
+    # python 2.7
+    # noinspection PyProtectedMember,PyUnresolvedReferences
+    from typing import Mapping
 from warnings import warn
 
 from pixcap65.pixcap.pixcap65 import Pixcap65

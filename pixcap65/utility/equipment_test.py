@@ -9,7 +9,13 @@ import time
 from matplotlib import pyplot as plt
 from matplotlib.backends.backend_pdf import PdfPages
 from tqdm import tqdm
-from typing import Iterable
+try:
+    # noinspection PyCompatibility
+    from collections.abc import Iterable
+except ImportError:
+    # python 2.7
+    # noinspection PyProtectedMember,PyUnresolvedReferences
+    from typing import Iterable
 
 from pixcap65.analysis import analyze_data
 from pixcap65.analysis_util import GENERAL_PIXCAP_SHAPE, CURRENT_CONVERSION_FACTOR

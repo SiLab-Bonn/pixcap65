@@ -14,7 +14,15 @@ from contextlib import contextmanager
 from iminuit.warnings import IMinuitWarning
 from tables.exceptions import NaturalNameWarning
 from tqdm import tqdm
-from typing import Optional, Tuple, Union, Callable, Any, List
+
+try:
+    # noinspection PyCompatibility
+    from collections.abc import Callable
+except ImportError:
+    # python 2.7
+    # noinspection PyProtectedMember,PyUnresolvedReferences
+    from collections import Callable
+from typing import Optional, Tuple, Union, Any, List
 from warnings import warn, filterwarnings
 
 from pixcap65.analysis_util.modelling.data_store import DepletionDataStore, DepletionTableStore, DepletionArrayStore, \
@@ -36,8 +44,6 @@ from pixcap65.utility import synchronized_process_open_file
 from pixcap65.utility.tables_util import get_groups, get_leaves, copy_node, list_attributes, group_get_file, \
     set_group_attribute, get_group_attribute, get_group_attributes, get_parent_group
 from pixcap65.utility.utils_2 import walk_to_node, GroupType, create_carray, prevent_group_mix_up
-
-# from tables import open_file as synchronized_process_open_file
 
 try:
     # noinspection PyCompatibility
@@ -1868,19 +1874,6 @@ def fetch_bias_voltage(data_group, selection, scan_parameters=None):
         renew_bias_voltages[:, 0] = voltage_settings
         renew_bias_voltages[:, 1] = voltages
         renew_bias_voltages[:, 2] = voltage_errors
-        # file = group_get_file(data_group)
-        # temp = data_group.BiasVoltageHist
-        # assert isinstance(temp, tb.CArray)
-        # try:
-        #     import uuid
-        #     file.copy_node(where=data_group, name="BiasVoltageHist",
-        #                    newname="BiasVoltageHist_{}.backing".format(uuid.uuid4()))
-        #     temp._f_remove()
-        #     time.sleep(30)
-        #     create_carray(file, data_group, "BiasVoltageHist", obj=renew_bias_voltages,
-        #                   filters=tb.Filters(complib='blosc', fletcher32=False, complevel=5), unit=HIST_BIAS_MEAS_UNIT)
-        # except Exception as e:
-        #     warn("Encountered the error: " + repr(e), stacklevel=1)
 
         return renew_bias_voltages, voltages, voltage_errors
 

@@ -20,7 +20,14 @@ uncertainties correctly.
 
 import numpy as np
 import tables as tb
-from typing import Union, Callable, Any
+try:
+    # noinspection PyCompatibility
+    from collections.abc import Callable
+except ImportError:
+    # python 2.7
+    # noinspection PyProtectedMember,PyUnresolvedReferences
+    from typing import Callable
+from typing import Union, Any
 
 from pixcap65.analysis_util import TABLES_ARRAY_TYPE, TABLES_TABLE_TYPE, GENERAL_PIXCAP_SHAPE, transform_covariance, \
     GLOBAL_FILTERS, FARAD_CONVERSION_FACTOR, CURRENT_CONVERSION_FACTOR

@@ -13,7 +13,14 @@ import logging
 import numpy as np
 import tables as tb
 import time
-from collections.abc import Iterable
+
+try:
+    # noinspection PyCompatibility
+    from collections.abc import Iterable
+except ImportError:
+    # python 2.7
+    # noinspection PyProtectedMember,PyUnresolvedReferences
+    from collections import Iterable
 
 from examples.data_constants import R11_SCAN_FILE, R13_2_SCAN_FILE, E1_2_SCAN_FILE, X4_SCAN_FILE
 from examples.data_constants import X1_SCAN_2_FILE, X2_SCAN_2_FILE

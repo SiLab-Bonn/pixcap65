@@ -2,7 +2,14 @@
 Utility functions for :py:mod:`pytables` to access protected properties.
 """
 import tables as tb
-from typing import Any, ItemsView
+try:
+    # noinspection PyCompatibility
+    from collections.abc import ItemsView
+except ImportError:
+    # python 2.7
+    # noinspection PyProtectedMember,PyUnresolvedReferences
+    from typing import ItemsView
+from typing import Any
 
 
 def get_groups(parent: tb.Group) -> ItemsView[str, tb.Group]:

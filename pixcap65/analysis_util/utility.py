@@ -21,10 +21,17 @@ In particular it should help with defining constants of values used quite often.
 import logging
 import numpy as np
 import tables as tb
-from collections.abc import Sequence
+try:
+    # noinspection PyCompatibility
+    from collections.abc import Sequence, Mapping
+except ImportError:
+    # python 2.7
+    # noinspection PyProtectedMember,PyUnresolvedReferences
+    from collections import Sequence
+    from typing import Mapping
 from tables import File
 from tables.group import RootGroup
-from typing import Union, Mapping, Any
+from typing import Union, Any
 
 from pixcap65.utility.utils_2 import walk_to_node, UNITS_ATTRIBUTE_KEY, prevent_group_mix_up
 

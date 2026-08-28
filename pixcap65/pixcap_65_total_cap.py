@@ -43,12 +43,19 @@ import time
 import warnings
 import yaml
 from abc import abstractmethod, ABCMeta
-from collections.abc import Callable
+try:
+    # noinspection PyCompatibility
+    from collections.abc import Callable, Iterable, Mapping
+except ImportError:
+    # python 2.7
+    # noinspection PyProtectedMember,PyUnresolvedReferences
+    from collections import Callable, Iterable, Mapping
+finally:
+    from typing import Any, Optional
 from contextlib import contextmanager
 from numpy import ndarray
 from tqdm import tqdm
-# noinspection PyProtectedMember
-from typing import Iterable, Mapping, Any, Optional
+
 from warnings import deprecated
 
 from pixcap65.analysis import analysis_data_handle

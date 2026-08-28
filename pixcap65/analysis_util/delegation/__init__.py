@@ -18,7 +18,14 @@ measurements.
 #  limitations under the License.
 # ----------------------------------------------------------
 import numpy as np
-from typing import Any, Callable
+try:
+    # noinspection PyCompatibility
+    from collections.abc import Callable
+except ImportError:
+    # python 2.7
+    # noinspection PyProtectedMember,PyUnresolvedReferences
+    from typing import Callable
+from typing import Any
 
 from pixcap65.analysis_util.modelling.configuration_constants import ANALYSIS_INITIAL_CAPACITANCE, \
     ANALYSIS_INITIAL_RESISTANCE, ANALYSIS_INITIAL_LEAKAGE, ANALYSIS_REFERENCE_VOLTAGE

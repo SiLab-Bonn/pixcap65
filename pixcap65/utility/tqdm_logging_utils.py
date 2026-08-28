@@ -11,17 +11,18 @@ import sys
 
 try:
     # noinspection PyCompatibility
-    from collections.abc import Iterable
+    from collections.abc import Iterable, Iterator
 except ImportError:
     # python 2.7 and < python 3.3
     # noinspection PyProtectedMember,PyUnresolvedReferences
     from collections import Iterable
+    from typing import Iterator
 from contextlib import contextmanager, redirect_stdout, redirect_stderr
 from tqdm import tqdm
 # noinspection PyProtectedMember
 from tqdm.contrib import DummyTqdmFile as StdTqdmFile
 from tqdm.std import tqdm as std_tqdm
-from typing import Union, Optional, Type, List, Iterator
+from typing import Union, Optional, Type, List
 
 
 class _TqdmLoggingHandler(logging.StreamHandler):
