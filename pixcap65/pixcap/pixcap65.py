@@ -183,6 +183,7 @@ class Pixcap65(Dut):
 
     # Handle the implementation of the SMU config
     # CHECK: is this property obsolete by now?
+    # it is still used quite often, but I could not find any usage where the value returned might have changed.
     @property
     def smu_kwargs(self):
         """Gets the primary SMUs additional keyword arguments."""

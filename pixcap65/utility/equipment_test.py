@@ -9,6 +9,9 @@ import time
 from matplotlib import pyplot as plt
 from matplotlib.backends.backend_pdf import PdfPages
 from tqdm import tqdm
+
+from pixcap65.pixcap.pixcap65_measurement import ScanConfigurationKeys
+
 try:
     # noinspection PyCompatibility
     from collections.abc import Iterable
@@ -20,7 +23,6 @@ except ImportError:
 from pixcap65.analysis import analyze_data
 from pixcap65.analysis_util import GENERAL_PIXCAP_SHAPE, CURRENT_CONVERSION_FACTOR
 from pixcap65.analysis_util.utility import get_base_group
-from pixcap65.pixcap.pixcap65_measurements import NUMBER_AVERAGE_MEASUREMENTS_KEY
 from pixcap65.pixcap_65_total_cap import scan_configuration, PixCap65TotalCap
 from pixcap65.utility.tqdm_logging_utils import logging_redirect_tqdm
 from pixcap65.utility.utils_2 import create_carray
@@ -117,7 +119,7 @@ def test_frequency_settling(settling_range: Iterable, file_name: str):
     """
     special_config = scan_configuration.copy()
     special_config["double_sweep"] = True
-    special_config[NUMBER_AVERAGE_MEASUREMENTS_KEY] = 10
+    special_config[ScanConfigurationKeys.AVERAGE_MEASUREMENTS] = 10
     with PixCap65TotalCap(special_config, file_name) as pix:
         from matplotlib.backends.backend_pdf import PdfPages
         from matplotlib import cm

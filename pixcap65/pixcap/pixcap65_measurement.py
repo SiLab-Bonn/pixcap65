@@ -32,8 +32,6 @@ except ImportError:
 from warnings import warn
 
 from pixcap65.pixcap.pixcap65 import Pixcap65
-from pixcap65.pixcap.pixcap65_measurements import NUMBER_AVERAGE_MEASUREMENTS_KEY, \
-    BIASING_NUMBER_AVERAGE_MEASUREMENTS_KEY
 from pixcap65.pixcap.pixcap_structure import BasilConfigKeys
 from pixcap65.utility.utils_2 import walk_to_node
 
@@ -460,26 +458,80 @@ def configuration_context(config):
         raise
 
 
-# TODO: looks like this enumeration of configuration keys is still incomplete.
 class ScanConfigurationKeys(StrEnum):
     """
     Enumeration object for type-safe access to the names of the scan configuration keys.
     """
+    # define the general setup of the measurement device
+    # input voltage of the measurement circuit in V. Used for charging the capacitances'.
+    VIN = "Vin"
+    # grid of the switching frequencies to use for determining the capacitance.
+    FREQUENCY_RANGE = "frequency_range"
+    # group in which to store the measurements in general (individual scans should be in subgroups)
+    DATA = "data_path"
+    # how to treat the .h5 file; only supported value is currently `append`.
+    # if it is left unspecified or any other str value is provided, the output file will be overriden if
+    #  it already exists.
+    MODE = "out_file_mode"
+    # path/name of the output file to use for storing measurement results.
+    # it will be used instead of the output file specified on instantiation of the actual measurement class.
+    OUTPUT = "output_file"
+    DOUBLE_SWEEP = "double_sweep"
+    PLC = 'plc_cycles'
+
+    # define the part of the sensor's pixel matrix which should actually be measured.
     START_COLUMN = "start_column"
     STOP_COLUMN = "stop_column"
     START_ROW = "start_row"
     STOP_ROW = "stop_row"
-    AVERAGE_MEASUREMENTS = NUMBER_AVERAGE_MEASUREMENTS_KEY
-    BIAS_AVERAGE_MEASUREMENTS = BIASING_NUMBER_AVERAGE_MEASUREMENTS_KEY
-    VIN = "Vin"
-    FREQUENCY_RANGE = "frequency_range"
-    BIAS_VOLTAGE_RANGE = "bias_range"
-    BIAS_VOLTAGE_SINGLE = "bias"
-    BIAS_CURRENT_LIMIT = "bias_limit"
-    BIAS_CURRENT_RANGE = "bias_sense_range"
-    BIAS_HV_CURRENT_LIMIT = "bias_hv_limit"
+
+    # SMU configuration for general measurements
+    # number of measurements to take and average over later for the primary measurement SMUs
+    AVERAGE_MEASUREMENTS = "average_measurements"
+    # current measurement range to use with this SMU.
     SMU_CURRENT_RANGE = "pixcap_range"
+    # current compliance limit to use with these SMUs for the measurement.
     SMU_CURRENT_LIMIT = "pixcap_limit"
+
+    # SMU configuration for biasing/HV
+    # number of measurements to take and average over later for the HV SMU (leakage current measurements)
+    BIAS_AVERAGE_MEASUREMENTS = "bias_average_measurements"
+    # voltage sourcing range to use for the HV Supply.
+    BIAS_VOLTAGE_RANGE = "bias_range"
+    # reverse bias voltage for the capacitance scans to use for depleting the sensor (in V).
+    BIAS_VOLTAGE_SINGLE = "bias"
+    # current measurement compliance limit for the HV Supply.
+    BIAS_CURRENT_LIMIT = "bias_limit"
+    # current measurement range to use for the HV Supply.
+    BIAS_CURRENT_RANGE = "bias_sense_range"
+    # Additional current limit for the HV measurements to protect the sensor from destruction.
+    BIAS_HV_CURRENT_LIMIT = "bias_hv_limit"
+
+class MeasurementAttributes(StrEnum):
+    """Enumeration of the attribute names used to tag the arrays and tables in the output file."""
+    BIAS_MEASUREMENT_UNIT = 'bias_unit'
+    BIAS_V_UNIT = 'bias_voltage_unit'
+    N_BIAS_ITEMS = 'voltages'
+    N_FREQUENCIES = 'frequencies'
+    BIASING = 'bias_voltage'
+    UNIT_FREQUENCIES = 'freq_unit'
+    UNIT_CURRENT = 'current_unit'
+    UNIT_CURRENT_BIASING = 'bias_current_unit'
+
+class CapType(StrEnum):
+    """Enumeration of the names of the different measurement types to name their groups accordingly."""
+    BIASING_DEPENDENCE = 'biasing'
+    INTER_PIXEL = 'inter_cap'
+    TOTAL_PIXEL = 'total_cap'
+
+class ScanParameters(StrEnum):
+    """keys for the `scan parameters` table."""
+    HV = "hv_voltage"
+
+
+REDUCED_NPLC = 2
+STANDARD_NLPC = 10
+NUMBER_INITIAL_MEASUREMENTS = 20
 
 
 def declare_logger():

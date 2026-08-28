@@ -286,9 +286,8 @@ class PixCapSetup(Dut):
                                                              PixCap65Measurement))
 
         # we need to catch the None case first here
-        # FIXME: there parts of the data repositories packaged as well => these need to be removed.
-
         from pixcap65.pixcap.pixcap65_measurement import configuration_context
+
         with configuration_context(config) as context:
             adjusted_config = self.init_environment(context, hl_keys, name, rl_keys, tl_keys)
         logger.debug("For the handling of the setup, we'll use the config:\n %s", str(self._environ_config))
