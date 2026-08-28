@@ -18,7 +18,8 @@ from contextlib import contextmanager
 from pixcap65.analysis import analysis_data_handle
 from pixcap65.analysis_util import GENERAL_PIXCAP_SHAPE
 from pixcap65.analysis_util.utility import HIST_CURRENT_MEAS_UNIT, handle_analysis_mix_up
-from pixcap65.pixcap.pixcap65_measurement import ScanConfigurationKeys, declare_logger
+from pixcap65.pixcap.pixcap65_measurement import ScanConfigurationKeys, declare_logger, NUMBER_INITIAL_MEASUREMENTS, \
+    MeasurementAttributes, CapType, REDUCED_NPLC, STANDARD_NLPC
 from pixcap65.pixcap_65_total_cap import PixCap65Measurement, MEASURING_PIXEL_TEXT, \
     _store_scan_par_values
 from pixcap65.utility import pixcap65_constants as c
@@ -37,8 +38,7 @@ scan_configuration = {
     'frequency_range': np.arange(1.0, 6.1, 0.75),  # .astype(np.float) # [MHz]
     'bias': -80,
 
-    # TODO: choose a more suitable default value for the configuration here!
-    'data_path': "Reference/R1",
+    'data_path': "Reference/Demo",
     "out_file_mode": "append",
 }
 
@@ -124,33 +124,34 @@ class Pixcap65InterCap(PixCap65Measurement):
         super(Pixcap65InterCap, self).__init__(scan_config, output_file, **kwargs)
 
         # prepare the data fields for the measurement
-        self.inter_hist_current_1 = np.full(shape=(40, 41, self.n_frequencies),
+        measurements_shape = tuple([*GENERAL_PIXCAP_SHAPE, self.n_frequencies])
+        self.inter_hist_current_1 = np.full(shape=measurements_shape,
                                             fill_value=np.nan)  # current value for each measured frequency per pixel
-        self.inter_hist_current_2 = np.full(shape=(40, 41, self.n_frequencies),
+        self.inter_hist_current_2 = np.full(shape=measurements_shape,
                                             fill_value=np.nan)  # current value for each measured frequency per pixel
-        self.total_hist_current = np.full(shape=(40, 41, self.n_frequencies),
+        self.total_hist_current = np.full(shape=measurements_shape,
                                           fill_value=np.nan)  # current value for each measured frequency per pixel
 
         # current value for each measured frequency per pixel
-        self.inter_hist_current_1_error = np.full(shape=(40, 41, self.n_frequencies),
+        self.inter_hist_current_1_error = np.full(shape=measurements_shape,
                                                   fill_value=np.nan)
         # current value for each measured frequency per pixel
-        self.inter_hist_current_2_error = np.full(shape=(40, 41, self.n_frequencies),
+        self.inter_hist_current_2_error = np.full(shape=measurements_shape,
                                                   fill_value=np.nan)
         # current value for each measured frequency per pixel
-        self.total_hist_current_error = np.full(shape=(40, 41, self.n_frequencies),
+        self.total_hist_current_error = np.full(shape=measurements_shape,
                                                 fill_value=np.nan)
 
         self.n_measurements = scan_config.get(ScanConfigurationKeys.AVERAGE_MEASUREMENTS, 1)
-        self.inter_hist_individual_currents_1 = np.full(shape=(40,41,self.n_frequencies, 1), fill_value=np.nan)
-        self.inter_hist_individual_currents_2 = np.full(shape=(40, 41, self.n_frequencies, 1), fill_value=np.nan)
-        self.total_hist_individual_currents = np.full(shape=(40, 41, self.n_frequencies, 1), fill_value=np.nan)
+        measurement_values_shape = (*measurements_shape, 1)
+        self.inter_hist_individual_currents_1 = np.full(shape=measurement_values_shape, fill_value=np.nan)
+        self.inter_hist_individual_currents_2 = np.full(shape=measurement_values_shape, fill_value=np.nan)
+        self.total_hist_individual_currents = np.full(shape=measurement_values_shape, fill_value=np.nan)
 
         # this kind of setup is somewhat misplaced.
         self.pixcap.seq_size = 4
         self.handle_measurement = self._handle_single_measurement
 
-    # TODO: looks like there is no documentation on what do the configuration options actually.
     def configure(self):
         """
         configure
@@ -177,9 +178,10 @@ class Pixcap65InterCap(PixCap65Measurement):
         # simplify switch the order of the clocks for once.
         self.pixcap.seq_init(clk_0='0100', clk_1='0001', clk_2='0001', clk_3='0100')
 
-        self.inter_hist_individual_currents_1 = np.full(shape=(40, 41, self.n_frequencies, self.n_measurements), fill_value=np.nan)
-        self.inter_hist_individual_currents_2 = np.full(shape=(40, 41, self.n_frequencies, self.n_measurements), fill_value=np.nan)
-        self.total_hist_individual_currents = np.full(shape=(40, 41, self.n_frequencies, self.n_measurements), fill_value=np.nan)
+        measurement_values_shape = tuple([*GENERAL_PIXCAP_SHAPE, self.n_frequencies, self.n_measurements])
+        self.inter_hist_individual_currents_1 = np.full(shape=measurement_values_shape, fill_value=np.nan)
+        self.inter_hist_individual_currents_2 = np.full(shape=measurement_values_shape, fill_value=np.nan)
+        self.total_hist_individual_currents = np.full(shape=measurement_values_shape, fill_value=np.nan)
 
         self.pixcap.vm3_on()
         self.pixcap.vm2_on()
@@ -187,7 +189,7 @@ class Pixcap65InterCap(PixCap65Measurement):
 
         # measure some current values; avoid measuring incorrect currents due to initial oscillation effects of SMU
         logging.debug('Waiting for settling of SMU...')
-        for _ in range(0, 20):
+        for _ in range(0, NUMBER_INITIAL_MEASUREMENTS):
             c3 = self.pixcap.vm3_measure_current()
             c2 = self.pixcap.vm2_measure_current()
             c1 = self.pixcap.vm1_measure_current()
@@ -206,14 +208,13 @@ class Pixcap65InterCap(PixCap65Measurement):
         current at all three SMU channels to obtain information about the pixel capacitance and the inter-pixel
         capacitance.
 
-        CHECK: does this still match the definitions by the super classes?
         :param data_group_spec: specifier of the data group in hdf file where the measurements are stored.
         :param sequence_call: boolean to indicate whether this function is called in a sequence of scan calls from another scan procedure.
         """
         global logger
         # some further setup to be done right before the measurement
-        data_group = self.get_data_group(data_group_spec, "inter_cap")
-        set_group_attribute(data_group, "frequencies", self.n_frequencies)
+        data_group = self.get_data_group(data_group_spec, CapType.INTER_PIXEL)
+        set_group_attribute(data_group, MeasurementAttributes.N_FREQUENCIES, self.n_frequencies)
 
         for i_col, i_row in self.measurement_procedure(data_group, False):
             logging.info(MEASURING_PIXEL_TEXT % (i_col, i_row))
@@ -471,12 +472,12 @@ class Pixcap65InterCap(PixCap65Measurement):
     def enhanced_readout_mode(self):
         try:
             if self.n_measurements > 5:
-                self.pixcap[self.pixcap.vm2_smu_key].set_current_nlpc(2)
-                self.pixcap[self.pixcap.vm3_smu_key].set_current_nlpc(2)
+                self.pixcap[self.pixcap.vm2_smu_key].set_current_nlpc(REDUCED_NPLC)
+                self.pixcap[self.pixcap.vm3_smu_key].set_current_nlpc(REDUCED_NPLC)
             yield self
         finally:
-            self.pixcap[self.pixcap.vm2_smu_key].set_current_nlpc(10)
-            self.pixcap[self.pixcap.vm3_smu_key].set_current_nlpc(10)
+            self.pixcap[self.pixcap.vm2_smu_key].set_current_nlpc(STANDARD_NLPC)
+            self.pixcap[self.pixcap.vm3_smu_key].set_current_nlpc(STANDARD_NLPC)
 
     # region Pixcap Properties
     # specialized for the inter capacitance measurement.
@@ -562,28 +563,6 @@ class Pixcap65InterCapDiagonals(Pixcap65InterCap):
 
 
 if __name__ == "__main__":
-    output_file = "../RX-Interpixel_Scan.h5"
-    # with Pixcap65InterCap(scan_configuration, output_file) as pix:
-    # pix.scan(data_group_spec="demo_measurement_1_80_V")
-    # TODO: prepare this main part for final submission!
-    from pixcap65.utils import PixCapSetup
-
-    del scan_configuration['bias']
-    with PixCapSetup(scan_configuration, output_file, measurement=Pixcap65InterCap) as pix:
-        pix.pixcap.frequency_settling = 0.4
-        pix.scan(data_group_spec="demo_measurement_1_unbiased_1_discharge")
-
-    scan_configuration['bias'] = -80
-    with PixCapSetup(scan_configuration, output_file, measurement=Pixcap65InterCap) as pix:
-        pix.pixcap.frequency_settling = 0.6
-        pix.scan(data_group_spec="demo_measurement_2_biased_80_V_1_discharge")
-
-    scan_configuration['bias'] = -40
-    with PixCapSetup(scan_configuration, output_file, measurement=Pixcap65InterCap) as pix:
-        pix.pixcap.frequency_settling = 0.4
-        pix.scan(data_group_spec="demo_measurement_3_biased_40_V_1_discharge")
-
-    # scan_configuration['bias'] = -5
-    # with PixCapSetup(scan_configuration, output_file, measurement=Pixcap65InterCap) as pix:
-    #     pix.pixcap.frequency_settling = 0.4
-    #     pix.scan(data_group_spec="demo_measurement_4_biased_05_V_1_discharge")
+    output_file = "test.h5"
+    with Pixcap65InterCap(scan_configuration, output_file) as pix:
+        pix.scan(data_group_spec="demo_measurement")

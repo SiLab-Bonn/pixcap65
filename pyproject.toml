@@ -46,8 +46,9 @@ source = "https://github.com/SiLab-Bonn/pixcap65/"
 # no documentation present.
 
 [project.scripts]
-pixcap65-save_firmware = "pixcap65.pixcap.pixcap65_measurement:load_firmware_main"
-pixcap65-load_example_configuration = "pixcap65.pixcap.pixcap65_measurement:load_configuration_main"
+pixcap65-save-firmware = "pixcap65.pixcap.pixcap65_measurement:load_firmware_main"
+pixcap65-load-example-configuration = "pixcap65.pixcap.pixcap65_measurement:load_configuration_main"
+pixcap65-measurement = "pixcap65.measurements:main"
 
 [project.optional-dependencies]
 dut = [
