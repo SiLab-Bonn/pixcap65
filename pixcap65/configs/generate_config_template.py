@@ -25,7 +25,13 @@ import os
 import ruamel.yaml
 from argparse import ArgumentParser
 from ruamel.yaml.comments import CommentedMap
-from typing import Iterable
+try:
+    # noinspection PyCompatibility
+    from collections.abc import Iterable
+except ImportError:
+    # python 2.7
+    # noinspection PyProtectedMember,PyUnresolvedReferences
+    from typing import Iterable
 
 yml = ruamel.yaml.YAML()
 

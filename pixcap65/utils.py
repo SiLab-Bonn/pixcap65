@@ -20,13 +20,15 @@ corresponding measurements.
 #  limitations under the License.
 # ----------------------------------------------------------
 
+from collections import OrderedDict
+
 import logging
 import numpy as np
 import time
 # noinspection PyUnresolvedReferences
 from basil.dut import Dut, Base
 from enum import StrEnum
-from typing import Optional, OrderedDict, Union
+from typing import Optional, Union
 
 from pixcap65.pixcap_65_total_cap import PixCap65Measurement
 from pixcap65.utility.basil_utils import extract_basil_layers

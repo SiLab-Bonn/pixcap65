@@ -18,7 +18,15 @@
 import locale
 import numpy as np
 import tables as tb
-from collections.abc import Iterable, Mapping, Callable
+
+try:
+    # noinspection PyCompatibility
+    from collections.abc import Iterable, Mapping, Callable
+except ImportError:
+    # python 2.7
+    # noinspection PyProtectedMember,PyUnresolvedReferences
+    from collections import Iterable, Mapping, Callable
+
 from iminuit import Minuit
 from iminuit.cost import LeastSquares
 from inspect import Parameter

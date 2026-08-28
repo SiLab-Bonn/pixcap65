@@ -28,7 +28,14 @@
 # ----------------------------------------------------------
 import numpy as np
 import tables as tb
-from collections.abc import Iterable, Callable
+try:
+    # noinspection PyCompatibility
+    from collections.abc import Iterable, Callable, Sequence
+except ImportError:
+    # python 2.7
+    # noinspection PyProtectedMember,PyUnresolvedReferences
+    from collections import Iterable, Callable
+    from typing import Sequence
 from iminuit import Minuit
 from iminuit.cost import LeastSquares
 from iminuit.util import _detect_log_spacing, _smart_sampling
@@ -36,7 +43,7 @@ from matplotlib import pyplot as plt, rc_context
 from matplotlib.backends.backend_pdf import PdfPages
 from matplotlib.lines import Line2D
 from numpy._typing import NDArray, ArrayLike
-from typing import Tuple, Union, Sequence, Optional, List
+from typing import Tuple, Union, Optional, List
 
 from capacitance_models import linear_model, reciprocal_model, extended_cap_model_5, inverted_reciprocal_model
 from examples.plot_dependencies import read_rec_array_sorted, read_rec_array_sorted_where, chi2
