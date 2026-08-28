@@ -5,6 +5,7 @@ version = "1.0.0.dev2"
 description = "Host software for the PixCap65 chip control system based on MIO2 + GPAC hardware."
 authors = [
     { name = "Hans Krüger", email = "krueger@physik.uni-bonn.de" },
+    { name = "Dominik Fischer", email = "s6dkfisc@uni-bonn.de" },
 ]
 maintainers = [
     { name = "Yannick Dieter", email = "dieter@physik.uni-bonn.de" },
