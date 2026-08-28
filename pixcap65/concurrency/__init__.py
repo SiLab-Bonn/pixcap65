@@ -29,30 +29,85 @@ __depletion_manager = None
 __manager_handling_lock = mp.Lock()
 
 def defer_module():
+    """
+    Deinitialization handler of the :py:mod:`pixcap65.concurrency` module.
+    This implementation should make sure that afterwards there are no remnant semaphore objects or something similar
+    which may leak out of the process and could cause issue with other processes which try to acquire new locks but
+    the operating system could not provided any further locks.
+
+    @author: Dominik Fischer
+    last update: 2026-08-25
+    """
     global __manager_handling_lock
     del __manager_handling_lock
 
 
 atexit.register(defer_module)
 
+
 def exit_manager():
+    """
+    Exit/deinitialization handler for module level :py:class:`multiprocessing.managers.Manager` objects or their subclasses.
+    This should make sure that before exiting the process the resources of a manager object used for sharing resources
+    and process synchroniztation are cleaned-up.
+
+    @author: Dominik Fischer
+    last update: 2026-08-25
+    """
     global __manager
     with __manager_handling_lock:
         if __manager is not None:
             __manager.__exit__(*sys.exc_info())
             __manager = None
 
+
 # make sure the manager object will be closed ordinarily on exit.
 __started_manager = True
 
+
 @contextmanager
 def get_context_manager(**kwargs):
+    """
+    Retrieve a manager object for sharing resources and handling the closing process of this multiprocessing manager at
+    the end of the context manager.
+    For fetching the multiprocessing manager object a delegation to
+    :py:func:`pixcap65.concurrency.get_manager` and for closing a delegation to
+    :py:func:`pixcap65.concurrency.close_manager` is used.
+    This way of sharing resources could be quite slow as all the data transmitted needs to be pickled.
+
+    @author: Dominik Fischer
+    last update: 2026-08-25
+
+    :param kwargs: further arguments to connect to a already running manager or create a new one with well-defined parameters. For this keywords you may also take a look at :py:func:`pixcap65.analysis.get_manager_keywords`.
+    :key address: address of the socket of the multiprocessing.Manager object we want to connect to.
+    :key authkey: authentication key necessary to connect to the socket. (It is recommended not to use this parameter as
+        it is not pickable)
+    :return: context manager to use a multiprocessing.Manager object suitable for sharing resources.
+    """
     try:
         yield get_manager(**kwargs)
     finally:
         close_manager()
 
+
 def get_manager(**kwargs):
+    """
+    Retrieve a manager object for sharing resources.
+    This way of sharing resources could be quite slow as all the data transmitted needs to be pickled.
+    It is advised to use this function only for exceptional cases where the usage of a context manager like provided by
+    :py:func:`pixcap65.concurrency.get_context_manager` is not applyable.
+
+    @author: Dominik Fischer
+    last update: 2026-08-25
+
+    :param kwargs: further arguments to connect to a already running manager or create a new one with well-defined parameters. For this keywords you may also take a look at :py:func:`pixcap65.analysis.get_manager_keywords`.
+
+    :key address: address of the socket of the multiprocessing.Manager object we want to connect to.
+    :key authkey: authentication key necessary to connect to the socket. (It is recommended not to use this parameter as
+        it is not pickable)
+    :return: multiprocessing.Manager object suitable for sharing resources.
+    :rtype: :py:class:`multiprocessing.managers.Manager`
+    """
     with __manager_handling_lock:
         global __manager, __started_manager
         if __manager is None:
@@ -70,7 +125,16 @@ def get_manager(**kwargs):
 
     return __manager
 
+
 def close_manager():
+    """
+    Close the manager object if this module/process has create the manager or simply disconnect from it.
+    It is designe to close :py:class:`multiprocessing.managers.Manager` objects created by
+    :py:func:`pixcap65.concurrency.get_manager`.
+
+    @author: Dominik Fischer
+    last update: 2026-08-25
+    """
     global __manager, __started_manager
     with __manager_handling_lock:
         if __manager is not None and isinstance(__manager, BaseManager) and __started_manager:
@@ -85,6 +149,25 @@ def close_manager():
 
 @contextmanager
 def get_mp_context_manager(**kwargs):
+    """
+    Retrieve a manager object for sharing resources and handling the closing process of this multiprocessing manager at
+    the end of the context manager.
+    The manager object fetched here is particular designed for the usage with the depletion analysis
+    of this framework.
+    For fetching the multiprocessing manager object a delegation to
+    :py:func:`pixcap65.concurrency.get_mp_manager` and for closing a delegation to
+    :py:func:`pixcap65.concurrency.close_mp_manager` is used.
+    This way of sharing resources could be quite slow as all the data transmitted needs to be pickled.
+
+    @author: Dominik Fischer
+    last update: 2026-08-25
+
+    :param kwargs: further arguments to connect to a already running manager or create a new one with well-defined parameters. For this keywords you may also take a look at :py:func:`pixcap65.analysis.get_manager_keywords`.
+    :key address: address of the socket of the multiprocessing.Manager object we want to connect to.
+    :key authkey: authentication key necessary to connect to the socket. (It is recommended not to use this parameter as
+        it is not pickable)
+    :return: context manager to use a multiprocessing.Manager object suitable for sharing resources.
+    """
     try:
         yield get_mp_manager(**kwargs)
     finally:
@@ -92,6 +175,24 @@ def get_mp_context_manager(**kwargs):
 
 
 def get_mp_manager(**kwargs):
+    """
+    Retrieve a manager object for sharing resources.
+    This way of sharing resources could be quite slow as all the data transmitted needs to be pickled.
+    The manager object fetched here is particular designed for the usage with the depletion analysis
+    of this framework.
+    It is advised to use this function only for exceptional cases where the usage of a context manager like provided by
+    :py:func:`pixcap65.concurrency.get_mp_context_manager` is not applyable.
+
+    @author: Dominik Fischer
+    last update: 2026-08-25
+
+    :param kwargs: further arguments to connect to a already running manager or create a new one with well-defined parameters. For this keywords you may also take a look at :py:func:`pixcap65.analysis.get_manager_keywords`.
+    :key address: address of the socket of the multiprocessing.Manager object we want to connect to.
+    :key authkey: authentication key necessary to connect to the socket. (It is recommended not to use this parameter as
+        it is not pickable)
+    :return: multiprocessing.Manager object suitable for sharing resources.
+    :rtype: :py:class:`pixcap65.concurrency.manager.DepletionMPManager`
+    """
     with __manager_handling_lock:
         global __depletion_manager
         if __depletion_manager is None:
@@ -106,6 +207,14 @@ def get_mp_manager(**kwargs):
 
 
 def close_mp_manager():
+    """
+    Close the manager object if this module/process has create the manager or simply disconnect from it.
+    It is designe to close :py:class:`multiprocessing.managers.Manager` objects created by
+    :py:func:`pixcap65.concurrency.get_mp_manager`.
+
+    @author: Dominik Fischer
+    last update: 2026-08-25
+    """
     global __depletion_manager
     with __manager_handling_lock:
         if __depletion_manager is not None:
@@ -113,10 +222,20 @@ def close_mp_manager():
             __depletion_manager = None
             atexit.unregister(close_mp_manager)
 
+
+# this part is unused by the analysis framework as it does not work as expected.
+# these proxies will only be available when matplotlib is installed and could be imported.
 try:
     from matplotlib.backends.backend_pdf import PdfPages
 
     class PdfPagesProxy(mp.managers.BaseProxy):
+        """
+        Proxy class to enable matplotlib PdfPages objects handled by a multiprocessing.Manager object.
+        Here only a minimal set of functionality will be exposed to the calling to enable saving for figures in a
+        multiprocessing context.
+
+        Effectively only the context manager implementation is exposed at all.
+        """
         _exposed_ = ('__enter__', '__exit__')
 
         def __enter__(self):
@@ -239,34 +358,3 @@ manager.ExtendedSyncManager.register('full', np.full, proxy.NumpyProxy)
 register_proxy("DepletionArrayStorage", DepletionArrayStoreMP, proxy.DepletionArrayStoreProxy)
 register_proxy("DepletionArrayStorage", DepletionArrayStoreMP, proxy.DepletionArrayStoreProxy,
                manager.ExtendedSyncManager)
-
-
-@contextmanager
-def get_mp_context_manager(**kwargs):
-    try:
-        yield get_mp_manager(**kwargs)
-    finally:
-        close_mp_manager()
-
-
-def get_mp_manager(**kwargs):
-    with __manager_handling_lock:
-        global __depletion_manager
-        if __depletion_manager is None:
-            __depletion_manager = manager.DepletionMPManager(**kwargs)
-            if "address" in kwargs:
-                __depletion_manager.connect()
-            else:
-                __depletion_manager.__enter__()
-                atexit.register(close_mp_manager)
-
-        return __depletion_manager
-
-
-def close_mp_manager():
-    global __depletion_manager
-    with __manager_handling_lock:
-        if __depletion_manager is not None:
-            __depletion_manager.__exit__(None, None, None)
-            __depletion_manager = None
-            atexit.unregister(close_mp_manager)
