@@ -8,17 +8,22 @@ Calculate t_charge with t_charge = m/seq_size * 1/f_rep
 
 import logging
 import numpy as np
+import tables as tb
 import time
 from bitarray import bitarray
 
-from pixcap65.pixcap_65_total_cap import PixCap65Measurement
+from pixcap65.analysis_util.utility import HIST_CURRENT_MEAS_UNIT
+from pixcap65.pixcap.pixcap65_measurement import ScanConfigurationKeys, CapType, MeasurementAttributes
+from pixcap65.pixcap_65_total_cap import PixCap65Measurement, _store_scan_par_values
 from pixcap65.utility import pixcap65_constants as c
+from pixcap65.utility.tables_util import set_group_attribute
 
 LOAD_LINE_SEQ_SIZE = 128
 
 logger = logging.getLogger()
 logger.setLevel(logging.DEBUG)
 
+# this will only investigate a particular pixel!
 # noinspection SpellCheckingInspection
 scan_configuration = {
     'start_column': 12,
@@ -33,11 +38,42 @@ scan_configuration = {
 
 
 class Pixcap65LoadLine(PixCap65Measurement):
+    """
+    Measurement class for line-loading tests with the PixCap65 chip.
+
+    """
     def handle_measurement_errors(self, unit):
-        raise NotImplementedError("Pixcap65LoadLine.handle_measurement_errors")
+        if self.averaging:
+            average_currents = np.nanmean(self.hist_current_values, axis=4, keepdims=True)
+            self.hist_current = average_currents[:, :, :, :, 0]
+            self.hist_current_errors = np.nanstd(self.hist_current_values, axis=4, mean=average_currents)
+        else:
+            self.hist_current_errors = self.determine_measurement_uncertainty(self.pixcap.primary_smu_key,
+                                                                              self.hist_current)
 
     def store_measurement_data(self, data_group, sequence_call, unit=None):
-        raise NotImplementedError("Pixcap65LoadLine.store_measurement_data")
+        try:
+            if "HistCurr" in data_group:
+                data_group.HistCurr[:] = self.hist_current[:]
+                if np.any(np.isfinite(self.hist_current_errors)):
+                    data_group.HistCurrErr[:] = self.hist_current_errors[:]
+            else:
+                self.create_carray(where=data_group, name="HistCurr", title="Current Histogram",
+                                   obj=self.hist_current, filters=self.filters, unit=HIST_CURRENT_MEAS_UNIT)
+                if np.any(np.isfinite(self.hist_current_errors)):
+                    self.create_carray(data_group, name='HistCurrErr', title='Current Error Histogram',
+                                       obj=self.hist_current_errors, filters=self.filters, unit=HIST_CURRENT_MEAS_UNIT)
+
+            if self.averaging:
+                if "HistCurrValues" in data_group:
+                    data_group.HistCurrValues[:] = self.hist_current_values[:]
+                else:
+                    self.create_carray(data_group, name='HistCurrValues', title='Multiple Current Histogram',
+                                       obj=self.hist_current_values, filters=self.filters, unit=HIST_CURRENT_MEAS_UNIT)
+        finally:
+            assert isinstance(data_group, tb.Group)
+            _store_scan_par_values(h5_file=self.out_file_h5, scan_parameters=self.scan_parameters, group=data_group)
+            self.out_file_h5.flush()
 
     def __init__(self, scan_config, out_file):
         # granularity of the clock sequencer must be set upfront.
@@ -45,14 +81,35 @@ class Pixcap65LoadLine(PixCap65Measurement):
         super(Pixcap65LoadLine).__init__(scan_config, out_file)
 
         # prepare the measurement fields
-        self.hist_current = np.full(shape=(int(self.seq_size / 2 - 1), 40, 40, self.n_frequencies + 1),
+        self.hist_current = np.full(shape=(40, 41, self.n_frequencies + 1, int(self.seq_size / 2 - 1)),
                                     fill_value=np.nan)
+        self.hist_current_errors = np.full(shape=(40, 41, self.n_frequencies + 1, int(self.seq_size / 2 - 1)),
+                                           fill_value=np.nan)
+        self.hist_current_values = np.full(
+            shape=(40, 41, self.n_frequencies + 1, int(self.seq_size / 2 - 1), self.n_measurements),
+            fill_value=np.nan)
+
+        self.handle_measurement = self._handle_single_measurement
+        self.cnt = 0
+
+    def update_config(self, new_config=None):
+        super(Pixcap65LoadLine).update_config(new_config)
+        self.hist_current = np.full(shape=(40, 41, self.n_frequencies + 1, int(self.seq_size / 2 - 1)),
+                                    fill_value=np.nan)
+        self.hist_current_errors = np.full(shape=(40, 41, self.n_frequencies + 1, int(self.seq_size / 2 - 1)),
+                                           fill_value=np.nan)
+        self.hist_current_values = np.full(
+            shape=(40, 41, self.n_frequencies + 1, int(self.seq_size / 2 - 1), self.n_measurements),
+            fill_value=np.nan)
 
     def scan(self, data_group_spec=None, sequence_call=False):
+        data_group = self.get_data_group(data_group_spec, CapType.TOTAL_PIXEL)
+        set_group_attribute(data_group, MeasurementAttributes.N_FREQUENCIES, self.n_frequencies)
+
+        # not handled by `configure` as these are adapted by the measurement.
         m = self.seq_size / 2 - 1  # define index of the last 1 in order to create a non-overlapping clock sequence
         assert isinstance(m, int), "m has to be an integer!"
-        # I do not see the point of a second variable of the same value?
-        cnt = self.seq_size / 2 - 1  # counter for numbering in output file
+        self.cnt = self.seq_size / 2 - 1  # counter for numbering in output file
 
         # create initial bit arrays for a given sequencer size
         bit_array_clk_3 = bitarray(self.seq_size)
@@ -67,58 +124,50 @@ class Pixcap65LoadLine(PixCap65Measurement):
         # number is reduced by one in every step
         for i in range(m, 0, -1):
             self.pixcap.seq_init(clk_0=bit_array_clk_0, clk_3=bit_array_clk_3)
-            # self.pixcap['SEQ'].reset()
-            # self.pixcap['SEQ'].set_clk_divide(1)
-            # self.pixcap['SEQ'].set_repeat_start(0)
-            # self.pixcap['SEQ'].set_repeat(0)
-            # self.pixcap['SEQ'].set_size(self.seq_size)
-            # self.pixcap['SEQ']['CLK_0'][0:self.seq_size - 1] = bit_array_clk_0
-            # self.pixcap['SEQ']['CLK_3'][0:self.seq_size - 1] = bit_array_clk_3
-            # self.pixcap['SEQ'].write()
-            # self.pixcap['SEQ'].start()
 
             # maybe this step does not have to be within the loop over m
             # did not know if SMU has to be set on after changing the clock sequencer
             self.smu_on()
             self.get_source_current()
 
-            if 'invert_slicing' in self.scan_config and self.scan_config['invert_slicing']:
-                col_range = self.row_range
-                row_range = self.col_range
-            else:
-                col_range = self.col_range
-                row_range = self.row_range
+            i_row = 0
+            for i_col, i_row in self.measurement_procedure(data_group, sequence_call,
+                                                           reversed_order=self.scan_config(ScanConfigurationKeys.INVERT,
+                                                                                           False)):
+                # handle enabled pixels
+                self.pixcap.disable_all_pixels()
+                self.pixcap.disable_all_columns()
+                self.pixcap.enable_column(i_col, c.EN_EOC_3)
+                time.sleep(1)
+                self.pixcap.enable_pixel_clk(i_col, i_row, c.EN_CLK_0 | c.EN_CLK_3)
 
-            for i_row in row_range:
-                for i_col in col_range:
-                    if 'invert_slicing' in self.scan_config and self.scan_config['invert_slicing']:
-                        temp_row, temp_col = i_row, i_col
-                        i_row, i_col = temp_col, temp_row
-                    self.pixcap.disable_all_pixels()
-                    self.pixcap.disable_all_columns()
-                    self.pixcap.enable_column(i_col, c.EN_EOC_3)
-                    time.sleep(1)
-                    self.pixcap.enable_pixel_clk(i_col, i_row, c.EN_CLK_0 | c.EN_CLK_3)
+                # perform the measurement.
+                for k, freq in enumerate(self.frequency_range):
+                    self.pixcap.cvm_frequency = freq
 
-                    for k, freq in enumerate(self.freq_sweep_array):
-                        self.pixcap.cvm_frequency = freq
-                        result = self.get_source_current()
-                        self.hist_current[cnt - 1, i_col, i_row, 0] = cnt
-                        if isinstance(result, float):
-                            self.hist_current[cnt - 1, i_col, i_row, k + 1] = result
-                        elif isinstance(result, str):
-                            self.hist_current[cnt - 1, i_col, i_row, k + 1] = float(result.split(',')[1])
+                    # no verification of averaged current stability!
+                    self.handle_measurement(i_col, i_row, k)
+                    self.store_iteration_parameters(freq, k)
 
-                logger.info(bit_array_clk_3)
-                # logger.info(self.hist_current[cnt-1, i_col, i_row, :])
-                logger.info(self.hist_current[cnt - 1, col_range[-1], i_row, :])
+            logger.info(bit_array_clk_3)
+            logger.info(self.hist_current[self.col_range[-1], i_row, :, self.cnt - 1])
 
             # reduce charging time with every iteration by setting last bit 1 -> 0 and decrement counter
             bit_array_clk_3[i] = 0
-            cnt = cnt - 1
-        self.out_file_h5.create_carray(where=self.out_file_h5.root, name="HistCurr", title="Current Histogram",
-                                       obj=self.hist_current, filters=self.filters)
-        self.out_file_h5.flush()
+            self.cnt = self.cnt - 1
+
+    def _handle_single_measurement(self, col, row, k):
+        result = self.get_source_current()
+        # Why this special format?
+        self.hist_current[col, row, 0, self.cnt - 1] = self.cnt
+
+        # not necessary anymore, as these is handled by the measurement function
+        self.hist_current[col, row, k + 1, self.cnt - 1] = result
+
+    def _handle_averaged_measurement(self, col, row, k):
+        result = self.pixcap.get_advanced_current_multiple(self.n_measurements)[:]
+        self.hist_current_values[col, row, 0, self.cnt - 1, :] = self.cnt
+        self.hist_current_values[col, row, k + 1, self.cnt - 1, :] = result
 
     def close(self):
         self.smu_off()
@@ -131,6 +180,18 @@ class Pixcap65LoadLine(PixCap65Measurement):
     def plot(self):
         logger.info("There is nothing to plot for the load line test.")
 
+    def storage_exception_handler(self, temp_id):
+        with open("error_storage_configuration_{}_line_test.yaml".format(temp_id), 'w') as f:
+            import yaml
+            yaml.safe_dump(self.scan_config, f)
+        with open("error_storage_scan_parameters_{}_line_test.yaml".format(temp_id), 'w') as f:
+            import yaml
+            yaml.safe_dump(self.scan_parameters, f)
+
+        np.save("error_storage_currents_{}_line_test".format(temp_id), self.hist_current)
+        np.save("error_storage_current_errors_{}_line_test".format(temp_id), self.hist_current_errors)
+        np.save("error_storage_individual_currents_{}_line_test".format(temp_id), self.hist_individual_currents)
+
     # properties of the measurement class
     @property
     def row_range(self):
@@ -140,14 +201,12 @@ class Pixcap65LoadLine(PixCap65Measurement):
     def col_range(self):
         return range(self.col_start, self.col_stop + 1)
 
-    @property
-    def freq_sweep_array(self):
-        return np.asarray(self.scan_config['frequency_range'], dtype=np.float64)
-
 
 if __name__ == "__main__":
     output_file = "./pixcap_full_data_image1.h5"
     with Pixcap65LoadLine(scan_configuration, output_file) as pix:
         pix.scan()
+
+        # but the analysis and plotting procedures are not included within the legacy script.
         pix.analyze()
         pix.plot()
