@@ -1192,13 +1192,3 @@ if __name__ == "__main__":
         time_str = date_obj.strftime("%H:%M:%S")
         print(date, mp.current_process().pid, time_str,
               mp.current_process().name, mp.current_process().authkey, "FINISH - MARK", file=f)
-
-
-# list of updated sensors
-# x4
-# r1
-# x5
-# x6
-# x7
-# r13
-# e1

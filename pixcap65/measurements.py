@@ -461,12 +461,9 @@ def main():
     # fine scan
     perform_fine_cv_scan(arguments, fine_bias_range)
 
-
-
     # perform the inter-pixel cap scans
     scan_configuration[ScanConfigurationKeys.AVERAGE_MEASUREMENTS] = 40
     perform_inter_pix_scan(arguments)
-    # time.sleep(600)
     if ScanConfigurationKeys.AVERAGE_MEASUREMENTS in scan_configuration:
         del scan_configuration[ScanConfigurationKeys.AVERAGE_MEASUREMENTS]
     # scan_configuration[ScanConfigurationKeys.AVERAGE_MEASUREMENTS] = 15

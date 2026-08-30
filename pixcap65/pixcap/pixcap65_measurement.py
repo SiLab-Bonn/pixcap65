@@ -144,29 +144,37 @@ def load_firmware(config=None):
     with configuration_context(config=config) as safe_config:
         # from here we need to extract the firmware location!
         dut = Pixcap65(safe_config)
-        for transfer in dut._conf[BasilConfigKeys.TRANSFER_LAYER]:
-            print("new entry")
-            print(type(transfer))
-            if 'type' not in transfer or not transfer['type'] == 'SiUsb':
-                continue
-            if 'bit_file' not in transfer['init']:
-                continue
+        with fetch_firmware(dut) as (resource_firmware, guess_path):
+            if not os.path.exists(os.path.dirname(guess_path)):
+                os.makedirs(os.path.dirname(guess_path), exist_ok=True)
+            with open(guess_path, 'wb') as bit_file:
+                with as_file(resource_firmware) as firmware:
+                    logging.debug("Will write the firmware %s", firmware)
+                    with open(firmware, 'rb') as guess_file:
+                        bit_file.write(guess_file.read())
 
-            guess_path = transfer['init']['bit_file']
-            print("What about the path to guess?", guess_path, os.path.abspath(guess_path))
-            if not os.path.exists(guess_path):
-                resource_firmware = files("pixcap65").joinpath('device', 'ise', 'pixcap65.bit')
-                assert resource_firmware.is_file()
-                if not os.path.exists(os.path.dirname(guess_path)):
-                    os.makedirs(os.path.dirname(guess_path), exist_ok=True)
-                with open(guess_path, 'wb') as bit_file:
-                    with as_file(resource_firmware) as firmware:
-                        print("Will write the firmware", firmware)
-                        with open(firmware, 'rb') as guess_file:
-                            bit_file.write(guess_file.read())
-
-                break
         del dut
+
+@contextmanager
+def fetch_firmware(dut):
+    """
+    Fetches the firmware from the modules resources
+    :param dut: `basil` device under test object
+    :return: yields tuple of resource and guess path
+    """
+    for transfer in dut._conf[BasilConfigKeys.TRANSFER_LAYER]:
+        if 'type' not in transfer or not transfer['type'] == 'SiUsb':
+            continue
+        if 'bit_file' not in transfer['init']:
+            continue
+
+        guess_path = transfer['init']['bit_file']
+        logger.debug("What about the path to guess? %s: %s", guess_path, os.path.abspath(guess_path))
+        if not os.path.exists(guess_path):
+            resource_firmware = files("pixcap65").joinpath('device', 'ise', 'pixcap65.bit')
+            assert resource_firmware.is_file()
+            yield resource_firmware, guess_path
+            break
 
 
 def load_configuration(target_path="pixcap65.yaml"):
@@ -224,6 +232,7 @@ class Pixcap65BaseMeasurement(MeasurementAbstract, metaclass=ABCMeta):
                 continue
 
             guess_path = transfer['init']['bit_file']
+            logger.debug("What about the path to guess? %s: %s", guess_path, os.path.abspath(guess_path))
             if not os.path.exists(guess_path):
                 resource_firmware = files("pixcap65").joinpath('device', 'ise', 'pixcap65.bit')
                 assert resource_firmware.is_file()
@@ -412,6 +421,7 @@ class Pixcap65BaseMeasurement(MeasurementAbstract, metaclass=ABCMeta):
         """
         raise NotImplementedError("`col_range` is abstract and therefore not implemented.")
 
+
 @contextmanager
 def configuration_context(config):
     """
@@ -484,6 +494,7 @@ class ScanConfigurationKeys(StrEnum):
     STOP_COLUMN = "stop_column"
     START_ROW = "start_row"
     STOP_ROW = "stop_row"
+    INVERT = 'invert_slicing'
 
     # SMU configuration for general measurements
     # number of measurements to take and average over later for the primary measurement SMUs
