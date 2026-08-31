@@ -1,11 +1,3 @@
-"""
-Implementations of some commonly used measurement routines.
-For further measurement routines (in particular more advanced/enhanced ones it might be necessary to implement your
-own measurement classes.
-
-If the requirements for the scan configuration could not be fullfilled by this module, it is necessary to provide your
-own implemetnation.
-"""
 # ----------------------------------------------------------
 #  Copyright (c) 2026. SiLab, Institute of Physics, University of Bonn.
 #
@@ -21,6 +13,14 @@ own implemetnation.
 #  See the License for the specific language governing permissions and
 #  limitations under the License.
 # ----------------------------------------------------------
+"""
+Implementations of some commonly used measurement routines.
+For further measurement routines (in particular more advanced/enhanced ones it might be necessary to implement your
+own measurement classes.
+
+If the requirements for the scan configuration could not be fullfilled by this module, it is necessary to provide your
+own implemetnation.
+"""
 
 import argparse
 import logging

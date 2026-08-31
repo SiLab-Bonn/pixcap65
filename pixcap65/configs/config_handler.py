@@ -1,8 +1,3 @@
-"""
-Implementations to normalize and load configuration files containing information about the range specs of the lab
-devices used and their measurement accuracy which is necessary to estimate the uncertainties (statistical) of the
-performed measurements.
-"""
 # ----------------------------------------------------------
 #  Copyright (c) 2026. SiLab, Institute of Physics, University of Bonn.
 #
@@ -18,6 +13,11 @@ performed measurements.
 #  See the License for the specific language governing permissions and
 #  limitations under the License.
 # ----------------------------------------------------------
+"""
+Implementations to normalize and load configuration files containing information about the range specs of the lab
+devices used and their measurement accuracy which is necessary to estimate the uncertainties (statistical) of the
+performed measurements.
+"""
 
 import enum
 import logging.config

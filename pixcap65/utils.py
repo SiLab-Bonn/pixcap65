@@ -1,9 +1,3 @@
-"""
-utils.py
-
-Utilities to control the whole setup including the power supply (psu) and initiating measurement class and their
-corresponding measurements.
-"""
 # ----------------------------------------------------------
 #  Copyright (c) 2026. SiLab, Institute of Physics, University of Bonn.
 #
@@ -19,6 +13,12 @@ corresponding measurements.
 #  See the License for the specific language governing permissions and
 #  limitations under the License.
 # ----------------------------------------------------------
+"""
+utils.py
+
+Utilities to control the whole setup including the power supply (psu) and initiating measurement class and their
+corresponding measurements.
+"""
 
 from collections import OrderedDict
 

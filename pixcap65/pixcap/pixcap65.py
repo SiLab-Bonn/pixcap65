@@ -1,9 +1,3 @@
-"""
-Implementation of the Pixcap65 Chip as a DUT for usage with the `basil` framework.
-
-Original by Hans Krüger.
-The measurement capabilities are enhanced by Dominik Fischer.
-"""
 #
 # ------------------------------------------------------------
 # Copyright (c) SILAB , Physics Institute of Bonn University
@@ -14,6 +8,12 @@ The measurement capabilities are enhanced by Dominik Fischer.
 #  $Author:: HK    $:
 #  $Date:: 2015-01-04 10:56:36 #$:
 #
+"""
+Implementation of the Pixcap65 Chip as a DUT for usage with the `basil` framework.
+
+Original by Hans Krüger.
+The measurement capabilities are enhanced by Dominik Fischer.
+"""
 import logging
 import numpy as np
 import time

@@ -1,7 +1,3 @@
-"""
-Implements the enhanced analysis strategy by using non-linerar fitting algorithms to also estimate the parameter
-uncertainties correctly.
-"""
 # ----------------------------------------------------------
 #  Copyright (c) 2026. SiLab, Institute of Physics, University of Bonn.
 #
@@ -17,6 +13,10 @@ uncertainties correctly.
 #  See the License for the specific language governing permissions and
 #  limitations under the License.
 # ----------------------------------------------------------
+"""
+Implements the enhanced analysis strategy by using non-linerar fitting algorithms to also estimate the parameter
+uncertainties correctly.
+"""
 
 import numpy as np
 import tables as tb

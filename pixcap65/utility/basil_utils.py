@@ -1,11 +1,11 @@
-"""
-Collection of utility function to help with the interaction with the `basil` framework.
-"""
 # ----------------------------------------------------------
 #  Copyright (c) .
 #   All rights reserved
 #  SiLab, Institute of Physics, University of Bonn
 # ----------------------------------------------------------
+"""
+Collection of utility function to help with the interaction with the `basil` framework.
+"""
 
 from __future__ import annotations
 

@@ -1,12 +1,12 @@
-"""
-Implementations to simplify the usage of pythons concurrency features in particular concering multiple processes,
-shared resources and synchronization between different processes.
-"""
 # ----------------------------------------------------------
 #  Copyright (c) .
 #   All rights reserved
 #  SiLab, Institute of Physics, University of Bonn
 # ----------------------------------------------------------
+"""
+Implementations to simplify the usage of pythons concurrency features in particular concering multiple processes,
+shared resources and synchronization between different processes.
+"""
 import atexit
 import inspect
 import multiprocessing as mp

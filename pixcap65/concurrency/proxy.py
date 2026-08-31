@@ -1,7 +1,3 @@
-"""
-Definitions of proxies to be used to access data store types of the :py:mod:`pixcap6` framework as shared resources
-managed by a multiprocessing.manager process.
-"""
 # ----------------------------------------------------------
 #  Copyright (c) 2026. SiLab, Institute of Physics, University of Bonn.
 #
@@ -17,6 +13,10 @@ managed by a multiprocessing.manager process.
 #  See the License for the specific language governing permissions and
 #  limitations under the License.
 # ----------------------------------------------------------
+"""
+Definitions of proxies to be used to access data store types of the :py:mod:`pixcap6` framework as shared resources
+managed by a multiprocessing.manager process.
+"""
 
 import multiprocessing as mp
 from multiprocessing.managers import BaseProxy

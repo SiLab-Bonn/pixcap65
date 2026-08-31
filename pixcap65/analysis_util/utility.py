@@ -1,7 +1,3 @@
-"""
-This file contains some utilities needed for the analysis and the plotting.
-In particular it should help with defining constants of values used quite often.
-"""
 # ----------------------------------------------------------
 #  Copyright (c) 2026. SiLab, Institute of Physics, University of Bonn.
 #
@@ -17,6 +13,10 @@ In particular it should help with defining constants of values used quite often.
 #  See the License for the specific language governing permissions and
 #  limitations under the License.
 # ----------------------------------------------------------
+"""
+This file contains some utilities needed for the analysis and the plotting.
+In particular it should help with defining constants of values used quite often.
+"""
 
 import logging
 import numpy as np
