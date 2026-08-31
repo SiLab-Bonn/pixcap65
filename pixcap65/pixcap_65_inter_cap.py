@@ -26,7 +26,7 @@ from pixcap65.utility import pixcap65_constants as c
 from pixcap65.utility.tables_util import set_group_attribute
 from pixcap65.utility.utils_2 import walk_to_node
 
-declare_logger()
+logger = declare_logger()
 
 scan_configuration = {
     'start_column': 1,

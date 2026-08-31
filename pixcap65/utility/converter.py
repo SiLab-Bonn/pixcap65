@@ -8,7 +8,6 @@ In addition, there are also handlers to take care of incomplete data written or 
 in particular the measurement uncertainties.
 """
 
-# CHECK: verify and improve the way configuration files are loaded here!
 try:
     from importlib.resources import files, open_text
 except ImportError:
@@ -185,14 +184,13 @@ def adjust_cap_measurement(group, has_values=False):
     """
     group.HistCurr.attrs["Units"] = "A"
     if "HistCurrErr" not in group:
-        from pixcap65.configs.config_handler import extract_smu_current_error
-        import yaml
-        with open("/configs/keithley_2602a_range.yaml") as f:
+        config_file = files('pixcap65.configs').joinpath("keithley_2602a_range.yaml")
+        with config_file.open('r') as f:
             config = yaml.safe_load(f)
             data = group.HistCurr[:]
             errors = extract_smu_current_error(config, data, 0.000001)
             group_get_file(group).create_carray(where=group, name="HistCurrErr", obj=errors,
-                                                filters=tb.Filters(complib='blosc', fletcher32=False, complevel=5))
+                                                filters=GLOBAL_FILTERS)
     group.HistCurrErr.attrs[UNITS_ATTRIBUTE_KEY] = HIST_CURRENT_MEAS_UNIT
     if has_values:
         group.HistCurrValues.attrs[UNITS_ATTRIBUTE_KEY] = HIST_CURRENT_MEAS_UNIT
@@ -217,7 +215,7 @@ def generate_pixel_dimensions(group, quad_length=50.0):
     group_get_file(group).create_group(group, name="sensor")
     dimensions_array = np.full((40, 40, 2), fill_value=quad_length)
     array = group_get_file(group).create_carray(where=group.sensor, name="PhysicalDimensions", obj=dimensions_array,
-                                                filters=tb.Filters(complevel=5, complib='blosc', fletcher32=False))
+                                                filters=GLOBAL_FILTERS)
     array.attrs[UNITS_ATTRIBUTE_KEY] = "um"
     array.flush()
 
@@ -237,9 +235,8 @@ def regenerate_measurement_errors(group):
     :type group: :py:class:`pytables.Group`
     """
     if "HistCurrValues" not in group:
-        from pixcap65.configs.config_handler import extract_smu_current_error
-        import yaml
-        with open("pixcap65/configs/keithley_2602a_range.yaml") as f:
+        config_file = files('pixcap65.configs').joinpath('keithley_2602a_range.yaml')
+        with config_file.open('r') as f:
             config = yaml.safe_load(f)
             data = group.HistCurr[:]
             errors = np.where(np.isfinite(data), extract_smu_current_error(config, data, 0.000001), np.nan)
@@ -496,8 +493,11 @@ def full_regenerate_bias_table(group: tb.Group, **kwargs):
         internal_parameters = group.scan_params[:]
 
     # fetch the voltage parameters
-    # FIXME: What to do if the field 'hv_voltage' does not yet exist?
-    voltages = internal_parameters["hv_voltage"]
+    try:
+        voltages = internal_parameters["hv_voltage"]
+    except KeyError:
+        # if the measured value does not exist, use the value which should be set/sourced.
+        voltages = internal_parameters["bias_voltage"]
     try:
         hist_parameters = group.BiasVoltageHist[:]
         need_bias_table_hist = False
@@ -531,9 +531,6 @@ def full_regenerate_bias_table(group: tb.Group, **kwargs):
         except:
             logging.warning("Could not extract voltage errors from keithley_2410_range.yaml", exc_info=True)
             voltage_errors = np.full_like(voltages, np.nan)
-
-
-
 
     # generate the new/renew table
     bias_currents = group.HistCurr[:]
@@ -619,7 +616,8 @@ def generate_bias_table(group, **kwargs):
     bias_currents = group.HistCurr[:]
     bias_errors = group.HistCurrErr[:]
     new_voltage_hist_data = np.full(shape=(hist_parameters.shape[0], 3,), fill_value=np.nan)
-    # if the BiasVoltageHist was initialized correctly, this should yield the same voltages array as the alternative implementation!
+    # if the BiasVoltageHist was initialized correctly, this should yield the same voltages array as the alternative
+    # implementation!
     if np.any(np.isfinite(hist_parameters)):
         if len(hist_parameters.shape) > 1:
             voltages = hist_parameters[:, 1]
@@ -646,7 +644,8 @@ def generate_bias_table(group, **kwargs):
         except:
             logging.warning("Could not extract voltage errors from keithley_2410_range.yaml", exc_info=True)
             voltage_errors = np.full_like(voltages, np.nan)
-    # seems to be more or less the same for both implementations; except for discussions about the voltage_settings, voltages and voltage_erros arrays.
+    # seems to be more or less the same for both implementations; except for discussions about the voltage_settings,
+    # voltages and voltage_erros arrays.
     for set_voltage, leak_current, current_error, meas_voltage, meas_voltage_error in zip(
             voltage_settings, bias_currents,
             bias_errors, voltages, voltage_errors):
@@ -890,7 +889,6 @@ if __name__ == "__main__":
     #
     #     with tb.open_file("packaged/data/X2_12_Renew_Scan.h5") as backing_file:
     #         backing_file.copy_children(backing_file.root.Thesis.ATLAS_ITk.X2, h5_file.root.Thesis.ATLAS_ITk.X2, recursive=True, overwrite=True)
-
 
     with tb.open_file(R11_SCAN_FILE, "a") as h5_file:
         generate_pixel_dimensions(h5_file.root.Reference.R1)
