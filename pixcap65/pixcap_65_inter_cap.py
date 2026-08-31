@@ -280,6 +280,7 @@ class Pixcap65InterCap(PixCap65Measurement):
 
         :author: Dominik Fischer
         :date: 2026-05-14
+
         last update: 2026-08-27
 
         Stores the measured data into a hdf file.

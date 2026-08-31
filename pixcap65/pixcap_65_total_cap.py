@@ -364,6 +364,7 @@ class PixCap65Measurement(Pixcap65BaseMeasurement, metaclass=ABCMeta):
 
         :author: Dominik Fischer
         :date: 2026-05-14
+
         last update: 2026-08-27
 
         Verify that a stable working point w.r.t. the leakage current through the sensor is reached for the HV by
@@ -402,6 +403,7 @@ class PixCap65Measurement(Pixcap65BaseMeasurement, metaclass=ABCMeta):
 
         :author: Dominik Fischer
         :date: 2026-05-14
+
         last update: 2026-08-27
 
         Verify that a stable working point w.r.t. the applied voltage is reached for the HV by
@@ -452,6 +454,7 @@ class PixCap65Measurement(Pixcap65BaseMeasurement, metaclass=ABCMeta):
 
         :author: Dominik Fischer
         :date: 2026-05-14
+
         last update: 2026-08-27
 
         Helper function to extract the measurement uncertainties either from multiple measurements under the same
@@ -469,6 +472,7 @@ class PixCap65Measurement(Pixcap65BaseMeasurement, metaclass=ABCMeta):
 
         :author: Dominik Fischer
         :date: 2026-05-14
+
         last update: 2026-08-27
 
         Stores the measured data into a hdf file. The details will depend on the implementation.
@@ -535,6 +539,7 @@ class PixCap65Measurement(Pixcap65BaseMeasurement, metaclass=ABCMeta):
 
         :author: Dominik Fischer
         :date: 2026-05-14
+
         last update: 2026-08-27
 
         Stores the configuration keys and values in the provided group used for saving the measurement results, to be
@@ -571,6 +576,7 @@ class PixCap65Measurement(Pixcap65BaseMeasurement, metaclass=ABCMeta):
 
         :author: Dominik Fischer
         :date: 2026-05-14
+
         last update: 2026-08-27
 
         Controls the applied high voltage in measurement runs where the bias voltage is not scanned, e.g. the scan
@@ -614,6 +620,7 @@ class PixCap65Measurement(Pixcap65BaseMeasurement, metaclass=ABCMeta):
 
         :author: Dominik Fischer
         :date: 2026-05-14
+
         last update: 2026-08-27
 
         Get the hdf files group where the data should be stored from the additional path specific for this scan and the
@@ -647,6 +654,7 @@ class PixCap65Measurement(Pixcap65BaseMeasurement, metaclass=ABCMeta):
 
         :author: Dominik Fischer
         :date: 2026-05-14
+
         last update: 2026-08-27
 
         Stores the parameters of the current iteration into the scan parameters mapping to be written later to disk.
@@ -668,14 +676,18 @@ class PixCap65Measurement(Pixcap65BaseMeasurement, metaclass=ABCMeta):
 
         :author: Dominik Fischer
         :date: 2026-05-14
+
         last update: 2026-08-27
 
         Determines the measurement uncertainty from reading, the measurement range and the SMU's manual.
 
         :param smu: dut key of the SMU
         :param temp_data: data/data array for which the uncertainty should be determined.
+
         :return: measurement uncertainties.
+
         """
+
         if sense_range is None:
             sense_range = self.bias_sense_range if smu == self.pixcap.bias_smu_key else self.current_sense_range
         if np.any(np.isfinite(temp_data)):
@@ -695,6 +707,7 @@ class PixCap65Measurement(Pixcap65BaseMeasurement, metaclass=ABCMeta):
 
         :author: Dominik Fischer
         :date: 2026-05-14
+
         last update: 2026-08-27
 
         Fetch all the biasing information and the capacitance measurement data and combine them such that only one
@@ -775,6 +788,7 @@ class PixCap65Measurement(Pixcap65BaseMeasurement, metaclass=ABCMeta):
 
         :author: Dominik Fischer
         :date: 2026-05-14
+
         last update: 2026-08-27
 
         If the current scan is not called from another scan procedure the scan configuration should be stored, where
@@ -821,6 +835,7 @@ class PixCap65Measurement(Pixcap65BaseMeasurement, metaclass=ABCMeta):
         enhanced_readout_mode
 
         :author: Dominik Fischer
+
         last update: 2026-05-14
 
         Enter the enhanced readout mode, capable of distinguishing between single point or multiple point measurements.
@@ -1080,6 +1095,7 @@ class PixCap65Measurement(Pixcap65BaseMeasurement, metaclass=ABCMeta):
 
         @author Dominik Fischer
         @date 2026-05-14
+
         last update: 2026-08-27
 
         Measurement handler to generally initialize a SMU to the settings/state required for the measurement.
@@ -1089,8 +1105,8 @@ class PixCap65Measurement(Pixcap65BaseMeasurement, metaclass=ABCMeta):
         :key current_limit: maximum current which should be measured by the SMU. Set the current protection of the SMU.
         :param plc: number of power cycles to average the measured quantity over.
         :param kwargs: further keyword arguments to be propagated to the dut. (all not explicitly named keyword
-        arguments are propagated to the dut SMU handler.)
-        :key plc_cycles: :ref:`plc`
+            arguments are propagated to the dut SMU handler.)
+        :key plc_cycles: `plc`
         :key current_range: maximum current to be measured by the SMU.
         """
         if plc is None:
@@ -1168,7 +1184,7 @@ class PixCap65Measurement(Pixcap65BaseMeasurement, metaclass=ABCMeta):
         On some SMUs it will also configure the measurement buffers for acquiring multiple readings at once.
 
         The voltage range will be set statically to 1.5 V, the current limit to 0.001 A and the plc to 10. The current
-        range will be extracted from the measurement object's properties (:ref:`bias_sense_range`).
+        range will be extracted from the measurement object's properties (:py:attr:`pixcap65.pixcap.pixcap65_measurement.PixCap65BaseMeasurement.bias_sense_range`).
 
         For further information see :py:meth:`pixcap.pixcap65.Pixcap65.init_bias`.
 
@@ -1232,6 +1248,7 @@ class PixCap65Measurement(Pixcap65BaseMeasurement, metaclass=ABCMeta):
 
         :author: Dominik Fischer
         :date: 2026-05-14
+
         last update: 2026-08-27
 
         Verify that a stable working point w.r.t. the leakage current through the sensor is reached for the primary SMU
@@ -1293,6 +1310,7 @@ class PixCap65Measurement(Pixcap65BaseMeasurement, metaclass=ABCMeta):
 
         :author: Dominik Fischer
         :date: 2026-05-14
+
         last update: 2026-08-27
 
         Actual implementation for presenting the results of the I-V characterization.
@@ -1350,6 +1368,7 @@ class PixCap65Measurement(Pixcap65BaseMeasurement, metaclass=ABCMeta):
 
         :author: Dominik Fischer
         :date: 2026-05-14
+
         last update: 2026-08-27
 
         Prepare the scan of the sensor and its capacitance when performing measurements of the C-V-Characteristics.
@@ -1514,6 +1533,7 @@ class PixCap65TotalCap(PixCap65Measurement):
         scan
 
         :author: Dominik Fischer
+
         last update: 2026-08-28
 
         Performs the scan over the pixels on the sensor and measures the requested quantities in dependence on some
@@ -1635,6 +1655,7 @@ class PixCap65TotalCap(PixCap65Measurement):
 
         :author: Dominik Fischer
         :date: 2026-05-14
+
         last update: 2026-08-27
 
         Stores the measured data into a hdf file.
@@ -1706,6 +1727,7 @@ class PixCap65TotalCap(PixCap65Measurement):
 
         :author: Dominik Fischer
         :date: 2026-05-14
+
         last update: 2026-08-27
 
         Fetch all the biasing information and the capacitance measurement data and combine them such that only one
