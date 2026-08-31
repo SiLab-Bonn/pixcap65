@@ -182,14 +182,12 @@ class Pixcap65(Dut):
         return 10
 
     # Handle the implementation of the SMU config
-    # CHECK: is this property obsolete by now?
     # it is still used quite often, but I could not find any usage where the value returned might have changed.
     @property
     def smu_kwargs(self):
         """Gets the primary SMUs additional keyword arguments."""
         return self.__smu_kwargs
 
-    # CHECK: is this property obsolete by now?
     @property
     def smu_bias_kwargs(self):
         """Gets the HV SMUs additional keyword arguments."""

@@ -91,7 +91,7 @@ HV_VOLTAGE_TOL = 1e-2
 HV_CURRENT_STABLE_TOL = 1e-2
 HV_CURRENT_LIMIT = 2.e-7
 
-declare_logger()
+logger = declare_logger()
 
 
 def _get_enumerate(iterator, **kwargs) -> Iterable:
@@ -1223,7 +1223,7 @@ class PixCap65Measurement(Pixcap65BaseMeasurement, metaclass=ABCMeta):
         """Get the number of voltages used for a scan over the HV supply."""
         try:
             return self.bias_voltages.shape[0]
-        except (AttributeError, IndexError):
+        except (AttributeError, IndexError, TypeError):
             return 1
 
     def verify_stable_current(self, smu: str):

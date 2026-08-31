@@ -4,7 +4,7 @@ Outputs in txt file the number of bits m that were set to 1 and the correspondin
 Calculate t_charge with t_charge = m/seq_size * 1/f_rep
 """
 
-# TODO: implementation of this kind of measurement.
+# TODO: Analysis and plotting of this kind of measurement is still missing.
 
 import logging
 import numpy as np
@@ -40,7 +40,7 @@ scan_configuration = {
 class Pixcap65LoadLine(PixCap65Measurement):
     """
     Measurement class for line-loading tests with the PixCap65 chip.
-
+    Could measure the average current in dependence on the charging time and switching-frequency.
     """
     def handle_measurement_errors(self, unit):
         if self.averaging:

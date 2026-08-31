@@ -1,3 +1,7 @@
+"""
+Base implementations of the measurement procedure classes.
+Handles also functions and methods to fetch the firmware from the module/package resources.
+"""
 # ----------------------------------------------------------
 #  Copyright (c) .
 #   All rights reserved
@@ -125,7 +129,7 @@ def load_configuration_main():
     load_configuration(arguments.target)
 
 
-# TODO: test implementations on the actual device
+# TODO: test implementations on the actual device (In progress)
 def load_firmware(config=None):
     """
     load_firmware
@@ -563,3 +567,4 @@ def declare_logger():
     log_handler.setFormatter(log_formater)
     logger.addHandler(log_handler)
     logger.propagate = True
+    return logger

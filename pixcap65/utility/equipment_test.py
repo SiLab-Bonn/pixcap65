@@ -62,7 +62,6 @@ def test_frequency_settling_2(settling_range: Iterable, file_name: str):
             settling_path[settling_time] = "settling-time-{}".format(settling_time).replace('.', '_')
             try:
                 pix.pixcap.binary_active = True
-                # CHECK: verify whether this is using the correct api after all.
                 pix._smu_setup(pix.pixcap.primary_smu_key).binary_format()
                 pix.pixcap[pix.pixcap.primary_smu_key].set_current_nlpc(1)
                 pix.scan(data_group_spec=settling_path[settling_time])
@@ -182,7 +181,6 @@ def test_source_settling(settling_range: Iterable, file_name: str):
     :return:
     """
     settling_times = np.asarray(settling_range)
-    # CHECK: is this API of the measurement classes still usable.
     with PixCap65TotalCap(scan_configuration, file_name) as pix:
         pix.pixcap.bias_voltage = -0.1
         pix.pixcap.bias_on()
