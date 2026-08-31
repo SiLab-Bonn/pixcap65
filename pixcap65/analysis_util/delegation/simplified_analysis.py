@@ -1,9 +1,3 @@
-"""
-Implementation of a simplified analysis strategy.
-This analysis strategy is not capable of correctly estimating the parameter uncertainties.
-Also more complicated models (with corrections already applied) than the simple linear model
-could not be handled when using this analysis strategy.
-"""
 # ----------------------------------------------------------
 #  Copyright (c) 2026. SiLab, Institute of Physics, University of Bonn.
 #
@@ -19,6 +13,12 @@ could not be handled when using this analysis strategy.
 #  See the License for the specific language governing permissions and
 #  limitations under the License.
 # ----------------------------------------------------------
+"""
+Implementation of a simplified analysis strategy.
+This analysis strategy is not capable of correctly estimating the parameter uncertainties.
+Also more complicated models (with corrections already applied) than the simple linear model
+could not be handled when using this analysis strategy.
+"""
 import numpy as np
 import tables as tb
 

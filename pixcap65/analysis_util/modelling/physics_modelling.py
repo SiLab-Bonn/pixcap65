@@ -1,7 +1,3 @@
-"""
-Collection of physical models used e.g. for analysing the capacitance measurements or the distribution of the
-capacitance over a (full) sensor.
-"""
 # ----------------------------------------------------------
 #  Copyright (c) 2026. SiLab, Institute of Physics, University of Bonn.
 #
@@ -17,6 +13,10 @@ capacitance over a (full) sensor.
 #  See the License for the specific language governing permissions and
 #  limitations under the License.
 # ----------------------------------------------------------
+"""
+Collection of physical models used e.g. for analysing the capacitance measurements or the distribution of the
+capacitance over a (full) sensor.
+"""
 
 import numpy as np
 try:

@@ -1,10 +1,10 @@
-"""
-Plotting of Pixcap65 data.
-"""
 # ----------------------------------------------------------
 #  Copyright (c) 2018-2026. All rights reserved
 #  SiLab, Institute of Physics, University of Bonn
 # ----------------------------------------------------------
+"""
+Plotting of Pixcap65 data.
+"""
 
 
 import os.path

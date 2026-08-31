@@ -1,7 +1,3 @@
-"""
-Module for delegation functions to perform the actual fits in order to determine the capacitances from current
-measurements.
-"""
 # ----------------------------------------------------------
 #  Copyright (c) 2026. SiLab, Institute of Physics, University of Bonn.
 #
@@ -17,6 +13,10 @@ measurements.
 #  See the License for the specific language governing permissions and
 #  limitations under the License.
 # ----------------------------------------------------------
+"""
+Module for delegation functions to perform the actual fits in order to determine the capacitances from current
+measurements.
+"""
 import numpy as np
 try:
     # noinspection PyCompatibility

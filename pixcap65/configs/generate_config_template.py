@@ -1,8 +1,3 @@
-"""
-Convenience module providing a cli.
-Could be used to generate basil scpi configuration files for lab devices with multiple equivalent outputs from the
-commands for just a single-output by duplicating the commands and inserting appropriate prefixes.
-"""
 # ----------------------------------------------------------
 #  Copyright (c) 2026. SiLab, Institute of Physics, University of Bonn.
 #
@@ -18,6 +13,11 @@ commands for just a single-output by duplicating the commands and inserting appr
 #  See the License for the specific language governing permissions and
 #  limitations under the License.
 # ----------------------------------------------------------
+"""
+Convenience module providing a cli.
+Could be used to generate basil scpi configuration files for lab devices with multiple equivalent outputs from the
+commands for just a single-output by duplicating the commands and inserting appropriate prefixes.
+"""
 
 import argparse
 import numpy as np

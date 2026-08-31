@@ -1,7 +1,3 @@
-"""
-Additional implementations of :py:class:`multiprocessing.managers.BaseManager` designed for the purpose of enabling
-multiprocessing in the depletion analysis of the :py:mod:`pixcap6` framework.
-"""
 # ----------------------------------------------------------
 #  Copyright (c) 2026. SiLab, Institute of Physics, University of Bonn.
 #
@@ -17,6 +13,11 @@ multiprocessing in the depletion analysis of the :py:mod:`pixcap6` framework.
 #  See the License for the specific language governing permissions and
 #  limitations under the License.
 # ----------------------------------------------------------
+"""
+Additional implementations of :py:class:`multiprocessing.managers.BaseManager` designed for the purpose of enabling
+multiprocessing in the depletion analysis of the :py:mod:`pixcap6` framework.
+"""
+
 
 from multiprocessing.managers import SyncManager, BaseManager
 

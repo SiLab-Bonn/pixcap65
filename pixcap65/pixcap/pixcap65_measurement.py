@@ -1,12 +1,12 @@
-"""
-Base implementations of the measurement procedure classes.
-Handles also functions and methods to fetch the firmware from the module/package resources.
-"""
 # ----------------------------------------------------------
 #  Copyright (c) .
 #   All rights reserved
 #  SiLab, Institute of Physics, University of Bonn
 # ----------------------------------------------------------
+"""
+Base implementations of the measurement procedure classes.
+Handles also functions and methods to fetch the firmware from the module/package resources.
+"""
 
 from __future__ import annotations
 

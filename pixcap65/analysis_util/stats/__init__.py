@@ -1,3 +1,8 @@
+# ----------------------------------------------------------
+#  Copyright (c) .
+#   All rights reserved
+#  SiLab, Institute of Physics, University of Bonn
+# ----------------------------------------------------------
 """
 Utility module to simplify the access to the different statistics functions depending on the presence of installed
 modules.
@@ -5,11 +10,6 @@ It makes sure that if `numba_stats` is installed these optimized functions will 
 implementation.
 But one of these two must be installed.
 """
-# ----------------------------------------------------------
-#  Copyright (c) .
-#   All rights reserved
-#  SiLab, Institute of Physics, University of Bonn
-# ----------------------------------------------------------
 
 
 try:

@@ -1,12 +1,12 @@
-"""
-Analysis module to summarize the main/major results of the analysis for multiple sensors (at least one sensor) into a
-single file, such that these results could be easily post processed.
-"""
 # ----------------------------------------------------------
 #  Copyright (c) .
 #   All rights reserved
 #  SiLab, Institute of Physics, University of Bonn
 # ----------------------------------------------------------
+"""
+Analysis module to summarize the main/major results of the analysis for multiple sensors (at least one sensor) into a
+single file, such that these results could be easily post processed.
+"""
 from os import PathLike
 
 import logging

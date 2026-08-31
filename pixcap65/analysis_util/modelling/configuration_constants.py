@@ -1,9 +1,3 @@
-"""
-Collection of configuration constants to define the behaviour and some of the value transformations/conversions
-properly when analyzing the data.
-These constants are also used to declare the initial values of the fit parameters when using non-linear fitting
-algorithms.
-"""
 # ----------------------------------------------------------
 #  Copyright (c) 2026. SiLab, Institute of Physics, University of Bonn.
 #
@@ -19,6 +13,12 @@ algorithms.
 #  See the License for the specific language governing permissions and
 #  limitations under the License.
 # ----------------------------------------------------------
+"""
+Collection of configuration constants to define the behaviour and some of the value transformations/conversions
+properly when analyzing the data.
+These constants are also used to declare the initial values of the fit parameters when using non-linear fitting
+algorithms.
+"""
 
 ANALYSIS_INITIAL_CAPACITANCE = 1e-6
 ANALYSIS_INITIAL_LEAKAGE = 0

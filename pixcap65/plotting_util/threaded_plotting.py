@@ -1,9 +1,3 @@
-"""
-Implementations to perform the plottling asynchronously in multiple threads.
-
-For plotting we could do this as a file could be opened in reading mode multiple times, then only issue may be the
-matplotlib backend used plot the actual figures.
-"""
 # ----------------------------------------------------------
 #  Copyright (c) 2026. SiLab, Institute of Physics, University of Bonn.
 #
@@ -19,6 +13,12 @@ matplotlib backend used plot the actual figures.
 #  See the License for the specific language governing permissions and
 #  limitations under the License.
 # ----------------------------------------------------------
+"""
+Implementations to perform the plottling asynchronously in multiple threads.
+
+For plotting we could do this as a file could be opened in reading mode multiple times, then only issue may be the
+matplotlib backend used plot the actual figures.
+"""
 import queue
 import threading
 
