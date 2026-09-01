@@ -46,8 +46,7 @@ from examples.data_constants import X1_SCAN_2_FILE, X2_SCAN_2_FILE, X2_SCAN_FILE
 from examples.data_constants import X5_SCAN_FILE, X6_SCAN_FILE, X7_SCAN_FILE
 from pixcap65.analysis import analyze_data, analyze_capacitance_distribution
 from pixcap65.analysis_util.utility import get_base_group
-from pixcap65.plotting import plot_data, plot_combined_data, plot_bias_data, plot_inter_pix_data, \
-    plot_cv_data, CV_DATA_FOR_
+from pixcap65.plotting_util import plot_data, plot_inter_pix_data, plot_bias_data, plot_cv_data, plot_combined_data
 from pixcap65.utility import synchronized_process_open_file
 from pixcap65.utility.homogenize_plots import set_params
 from pixcap65.utility.tables_util import get_group_attribute
@@ -2984,3 +2983,4 @@ if __name__ == '__main__':
 
     print("Plot X7")
     x7_plotter(global_processing_lock)
+CV_DATA_FOR_ = "CV Data for {}"

@@ -39,7 +39,8 @@ from pixcap65.analysis_util.utility import check_leaf_unit, str_join, ANALYSIS_C
     HIST_BIAS_MEAS_UNIT, get_analysis_group, investigate_fit_convergence, TABLES_LEAF_COMPAT_TYPE, \
     CVDistributionData, handle_fitter_advanced_options
 from pixcap65.concurrency import get_context_manager
-from pixcap65.plotting import CAPACITANCE_CONVERSION_FACTOR, evaluate_pixel_mask
+from pixcap65.pixcap.pixcap_structure import CAPACITANCE_CONVERSION_FACTOR, DEFAULT_BIN_NUMBER
+from pixcap65.plotting_util.utility import evaluate_pixel_mask
 from pixcap65.utility import synchronized_process_open_file
 from pixcap65.utility.tables_util import get_groups, get_leaves, copy_node, list_attributes, group_get_file, \
     set_group_attribute, get_group_attribute, get_group_attributes, get_parent_group
@@ -2958,7 +2959,8 @@ def analyze_capacitance_distribution_delegate(analysis_group: Optional[tb.Group]
     :rtype tuple
     """
     # none to expect, as these function runs fine without leaks when not called from an mp processing pool!
-    from pixcap65.plotting import DEFAULT_BIN_NUMBER, COUNTS_HIST_LABEL, HIST_PIX_CAP_LABEL
+    from pixcap65.pixcap.pixcap_structure import COUNTS_HIST_LABEL
+    from pixcap65.pixcap.pixcap_structure import HIST_PIX_CAP_LABEL
     from matplotlib import pyplot as plt
     # extract further arguments for the performance of the fitting
     use_kafe2 = kwargs.pop("use_kafe2", False)

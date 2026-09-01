@@ -421,7 +421,9 @@ class Pixcap65InterCap(PixCap65Measurement):
 
     def plot(self, data_group_spec=None, **kwargs):
         from matplotlib.backends.backend_pdf import PdfPages
-        from pixcap65.plotting import get_pdf_name, get_analysis_group, plot_inter_pix_data_delegate
+        from pixcap65.plotting import get_analysis_group
+        from pixcap65.plotting_util.inter_pixel import plot_inter_pix_data_delegate
+        from pixcap65.plotting_util.utility import get_pdf_name
 
         suffix = kwargs.pop("suffix", "general_data_intern")
         if kwargs.get("use_corrected", False):

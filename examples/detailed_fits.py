@@ -48,7 +48,7 @@ from typing import Tuple, Union, Optional, List
 from capacitance_models import linear_model, reciprocal_model, extended_cap_model_5, inverted_reciprocal_model
 from examples.plot_dependencies import read_rec_array_sorted, read_rec_array_sorted_where, chi2
 from general_model import exponential_model
-from pixcap65.plotting import GENERATE_THESIS_PLOTS
+from pixcap65.plotting_util import GENERATE_THESIS_PLOTS
 from pixcap65.utility.homogenize_plots import set_params, get_error_cycler
 
 
