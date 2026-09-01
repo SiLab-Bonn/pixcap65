@@ -22,7 +22,7 @@ matplotlib backend used plot the actual figures.
 import queue
 import threading
 
-import pixcap65.plotting as plotting
+from pixcap65 import plotting_util
 
 thread_storage = queue.SimpleQueue()
 threading_lock = threading.RLock()
@@ -49,7 +49,7 @@ def plot_data(interpreted_data, base_path=None, suffix="general_data", use_group
     :key distribution: boolean, indicating whether to investigate the capacitance distribution over the whole sensor.
     """
     with lock:
-        thread = threading.Thread(target=plotting.plot_data, args=(interpreted_data, base_path, suffix, use_group), kwargs=kwargs)
+        thread = threading.Thread(target=plotting_util.plot_data, args=(interpreted_data, base_path, suffix, use_group), kwargs=kwargs)
         thread.start()
         thread_storage.put(thread)
     return thread
@@ -91,7 +91,7 @@ def plot_inter_pix_data(interpreted_data, base_path=None, suffix="general_inter_
             kwargs["total_path"] = total_path
         if total_data is not None:
             kwargs["total_data"] = total_data
-        thread = threading.Thread(target=plotting.plot_inter_pix_data, args=(interpreted_data, base_path, suffix, use_group,), kwargs=kwargs)
+        thread = threading.Thread(target=plotting_util.plot_inter_pix_data, args=(interpreted_data, base_path, suffix, use_group,), kwargs=kwargs)
         thread.start()
         thread_storage.put(thread)
     return thread
@@ -109,7 +109,7 @@ def plot_bias_data(interpreted_data, base_path=None, suffix="bias_curve", use_gr
     :param use_group: boolean, whether to append the group name of the measurements to the PDF name.
     """
     with lock:
-        thread = threading.Thread(target=plotting.plot_bias_data, args=(interpreted_data, base_path, suffix, use_group), kwargs=kwargs)
+        thread = threading.Thread(target=plotting_util.plot_bias_data, args=(interpreted_data, base_path, suffix, use_group), kwargs=kwargs)
         thread.start()
         thread_storage.put(thread)
     return thread
@@ -136,7 +136,7 @@ def plot_cv_data(interpreted_data, base_path=None, suffix="C_V_characteristic", 
         should be investigated.
     """
     with lock:
-        thread = threading.Thread(target=plotting.plot_cv_data, args=(interpreted_data, base_path, suffix, use_group), kwargs=kwargs)
+        thread = threading.Thread(target=plotting_util.plot_cv_data, args=(interpreted_data, base_path, suffix, use_group), kwargs=kwargs)
         thread.start()
         thread_storage.put(thread)
     return thread
@@ -165,7 +165,7 @@ def plot_combined_data(interpreted_data, base_path=None, suffix="combined_bias_c
         should be investigated.
     """
     with lock:
-        thread = threading.Thread(target=plotting.plot_combined_data, args=(interpreted_data, base_path, suffix, use_group), kwargs=kwargs)
+        thread = threading.Thread(target=plotting_util.plot_combined_data, args=(interpreted_data, base_path, suffix, use_group), kwargs=kwargs)
         thread.start()
         thread_storage.put(thread)
     return thread

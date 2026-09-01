@@ -42,7 +42,7 @@ from general_model import exponential_model
 from inter_capacitance_models import inter_cap_model, inter_cap_model_2, inter_cap_model_3, inter_cap_model_4, \
     inter_cap_model_5, inter_cap_model_6, inter_cap_model_7
 from pixcap65.analysis_util.summary import field_names, test_design_values, spatial_identifier
-from pixcap65.plotting import CAPACITANCE_CONVERSION_FACTOR
+from pixcap65.pixcap.pixcap_structure import CAPACITANCE_CONVERSION_FACTOR
 from pixcap65.utility.homogenize_plots import set_params
 
 

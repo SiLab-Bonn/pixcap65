@@ -4,8 +4,9 @@ from matplotlib import pyplot as plt
 from matplotlib.backends.backend_pdf import PdfPages
 
 from pixcap65.analysis_util.utility import check_leaf_unit, HIST_CURRENT_MEAS_UNIT
-from pixcap65.plotting import BIAS_CURVE_X_LABEL, BIAS_CURVE_Y_LABEL, CURRENT_CONVERSION_FACTOR
-from pixcap65.plotting import get_pdf_name, get_base_group, CURRENT_LABEL, FREQUENCY_LABEL
+from pixcap65.plotting import CURRENT_CONVERSION_FACTOR
+from pixcap65.plotting import get_base_group
+from pixcap65.plotting_util.utility import get_pdf_name
 
 
 def plot_bias_data(interpreted_data, base_path=None, second_data=None, second_path=None, suffix="bias_curve",
@@ -171,7 +172,8 @@ def plot_data_delegate(data_group: tb.Group, reference_group: tb.Group, output_p
 
 if __name__ == "__main__":
     from pixcap65.analysis import analyze_data
-    from pixcap65.plotting import plot_cv_data
+    from pixcap65.plotting_util import plot_cv_data, FREQUENCY_LABEL, CURRENT_LABEL, BIAS_CURVE_Y_LABEL, \
+        BIAS_CURVE_X_LABEL
 
     plot_bias_data(interpreted_data="packaged/DEMO_HV_Sweep.h5", second_path="Reference/R13/simple_bias", base_path="Reference/R13/improved_bias")
     analyze_data(raw_data="packaged/DEMO_HV_Sweep.h5", base_path="Reference/R13/cv_bias", is_cv=True, is_advanced=False)

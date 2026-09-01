@@ -9,7 +9,8 @@ from matplotlib.backends.backend_pdf import PdfPages
 
 from pixcap65.analysis_util.utility import get_base_group, get_analysis_group
 from pixcap65.async_pix import tables_open_file
-from pixcap65.plotting import get_pdf_name, plot_data_delegate
+from pixcap65.plotting_util.general import plot_data_delegate
+from pixcap65.plotting_util.utility import get_pdf_name
 
 
 async def plot_data(interpreted_data, base_path=None, suffix="general_data", use_group=False, **kwargs):

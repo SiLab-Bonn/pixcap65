@@ -65,7 +65,7 @@ from pixcap65.pixcap.pixcap65 import Pixcap65
 from pixcap65.pixcap.pixcap65_measurement import Pixcap65BaseMeasurement, ScanConfigurationKeys, declare_logger, \
     MeasurementAttributes, CapType, REDUCED_NPLC, ScanParameters, STANDARD_NLPC, NUMBER_INITIAL_MEASUREMENTS
 from pixcap65.pixcap.pixcap_structure import BasilConfigKeys
-from pixcap65.plotting import plot_data_delegate
+from pixcap65.plotting_util.general import plot_data_delegate
 from pixcap65.utility import pixcap65_constants as c
 from pixcap65.utility.basil_utils import extract_basil_layers
 from pixcap65.utility.tables_util import get_group_attributes, set_group_attribute, \
@@ -1322,7 +1322,8 @@ class PixCap65Measurement(Pixcap65BaseMeasurement, metaclass=ABCMeta):
         :key use_group: boolean, whether to append the group name of the measurements to the PDF name.
         """
         from matplotlib.backends.backend_pdf import PdfPages
-        from pixcap65.plotting import get_pdf_name, plot_bias_delegate
+        from pixcap65.plotting_util.biasing import plot_bias_delegate
+        from pixcap65.plotting_util.utility import get_pdf_name
 
         suffix = kwargs.pop("suffix", "bias_data_intern")
         use_group = kwargs.pop("use_group", False)
@@ -1578,7 +1579,8 @@ class PixCap65TotalCap(PixCap65Measurement):
 
     def plot(self, data_group_spec=None, **kwargs):
         from matplotlib.backends.backend_pdf import PdfPages
-        from pixcap65.plotting import get_pdf_name, get_analysis_group
+        from pixcap65.plotting import get_analysis_group
+        from pixcap65.plotting_util.utility import get_pdf_name
 
         suffix = kwargs.pop("suffix", "general_data_intern")
         if kwargs.get("use_corrected", False):

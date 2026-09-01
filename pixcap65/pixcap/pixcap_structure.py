@@ -12,3 +12,9 @@ class BasilConfigKeys(StrEnum):
     TRANSFER_LAYER = 'transfer_layer'
     HARDWARE_LAYER = 'hw_drivers'
     REGISTER_LAYER = 'registers'
+
+
+HIST_PIX_CAP_LABEL = '$C$ / \\unit{{\\femto\\farad}}'
+COUNTS_HIST_LABEL = 'Counts / \\#'
+CAPACITANCE_CONVERSION_FACTOR = 1e15
+DEFAULT_BIN_NUMBER = 50
