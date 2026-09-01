@@ -82,8 +82,8 @@ def get_manager_keywords(**kwargs):
 
     extract the multiprocessing.Manager keyword arguments from the provided keyword arguments.
 
-    :key address: address of the socket of the multiprocessing.Manager object we want to connect to.
-    :key authkey: authentication key necessary to connect to the socket. (It is recommended not to use this parameter as
+    :keyword address: address of the socket of the multiprocessing.Manager object we want to connect to.
+    :keyword authkey: authentication key necessary to connect to the socket. (It is recommended not to use this parameter as
         it is not pickable)
     :return: dict-like mapping of keys suitable to instantiate a multiprocessing.Manager object.
     """
@@ -164,66 +164,66 @@ def analyze_data(raw_data, base_path=None, is_advanced=False, is_cv=False,
     :param is_inter_pixel: boolean, False, indicating whether the measurement to be analyzed is an inter-pixel
         capacitance measurement. In this case more fits will be applied, adjusted to the specific structure of this
         problem
-    :key lock: synchronization object to prevent multiple overlapping accesses to the pytables api and simultaneously
+    :keyword lock: synchronization object to prevent multiple overlapping accesses to the pytables api and simultaneously
         write/read operations on the same file. IT IS STRONGLY RECOMMENDED TO EXPLICITLY SUPPLY A LOCK
         for synchronization.
-    :key apply_correction: boolean, indicates whether the measured capacitance should be
+    :keyword apply_correction: boolean, indicates whether the measured capacitance should be
         corrected immediately; Will require the presence of further arguments as information about
         the parasitic capacitance needs to be submitted. (data corrected for parasitic capacitances of PixCap65,
         default: False)
     :type apply_correction: bool
-    :key fit_plot_pdf_name:  Name of the PDF file to save fitting figures from the advanced procedures to.
+    :keyword fit_plot_pdf_name:  Name of the PDF file to save fitting figures from the advanced procedures to.
         (Only used for the advanced procedure)
     :type fit_plot_pdf_name:  str
-    :key use_kafe2: boolean, indicates whether kafe2 is used for the fit. (default: False) (Only used for the advanced procedure)
+    :keyword use_kafe2: boolean, indicates whether kafe2 is used for the fit. (default: False) (Only used for the advanced procedure)
     :type use_kafe2:  bool
-    :key plot: indicates whether to plot the data. An output PDF object could be submitted here instead of an explicitly created one. (Default: False) (Only used for the advanced procedure)
+    :keyword plot: indicates whether to plot the data. An output PDF object could be submitted here instead of an explicitly created one. (Default: False) (Only used for the advanced procedure)
     :type plot: bool
-    :key apply_contour: boolean, indicates whether to determine the contours and try to plot them. (default: False)
+    :keyword apply_contour: boolean, indicates whether to determine the contours and try to plot them. (default: False)
         (Only used for the advanced procedure or 'apply_contours': there might be some inconsistencies.)
     :type apply_contour: bool
-    :key fit_plot_pdf: PDF object to save the fit figures to.
-    :key distribution: boolean, indicating whether to investigate the capacitance distribution over the whole sensor. (default: False)
+    :keyword fit_plot_pdf: PDF object to save the fit figures to.
+    :keyword distribution: boolean, indicating whether to investigate the capacitance distribution over the whole sensor. (default: False)
     :type distribution: bool
-    :key total_cap_file:
-    :key total_cap_group:
-    :key in_cap_file:
-    :key in_cap_group:
-    :key inter_pix_id: identifier of the kind of inter-pixel-capacitance measurement to be processed (default: 18000)
+    :keyword total_cap_file:
+    :keyword total_cap_group:
+    :keyword in_cap_file:
+    :keyword in_cap_group:
+    :keyword inter_pix_id: identifier of the kind of inter-pixel-capacitance measurement to be processed (default: 18000)
     :type inter_pix_id: int
-    :key full_model: boolean, True, indicates whether the full model for extended frequency range is to be used.
+    :keyword full_model: boolean, True, indicates whether the full model for extended frequency range is to be used.
         Otherwise, the linear model is used. (Only used for the advanced procedure)
     :type full_model: bool
-    :key bare_file: hdf file containing the measurements and investigation of a bare pix cap sample to obtain
+    :keyword bare_file: hdf file containing the measurements and investigation of a bare pix cap sample to obtain
         information about intrinsic and parasitic capacitance. (Only required for the correction procedure, but in
         this case it must be present)
     :type bare_file: str
-    :key bare_hdf_path: hdf files hierarchy path to the group containing the bare pix cap analysis with the information
+    :keyword bare_hdf_path: hdf files hierarchy path to the group containing the bare pix cap analysis with the information
         about the parasitic after investigating the capacitance distribution. (Only required for
         the correction procedure, but in this case it must be present) There might be some inconsistencies when using 'bare_path'.
     :type bare_hdf_path: str
-    :key chip_group_name: HDF files hierarchy group (path to it) with the data/specifications of the pixels on the current sensor.
+    :keyword chip_group_name: HDF files hierarchy group (path to it) with the data/specifications of the pixels on the current sensor.
         (Will only be usd if the depletion behaviour is investigated)
     :type chip_group_name: str
-    :key address: address of the socket of the multiprocessing.Manager object we want to connect to.
-    :key authkey: authentication key necessary to connect to the socket. (It is recommended not to use this parameter as
+    :keyword address: address of the socket of the multiprocessing.Manager object we want to connect to.
+    :keyword authkey: authentication key necessary to connect to the socket. (It is recommended not to use this parameter as
         it is not pickable)
-    :key full_model: boolean, True, indicates whether the full model for extended frequency range is to be used.
+    :keyword full_model: boolean, True, indicates whether the full model for extended frequency range is to be used.
         Otherwise, the linear model is used. (Only used for the advanced procedure)
-    :key output_pdf: PdfPages object, to save the fit plot figures to (will override the plot object if provided)
-    :key hist_res_key: name/identifiert of the array/table which contains the on-resistance estimators if present.
-    :key test_cap_exclusion: whether to exclude row 0 completely. (default: False)
+    :keyword output_pdf: PdfPages object, to save the fit plot figures to (will override the plot object if provided)
+    :keyword hist_res_key: name/identifiert of the array/table which contains the on-resistance estimators if present.
+    :keyword test_cap_exclusion: whether to exclude row 0 completely. (default: False)
     :type test_cap_exclusion: bool
-    :key mask_pixel: array/iterable of tuple of pixel positions to be masked and therefore ignored for evaluation. [array-like]
-    :key mask_lower: threshold to mask all pixels below this value.
+    :keyword mask_pixel: array/iterable of tuple of pixel positions to be masked and therefore ignored for evaluation. [array-like]
+    :keyword mask_lower: threshold to mask all pixels below this value.
     :type mask_lower: float
-    :key mask_upper: threshold to mask all pixels above this value.
+    :keyword mask_upper: threshold to mask all pixels above this value.
     :type mask_upper: float
-    :key hist_bins: integer, number of bins to use for the histogram. (default: 50)
+    :keyword hist_bins: integer, number of bins to use for the histogram. (default: 50)
     :type hist_bins: int
-    :key chip_group: HDF files hierarchy group (object) with the data/specifications of the pixels on the current sensor.
+    :keyword chip_group: HDF files hierarchy group (object) with the data/specifications of the pixels on the current sensor.
         (Will only be usd if the depletion behaviour is investigated)
-    :key fit_description_text: text describing the fit performed for usage within the plot handler of the fits.
+    :keyword fit_description_text: text describing the fit performed for usage within the plot handler of the fits.
     :type fit_description_text: str
     :returns: optional list of figure holder objects to be processed later on.
     """
@@ -503,39 +503,39 @@ def _cv_analysis(in_file_h5: tb.File, bare_file_arg, bare_path_arg, base_group: 
     :param parasitic: parasitic capcitance of the measurement circuit to be assumed
     :param parasitic_error: uncertainty/deviation of the parasitic capacitance of the circuit to be assumed.
 
-    :key lock: synchronization object to prevent multiple overlapping accesses to the pytables api and simultaneously
+    :keyword lock: synchronization object to prevent multiple overlapping accesses to the pytables api and simultaneously
         write/read operations on the same file.
-    :key full_model: boolean, True, indicates whether the full model for extended frequency range is to be used.
+    :keyword full_model: boolean, True, indicates whether the full model for extended frequency range is to be used.
         Otherwise, the linear model is used. (Only used for the advanced procedure)
-    :key use_kafe2: indicates whether kafe2 is used for the fit. (default: False)
-    :key plot: boolean, indicates whether to plot the data. An output PDF object could be submitted here instead of an explicitly created one. (Default: False) (Only used for the advanced procedure)
-    :key apply_contour: boolean, indicates whether to determine the contours and try to plot them. (default: False)
+    :keyword use_kafe2: indicates whether kafe2 is used for the fit. (default: False)
+    :keyword plot: boolean, indicates whether to plot the data. An output PDF object could be submitted here instead of an explicitly created one. (Default: False) (Only used for the advanced procedure)
+    :keyword apply_contour: boolean, indicates whether to determine the contours and try to plot them. (default: False)
         (Only used for the advanced procedure, perhaps also 'apply_contours')
-    :key fit_plot_pdf: PdfPages object, to save the fit plot figures to (will override the plot object if provided,
+    :keyword fit_plot_pdf: PdfPages object, to save the fit plot figures to (will override the plot object if provided,
         Only used for the advanced procedure)
-    :key apply_correction: boolean, False, indicates whether the measured capacitance should be
+    :keyword apply_correction: boolean, False, indicates whether the measured capacitance should be
         corrected immediately; Will require the presence of further arguments as information about
         the parasitic capacitance needs to be submitted.
-    :key bare_file: hdf file containing the measurements and investigation of a bare pix cap sample to obtain
+    :keyword bare_file: hdf file containing the measurements and investigation of a bare pix cap sample to obtain
         information about intrinsic and parasitic capacitance. (Only required for the correction procedure, but in
         this case it must be present)
-    :key bare_path: hdf files hierarchy path to the group containing the bare pix cap analysis with the information
+    :keyword bare_path: hdf files hierarchy path to the group containing the bare pix cap analysis with the information
         about the parasitic after investigating the capacitance distribution. (Only required for
         the correction procedure, but in this case it must be present)
-    :key output_pdf: PdfPages object, to save the fit plot figures to (will override the plot object if provided)
-    :key hist_res_key: name/identifiert of the array/table which contains the on-resistance estimators if present.
-    :key test_cap_exclusion: whether to exclude row 0 completely. (default: False)
+    :keyword output_pdf: PdfPages object, to save the fit plot figures to (will override the plot object if provided)
+    :keyword hist_res_key: name/identifiert of the array/table which contains the on-resistance estimators if present.
+    :keyword test_cap_exclusion: whether to exclude row 0 completely. (default: False)
     :type test_cap_exclusion: bool
-    :key mask_pixel: array/iterable of tuple of pixel positions to be masked and therefore ignored for evaluation. [array-like]
-    :key mask_lower: threshold to mask all pixels below this value.
+    :keyword mask_pixel: array/iterable of tuple of pixel positions to be masked and therefore ignored for evaluation. [array-like]
+    :keyword mask_lower: threshold to mask all pixels below this value.
     :type mask_lower: float
-    :key mask_upper: threshold to mask all pixels above this value.
+    :keyword mask_upper: threshold to mask all pixels above this value.
     :type mask_upper: float
-    :key hist_bins: integer, number of bins to use for the histogram. (default: 50)
+    :keyword hist_bins: integer, number of bins to use for the histogram. (default: 50)
     :type hist_bins: int
-    :key chip_group_name: path hdf files' group containing the (physical) properties of the sensor pixels. This must include a matrix of the Physical dimensions of the individual pixels named ''.
-    :key chip_group:
-    :key fit_description_text: text describing the fit performed for usage within the plot handler of the fits.
+    :keyword chip_group_name: path hdf files' group containing the (physical) properties of the sensor pixels. This must include a matrix of the Physical dimensions of the individual pixels named ''.
+    :keyword chip_group:
+    :keyword fit_description_text: text describing the fit performed for usage within the plot handler of the fits.
     :type fit_description_text: str
     :return: hdf files' hierarchy group, used as the reference (containing now the measurements as well as the analysis results)
     """
@@ -917,11 +917,11 @@ def perform_inter_pix_deep_dive(reference_group, get_total_cap_group: Optional[s
     :type parasitic_error: float
     :param get_inter_cap_group: hdf files' group storing the reference data for the full inter-pix measurements.
     :type get_inter_cap_group: str
-    :key total_ref_file: path/filename from which to read the reference data of the total-cap measurements.
-    :key inter_ref_file: path/filename from which to read the reference data of the full inter-pixel measurements.
-    :key lock: synchronization object to prevent multiple overlapping accesses to the pytables api and simultaneously
+    :keyword total_ref_file: path/filename from which to read the reference data of the total-cap measurements.
+    :keyword inter_ref_file: path/filename from which to read the reference data of the full inter-pixel measurements.
+    :keyword lock: synchronization object to prevent multiple overlapping accesses to the pytables api and simultaneously
         write/read operations on the same file.
-    :key is_inter: indicates whether the single contributions to the inter-pixel capacitance shall
+    :keyword is_inter: indicates whether the single contributions to the inter-pixel capacitance shall
         resolved (default: False)
     :type is_inter: bool
     :return: tuple of hdf files group objects (or None) for the total-pix and inter-pix reference data.
@@ -1107,17 +1107,17 @@ def _get_sensor_distribution(ana_group: tb.Group, bias_voltage, cap_data, dist_e
     :param parasitic_error: spread of the parasitic capacitance over a pixcap chip
     :param kwargs: further keyword arguments (but which only used for the resistance distribution if estimators
         are present)
-    :key hist_res_key: name/identifiert of the array/table which contains the on-resistance estimators if present.
-    :key apply_contours: indicates whether to determine the contours and try to plot them. (default: False)
+    :keyword hist_res_key: name/identifiert of the array/table which contains the on-resistance estimators if present.
+    :keyword apply_contours: indicates whether to determine the contours and try to plot them. (default: False)
     :type apply_contours: bool
-    :key test_cap_exclusion: whether to exclude row 0 completely. (default: False)
+    :keyword test_cap_exclusion: whether to exclude row 0 completely. (default: False)
     :type test_cap_exclusion: bool
-    :key mask_pixel: array/iterable of tuple of pixel positions to be masked and therefore ignored for evaluation. [array-like]
-    :key mask_lower: threshold to mask all pixels below this value.
+    :keyword mask_pixel: array/iterable of tuple of pixel positions to be masked and therefore ignored for evaluation. [array-like]
+    :keyword mask_lower: threshold to mask all pixels below this value.
     :type mask_lower: float
-    :key mask_upper: threshold to mask all pixels above this value.
+    :keyword mask_upper: threshold to mask all pixels above this value.
     :type mask_upper: float
-    :key hist_bins: integer, number of bins to use for the histogram. (default: 50)
+    :keyword hist_bins: integer, number of bins to use for the histogram. (default: 50)
     :type hist_bins: int
     """
     # remove all unnecessary keywords
@@ -1315,17 +1315,17 @@ def __distribution_depletion_estimation(dist_table,
     :type is_corrected: bool
     :param is_corrected: whether to use the corrected data for this operation.
     :param kwargs: further keyword arguments for the fits to estimate the depletion voltage.
-    :key fit_description_text: text describing the fit performed for usage within the plot handler of the fits.
-    :key use_kafe2: boolean, False, indicates whether kafe2 is used for the fit.
-    :key apply_contours: boolean, indicates whether to determine the contours and try to plot them. (No effect for
+    :keyword fit_description_text: text describing the fit performed for usage within the plot handler of the fits.
+    :keyword use_kafe2: boolean, False, indicates whether kafe2 is used for the fit.
+    :keyword apply_contours: boolean, indicates whether to determine the contours and try to plot them. (No effect for
         the fit to estimate systematic effects)
     :type apply_contours: bool
-    :key plot: boolean, False, indicates whether to plot the data. AN output PDF object could be submitted here
+    :keyword plot: boolean, False, indicates whether to plot the data. AN output PDF object could be submitted here
          instead of an explicitly created one. (No effect for the fit to estimate systematic effects)
-    :key fit_plot_pdf: PDF object to save the fit figures to. (No effect for
+    :keyword fit_plot_pdf: PDF object to save the fit figures to. (No effect for
         the fit to estimate systematic effects.)
-    :key verbose: boolean, indicating whether to use verbose output of the depletion voltages.
-    :key cv_fit_plot_pdf: analog to `fit_plot_pdf` to activate the plotting for c-v- and depletion fits independent from
+    :keyword verbose: boolean, indicating whether to use verbose output of the depletion voltages.
+    :keyword cv_fit_plot_pdf: analog to `fit_plot_pdf` to activate the plotting for c-v- and depletion fits independent from
         the plotting for capacitance estimation fits. If this keyword argument is present also the `plot` arguments will
         be set automatically. (This keyword argument will be ignored for the fits to estimate systematic effects)
     :returns: optional list of figure holder objects.
@@ -1492,7 +1492,7 @@ def _handle_mp_parasitic_cap(bare_path: Optional[str], bare_file: Optional[str],
 
     :param bare_path: path of the analysis group within the provided file.
     :param bare_file: path/filename of the .h5-file storing the analysis data of a full measurement of a bare PixCap65 chip.
-    :key lock: synchronization object to prevent multiple overlapping accesses to the pytables api and simultaneously
+    :keyword lock: synchronization object to prevent multiple overlapping accesses to the pytables api and simultaneously
         write/read operations on the same file.
     :param kwargs: provide further keywords for opening a pytables.File object.
     :return: tuple of parasitic capacitance and it's spread over a single sensor.
@@ -1576,25 +1576,25 @@ def analysis_data_handle(file: tb.File, data_group: GroupType, result_group: Gro
     :param is_inter_pixel: boolean, False, indicating whether the measurement to be analysed is an inter-pixel
         capacitance measurement. In this case more fits will be applied, adjusted to the specific structure of this
         problem
-    :key full_model: boolean, True, indicates whether the full model for extended frequency range is to be used.
+    :keyword full_model: boolean, True, indicates whether the full model for extended frequency range is to be used.
         Otherwise, the linear model is used. (Only used for the advanced procedure)
-    :key use_kafe2: indicates whether kafe2 is used for the fit. (default: False)
-    :key plot: boolean, indicates whether to plot the data. An output PDF object could be submitted here instead of an explicitly created one. (Default: False) (Only used for the advanced procedure)
-    :key apply_contour: boolean, indicates whether to determine the contours and try to plot them. (default: False)
+    :keyword use_kafe2: indicates whether kafe2 is used for the fit. (default: False)
+    :keyword plot: boolean, indicates whether to plot the data. An output PDF object could be submitted here instead of an explicitly created one. (Default: False) (Only used for the advanced procedure)
+    :keyword apply_contour: boolean, indicates whether to determine the contours and try to plot them. (default: False)
         (Only used for the advanced procedure)
-    :key fit_plot_pdf: PdfPages object, to save the fit plot figures to (will override the plot object if provided,
+    :keyword fit_plot_pdf: PdfPages object, to save the fit plot figures to (will override the plot object if provided,
         Only used for the advanced procedure)
-    :key apply_correction: boolean, False, indicates whether the measured capacitance should be
+    :keyword apply_correction: boolean, False, indicates whether the measured capacitance should be
         corrected immediately; Will require the presence of further arguments as information about
         the parasitic capacitance needs to be submitted.
-    :key bare_file: hdf file containing the measurements and investigation of a bare pix cap sample to obtain
+    :keyword bare_file: hdf file containing the measurements and investigation of a bare pix cap sample to obtain
         information about intrinsic and parasitic capacitance. (Only required for the correction procedure, but in
         this case it must be present)
-    :key bare_path: hdf files hierarchy path to the group containing the bare pix cap analysis with the information
+    :keyword bare_path: hdf files hierarchy path to the group containing the bare pix cap analysis with the information
         about the parasitic after investigating the capacitance distribution. (Only required for
         the correction procedure, but in this case it must be present)
-    :key output_pdf: PdfPages object, to save the fit plot figures to (will override the plot object if provided)
-    :key lock: synchronization object to prevent multiple overlapping accesses to the pytables api and simultaneously
+    :keyword output_pdf: PdfPages object, to save the fit plot figures to (will override the plot object if provided)
+    :keyword lock: synchronization object to prevent multiple overlapping accesses to the pytables api and simultaneously
         write/read operations on the same file.
     """
     # get the correct analysis function
@@ -1662,16 +1662,16 @@ def _handle_inter_pix_capacitance(file: tb.File, data_group: tb.Group, is_advanc
         or not (may require additional keyword arguments)
     :param perform_analysis: function/callable to handle the analysis for individual pixels
     :param result_group: hdf files' group to write the analysis results of the individual pixels to.
-    :key current_error_hist: histogram/array-like of the uncertainties of the current measurements for the pixels; 2D-Array for the errors of the current data. This keyword argument must be present
+    :keyword current_error_hist: histogram/array-like of the uncertainties of the current measurements for the pixels; 2D-Array for the errors of the current data. This keyword argument must be present
         for the advanced analysis strategy.
     :type current_error_hist: numpy.ndarray
-    :key full_model: boolean, True, indicates whether the full model for extended frequency range is to be used.
+    :keyword full_model: boolean, True, indicates whether the full model for extended frequency range is to be used.
         Otherwise, the linear model is used.
-    :key use_kafe2: boolean, indicates whether kafe2 is used for the fit. (default: False)
-    :key plot: boolean, indicates whether to plot the data. An output PDF object could be submitted here instead of an explicitly created one. (Default: False)
-    :key apply_contour: boolean, indicates whether to determine the contours and try to plot them. (default: False)
-    :key fit_plot_pdf: PdfPages object, to save the fit plot figures to (will override the plot object if provided)
-    :key output_pdf: PdfPages object, to save the fit plot figures to (will override the plot object if provided)
+    :keyword use_kafe2: boolean, indicates whether kafe2 is used for the fit. (default: False)
+    :keyword plot: boolean, indicates whether to plot the data. An output PDF object could be submitted here instead of an explicitly created one. (Default: False)
+    :keyword apply_contour: boolean, indicates whether to determine the contours and try to plot them. (default: False)
+    :keyword fit_plot_pdf: PdfPages object, to save the fit plot figures to (will override the plot object if provided)
+    :keyword output_pdf: PdfPages object, to save the fit plot figures to (will override the plot object if provided)
     """
     current_hist = check_leaf_unit(data_group.TotalHistCurr, HIST_CURRENT_MEAS_UNIT)
     if is_advanced and "TotalHistCurr" in data_group:
@@ -1772,15 +1772,15 @@ def _handle_cap_correction(result_group: tb.Group, **kwargs):
     (Internal) Utility function to correct the measured capacitance for the parasitic ones by the measurement circuit.
 
     :param result_group: hdf files' group where the analysis results were written to.
-    :key lock: synchronization object to prevent multiple overlapping accesses to the pytables api and simultaneously
+    :keyword lock: synchronization object to prevent multiple overlapping accesses to the pytables api and simultaneously
         write/read operations on the same file.
-    :key apply_correction: boolean, apply_correction: boolean, indicates whether the measured capacitance should be corrected
+    :keyword apply_correction: boolean, apply_correction: boolean, indicates whether the measured capacitance should be corrected
         immediately; Will require the presence of further arguments as information about the parasitic capacitance needs to be
         submitted. (data corrected for parasitic capacitances of PixCap65, default: False)
-    :key bare_file: hdf file containing the measurements and investigation of a bare pix cap sample to obtain
+    :keyword bare_file: hdf file containing the measurements and investigation of a bare pix cap sample to obtain
         information about intrinsic and parasitic capacitance. (Only required for the correction procedure, but in
         this case it must be present)
-    :key bare_path: hdf files hierarchy path to the group containing the bare pix cap analysis with the information
+    :keyword bare_path: hdf files hierarchy path to the group containing the bare pix cap analysis with the information
         about the parasitic after investigating the capacitance distribution. (Only required for
         the correction procedure, but in this case it must be present)
     """
@@ -1922,30 +1922,30 @@ def analyze_depletion_delegate(data_group: tb.Group, analysis_group: tb.Group,
         the depletion voltage of the pixel.
     :param chip_group: HDF files hierarchy group with the data/specifications of the pixels on the current sensor.
     :param apply_doping: boolean, False, indicating whether to investigate the (effective) doping of the sensor.
-    :key use_kafe2: boolean, False, indicates whether kafe2 is used for the fit.
-    :key plot: boolean, False, indicates whether to plot the data. AN output PDF object could be submitted here
+    :keyword use_kafe2: boolean, False, indicates whether kafe2 is used for the fit.
+    :keyword plot: boolean, False, indicates whether to plot the data. AN output PDF object could be submitted here
          instead of an explicitly created one.
-    :key apply_contours: boolean, indicates whether to determine the contours and try to plot them.
-    :key fit_plot_pdf: PdfPages object, to save the fit plot figures to (will override the plot object if provided,
+    :keyword apply_contours: boolean, indicates whether to determine the contours and try to plot them.
+    :keyword fit_plot_pdf: PdfPages object, to save the fit plot figures to (will override the plot object if provided,
         Only used for the advanced procedure)
-    :key output_pdf: PdfPages object, to save the fit plot figures to (will override the plot object if provided,
+    :keyword output_pdf: PdfPages object, to save the fit plot figures to (will override the plot object if provided,
         Only used for the advanced procedure)
-    :key verbose: boolean, indicating whether to use verbose output of the depletion voltages.
-    :key address: address of the socket of the multiprocessing.Manager object we want to connect to.
-    :key authkey: authentication key necessary to connect to the socket. (It is recommended not to use this parameter as
+    :keyword verbose: boolean, indicating whether to use verbose output of the depletion voltages.
+    :keyword address: address of the socket of the multiprocessing.Manager object we want to connect to.
+    :keyword authkey: authentication key necessary to connect to the socket. (It is recommended not to use this parameter as
         it is not pickable)
-    :key lock: synchronization object to prevent multiple overlapping accesses to the pytables api and simultaneously
+    :keyword lock: synchronization object to prevent multiple overlapping accesses to the pytables api and simultaneously
         write/read operations on the same file.
-    :key systematic_offset: enlargement in V for the fit range conditions applied for fitting. Needed to estiamte the
+    :keyword systematic_offset: enlargement in V for the fit range conditions applied for fitting. Needed to estiamte the
         systematic uncertainties by the fit range accurately. (default: 2)
-    :key para_dist: standard deviation of the parasitic capacitance of the Pixcap chip on a single sensor.
-    :key systematic_dispersion: spread of the dispersion of the parasitic capacitance between different Pixcap chip
+    :keyword para_dist: standard deviation of the parasitic capacitance of the Pixcap chip on a single sensor.
+    :keyword systematic_dispersion: spread of the dispersion of the parasitic capacitance between different Pixcap chip
         samples. This will induce a systematic effect on the accuracy of the capacitance's and the depletion voltage of
         the investigated sensor.
-    :key systematic_offset: (default: 2)
+    :keyword systematic_offset: (default: 2)
     :type systematic_offset: float
-    :key fit_description_text: text describing the fit performed for usage within the plot handler of the fits.
-    :key cv_fit_plot_pdf: analog to `fit_plot_pdf` to activate the plotting for c-v- and depletion fits independent from
+    :keyword fit_description_text: text describing the fit performed for usage within the plot handler of the fits.
+    :keyword cv_fit_plot_pdf: analog to `fit_plot_pdf` to activate the plotting for c-v- and depletion fits independent from
         the plotting for capacitance estimation fits. If this keyword argument is present also the `plot` arguments will
         be set automatically.
     """
@@ -2166,23 +2166,23 @@ def __depletion_iterator_implementation(index, cap_data, cap_error_data, lower_b
     :param upper_boundary: boundaries for the fits to the low voltage asymptotic limit for determining the depletion voltage.
     :param voltage_data: array of the biasing HV voltages (with the correct sign)
     :param storage: (specialised) object to store the results of the analysis while the mapping to individual pixels is done by the calling code.
-    :key systematic_offset: (default: 2)
+    :keyword systematic_offset: (default: 2)
     :type systematic_offset: float
-    :key para_dist: standard deviation of the parasitic capacitance of the Pixcap chip on a single sensor.
+    :keyword para_dist: standard deviation of the parasitic capacitance of the Pixcap chip on a single sensor.
     :type para_dist: float
-    :key systematic_dispersion: dispersion of the parasitic capacitance's between multiple PixCap65 chips
+    :keyword systematic_dispersion: dispersion of the parasitic capacitance's between multiple PixCap65 chips
     :type systematic_dispersion: float
-    :key fit_description_text: text describing the fit performed for usage within the plot handler of the fits.
-    :key fit_plot_pdf: PDF object to save the fit figures to.
-    :key verbose: boolean, indicating whether to use verbose output of the depletion voltages.
-    :key cv_fit_plot_pdf: analog to `fit_plot_pdf` to activate the plotting for c-v- and depletion fits independent from
+    :keyword fit_description_text: text describing the fit performed for usage within the plot handler of the fits.
+    :keyword fit_plot_pdf: PDF object to save the fit figures to.
+    :keyword verbose: boolean, indicating whether to use verbose output of the depletion voltages.
+    :keyword cv_fit_plot_pdf: analog to `fit_plot_pdf` to activate the plotting for c-v- and depletion fits independent from
         the plotting for capacitance estimation fits. If this keyword argument is present also the `plot` arguments will
         be set automatically.
-    :key use_kafe2: indicates whether kafe2 is used for the fit. (default: False)
+    :keyword use_kafe2: indicates whether kafe2 is used for the fit. (default: False)
     :type use_kafe2: bool
-    :key apply_contours: indicates whether to determine the contours and try to plot them. (default: False)
+    :keyword apply_contours: indicates whether to determine the contours and try to plot them. (default: False)
     :type apply_contours: bool
-    :key plot: indicates whether to plot the data. An output PDF object could be submitted here
+    :keyword plot: indicates whether to plot the data. An output PDF object could be submitted here
          instead of an explicitly created one. (default: False)
     :type plot: bool
     """
@@ -2302,22 +2302,22 @@ def depletion_delegation_impl(cap_data, cap_error_data, first_lower, first_upper
     :param fit_result_storage: DataStorage object for intermediate storage of fit results and depletion parameters
     :param voltage_data: data of the applied HV voltages
     :param kwargs: further keyword arguments to be propagated to functions/implementations.
-    :key use_kafe2: boolean, False, indicates whether kafe2 is used for the fit.
-    :key apply_contours: boolean, indicates whether to determine the contours and try to plot them.
-    :key plot: boolean, False, indicates whether to plot the data. AN output PDF object could be submitted here
+    :keyword use_kafe2: boolean, False, indicates whether kafe2 is used for the fit.
+    :keyword apply_contours: boolean, indicates whether to determine the contours and try to plot them.
+    :keyword plot: boolean, False, indicates whether to plot the data. AN output PDF object could be submitted here
          instead of an explicitly created one.
-    :key fit_plot_pdf: PDF object to save the fit figures to.
-    :key verbose: boolean, indicating whether to use verbose output of the depletion voltages.
-    :key systematic_offset: enlargement in V for the fit range conditions applied for fitting. Needed to estiamte the
+    :keyword fit_plot_pdf: PDF object to save the fit figures to.
+    :keyword verbose: boolean, indicating whether to use verbose output of the depletion voltages.
+    :keyword systematic_offset: enlargement in V for the fit range conditions applied for fitting. Needed to estiamte the
         systematic uncertainties by the fit range accurately. (default: 2)
-    :key para_dist: standard deviation of the parasitic capacitance of the Pixcap chip on a single sensor.
-    :key systematic_dispersion: spread of the dispersion of the parasitic capacitance between different Pixcap chip
+    :keyword para_dist: standard deviation of the parasitic capacitance of the Pixcap chip on a single sensor.
+    :keyword systematic_dispersion: spread of the dispersion of the parasitic capacitance between different Pixcap chip
         samples. This will induce a systematic effect on the accuracy of the capacitance's and the depletion voltage of
         the investigated sensor.
-    :key systematic_offset: (default: 2)
+    :keyword systematic_offset: (default: 2)
     :type systematic_offset: float
-    :key fit_description_text: text describing the fit performed for usage within the plot handler of the fits.
-    :key cv_fit_plot_pdf: analog to `fit_plot_pdf` to activate the plotting for c-v- and depletion fits independent from
+    :keyword fit_description_text: text describing the fit performed for usage within the plot handler of the fits.
+    :keyword cv_fit_plot_pdf: analog to `fit_plot_pdf` to activate the plotting for c-v- and depletion fits independent from
         the plotting for capacitance estimation fits. If this keyword argument is present also the `plot` arguments will
         be set automatically.
     :return: optionally list of figure holder objects; the list elements could also be None themselves.
@@ -2364,14 +2364,14 @@ def analyze_doping_profile(bias_voltages: np.ndarray,
     :param pixel_cap_data: capacitance data from the C-V characterization.
     :param pixel_cap_error_data: uncertainties of the capacitance data from the C-V characterization.
     :param kwargs: further keyword arguments to be propagated to functions/implementations.
-    :key use_kafe2: boolean, indicates whether kafe2 is used for the fit. (default: False)
+    :keyword use_kafe2: boolean, indicates whether kafe2 is used for the fit. (default: False)
     :type use_kafe2: bool
-    :key apply_contours: boolean, indicates whether to determine the contours and try to plot them. (default: False)
+    :keyword apply_contours: boolean, indicates whether to determine the contours and try to plot them. (default: False)
     :type apply_contours: bool
-    :key plot: boolean, False, indicates whether to plot the data. An output PDF object could be submitted here instead of an explicitly created one. (Default: False)
+    :keyword plot: boolean, False, indicates whether to plot the data. An output PDF object could be submitted here instead of an explicitly created one. (Default: False)
     :type plot: bool
-    :key fit_plot_pdf: PDF object to save the fit figures to.
-    :key fit_description_text: text describing the fit performed for usage within the plot handler of the fits.
+    :keyword fit_plot_pdf: PDF object to save the fit figures to.
+    :keyword fit_description_text: text describing the fit performed for usage within the plot handler of the fits.
     :type fit_description_text: str
     :return: tuple of doping_profile, depletion_width data, index of minimum doping concentration
     :rtype: tuple
@@ -2522,17 +2522,17 @@ def analyze_pixel_depletion(first_lower, first_upper,
     :param voltage_data: array of the biasing HV voltages (with the correct sign)
     :param result: data store container to write the results back
     :param kwargs: further keyword arguments for fitting and output.
-    :key fit_description_text: text describing the fit performed for usage within the plot handler of the fits.
-    :key fit_plot_pdf: PDF object to save the fit figures to.
-    :key verbose: boolean, indicating whether to use verbose output of the depletion voltages.
-    :key cv_fit_plot_pdf: analog to `fit_plot_pdf` to activate the plotting for c-v- and depletion fits independent from
+    :keyword fit_description_text: text describing the fit performed for usage within the plot handler of the fits.
+    :keyword fit_plot_pdf: PDF object to save the fit figures to.
+    :keyword verbose: boolean, indicating whether to use verbose output of the depletion voltages.
+    :keyword cv_fit_plot_pdf: analog to `fit_plot_pdf` to activate the plotting for c-v- and depletion fits independent from
         the plotting for capacitance estimation fits. If this keyword argument is present also the `plot` arguments will
         be set automatically.
-    :key use_kafe2: indicates whether kafe2 is used for the fit. (default: False)
+    :keyword use_kafe2: indicates whether kafe2 is used for the fit. (default: False)
     :type use_kafe2: bool
-    :key apply_contours: indicates whether to determine the contours and try to plot them. (default: False)
+    :keyword apply_contours: indicates whether to determine the contours and try to plot them. (default: False)
     :type apply_contours: bool
-    :key plot: indicates whether to plot the data. An output PDF object could be submitted here
+    :keyword plot: indicates whether to plot the data. An output PDF object could be submitted here
          instead of an explicitly created one. (default: False)
     :type plot: bool
     """
@@ -2595,21 +2595,21 @@ def _analyze_pixel_depletion_fit(pixel_cap_data: np.ndarray,
             depletion voltage.
     :param second_upper: upper bound for the fitting range in the low voltage limit of the C-V-curve to estimate the
             depletion voltage.
-    :key cv_fit_plot_pdf: analog to `fit_plot_pdf` to activate the plotting for c-v- and depletion fits independent from
+    :keyword cv_fit_plot_pdf: analog to `fit_plot_pdf` to activate the plotting for c-v- and depletion fits independent from
         the plotting for capacitance estimation fits. If this keyword argument is present also the `plot` arguments will
         be set automatically.
-    :key fit_plot_pdf: pdf object to write the all the fits control figures to.
-    :key enhanced: Not clear what this key really does. It should not be used at all.
+    :keyword fit_plot_pdf: pdf object to write the all the fits control figures to.
+    :keyword enhanced: Not clear what this key really does. It should not be used at all.
     :type enhanced: bool
-    :key fit_description_text: text describing the fit performed for usage within the plot handler of the fits.
-    :key use_kafe2: indicates whether kafe2 is used for the fit. (default: False)
+    :keyword fit_description_text: text describing the fit performed for usage within the plot handler of the fits.
+    :keyword use_kafe2: indicates whether kafe2 is used for the fit. (default: False)
     :type use_kafe2: bool
-    :key apply_contours: indicates whether to determine the contours and try to plot them. (default: False)
+    :keyword apply_contours: indicates whether to determine the contours and try to plot them. (default: False)
     :type apply_contours: bool
-    :key plot: indicates whether to plot the data. An output PDF object could be submitted here
+    :keyword plot: indicates whether to plot the data. An output PDF object could be submitted here
          instead of an explicitly created one. (default: False)
     :type plot: bool
-    :key fit_plot_pdf: PDF object to save the fit figures to.
+    :keyword fit_plot_pdf: PDF object to save the fit figures to.
     :return: tuple (Udep, error of Udep, first fits parameters, first fits parameter errors, covariance matrix of the first fit, second fits parameters, second fits parameter errors, covariance matrix for the second fit). If the `enhanced` keyword is present the return type/values might differ.
     :rtype: tuple
     """
@@ -2716,15 +2716,15 @@ def get_depletion_fit(cap_data: np.ndarray, cap_error_data: np.ndarray, voltage_
     :param cap_error_data: uncertainties of the capacitance data from the characterization for this fit section.
     :param voltage_data: data of the applied HV voltages for this fit section.
     :param fit_reference: identifying the fit section for which the fit is performed.
-    :key fit_description_text: text describing the fit performed for usage within the plot handler of the fits.
-    :key use_kafe2: indicates whether kafe2 is used for the fit. (default: False)
+    :keyword fit_description_text: text describing the fit performed for usage within the plot handler of the fits.
+    :keyword use_kafe2: indicates whether kafe2 is used for the fit. (default: False)
     :type use_kafe2: bool
-    :key apply_contours: indicates whether to determine the contours and try to plot them. (default: False)
+    :keyword apply_contours: indicates whether to determine the contours and try to plot them. (default: False)
     :type apply_contours: bool
-    :key plot: indicates whether to plot the data. An output PDF object could be submitted here
+    :keyword plot: indicates whether to plot the data. An output PDF object could be submitted here
          instead of an explicitly created one. (default: False)
     :type plot: bool
-    :key fit_plot_pdf: PDF object to save the fit figures to.
+    :keyword fit_plot_pdf: PDF object to save the fit figures to.
     :return: covariance_matrix, fit parameter errors, fit parameter values
     """
     # extract the additional parameters for advanced fitting procedures
@@ -2879,24 +2879,24 @@ def analyze_capacitance_distribution(raw_data, base_path=None, corrected_distrib
     :param corrected_distribution: boolean, False, indicates whether the corrected capacitance distribution
         should be analyzed.
     :param base_path: hdf files group witht the measurement data.
-    :key fit_plot_pdf: PdfPages object, to save the fit plot figures to (will override the plot object if provided,
+    :keyword fit_plot_pdf: PdfPages object, to save the fit plot figures to (will override the plot object if provided,
         Only used for the advanced procedure).
-    :key output_pdf: PdfPages object, to save the fit plot figures to (will override the plot object if provided,
+    :keyword output_pdf: PdfPages object, to save the fit plot figures to (will override the plot object if provided,
         Only used for the advanced procedure).
-    :key fit_plot_pdf_name:  Name of the PDF file to save fitting figures from the advanced procedures to
+    :keyword fit_plot_pdf_name:  Name of the PDF file to save fitting figures from the advanced procedures to
         (Only used for the advanced procedure).
-    :key mask_pixel: iterable of pixel positions on the grid to ignore for evaluations.
-    :key test_cap_exclusion: boolean, whether to exclude the test capacitator row from the histograms.
-    :key hist_bins: integer, number of bins to use for the histogram.
-    :key no_plot: boolean, whether to supress (interactive) plotting of the distribution of the capacitance.
-    :key convert: boolean, whether to convert the capacitance to fF, or not (default: True)
-    :key use_kafe2: indicates whether kafe2 is used for the fit. (default: False)
+    :keyword mask_pixel: iterable of pixel positions on the grid to ignore for evaluations.
+    :keyword test_cap_exclusion: boolean, whether to exclude the test capacitator row from the histograms.
+    :keyword hist_bins: integer, number of bins to use for the histogram.
+    :keyword no_plot: boolean, whether to supress (interactive) plotting of the distribution of the capacitance.
+    :keyword convert: boolean, whether to convert the capacitance to fF, or not (default: True)
+    :keyword use_kafe2: indicates whether kafe2 is used for the fit. (default: False)
     :type use_kafe2: bool
-    :key apply_contours: indicates whether to determine the contours and try to plot them. (default: False)
+    :keyword apply_contours: indicates whether to determine the contours and try to plot them. (default: False)
     :type apply_contours: bool
-    :key mask_lower: threshold to mask all pixels below this value.
+    :keyword mask_lower: threshold to mask all pixels below this value.
     :type mask_lower: float
-    :key mask_upper: threshold to mask all pixels above this value.
+    :keyword mask_upper: threshold to mask all pixels above this value.
     :type mask_upper: float
     """
     temp_plot_name = kwargs.pop("fit_plot_pdf_name", None)
@@ -2936,24 +2936,24 @@ def analyze_capacitance_distribution_delegate(analysis_group: Optional[tb.Group]
 
     :param analysis_group: hdf file's group where to find the capacitance to be analysed.
     :param output_pdf: PDF object to write the created figures to for long-term saving.
-    :key capacitance: histogram of the capacitance to use instead of those extracted from the provided hdf files group.
-    :key set_parasitic: boolean, whether to set the parasitic capacitance for this data set.
+    :keyword capacitance: histogram of the capacitance to use instead of those extracted from the provided hdf files group.
+    :keyword set_parasitic: boolean, whether to set the parasitic capacitance for this data set.
     :type set_parasitic: bool
-    :key no_plot: boolean, whether to supress (interactive) plotting of the distribution of the capacitance.
-    :key convert: boolean, whether to convert the capacitance to fF, or not (default: True)
-    :key use_kafe2: indicates whether kafe2 is used for the fit. (default: False)
+    :keyword no_plot: boolean, whether to supress (interactive) plotting of the distribution of the capacitance.
+    :keyword convert: boolean, whether to convert the capacitance to fF, or not (default: True)
+    :keyword use_kafe2: indicates whether kafe2 is used for the fit. (default: False)
     :type use_kafe2: bool
-    :key apply_contours: indicates whether to determine the contours and try to plot them. (default: False)
+    :keyword apply_contours: indicates whether to determine the contours and try to plot them. (default: False)
     :type apply_contours: bool
-    :key fit_plot_pdf: PDF object to save the fit figures to.
-    :key test_cap_exclusion: whether to exclude row 0 completely. (default: False)
+    :keyword fit_plot_pdf: PDF object to save the fit figures to.
+    :keyword test_cap_exclusion: whether to exclude row 0 completely. (default: False)
     :type test_cap_exclusion: bool
-    :key mask_pixel: array/iterable of tuple of pixel positions to be masked and therefore ignored for evaluation. [array-like]
-    :key mask_lower: threshold to mask all pixels below this value.
+    :keyword mask_pixel: array/iterable of tuple of pixel positions to be masked and therefore ignored for evaluation. [array-like]
+    :keyword mask_lower: threshold to mask all pixels below this value.
     :type mask_lower: float
-    :key mask_upper: threshold to mask all pixels above this value.
+    :keyword mask_upper: threshold to mask all pixels above this value.
     :type mask_upper: float
-    :key hist_bins: integer, number of bins to use for the histogram. (default: 50)
+    :keyword hist_bins: integer, number of bins to use for the histogram. (default: 50)
     :type hist_bins: int
     :return tuple of (capacitance data used, mean value, mean parameter error, std parameter value, std parameter error)
     :rtype tuple
@@ -3145,7 +3145,7 @@ def apply_correction_simple(bare_data_path: str, bare_path: str, analysis_group:
         about the parasitic after investigating the capacitance distribution.
     :param analysis_group: hdf files hierarchy group with the analysis results which needs to be corrected for the
         intrinsic and parasitic effects.
-    :key lock: synchronization object to prevent multiple overlapping accesses to the pytables api and simultaneously
+    :keyword lock: synchronization object to prevent multiple overlapping accesses to the pytables api and simultaneously
         write/read operations on the same file.
     """
     with synchronized_process_open_file(bare_data_path, mode='r', **kwargs) as in_file_h5:
@@ -3228,7 +3228,7 @@ def get_test_capacitance_data(group: tb.Group, **kwargs):
     Utility function to print out the determined test capacitance values and their corresponding (statistical) uncertainties for the provided sensor.
 
     :param group: analysis group of the sensor and measurement series from which to take the test capacitances.
-    :key print_result: whether to print out the test capacitance values on the standard output (default: True)
+    :keyword print_result: whether to print out the test capacitance values on the standard output (default: True)
     :type print_result: bool
     :return: tuple of array of the test capacitances and their uncertainties.
     """

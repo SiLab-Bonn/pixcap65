@@ -23,6 +23,10 @@ Inter-Pixel Capacitance measurements
 .. autoclass:: Pixcap65InterCap
     :members:
 
+.. autoclass:: Pixcap65InterCapSides
+    :members:
+
 Analysis of the measurements
 ----------------------------
+.. automodule:: pixcap65.analysis
 

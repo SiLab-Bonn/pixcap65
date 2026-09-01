@@ -48,7 +48,7 @@ def analyze_data_delegate(file: tb.File, group: tb.Group, current_hist: TABLES_A
     :param current_hist: 2D-Array for the current data to fit the model to.
     :param scan_parameters: table of the scan parameters used for each measurement point within the frequency and/or
         voltage scan.
-    :key current_error_hist: 2D-Array for the errors of the current data. This keyword argument must be present
+    :keyword current_error_hist: 2D-Array for the errors of the current data. This keyword argument must be present
         for the advanced analysis strategy. (This argument has no effect by the current implementation).
     """
     # create array like objects to temporarily save the analysis results

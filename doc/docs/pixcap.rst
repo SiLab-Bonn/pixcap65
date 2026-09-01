@@ -8,6 +8,7 @@ Driver
 
 .. autoclass:: Pixcap65
     :members:
+    :no-index:
 
 Driver
 ------
@@ -18,4 +19,5 @@ Driver
 ------
 .. automodule:: pixcap65.plotting
     :members:
+    :no-index:
 

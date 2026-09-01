@@ -41,7 +41,7 @@ class Pixcap65(Dut):
     For correct initialization a valid configuration yaml defining all the components needed for `basil` is required.
 
     :ivar binary_active: boolean, indicating whether binary readout of the SMU should be used if the SMU support this
-        feature.
+     feature.
     """
     __slots__ = ["binary_active"]
 
@@ -432,7 +432,7 @@ class Pixcap65(Dut):
         specified column.
 
         :param i_col: column for which to activate a 'feature'/function !!no bit mask for specifying
-            multiple columns at once.!!
+         multiple columns at once.!!
         :param eoc_mask: Bit mask (multiply by bitwise OR) of the functions to be activated.
         """
         self['SPI']['COL'][c.COL_NMAX - i_col]['EOC'] = eoc_mask
@@ -592,8 +592,7 @@ class Pixcap65(Dut):
         :param current_range: current measurement range/maximum current intended to be measured in A.
         :param plc: number of power supply cycles to be averaged over when measuring.
         :param src_u: sourcing voltage for the SMU.
-        :param voltage_range: voltage sourcing range to be selected for the SMU. Possible values may depend on the
-            SMU in use.
+        :param voltage_range: voltage sourcing range to be selected for the SMU. Possible values may depend on the SMU in use.
         :param kwargs: further keyword arguments to be forwarded to the call of the lab device by basil
         """
 
@@ -857,7 +856,7 @@ class Pixcap65(Dut):
 
         This is the fast implementation for this purpose using directly dedicated functions of the SMU.
         :param n: number of measurements to be performed or None when the property should be used to determine the
-            number of measurements to perform.
+        number of measurements to perform.
         :param smu: smu dut key of the SMU to configure.
         :param kwargs: further keyword arguments to be forwarded to the call to the lab device by basil.
         """
@@ -894,7 +893,7 @@ class Pixcap65(Dut):
 
         This is the fast implementation for this purpose using directly dedicated functions of the SMU.
         :param n: umber of measurements to be performed or None when the property should be used to determine the
-            number of measurements to perform.
+        number of measurements to perform.
         :param smu: smu dut key of the SMU to configure.
         :param kwargs: further keyword arguments to be forwarded to the call to the lab device by basil.
         """
@@ -931,11 +930,11 @@ class Pixcap65(Dut):
 
         This is the fast implementation for this purpose using directly dedicated functions of the SMU.
         :param n: number of measurements performed or None when the property should be used to determine the
-            number of measurements to perform.
+         number of measurements to perform.
         :param smu: smu dut key of the SMU to configure.
         :param kwargs: further keyword arguments to be forwarded to the call to the lab device by basil.
         :return: array of the measured currents in A; If the SMU is not active only NaN will be returned within the
-            array.
+         array.
         """
         if not self.has_configured_smu(smu):
             logger.debug(SMU_DISABLED_CURRENT_MSG, smu)
@@ -974,11 +973,11 @@ class Pixcap65(Dut):
 
         This is the fast implementation for this purpose using directly dedicated functions of the SMU.
         :param n: umber of measurements to be performed or None when the property should be used to determine the
-            number of measurements to perform.
+         number of measurements to perform.
         :param smu: smu dut key of the SMU to configure.
         :param kwargs: further keyword arguments to be forwarded to the call to the lab device by basil.
         :return: array of the measured voltages in V; If the SMU is not active only NaN will be returned within the
-            array.
+         array.
         """
         if not self.has_configured_smu(smu):
             logger.debug(SMU_DISABLED_CURRENT_MSG, smu)
@@ -1013,7 +1012,7 @@ class Pixcap65(Dut):
         The call to the SMU is only performed when the SMU is connected and active.
 
         :param n: number of measurements to be performed or None when the property should be used to determine the
-            number of measurements to perform.
+         number of measurements to perform.
         :param smu: smu dut key of the SMU to configure.
         :param kwargs: further keyword arguments to be forwarded to the call to the lab device by basil.
         :return: (average current reading, uncertainty of the current reading) in A.
@@ -1050,7 +1049,7 @@ class Pixcap65(Dut):
         The call to the SMU is only performed when the SMU is connected and active.
 
         :param n: number of measurements to be performed or None when the property should be used to determine the
-            number of measurements to perform.
+         number of measurements to perform.
         :param smu: smu dut key of the SMU to configure.
         :param kwargs: further keyword arguments to be forwarded to the call to the lab device by basil.
         :return: (average voltage reading, uncertainty of the voltage reading) in V.
@@ -1091,12 +1090,12 @@ class Pixcap65(Dut):
         This is the fast implementation for this purpose using directly dedicated functions of the SMU.
 
         :param n: number of measurements to be performed or None when the property should be used to determine the
-            number of measurements to perform.
+         number of measurements to perform.
         :param smu: smu dut key of the SMU to configure.
         :param kwargs: further keyword arguments to be forwarded to the call to the lab device by basil or additionally
-            'binary_enabled' in the case that the special binary readout mode should be used.
+        'binary_enabled' in the case that the special binary readout mode should be used.
         :return: array of the measured currents in A; If the SMU is not active only NaN will be returned within the
-            array.
+         array.
         """
         if not self.has_configured_smu(smu):
             logger.debug(SMU_DISABLED_CURRENT_MSG, smu)
@@ -1141,12 +1140,12 @@ class Pixcap65(Dut):
         This is the fast implementation for this purpose using directly dedicated functions of the SMU.
 
         :param n: number of measurements to be performed or None when the property should be used to determine the
-            number of measurements to perform.
+         number of measurements to perform.
         :param smu: smu dut key of the SMU to configure.
         :param kwargs: further keyword arguments to be forwarded to the call to the lab device by basil or additionally
-            'binary_enabled' in the case that the special binary readout mode should be used.
+        'binary_enabled' in the case that the special binary readout mode should be used.
         :return: array of the measured voltages in V; If the SMU is not active only NaN will be returned within the
-            array.
+         array.
         """
         if not self.has_configured_smu(smu):
             logger.debug(SMU_DISABLED_MSG, smu)
@@ -1190,12 +1189,12 @@ class Pixcap65(Dut):
         This is the slow implementation for this purpose consisting on single measurement calls to the SMU.
 
         :param n: number of measurements to be performed or None when the property should be used to determine the
-            number of measurements to perform.
+         number of measurements to perform.
         :param smu: smu dut key of the SMU to configure.
         :param kwargs: further keyword arguments to be forwarded to the call to the lab device by basil or additionally
-            'binary_enabled' in the case that the special binary readout mode should be used.
+         'binary_enabled' in the case that the special binary readout mode should be used.
         :return: array of the measured currents in A; If the SMU is not active only NaN will be returned within the
-            array.
+         array.
         """
         if not self.has_configured_smu(smu):
             logger.debug(SMU_DISABLED_CURRENT_MSG, smu)
@@ -1234,12 +1233,12 @@ class Pixcap65(Dut):
         This is the slow implementation for this purpose consisting of single measurement calls to the SMU.
 
         :param n: number of measurements to be performed or None when the property should be used to determine the
-            number of measurements to perform.
+         number of measurements to perform.
         :param smu: smu dut key of the SMU to configure.
         :param kwargs: further keyword arguments to be forwarded to the call to the lab device by basil or additionally
-            'binary_enabled' in the case that the special binary readout mode should be used.
+         'binary_enabled' in the case that the special binary readout mode should be used.
         :return: array of the measured voltages in V; If the SMU is not active only NaN will be returned within the
-            array.
+         array.
         """
         if not self.has_configured_smu(smu):
             logger.debug(SMU_DISABLED_MSG, smu)
@@ -1360,7 +1359,7 @@ class Pixcap65(Dut):
         :param plc: number of power supply cycles to be averaged over when measuring
         :param src_u: sourcing voltage for the SMU
         :param voltage_range: voltage sourcing range to be selected for the SMU. Possible values may depend on the
-            SMU in use.
+         SMU in use.
         :param kwargs: further keyword arguments to be forwarded to the call of the lab device by basil
         :keyword smu: smu dut key of the SMU to configure
         """
@@ -1477,7 +1476,7 @@ class Pixcap65(Dut):
         The call to the SMU is only performed when the SMU is connected and active.
 
         :param n: number of measurements to be performed or None when the property should be used to determine the
-            number of measurements to perform
+        number of measurements to perform
         :return: (average current reading, uncertainty of the current reading) in A
         """
         return self.smu_averaged_current(n, self.__primary_smu_key, kwargs=self.smu_kwargs)
@@ -1496,7 +1495,7 @@ class Pixcap65(Dut):
         The call to the SMU is only performed when the SMU is connected and active.
 
         :param n: number of measurements to be performed or None when the property should be used to determine the
-            number of measurements to perform.
+        number of measurements to perform.
         :return: (average voltage reading, uncertainty of the voltage reading) in V
         """
         return self.smu_averaged_voltage(n, self.__primary_smu_key, kwargs=self.smu_kwargs)
@@ -1518,9 +1517,9 @@ class Pixcap65(Dut):
         This is the slow implementation for this purpose consisting on single measurement calls to the SMU.
 
         :param n: number of measurements to be performed or None when the property should be used to determine the
-            number of measurements to perform.
+         number of measurements to perform.
         :return: array of the measured currents in A; If the SMU is not active only NaN will be returned within the
-            array.
+         array.
         """
         return self.general_smu_current_multiple(self.__primary_smu_key, n, kwargs=self.smu_kwargs)
 
@@ -1541,9 +1540,9 @@ class Pixcap65(Dut):
         This is the slow implementation for this purpose consisting of single measurement calls to the SMU.
 
         :param n: number of measurements to be performed or None when the property should be used to determine the
-            number of measurements to perform.
+         number of measurements to perform.
         :return: array of the measured voltages in V; If the SMU is not active only NaN will be returned within the
-            array.
+         array.
         """
         return self.general_smu_voltage_multiple(self.__primary_smu_key, n, kwargs=self.smu_kwargs)
 
@@ -1564,9 +1563,9 @@ class Pixcap65(Dut):
         This is the fast implementation for this purpose using directly dedicated functions of the SMU.
 
         :param n: number of measurements to be performed or None when the property should be used to determine the
-            number of measurements to perform
+         number of measurements to perform
         :return: array of the measured currents in A; If the SMU is not active only NaN will be returned within the
-            array.
+         array.
         """
         keyword_arguments = self.smu_kwargs.copy()
         keyword_arguments['binary_enabled'] = self.binary_active
@@ -1587,9 +1586,9 @@ class Pixcap65(Dut):
         This is the fast implementation for this purpose using directly dedicated functions of the SMU.
 
         :param n: number of measurements to be performed or None when the property should be used to determine the
-            number of measurements to perform.
+         number of measurements to perform.
         :return: array of the measured voltages in V; If the SMU is not active only NaN will be returned within the
-            array.
+         array.
         """
         kargs = self.smu_kwargs.copy()
         kargs['binary_enabled'] = self.binary_active
@@ -1614,7 +1613,7 @@ class Pixcap65(Dut):
 
         This is the fast implementation for this purpose using directly dedicated functions of the SMU.
         :param n: number of measurements to be performed or None when the property should be used to determine the
-            number of measurements to perform.
+         number of measurements to perform.
         :param kwargs: further keyword arguments to be forwarded to the call to the lab device by basil.
         """
         self.smu_initiate_multiple_current(n, self.primary_smu_key, kwargs=kwargs)
@@ -1636,7 +1635,7 @@ class Pixcap65(Dut):
 
         This is the fast implementation for this purpose using directly dedicated functions of the SMU.
         :param n: umber of measurements to be performed or None when the property should be used to determine the
-            number of measurements to perform.
+         number of measurements to perform.
         :param kwargs: further keyword arguments to be forwarded to the call to the lab device by basil.
         """
         self.smu_initiate_multiple_voltage(n, self.primary_smu_key, kwargs)
@@ -1658,10 +1657,10 @@ class Pixcap65(Dut):
 
         This is the fast implementation for this purpose using directly dedicated functions of the SMU.
         :param n: number of measurements performed or None when the property should be used to determine the
-            number of measurements to perform.
+         number of measurements to perform.
         :param kwargs: further keyword arguments to be forwarded to the call to the lab device by basil.
         :return: array of the measured currents in A; If the SMU is not active only NaN will be returned within the
-            array.
+         array.
         """
         return self.smu_read_multiple_current(n, self.primary_smu_key, kwargs=kwargs)
 
@@ -1682,10 +1681,10 @@ class Pixcap65(Dut):
 
         This is the fast implementation for this purpose using directly dedicated functions of the SMU.
         :param n: umber of measurements to be performed or None when the property should be used to determine the
-            number of measurements to perform.
+         number of measurements to perform.
         :param kwargs: further keyword arguments to be forwarded to the call to the lab device by basil.
         :return: array of the measured voltages in V; If the SMU is not active only NaN will be returned within the
-            array.
+         array.
         """
         return self.smu_read_multiple_voltage(n, self.primary_smu_key, kwargs)
 
@@ -1847,7 +1846,7 @@ class Pixcap65(Dut):
         The call to the SMU is only performed when the SMU is connected and active.
 
         :param n: number of measurements to be performed or None when the property should be used to determine the
-            number of measurements to perform
+         number of measurements to perform
         :return: (average current reading, uncertainty of the current reading) in A
         """
         if self.has_bias_suppy:
@@ -1869,7 +1868,7 @@ class Pixcap65(Dut):
         The call to the SMU is only performed when the SMU is connected and active.
 
         :param n: number of measurements to be performed or None when the property should be used to determine the
-            number of measurements to perform.
+         number of measurements to perform.
         :return: (average voltage reading, uncertainty of the voltage reading) in V
         """
         if self.has_bias_suppy:
@@ -1895,9 +1894,9 @@ class Pixcap65(Dut):
         This is the slow implementation for this purpose consisting on single measurement calls to the SMU.
 
         :param n: number of measurements to be performed or None when the property should be used to determine the
-            number of measurements to perform.
+         number of measurements to perform.
         :return: array of the measured currents in A; If the SMU is not active only NaN will be returned within the
-            array.
+         array.
         """
         if self.has_bias_suppy:
             return self.general_smu_current_multiple(self.__bias_smu_key, n, kwargs=self.smu_bias_kwargs)
@@ -1921,9 +1920,9 @@ class Pixcap65(Dut):
         This is the slow implementation for this purpose consisting of single measurement calls to the SMU.
 
         :param n: number of measurements to be performed or None when the property should be used to determine the
-            number of measurements to perform.
+         number of measurements to perform.
         :return: array of the measured voltages in V; If the SMU is not active only NaN will be returned within the
-            array.
+         array.
         """
         if self.has_bias_suppy:
             return self.general_smu_voltage_multiple(self.__bias_smu_key, n, kwargs=self.smu_bias_kwargs)
@@ -1948,9 +1947,9 @@ class Pixcap65(Dut):
         This is the fast implementation for this purpose using directly dedicated functions of the SMU.
 
         :param n: number of measurements to be performed or None when the property should be used to determine the
-            number of measurements to perform
+         number of measurements to perform
         :return: array of the measured currents in A; If the SMU is not active only NaN will be returned within the
-            array.
+         array.
         """
         if self.has_bias_suppy:
             results = self.smu_advanced_current_multiple(n, self.__bias_smu_key, kwargs=self.smu_bias_kwargs)
@@ -1979,9 +1978,9 @@ class Pixcap65(Dut):
         This is the fast implementation for this purpose using directly dedicated functions of the SMU.
 
         :param n: number of measurements to be performed or None when the property should be used to determine the
-            number of measurements to perform.
+         number of measurements to perform.
         :return: array of the measured voltages in V; If the SMU is not active only NaN will be returned within the
-            array.
+         array.
         """
         if self.has_bias_suppy:
             return self.smu_advanced_voltage_multiple(n, self.__bias_smu_key, kwargs=self.smu_bias_kwargs)
@@ -1993,7 +1992,8 @@ class Pixcap65(Dut):
         """
         bias_initiate_multiple_current
 
-        @author: Dominik Fischer
+        :author: Dominik Fischer
+
         last update: 2026-08-25
 
         Performs a current measurement by reading multiple current values from the HV SMU.
@@ -2007,7 +2007,7 @@ class Pixcap65(Dut):
 
         This is the fast implementation for this purpose using directly dedicated functions of the SMU.
         :param n: number of measurements to be performed or None when the property should be used to determine the
-            number of measurements to perform.
+         number of measurements to perform.
         :param kwargs: further keyword arguments to be forwarded to the call to the lab device by basil.
         """
         self.smu_initiate_multiple_current(n, self.bias_smu_key, kwargs=kwargs)
@@ -2017,6 +2017,7 @@ class Pixcap65(Dut):
         bias_initiate_multiple_voltage
 
         @author: Dominik Fischer
+
         last update: 2026-08-25
 
         Performs a voltage measurement by reading multiple voltage values from the HV SMU.
@@ -2029,7 +2030,7 @@ class Pixcap65(Dut):
 
         This is the fast implementation for this purpose using directly dedicated functions of the SMU.
         :param n: umber of measurements to be performed or None when the property should be used to determine the
-            number of measurements to perform.
+         number of measurements to perform.
         :param kwargs: further keyword arguments to be forwarded to the call to the lab device by basil.
         """
         self.smu_initiate_multiple_voltage(n, self.bias_smu_key, kwargs=kwargs)
@@ -2051,10 +2052,10 @@ class Pixcap65(Dut):
 
         This is the fast implementation for this purpose using directly dedicated functions of the SMU.
         :param n: number of measurements performed or None when the property should be used to determine the
-            number of measurements to perform.
+         number of measurements to perform.
         :param kwargs: further keyword arguments to be forwarded to the call to the lab device by basil.
         :return: array of the measured currents in A; If the SMU is not active only NaN will be returned within the
-            array.
+         array.
         """
         return self.smu_read_multiple_current(n, self.bias_smu_key, kwargs=kwargs)
 
@@ -2075,10 +2076,10 @@ class Pixcap65(Dut):
 
         This is the fast implementation for this purpose using directly dedicated functions of the SMU.
         :param n: umber of measurements to be performed or None when the property should be used to determine the
-            number of measurements to perform.
+         number of measurements to perform.
         :param kwargs: further keyword arguments to be forwarded to the call to the lab device by basil.
         :return: array of the measured voltages in V; If the SMU is not active only NaN will be returned within the
-            array.
+         array.
         """
         return self.smu_read_multiple_voltage(n, self.bias_smu_key, kwargs=kwargs)
 
@@ -2222,7 +2223,7 @@ class Pixcap65(Dut):
         The call to the SMU is only performed when the SMU is connected and active.
 
         :param n: number of measurements to be performed or None when the property should be used to determine the
-            number of measurements to perform
+         number of measurements to perform
         :return: (average current reading, uncertainty of the current reading) in A
         """
         return self.smu_averaged_current(n, self.__vm1_smu_key, kwargs=self.smu_vm1_kwargs)
@@ -2240,7 +2241,7 @@ class Pixcap65(Dut):
         The call to the SMU is only performed when the SMU is connected and active.
 
         :param n: number of measurements to be performed or None when the property should be used to determine the
-            number of measurements to perform.
+         number of measurements to perform.
         :return: (average voltage reading, uncertainty of the voltage reading) in V
         """
         return self.smu_averaged_voltage(n, self.__vm1_smu_key, kwargs=self.smu_vm1_kwargs)
@@ -2262,9 +2263,9 @@ class Pixcap65(Dut):
         This is the slow implementation for this purpose consisting on single measurement calls to the SMU.
 
         :param n: number of measurements to be performed or None when the property should be used to determine the
-            number of measurements to perform.
+         number of measurements to perform.
         :return: array of the measured currents in A; If the SMU is not active only NaN will be returned within the
-            array.
+         array.
         """
         return self.general_smu_current_multiple(self.__vm1_smu_key, n, kwargs=self.smu_vm1_kwargs)
 
@@ -2286,9 +2287,9 @@ class Pixcap65(Dut):
         This is the slow implementation for this purpose consisting of single measurement calls to the SMU.
 
         :param n: number of measurements to be performed or None when the property should be used to determine the
-            number of measurements to perform.
+         number of measurements to perform.
         :return: array of the measured voltages in V; If the SMU is not active only NaN will be returned within the
-            array.
+         array.
         """
         return self.general_smu_voltage_multiple(self.__vm1_smu_key, n, kwargs=self.smu_vm1_kwargs)
 
@@ -2309,9 +2310,9 @@ class Pixcap65(Dut):
         This is the fast implementation for this purpose using directly dedicated functions of the SMU.
 
         :param n: number of measurements to be performed or None when the property should be used to determine the
-            number of measurements to perform.
+         number of measurements to perform.
         :return: array of the measured currents in A; If the SMU is not active only NaN will be returned within the
-            array.
+         array.
         """
         return self.smu_advanced_current_multiple(n, self.__vm1_smu_key, kwargs=self.smu_vm1_kwargs)
 
@@ -2332,9 +2333,9 @@ class Pixcap65(Dut):
         This is the fast implementation for this purpose using directly dedicated functions of the SMU.
 
         :param n: number of measurements to be performed or None when the property should be used to determine the
-            number of measurements to perform.
+         number of measurements to perform.
         :return: array of the measured voltages in V; If the SMU is not active only NaN will be returned within the
-            array.
+         array.
         """
         return self.smu_advanced_voltage_multiple(n, self.__vm1_smu_key, kwargs=self.smu_vm1_kwargs)
 
@@ -2356,7 +2357,7 @@ class Pixcap65(Dut):
 
         This is the fast implementation for this purpose using directly dedicated functions of the SMU.
         :param n: number of measurements to be performed or None when the property should be used to determine the
-            number of measurements to perform.
+         number of measurements to perform.
         :param kwargs: further keyword arguments to be forwarded to the call to the lab device by basil.
         """
         self.smu_initiate_multiple_current(n, self.vm1_smu_key, kwargs=kwargs)
@@ -2378,7 +2379,7 @@ class Pixcap65(Dut):
 
         This is the fast implementation for this purpose using directly dedicated functions of the SMU.
         :param n: umber of measurements to be performed or None when the property should be used to determine the
-            number of measurements to perform.
+         number of measurements to perform.
         :param kwargs: further keyword arguments to be forwarded to the call to the lab device by basil.
         """
         self.smu_initiate_multiple_voltage(n, self.vm1_smu_key, kwargs=kwargs)
@@ -2400,10 +2401,10 @@ class Pixcap65(Dut):
 
         This is the fast implementation for this purpose using directly dedicated functions of the SMU.
         :param n: number of measurements performed or None when the property should be used to determine the
-            number of measurements to perform.
+         number of measurements to perform.
         :param kwargs: further keyword arguments to be forwarded to the call to the lab device by basil.
         :return: array of the measured currents in A; If the SMU is not active only NaN will be returned within the
-            array.
+         array.
         """
         return self.smu_read_multiple_current(n, self.vm1_smu_key, kwargs=kwargs)
 
@@ -2424,10 +2425,10 @@ class Pixcap65(Dut):
 
         This is the fast implementation for this purpose using directly dedicated functions of the SMU.
         :param n: umber of measurements to be performed or None when the property should be used to determine the
-            number of measurements to perform.
+         number of measurements to perform.
         :param kwargs: further keyword arguments to be forwarded to the call to the lab device by basil.
         :return: array of the measured voltages in V; If the SMU is not active only NaN will be returned within the
-            array.
+         array.
         """
         return self.smu_read_multiple_voltage(n, self.vm1_smu_key, kwargs=kwargs)
 
@@ -2573,7 +2574,7 @@ class Pixcap65(Dut):
         The call to the SMU is only performed when the SMU is connected and active.
 
         :param n: number of measurements to be performed or None when the property should be used to determine the
-            number of measurements to perform
+         number of measurements to perform
         :return: (average current reading, uncertainty of the current reading) in A
         """
         return self.smu_averaged_current(n, self.__vm2_smu_key, kwargs=self.smu_vm2_kwargs)
@@ -2591,7 +2592,7 @@ class Pixcap65(Dut):
         The call to the SMU is only performed when the SMU is connected and active.
 
         :param n: number of measurements to be performed or None when the property should be used to determine the
-            number of measurements to perform.
+         number of measurements to perform.
         :return: (average voltage reading, uncertainty of the voltage reading) in V
         """
         return self.smu_averaged_voltage(n, self.__vm2_smu_key, kwargs=self.smu_vm2_kwargs)
@@ -2613,9 +2614,9 @@ class Pixcap65(Dut):
         This is the slow implementation for this purpose consisting on single measurement calls to the SMU.
 
         :param n: number of measurements to be performed or None when the property should be used to determine the
-            number of measurements to perform.
+         number of measurements to perform.
         :return: array of the measured currents in A; If the SMU is not active only NaN will be returned within the
-            array.
+         array.
         """
         return self.general_smu_current_multiple(self.__vm2_smu_key, n, kwargs=self.smu_vm2_kwargs)
 
@@ -2636,9 +2637,9 @@ class Pixcap65(Dut):
         This is the slow implementation for this purpose consisting of single measurement calls to the SMU.
 
         :param n: number of measurements to be performed or None when the property should be used to determine the
-            number of measurements to perform.
+         number of measurements to perform.
         :return: array of the measured voltages in V; If the SMU is not active only NaN will be returned within the
-            array.
+         array.
         """
         return self.general_smu_voltage_multiple(self.__vm2_smu_key, n, kwargs=self.smu_vm2_kwargs)
 
@@ -2659,9 +2660,9 @@ class Pixcap65(Dut):
         This is the fast implementation for this purpose using directly dedicated functions of the SMU.
 
         :param n: number of measurements to be performed or None when the property should be used to determine the
-            number of measurements to perform.
+         number of measurements to perform.
         :return: array of the measured currents in A; If the SMU is not active only NaN will be returned within the
-            array.
+         array.
         """
         return self.smu_advanced_current_multiple(n, self.__vm2_smu_key, kwargs=self.smu_vm2_kwargs)
 
@@ -2682,9 +2683,9 @@ class Pixcap65(Dut):
         This is the fast implementation for this purpose using directly dedicated functions of the SMU.
 
         :param n: number of measurements to be performed or None when the property should be used to determine the
-            number of measurements to perform.
+         number of measurements to perform.
         :return: array of the measured voltages in V; If the SMU is not active only NaN will be returned within the
-            array.
+         array.
         """
         return self.smu_advanced_voltage_multiple(n, self.__vm2_smu_key, kwargs=self.smu_vm2_kwargs)
 
@@ -2706,7 +2707,7 @@ class Pixcap65(Dut):
 
         This is the fast implementation for this purpose using directly dedicated functions of the SMU.
         :param n: number of measurements to be performed or None when the property should be used to determine the
-            number of measurements to perform.
+         number of measurements to perform.
         :param kwargs: further keyword arguments to be forwarded to the call to the lab device by basil.
         """
         self.smu_initiate_multiple_current(n, self.vm2_smu_key, kwargs=kwargs)
@@ -2728,7 +2729,7 @@ class Pixcap65(Dut):
 
         This is the fast implementation for this purpose using directly dedicated functions of the SMU.
         :param n: umber of measurements to be performed or None when the property should be used to determine the
-            number of measurements to perform.
+         number of measurements to perform.
         :param kwargs: further keyword arguments to be forwarded to the call to the lab device by basil.
         """
         self.smu_initiate_multiple_voltage(n, self.vm2_smu_key, kwargs=kwargs)
@@ -2750,10 +2751,10 @@ class Pixcap65(Dut):
 
         This is the fast implementation for this purpose using directly dedicated functions of the SMU.
         :param n: number of measurements performed or None when the property should be used to determine the
-            number of measurements to perform.
+         number of measurements to perform.
         :param kwargs: further keyword arguments to be forwarded to the call to the lab device by basil.
         :return: array of the measured currents in A; If the SMU is not active only NaN will be returned within the
-            array.
+         array.
         """
         return self.smu_read_multiple_current(n, self.vm2_smu_key, kwargs=kwargs)
 
@@ -2774,10 +2775,10 @@ class Pixcap65(Dut):
 
         This is the fast implementation for this purpose using directly dedicated functions of the SMU.
         :param n: umber of measurements to be performed or None when the property should be used to determine the
-            number of measurements to perform.
+         number of measurements to perform.
         :param kwargs: further keyword arguments to be forwarded to the call to the lab device by basil.
         :return: array of the measured voltages in V; If the SMU is not active only NaN will be returned within the
-            array.
+         array.
         """
         return self.smu_read_multiple_voltage(n, self.vm2_smu_key, kwargs=kwargs)
     # endregion
@@ -2924,7 +2925,7 @@ class Pixcap65(Dut):
         The call to the SMU is only performed when the SMU is connected and active.
 
         :param n: number of measurements to be performed or None when the property should be used to determine the
-            number of measurements to perform
+         number of measurements to perform
         :return: (average current reading, uncertainty of the current reading) in A
         """
         return self.smu_averaged_current(n, self.__vm3_smu_key, kwargs=self.smu_vm3_kwargs)
@@ -2942,7 +2943,7 @@ class Pixcap65(Dut):
         The call to the SMU is only performed when the SMU is connected and active.
 
         :param n: number of measurements to be performed or None when the property should be used to determine the
-            number of measurements to perform.
+         number of measurements to perform.
         :return: (average voltage reading, uncertainty of the voltage reading) in V
         """
         return self.smu_averaged_voltage(n, self.__vm3_smu_key, kwargs=self.smu_vm3_kwargs)
@@ -2964,9 +2965,9 @@ class Pixcap65(Dut):
         This is the slow implementation for this purpose consisting on single measurement calls to the SMU.
 
         :param n: number of measurements to be performed or None when the property should be used to determine the
-            number of measurements to perform.
+         number of measurements to perform.
         :return: array of the measured currents in A; If the SMU is not active only NaN will be returned within the
-            array.
+         array.
         """
         return self.general_smu_current_multiple(self.__vm3_smu_key, n, kwargs=self.smu_vm3_kwargs)
 
@@ -2987,9 +2988,9 @@ class Pixcap65(Dut):
         This is the slow implementation for this purpose consisting of single measurement calls to the SMU.
 
         :param n: number of measurements to be performed or None when the property should be used to determine the
-            number of measurements to perform.
+         number of measurements to perform.
         :return: array of the measured voltages in V; If the SMU is not active only NaN will be returned within the
-            array.
+         array.
         """
         return self.general_smu_voltage_multiple(self.__vm3_smu_key, n, kwargs=self.smu_vm3_kwargs)
 
@@ -3010,9 +3011,9 @@ class Pixcap65(Dut):
         This is the fast implementation for this purpose using directly dedicated functions of the SMU.
 
         :param n: number of measurements to be performed or None when the property should be used to determine the
-            number of measurements to perform.
+         number of measurements to perform.
         :return: array of the measured currents in A; If the SMU is not active only NaN will be returned within the
-            array.
+         array.
         """
         return self.smu_advanced_current_multiple(n, self.__vm3_smu_key, kwargs=self.smu_vm3_kwargs)
 
@@ -3033,9 +3034,9 @@ class Pixcap65(Dut):
         This is the fast implementation for this purpose using directly dedicated functions of the SMU.
 
         :param n: number of measurements to be performed or None when the property should be used to determine the
-            number of measurements to perform.
+         number of measurements to perform.
         :return: array of the measured voltages in V; If the SMU is not active only NaN will be returned within the
-            array.
+         array.
         """
         return self.smu_advanced_voltage_multiple(n, self.__vm3_smu_key, kwargs=self.smu_vm3_kwargs)
 
@@ -3057,7 +3058,7 @@ class Pixcap65(Dut):
 
         This is the fast implementation for this purpose using directly dedicated functions of the SMU.
         :param n: number of measurements to be performed or None when the property should be used to determine the
-            number of measurements to perform.
+         number of measurements to perform.
         :param kwargs: further keyword arguments to be forwarded to the call to the lab device by basil.
         """
         self.smu_initiate_multiple_current(n, self.vm3_smu_key, kwargs=kwargs)
@@ -3079,7 +3080,7 @@ class Pixcap65(Dut):
 
         This is the fast implementation for this purpose using directly dedicated functions of the SMU.
         :param n: umber of measurements to be performed or None when the property should be used to determine the
-            number of measurements to perform.
+         number of measurements to perform.
         :param kwargs: further keyword arguments to be forwarded to the call to the lab device by basil.
         """
         self.smu_initiate_multiple_voltage(n, self.vm3_smu_key, kwargs=kwargs)
@@ -3101,10 +3102,10 @@ class Pixcap65(Dut):
 
         This is the fast implementation for this purpose using directly dedicated functions of the SMU.
         :param n: number of measurements performed or None when the property should be used to determine the
-            number of measurements to perform.
+         number of measurements to perform.
         :param kwargs: further keyword arguments to be forwarded to the call to the lab device by basil.
         :return: array of the measured currents in A; If the SMU is not active only NaN will be returned within the
-            array.
+         array.
         """
         return self.smu_read_multiple_current(n, self.vm3_smu_key, kwargs=kwargs)
 
@@ -3125,10 +3126,10 @@ class Pixcap65(Dut):
 
         This is the fast implementation for this purpose using directly dedicated functions of the SMU.
         :param n: umber of measurements to be performed or None when the property should be used to determine the
-            number of measurements to perform.
+         number of measurements to perform.
         :param kwargs: further keyword arguments to be forwarded to the call to the lab device by basil.
         :return: array of the measured voltages in V; If the SMU is not active only NaN will be returned within the
-            array.
+         array.
         """
         return self.smu_read_multiple_voltage(n, self.vm3_smu_key, kwargs=kwargs)
     # endregion

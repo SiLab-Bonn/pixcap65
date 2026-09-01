@@ -48,7 +48,7 @@ from typing import Tuple, Union, Optional, List
 from capacitance_models import linear_model, reciprocal_model, extended_cap_model_5, inverted_reciprocal_model
 from examples.plot_dependencies import read_rec_array_sorted, read_rec_array_sorted_where, chi2
 from general_model import exponential_model
-from pixcap65.plotting_util import GENERATE_THESIS_PLOTS
+from pixcap65.plotting_util.constants import GENERATE_THESIS_PLOTS
 from pixcap65.utility.homogenize_plots import set_params, get_error_cycler
 
 
@@ -917,7 +917,7 @@ if __name__ == "__main__":
 
         cap_parameter_values = nw_m_s.values.to_dict().values()
 
-        # FIXME: bootstrapiing ignores the error on the parameters!
+        # FIXME: bootstraping ignores the error on the parameters!
         def perform_bootstrap(rng, idx, data: np.recarray, init):
             guess = newton(root_model, init, args=[
                 data.biased_capacitance.magnitude[idx],

@@ -476,7 +476,7 @@ def full_regenerate_bias_table(group: tb.Group, **kwargs):
 
     :param group: full hdf group which contains the measurement data.
     :type group: :py:class:`pytables.Group`
-    :key transform_api: specifies whether the transformation/conversion to the new api should be done.
+    :keyword transform_api: specifies whether the transformation/conversion to the new api should be done.
     """
     out_file = group_get_file(group)
     if "BiasTable" in group:
@@ -588,7 +588,7 @@ def generate_bias_table(group, **kwargs):
 
     :param group: full hdf group which contains the measurement data.
     :type group: :py:class:`pytables.Group`
-    :key transform_api: specifies whether the transformation/conversion to the new api should be done.
+    :keyword transform_api: specifies whether the transformation/conversion to the new api should be done.
     """
     file = group_get_file(group)
     if "BiasTable" in group:

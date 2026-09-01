@@ -518,8 +518,8 @@ def get_analysis_group(base_group, **kwargs):
     Distinguish between analysis and corrected analysis groups and provides the correct one.
 
     :param base_group: hdf files group where to look for the analysis groups.
-    :key use_corrected: boolean, whether to use the corrected capacitance's for plotting.
-    :key apply_correction: boolean, whether to use the corrected capacitance's for plotting/extraction.
+    :keyword use_corrected: boolean, whether to use the corrected capacitance's for plotting.
+    :keyword apply_correction: boolean, whether to use the corrected capacitance's for plotting/extraction.
     :return: analysis group from the hdf file.
     """
     if kwargs.get('use_corrected', False) or kwargs.get('apply_correction', False):

@@ -41,12 +41,12 @@ def plot_data(interpreted_data, base_path=None, suffix="general_data", use_group
     :param base_path: path to the base group in the hdf files hierarchy.
     :param suffix: additional suffix to use for naming the PDF containing the plots.
     :param use_group: boolean, whether to append the group name of the measurements to the PDF name.
-    :key use_corrected: boolean, False, indicating whether to use the corrected capacitance for plotting.
-    :key exclude_test_cap: boolean, whether to exclude the test capacitator row from the histograms.
-    :key hist_bins: integer, number of bins to use for the histogram.
-    :key mask_pixel: iterable of pixel positions on the grid to ignore for evaluations.
-    :key extract_pixel: iterable of pixel positions on the grid to extract the figures from.
-    :key distribution: boolean, indicating whether to investigate the capacitance distribution over the whole sensor.
+    :keyword use_corrected: boolean, False, indicating whether to use the corrected capacitance for plotting.
+    :keyword exclude_test_cap: boolean, whether to exclude the test capacitator row from the histograms.
+    :keyword hist_bins: integer, number of bins to use for the histogram.
+    :keyword mask_pixel: iterable of pixel positions on the grid to ignore for evaluations.
+    :keyword extract_pixel: iterable of pixel positions on the grid to extract the figures from.
+    :keyword distribution: boolean, indicating whether to investigate the capacitance distribution over the whole sensor.
     """
     with lock:
         thread = threading.Thread(target=plotting_util.plot_data, args=(interpreted_data, base_path, suffix, use_group), kwargs=kwargs)
@@ -81,10 +81,10 @@ def plot_inter_pix_data(interpreted_data, base_path=None, suffix="general_inter_
     :param use_group: boolean, whether to append the group name of the measurements to the PDF name.
     :param total_data: path to the hdf file which holds the analyzed data for the total capacitance scan.
     :param total_path: hdf group path inside the hdf file containing the total cap analysis results.
-    :key exclude_test_cap: boolean, whether to exclude the test capacitator row from the histograms.
-    :key hist_bins: integer, number of bins to use for the histogram.
-    :key mask_pixel: iterable of pixel positions on the grid to ignore for evaluations.
-    :key extract_pixel: iterable of pixel positions on the grid to extract the figures from.
+    :keyword exclude_test_cap: boolean, whether to exclude the test capacitator row from the histograms.
+    :keyword hist_bins: integer, number of bins to use for the histogram.
+    :keyword mask_pixel: iterable of pixel positions on the grid to ignore for evaluations.
+    :keyword extract_pixel: iterable of pixel positions on the grid to extract the figures from.
     """
     with lock:
         if total_path is not None:
@@ -131,8 +131,8 @@ def plot_cv_data(interpreted_data, base_path=None, suffix="C_V_characteristic", 
     :param base_path: path to the base group in the hdf files hierarchy.
     :param suffix:  additional suffix to use for naming the PDF containing the plots.
     :param use_group:   boolean, whether to append the group name of the measurements to the PDF name.
-    :key verbose: boolean, indicating whether to use verbose output for depletion voltages
-    :key distribution: boolean, indicating whether also the capacitance distribution of the whole sensor
+    :keyword verbose: boolean, indicating whether to use verbose output for depletion voltages
+    :keyword distribution: boolean, indicating whether also the capacitance distribution of the whole sensor
         should be investigated.
     """
     with lock:
@@ -159,9 +159,9 @@ def plot_combined_data(interpreted_data, base_path=None, suffix="combined_bias_c
     :param base_path: path to the base group in the hdf files hierarchy.
     :param suffix: additional suffix to use for naming the PDF containing the plots.
     :param use_group: boolean, whether to append the group name of the measurements to the PDF name.
-    :key use_corrected: boolean, whether to use corrected data
-    :key verbose: boolean, indicating whether to use verbose output for depletion voltages
-    :key distribution: boolean, indicating whether also the capacitance distribution of the whole sensor
+    :keyword use_corrected: boolean, whether to use corrected data
+    :keyword verbose: boolean, indicating whether to use verbose output for depletion voltages
+    :keyword distribution: boolean, indicating whether also the capacitance distribution of the whole sensor
         should be investigated.
     """
     with lock:

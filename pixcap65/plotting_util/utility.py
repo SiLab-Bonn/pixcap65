@@ -54,12 +54,12 @@ def evaluate_pixel_mask(hist, perform_filter=False, **kwargs):
         returned. (default: False)
     :type perform_filter: bool
     :param kwargs: further keyword arguments
-    :key test_cap_exclusion: whether to exclude row 0 completely. (default: False)
+    :keyword test_cap_exclusion: whether to exclude row 0 completely. (default: False)
     :type test_cap_exclusion: bool
-    :key mask_pixel: array of tuple of pixel positions to be masked.
-    :key mask_lower: float, threshold to mask all pixels below this value.
+    :keyword mask_pixel: array of tuple of pixel positions to be masked.
+    :keyword mask_lower: float, threshold to mask all pixels below this value.
     :type mask_lower: float
-    :key mask_upper: float, threshold to mask all pixels above this value.
+    :keyword mask_upper: float, threshold to mask all pixels above this value.
     :type mask_upper: float
     :return: masked histogram/data set (masked pixels values are replaced by np.nan). If `perform_filter` is True,
         he mask is already applied and the masked values are no longer included.
@@ -288,8 +288,8 @@ def multi_sensor_file_handler_simple(interpreted_data, base_path, **kwargs):
 
     :param interpreted_data: paths to the files containing the data to plot. (Iterable)
     :param base_path: hdf files hierarchy groups paths (Iterable)
-    :key pdf_name: file name for the output pdf file.
-    :key lock: synchronization object to prevent multiple overlapping accesses to the pytables api and simultaneously
+    :keyword pdf_name: file name for the output pdf file.
+    :keyword lock: synchronization object to prevent multiple overlapping accesses to the pytables api and simultaneously
         write/read operations on the same file.
     """
     pdf_name = kwargs.pop("pdf_name", "I-V-Collection.pdf")
@@ -340,8 +340,8 @@ def multi_sensor_file_handler_advanced(interpreted_data, base_path, **kwargs):
 
     :param interpreted_data: paths to the files containing the data to plot. (Iterable)
     :param base_path: hdf files hierarchy groups paths (Iterable)
-    :key pdf_name: file name for the output pdf file.
-    :key lock: synchronization object to prevent multiple overlapping accesses to the pytables api and simultaneously
+    :keyword pdf_name: file name for the output pdf file.
+    :keyword lock: synchronization object to prevent multiple overlapping accesses to the pytables api and simultaneously
         write/read operations on the same file.
     """
     pdf_name = kwargs.pop("pdf_name", "I-V-Collection.pdf")

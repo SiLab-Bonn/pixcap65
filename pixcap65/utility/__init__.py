@@ -63,8 +63,8 @@ def synchronized_open_file(*args, **kwargs):
 
     :param args: positional arguments to be used for opening a hdf file
     :param kwargs: keyword arguments for some further controlls and to be propagated to open the file.
-    :key lock: synchronization primitve object (or a Proxy to it) (also called a lock) to make sure that there are no data races when accessing pytables.
-    :key max_time: maximum time to wait for acquiring the lock or getting access to the file handle.
+    :keyword lock: synchronization primitve object (or a Proxy to it) (also called a lock) to make sure that there are no data races when accessing pytables.
+    :keyword max_time: maximum time to wait for acquiring the lock or getting access to the file handle.
     :return: yields a handle of hdf file object.
     """
     file_handle = __synchronized_tables_open_file(*args, **kwargs)
@@ -111,8 +111,8 @@ def synchronized_process_open_file(*args, **kwargs):
 
     :param args: positional arguments to be used for opening a hdf file
     :param kwargs: keyword arguments for some further controlls and to be propagated to open the file.
-    :key lock: synchronization primitve object (or a Proxy to it) (also called a lock) to make sure that there are no data races when accessing pytables.
-    :key max_time: maximum time to wait for acquiring the lock or getting access to the file handle.
+    :keyword lock: synchronization primitve object (or a Proxy to it) (also called a lock) to make sure that there are no data races when accessing pytables.
+    :keyword max_time: maximum time to wait for acquiring the lock or getting access to the file handle.
     :return: yields a handle of hdf file object.
     """
     lock = kwargs.pop("lock", get_tables_lock())
@@ -135,8 +135,8 @@ def synchronized_process_open_file(*args, **kwargs) -> File:
     last update: 2026-08-26
     :param args: positional arguments to be used for opening a hdf file
     :param kwargs: keyword arguments for some further controlls and to be propagated to open the file.
-    :key lock: synchronization primitve object (or a Proxy to it) (also called a lock) to make sure that there are no data races when accessing pytables.
-    :key max_time: maximum time to wait for acquiring the lock or getting access to the file handle.
+    :keyword lock: synchronization primitve object (or a Proxy to it) (also called a lock) to make sure that there are no data races when accessing pytables.
+    :keyword max_time: maximum time to wait for acquiring the lock or getting access to the file handle.
     :return: handle of hdf file object.
     """
     kwargs.setdefault("lock", get_tables_lock())

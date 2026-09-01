@@ -26,12 +26,12 @@ async def plot_data(interpreted_data, base_path=None, suffix="general_data", use
     :param base_path: path to the base group in the hdf files hierarchy.
     :param suffix: additional suffix to use for naming the PDF containing the plots.
     :param use_group: boolean, whether to append the group name of the measurements to the PDF name.
-    :key use_corrected: boolean, False, indicating whether to use the corrected capacitance for plotting.
-    :key exclude_test_cap: boolean, whether to exclude the test capacitator row from the histograms.
-    :key hist_bins: integer, number of bins to use for the histogram.
-    :key mask_pixel: iterable of pixel positions on the grid to ignore for evaluations.
-    :key extract_pixel: iterable of pixel positions on the grid to extract the figures from.
-    :key distribution: boolean, indicating whether to investigate the capacitance distribution over the whole sensor.
+    :keyword use_corrected: boolean, False, indicating whether to use the corrected capacitance for plotting.
+    :keyword exclude_test_cap: boolean, whether to exclude the test capacitator row from the histograms.
+    :keyword hist_bins: integer, number of bins to use for the histogram.
+    :keyword mask_pixel: iterable of pixel positions on the grid to ignore for evaluations.
+    :keyword extract_pixel: iterable of pixel positions on the grid to extract the figures from.
+    :keyword distribution: boolean, indicating whether to investigate the capacitance distribution over the whole sensor.
     """
     if kwargs.get("use_corrected", False):
         suffix = "{}_corrected".format(suffix)
