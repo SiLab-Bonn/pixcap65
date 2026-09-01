@@ -28,9 +28,9 @@ from pixcap65.analysis_util import CURRENT_CONVERSION_FACTOR, GENERAL_PIXCAP_SHA
 from pixcap65.analysis_util.modelling.physics_modelling import model_depletion
 from pixcap65.analysis_util.utility import check_leaf_unit, HIST_BIAS_MEAS_UNIT, HIST_CAP_UNIT, TABLES_LEAF_COMPAT_TYPE
 from pixcap65.pixcap.pixcap_structure import CAPACITANCE_CONVERSION_FACTOR, DEFAULT_BIN_NUMBER
-from pixcap65.plotting_util import GENERATE_THESIS_PLOTS, CV_USE_SEPARATE_PAGES, SENSOR_ITERABLE, \
-    global_interactive_lock, CAPACITANCE_LABEL, BIAS_CURVE_Y_LABEL, BIAS_CURVE_X_LABEL
+from pixcap65.plotting_util import global_interactive_lock, CAPACITANCE_LABEL, BIAS_CURVE_Y_LABEL, BIAS_CURVE_X_LABEL
 from pixcap65.plotting_util import logger
+from pixcap65.plotting_util.constants import GENERATE_THESIS_PLOTS, CV_USE_SEPARATE_PAGES, SENSOR_ITERABLE
 from pixcap65.plotting_util.utility import figure_provider
 from pixcap65.utility.homogenize_plots import enhanced_error_bar
 from pixcap65.utility.tables_util import group_get_file
