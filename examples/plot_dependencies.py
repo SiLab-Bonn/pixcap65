@@ -1,4 +1,3 @@
-
 # ----------------------------------------------------------
 #  Copyright (c) 2026. SiLab, Institute of Physics, University of Bonn.
 #
@@ -18,7 +17,6 @@
 import locale
 import numpy as np
 import tables as tb
-
 try:
     # noinspection PyCompatibility
     from collections.abc import Iterable, Mapping, Callable
@@ -35,16 +33,18 @@ from matplotlib.backends.backend_pdf import PdfPages
 from scipy.stats.distributions import chi2 as sample_chi2
 from typing import Optional
 
-from capacitance_models import linear_model, simplified_cap_model, extended_cap_model, extended_cap_model_2, \
+from examples.capacitance_models import simplified_cap_model, extended_cap_model, extended_cap_model_2, \
     extended_cap_model_3, extended_cap_model_4, extended_cap_model_5, extended_cap_model_6, extended_cap_model_7, \
     extended_cap_model_8
-from general_model import exponential_model
-from inter_capacitance_models import inter_cap_model, inter_cap_model_2, inter_cap_model_3, inter_cap_model_4, \
+from examples.general_model import exponential_model, linear_model
+from examples.inter_capacitance_models import inter_cap_model, inter_cap_model_2, inter_cap_model_3, inter_cap_model_4, \
     inter_cap_model_5, inter_cap_model_6, inter_cap_model_7
 from pixcap65.analysis_util.summary import field_names, test_design_values, spatial_identifier
 from pixcap65.pixcap.pixcap_structure import CAPACITANCE_CONVERSION_FACTOR
 from pixcap65.utility.homogenize_plots import set_params
 
+USE_OUTPUT_FITTING = False
+LABEL_HYPOTHESIS_TEST = "Hypothesis test!"
 
 def chi2(x: float, dof: int):
     return sample_chi2.cdf(x, dof)
@@ -242,7 +242,6 @@ def investigate_dependences_graphical(summary_data: np.recarray, property_data: 
     plotter("../Dependencies-log-log.pdf", spatial_mask, interesting_data, summary_data, property_data,
             scalex='log', scaley='log', **keys)
 
-
 def get_test_capacitance_data_correction(group: tb.Group, **kwargs):
     locale.setlocale(locale.LC_NUMERIC, "DE")
     table = read_rec_array(group.TestCapCorrected)
@@ -260,8 +259,6 @@ def get_test_capacitance_data_correction(group: tb.Group, **kwargs):
                 eff_cap = cap * 1e15
                 eff_err = err * 1e15
                 print(k, f"{eff_cap:.3n}+-{eff_err:.3n}")
-
-
 
 def __dependence_fit(spatial_mask, properties: np.recarray, y_data_set: np.recarray, model_name, model: Callable, condition: Optional[Callable]=None, systematic=True, x_log=False, y_log=False):
     if condition is None:
@@ -495,6 +492,7 @@ def handle_model_fit(x_data, y_data, y_errors, model_function, name, *initial_ar
     print(y_data)
     return m.fmin.fval, m.ndof
 
+
 if __name__ == "__main__":
     # we need to acquire all the data from the
     set_params(latex=True,
@@ -502,10 +500,8 @@ if __name__ == "__main__":
                            r"stat,sys}}\sisetup{uncertainty-descriptor-mode=subscript}\sisetup{"
                            r"retain-zero-uncertainty}", fig_height=8.26772, fig_width=11.69291,
                minor=True, fontsize=24, dpi=1200)
-    with tb.open_file('../conclude_summary.h5', mode='r') as h5_conclusion:
+    with tb.open_file('conclude_summary.h5', mode='r') as h5_conclusion:
         summary_data = h5_conclusion.root.GeneralSummaryTable
-        # CHECK: whether 'test_data' is still used! (UNDER INVESTIGATION)
-        # test_data = read_rec_array(h5_conclusion.root.TestCapCorrected)
         sensor_properties = h5_conclusion.root.SensorTypes
         assert isinstance(sensor_properties, tb.Table)
         final_properties = read_rec_array_sorted(sensor_properties, 'sensor')
@@ -543,11 +539,13 @@ if __name__ == "__main__":
             "pixel_separation_y": (linear_model, linear_model),
             "Perimeter": (linear_model, linear_model),
         }
-        # investigate_dependencies_fitting(final_summary, final_properties, model_mapper)
-        # print("Try the log plots")
-        # investigate_dependencies_fitting(final_summary, final_properties, second_model_mapper, y_log=True)
-        # print("Try the log-log plots")
-        # investigate_dependencies_fitting(final_summary, final_properties, third_model_mapper, x_log=True, y_log=True)
+
+        if USE_OUTPUT_FITTING:
+            investigate_dependencies_fitting(final_summary, final_properties, model_mapper)
+            print("Try the log plots")
+            investigate_dependencies_fitting(final_summary, final_properties, second_model_mapper, y_log=True)
+            print("Try the log-log plots")
+            investigate_dependencies_fitting(final_summary, final_properties, third_model_mapper, x_log=True, y_log=True)
 
         # it is also necessary to get a ND-Fit of our model for the capacitance distribution!
         upper_limit = 6
@@ -582,98 +580,98 @@ if __name__ == "__main__":
         full_inter_capacitance_data = full_inter_capacitance_data[full_inter_cap_mask]
         full_inter_capacitance_errors = full_inter_capacitance_errors[full_inter_cap_mask]
 
-        standard_model_dependences = (suited_implant_area, suited_depth, suited_perimeter)
-        simple_model_dependences = (suited_implant_area, suited_depth)
-        extended_model_dependences = (suited_implant_area, suited_depth, suited_perimeter, suited_x_separation,
-                                      suited_y_separation)
-        full_extended_model_dependences = (full_implant_area, full_depth, full_perimeter, full_x_separation,
-                                  full_y_separation)
-        inter_pix_model_dependences = (suited_implant_area[inter_cap_mask], suited_depth[inter_cap_mask],
-                                       suited_perimeter[inter_cap_mask], suited_x_separation[inter_cap_mask],
-                                       suited_y_separation[inter_cap_mask])
-        full_inter_pix_model_dependences = (full_implant_area[full_inter_cap_mask], full_depth[full_inter_cap_mask],
-                                            full_perimeter[full_inter_cap_mask], full_x_separation[full_inter_cap_mask],
-                                            full_y_separation[full_inter_cap_mask])
+        standard_model_dependencies = (suited_implant_area, suited_depth, suited_perimeter)
+        simple_model_dependencies = (suited_implant_area, suited_depth)
+        extended_model_dependencies = (suited_implant_area, suited_depth, suited_perimeter, suited_x_separation,
+                                       suited_y_separation)
+        full_extended_model_dependencies = (full_implant_area, full_depth, full_perimeter, full_x_separation,
+                                            full_y_separation)
+        inter_pix_model_dependencies = (suited_implant_area[inter_cap_mask], suited_depth[inter_cap_mask],
+                                        suited_perimeter[inter_cap_mask], suited_x_separation[inter_cap_mask],
+                                        suited_y_separation[inter_cap_mask])
+        full_inter_pix_model_dependencies = (full_implant_area[full_inter_cap_mask], full_depth[full_inter_cap_mask],
+                                             full_perimeter[full_inter_cap_mask], full_x_separation[full_inter_cap_mask],
+                                             full_y_separation[full_inter_cap_mask])
 
         total_cap_costs = []
         total_cap_dof = []
 
-        cost_0, dof_0 = handle_model_fit(simple_model_dependences, capacitance_data, capacitance_errors,
+        cost_0, dof_0 = handle_model_fit(simple_model_dependencies, capacitance_data, capacitance_errors,
                                          simplified_cap_model, 'simplified', 2, 0.005, 0.16)
 
-        cost_1, dof_1 = handle_model_fit(extended_model_dependences, capacitance_data, capacitance_errors,
+        cost_1, dof_1 = handle_model_fit(extended_model_dependencies, capacitance_data, capacitance_errors,
                                          extended_cap_model, "first_extension",
                                          0.06, 0.11, -0.0017, -0.00029, 1.57e-5, 3.9e-6)
-        print("Hypothesis test!")
+        print(LABEL_HYPOTHESIS_TEST)
         print(cost_0 - cost_1, dof_0 - dof_1)
         print(1 - chi2(cost_0 - cost_1, dof_0 - dof_1))
         total_cap_costs.append(cost_1)
         total_cap_dof.append(dof_1)
 
-        cost_1, dof_1 = handle_model_fit(extended_model_dependences, capacitance_data, capacitance_errors,
+        cost_1, dof_1 = handle_model_fit(extended_model_dependencies, capacitance_data, capacitance_errors,
                                          extended_cap_model_2,
                                          "second_extension", 6.45, 0, 10.87e-3, 0)
-        print("Hypothesis test!")
+        print(LABEL_HYPOTHESIS_TEST)
         print(cost_0 - cost_1, dof_0 - dof_1)
         print(1 - chi2(cost_0 - cost_1, dof_0 - dof_1))
         total_cap_costs.append(cost_1)
         total_cap_dof.append(dof_1)
 
-        cost_1, dof_1 = handle_model_fit(extended_model_dependences, capacitance_data,
+        cost_1, dof_1 = handle_model_fit(extended_model_dependencies, capacitance_data,
                                          capacitance_errors, extended_cap_model_3,
                                          "third_extension", 0.2, 0.065)
 
-        print("Hypothesis test!")
+        print(LABEL_HYPOTHESIS_TEST)
         print(cost_0 - cost_1, dof_0 - dof_1)
         print(1 - chi2(cost_0 - cost_1, dof_0 - dof_1))
         total_cap_costs.append(cost_1)
         total_cap_dof.append(dof_1)
 
-        cost_1, dof_1 = handle_model_fit(extended_model_dependences, capacitance_data,
+        cost_1, dof_1 = handle_model_fit(extended_model_dependencies, capacitance_data,
                                          capacitance_errors, extended_cap_model_4,
                                          "fourth_extension", 0.06, 0.11, -0.0017, -0.00029, 1.57e-5, 3.9e-6)
 
-        print("Hypothesis test!")
+        print(LABEL_HYPOTHESIS_TEST)
         print(cost_0 - cost_1, dof_0 - dof_1)
         print(1 - chi2(cost_0 - cost_1, dof_0 - dof_1))
         total_cap_costs.append(cost_1)
         total_cap_dof.append(dof_1)
 
-        cost_1, dof_1 = handle_model_fit(extended_model_dependences, capacitance_data,
+        cost_1, dof_1 = handle_model_fit(extended_model_dependencies, capacitance_data,
                                          capacitance_errors, extended_cap_model_5,
                                          "fifth_extension", 0.06, 0.11, -0.0017, -0.00029, 1.57e-5, 3.9e-6, 0, 0)
 
-        print("Hypothesis test!")
+        print(LABEL_HYPOTHESIS_TEST)
         print(cost_0 - cost_1, dof_0 - dof_1)
         print(1 - chi2(cost_0 - cost_1, dof_0 - dof_1))
         total_cap_costs.append(cost_1)
         total_cap_dof.append(dof_1)
 
-        cost_1, dof_1 = handle_model_fit(extended_model_dependences, capacitance_data,
+        cost_1, dof_1 = handle_model_fit(extended_model_dependencies, capacitance_data,
                                          capacitance_errors, extended_cap_model_6,
                                          "sixth_extension", 0.06, 0.11, -0.0017, -0.00029, 1.57e-5, 3.9e-6)
 
-        print("Hypothesis test!")
+        print(LABEL_HYPOTHESIS_TEST)
         print(cost_0 - cost_1, dof_0 - dof_1)
         print(1 - chi2(cost_0 - cost_1, dof_0 - dof_1))
         total_cap_costs.append(cost_1)
         total_cap_dof.append(dof_1)
 
-        cost_1, dof_1 = handle_model_fit(extended_model_dependences, capacitance_data,
+        cost_1, dof_1 = handle_model_fit(extended_model_dependencies, capacitance_data,
                                          capacitance_errors, extended_cap_model_7,
                                          "seventh_extension", 0.06, 0.11, -0.0017, -0.00029)
 
-        print("Hypothesis test!")
+        print(LABEL_HYPOTHESIS_TEST)
         print(cost_0 - cost_1, dof_0 - dof_1)
         print(1 - chi2(cost_0 - cost_1, dof_0 - dof_1))
         total_cap_costs.append(cost_1)
         total_cap_dof.append(dof_1)
 
-        cost_1, dof_1 = handle_model_fit(extended_model_dependences, capacitance_data,
+        cost_1, dof_1 = handle_model_fit(extended_model_dependencies, capacitance_data,
                                          capacitance_errors, extended_cap_model_8,
                                          "eigth_extension", 0.06, 0.11, -0.0017, -0.00029, 1.57e-5, 3.9e-6, 0, 0)
 
-        print("Hypothesis test!")
+        print(LABEL_HYPOTHESIS_TEST)
         print(cost_0 - cost_1, dof_0 - dof_1)
         print(1 - chi2(cost_0 - cost_1, dof_0 - dof_1))
         total_cap_costs.append(cost_1)
@@ -711,12 +709,12 @@ if __name__ == "__main__":
         print("INVESTIGATION OF THE INTER-PIXEL-CAPACITANCE")
         inter_cap_costs = []
         inter_cap_dof = []
-        cost_inter_1, inter_dof_1 = handle_model_fit(inter_pix_model_dependences, inter_capacitance_data,
+        cost_inter_1, inter_dof_1 = handle_model_fit(inter_pix_model_dependencies, inter_capacitance_data,
                                                      inter_capacitance_errors, inter_cap_model, "inter-pix", 0.1)
         inter_cap_costs.append(cost_inter_1)
         inter_cap_dof.append(inter_dof_1)
 
-        cost_inter_2, inter_dof_2 = handle_model_fit(inter_pix_model_dependences, inter_capacitance_data,
+        cost_inter_2, inter_dof_2 = handle_model_fit(inter_pix_model_dependencies, inter_capacitance_data,
                                                      inter_capacitance_errors, inter_cap_model_2,
                                                      "inter-pix-second", 0.1, 0.01)
         inter_cap_costs.append(cost_inter_2)
@@ -728,30 +726,30 @@ if __name__ == "__main__":
         effective_inter_cost = cost_inter_1 - cost_inter_2
         print(1 - chi2(effective_inter_cost, 1))
 
-        cost_inter_1, inter_dof_1 = handle_model_fit(inter_pix_model_dependences, inter_capacitance_data,
+        cost_inter_1, inter_dof_1 = handle_model_fit(inter_pix_model_dependencies, inter_capacitance_data,
                                                      inter_capacitance_errors, inter_cap_model_3, "inter-pix third", 0.1)
         inter_cap_costs.append(cost_inter_1)
         inter_cap_dof.append(inter_dof_1)
 
-        cost_inter_1, inter_dof_1 = handle_model_fit(inter_pix_model_dependences, inter_capacitance_data,
+        cost_inter_1, inter_dof_1 = handle_model_fit(inter_pix_model_dependencies, inter_capacitance_data,
                                                      inter_capacitance_errors, inter_cap_model_4, "inter-pix fourth",
-                                                     0.1, 0.06, 0. -0.0018, 0, 0.018e-3)
+                                                     0.1, 0.06, 0. - 0.0018, 0, 0.018e-3)
         inter_cap_costs.append(cost_inter_1)
         inter_cap_dof.append(inter_dof_1)
 
-        cost_inter_1, inter_dof_1 = handle_model_fit(inter_pix_model_dependences, inter_capacitance_data,
+        cost_inter_1, inter_dof_1 = handle_model_fit(inter_pix_model_dependencies, inter_capacitance_data,
                                                      inter_capacitance_errors, inter_cap_model_5, "inter-pix fifth",
                                                      0.1, 0.06, 0. - 0.0018, 0, 0.018e-3)
         inter_cap_costs.append(cost_inter_1)
         inter_cap_dof.append(inter_dof_1)
 
-        cost_inter_1, inter_dof_1 = handle_model_fit(inter_pix_model_dependences, inter_capacitance_data,
+        cost_inter_1, inter_dof_1 = handle_model_fit(inter_pix_model_dependencies, inter_capacitance_data,
                                                      inter_capacitance_errors, inter_cap_model_6, "inter-pix sixth",
                                                      0.1, 0.06, 0. - 0.0018)
         inter_cap_costs.append(cost_inter_1)
         inter_cap_dof.append(inter_dof_1)
 
-        cost_inter_1, inter_dof_1 = handle_model_fit(inter_pix_model_dependences, inter_capacitance_data,
+        cost_inter_1, inter_dof_1 = handle_model_fit(inter_pix_model_dependencies, inter_capacitance_data,
                                                      inter_capacitance_errors, inter_cap_model_7, "inter-pix seventh",
                                                      0.1, 0.06, 0. - 0.0018)
         inter_cap_costs.append(cost_inter_1)

@@ -13,21 +13,19 @@
 #  See the License for the specific language governing permissions and
 #  limitations under the License.
 # ----------------------------------------------------------
-#
-#  Licensed under the Apache License, Version 2.0 (the "License");
-#  you may not use this file except in compliance with the License.
-#  You may obtain a copy of the License at
-#
-#     http://www.apache.org/licenses/LICENSE-2.0
-#
-#  Unless required by applicable law or agreed to in writing, software
-#  distributed under the License is distributed on an "AS IS" BASIS,
-#  WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
-#  See the License for the specific language governing permissions and
-#  limitations under the License.
-# ----------------------------------------------------------
+"""
+Example file used for the investigation of the capacitance measurement results in my bachelor's thesis.
+Here the different dependencies of the capacitance's and the modelling is investigated.
+"""
+
 import numpy as np
 import tables as tb
+
+LABEL_PIXEL_CAPACITANCE = "$C$ / \\unit{{\\femto\\farad}}"
+
+ENHANCED_OR_SENSOR_FILTER = """ | (sensor == {})"""
+
+SIMPLE_SENSOR_FILTER = """(sensor == {})"""
 try:
     # noinspection PyCompatibility
     from collections.abc import Iterable, Callable, Sequence
@@ -36,6 +34,9 @@ except ImportError:
     # noinspection PyProtectedMember,PyUnresolvedReferences
     from collections import Iterable, Callable
     from typing import Sequence
+finally:
+    from typing import Tuple, Union, Optional, List
+
 from iminuit import Minuit
 from iminuit.cost import LeastSquares
 from iminuit.util import _detect_log_spacing, _smart_sampling
@@ -43,47 +44,28 @@ from matplotlib import pyplot as plt, rc_context
 from matplotlib.backends.backend_pdf import PdfPages
 from matplotlib.lines import Line2D
 from numpy._typing import NDArray, ArrayLike
-from typing import Tuple, Union, Optional, List
+from jacobi import propagate
 
-from capacitance_models import linear_model, reciprocal_model, extended_cap_model_5, inverted_reciprocal_model
+from examples.capacitance_models import extended_cap_model_5
 from examples.plot_dependencies import read_rec_array_sorted, read_rec_array_sorted_where, chi2
-from general_model import exponential_model
+from examples.general_model import exponential_model, quadratic_model, quadratic_model_grad, linear_model_grad, \
+    exponential_model_grad, get_polynomial_model, linear_model, reciprocal_model, inverted_reciprocal_model
+
 from pixcap65.plotting_util.constants import GENERATE_THESIS_PLOTS
 from pixcap65.utility.homogenize_plots import set_params, get_error_cycler
 
+LABEL_PIXEL_SEPARATION = "$\\Delta$ / \\unit{{\\micro\\meter}}"
+LABEL_PERIMETER_UNIT = "U / \\unit{{\\micro\\meter}}"
+LABEL_PIXEL_AREA = "A / \\unit{{\\micro\\meter\\squared}}"
 
-def quadratic_model(x, a, b, c):
-    return a + b * x + c * x ** 2
-
-
-def quadratic_model_grad(x, a, b, c):
-    if isinstance(x, Iterable):
-        return np.vstack([np.array([1, val, val ** 2]) for val in x]).T
-    else:
-        return np.array([1, x, x ** 2])
-
-
-def get_polynomial_model(dof):
-    def method(x, *args):
-        return np.polyval(args, x)
-
-    return method
-
-
-def linear_model_grad(x, a, b):
-    if isinstance(x, Iterable):
-        return np.vstack([np.array([1, val]) for val in x]).T
-    else:
-        return np.array([1, x])
-
-
-def exponential_model_grad(x, a, b):
-    if isinstance(x, Iterable):
-        return np.vstack([np.array([np.exp(b * val), a * b * np.exp(b * val)]) for val in x]).T
-    else:
-        return np.array([np.exp(b * x), a * b * np.exp(b * x)])
 
 def get_new_axes():
+    """
+    Get :py:class:`~matplotlib.axes.Axes` objects and corresponding :py:class:`~matplotlib.figure.Figure` objects for
+    the three different axis scalings to visualize the capacitance's in dependence on different parameters and try
+    to fit their dependencies.
+    :return: tuple of the :py:class:`~matplotlib.axes.Axes` and :py:class:`~matplotlib.figure.Figure` objects.
+    """
     plt.close('all')
     fig, ax = plt.subplots()
     fig_full, ax_full = plt.subplots(3)
@@ -93,6 +75,22 @@ def get_new_axes():
 
 
 def visualize(figures, axes, pdf1, pdf2, fitter: Minuit, title, parameter, *args, **kwargs):
+    """
+    Visualize data and model agreement in standard representation, with logarithmic y-scaling and with logarithmic x-
+    and -y scaling.
+    The different scalings are written into different pdf files.
+
+    :param figures: figures of the different scalings to which to add data and model.
+    :param axes: different axes objects to which to add data and model.
+    :param pdf1: pdf for full page figures.
+    :param pdf2: pdf for three axes combined figures.
+    :param fitter: `iminuit` Minuit fitting object.
+    :param title: title of the figures to create.
+    :param parameter: dependency of the capacitance's investigated.
+    :param args: further positional arguments to plot the data.
+    :param kwargs: further keyword arguments to plot the data.
+    :return:
+    """
     fig_full, fig_combi = figures
     _, _, ax_log, ax_loglog = axes
     for ax in axes:
@@ -112,7 +110,15 @@ def visualize(figures, axes, pdf1, pdf2, fitter: Minuit, title, parameter, *args
 
 
 def get_advanced_visualizer(obj):
-    def visualize_advanced_visualizer(
+    """
+    Create a method for advanced/enhanced visualization of (measured) data and model agreement.
+
+
+    :param obj: fitting/cost object for which to visualize the model agreement.
+    :return: function which visualizes the model agreement. Will take the parameters as a :py:class:`~numpy.ndarray` and
+     also the model points. The interface mimics :py:meth:`iminuit.cost.LeastSquares.visualize`.
+    """
+    def _method(
             args: ArrayLike, model_points: Union[int, Sequence[float]] = 0, **kwargs
     ) -> Tuple[Tuple[NDArray, NDArray, NDArray], Tuple[NDArray, NDArray]]:
         """
@@ -155,10 +161,35 @@ def get_advanced_visualizer(obj):
         plt.plot(xm, ym)
         return (x, y, ye), (xm, ym)
 
-    return visualize_advanced_visualizer
+    return _method
 
 
 def visualize_full(figures, axes, pdf1, pdf2, fitter: Iterable[Minuit], title, parameter, cost=None):
+    """
+    :author: Dominik Fischer
+    :date: ??
+
+    last update: 2026-09-01
+
+    Full/enhanced visualization of (measured) data and model agreement.
+    The visualization is drawn in standard representation, with logarithmic y-scaling and with logarithmic x-
+    and -y scaling.
+    The different scalings are written into different pdf files.
+
+    The legend features additionally some information about the Goodness-of-fit like the
+    p-value which could be used for hypothesis testing.
+
+
+    :param figures: figures of the different scalings to which to add data and model.
+    :param axes: different axes objects to which to add data and model.
+    :param pdf1: pdf for full page figures.
+    :param pdf2: pdf for three axes combined figures.
+    :param fitter: `iminuit` Minuit fitting object.
+    :param title: title of the figures to create.
+    :param parameter: dependency of the capacitance's investigated.
+    :param cost: Cost function object used for the fit.
+    :return:
+    """
     fig_full, fig_combi = figures
     _, _, ax_log, ax_loglog = axes
     for ax in axes:
@@ -188,6 +219,25 @@ def visualize_full(figures, axes, pdf1, pdf2, fitter: Iterable[Minuit], title, p
 
 
 def detailed_fit(x, y, error, model, title, parameter, *args, model_gradient=None, **kwargs):
+    """
+    Utility function to perform the detailed fits and also perform the visualization of the (full) data and the
+    corresponding model agreement.
+
+    :author: Dominik Fischer
+    :date: ??
+
+    last update: 2026-09-01
+
+    :param x: parameter which dependence should be investigated.
+    :param y: capacitance values.
+    :param error: uncertainties of the measured parameters.
+    :param model: model function to use for the fit.
+    :param title: title of possible figures to visualize the model agreement.
+    :param parameter: dependency of the capacitance's investigated.
+    :param args: positional arguments for initial values of the model's parameters.
+    :param model_gradient: callable of the models gradient in parameter space.
+    :return: tuple of the cost object and the fitter.
+    """
     if model_gradient is not None and model_gradient == "numeric":
         # use numdifftools for accurate numeric derivatives
         import numdifftools as nd
@@ -214,6 +264,7 @@ def detailed_fit(x, y, error, model, title, parameter, *args, model_gradient=Non
 
     return cost, m
 
+
 if __name__ == "__main__":
     plt.close('all')
 
@@ -226,10 +277,10 @@ if __name__ == "__main__":
     # need a fit for the areas with the same implantation depth
     # => thus could only use effectively R13 and E1 sensors
     # afterwards estimate the dependence of the A parameter on the depletion width.
-    with tb.open_file('../conclude_summary.h5', mode='r') as h5_conclusion,\
-        PdfPages("../Dependencies_fitted.pdf") as pdf,\
-        PdfPages("../Dependencies_fitted_full.pdf") as pdf_log,\
-            PdfPages("../Dependencies_fitted_full_full.pdf") as pdf_2:
+    with tb.open_file('conclude_summary.h5', mode='r') as h5_conclusion,\
+        PdfPages("Dependencies_fitted.pdf") as pdf,\
+        PdfPages("Dependencies_fitted_full.pdf") as pdf_log,\
+            PdfPages("Dependencies_fitted_full_full.pdf") as pdf_2:
 
         print("HANDLE THE AREA REDUCTION")
         full_properties = read_rec_array_sorted(h5_conclusion.root.SensorTypes, 'sensor')
@@ -246,9 +297,9 @@ if __name__ == "__main__":
         dnw_selection = None
         for sensor in dnw_properties_raw.sensor:
             if dnw_selection is None:
-                dnw_selection = """(sensor == {})""".format(sensor)
+                dnw_selection = SIMPLE_SENSOR_FILTER.format(sensor)
             else:
-                dnw_selection += """ | (sensor == {})""".format(sensor)
+                dnw_selection += ENHANCED_OR_SENSOR_FILTER.format(sensor)
 
         nw_selection = None
         full_nw_selection = None
@@ -256,36 +307,36 @@ if __name__ == "__main__":
         hpk_nw_selection = None
         for sensor in nw_properties.sensor:
             if full_full_nw_selection is None:
-                full_full_nw_selection = """(sensor == {})""".format(sensor)
+                full_full_nw_selection = SIMPLE_SENSOR_FILTER.format(sensor)
             else:
-                full_full_nw_selection += """ | (sensor == {})""".format(sensor)
+                full_full_nw_selection += ENHANCED_OR_SENSOR_FILTER.format(sensor)
             if sensor.decode().startswith("X"):
                 if hpk_nw_selection is None:
-                    hpk_nw_selection = """(sensor == {})""".format(sensor)
+                    hpk_nw_selection = SIMPLE_SENSOR_FILTER.format(sensor)
                 else:
-                    hpk_nw_selection += """ | (sensor == {})""".format(sensor)
+                    hpk_nw_selection += ENHANCED_OR_SENSOR_FILTER.format(sensor)
                 continue
             if sensor.decode() == 'R1' or sensor.decode().startswith('X'):
                 pass
             else:
                 if nw_selection is None:
-                    nw_selection = """(sensor == {})""".format(sensor)
+                    nw_selection = SIMPLE_SENSOR_FILTER.format(sensor)
                 else:
-                    nw_selection += """ | (sensor == {})""".format(sensor)
+                    nw_selection += ENHANCED_OR_SENSOR_FILTER.format(sensor)
                 if hpk_nw_selection is None:
-                    hpk_nw_selection = """(sensor == {})""".format(sensor)
+                    hpk_nw_selection = SIMPLE_SENSOR_FILTER.format(sensor)
                 else:
-                    hpk_nw_selection += """ | (sensor == {})""".format(sensor)
+                    hpk_nw_selection += ENHANCED_OR_SENSOR_FILTER.format(sensor)
             if full_nw_selection is None:
-                full_nw_selection = """(sensor == {})""".format(sensor)
+                full_nw_selection = SIMPLE_SENSOR_FILTER.format(sensor)
             else:
-                full_nw_selection += """ | (sensor == {})""".format(sensor)
+                full_nw_selection += ENHANCED_OR_SENSOR_FILTER.format(sensor)
 
         # we will also need to remove these from our list
-        def exclude_properties(a):
+        def _exclude_properties(a):
             return a.decode() == "R1" or a.decode().startswith("X")
 
-        mask = np.logical_not(np.array([exclude_properties(a) for a in nw_properties.sensor], dtype=bool))
+        mask = np.logical_not(np.array([_exclude_properties(a) for a in nw_properties.sensor], dtype=bool))
         second_mask = np.logical_not(np.array([a.decode().startswith("X") for a in nw_properties.sensor], dtype=bool))
         hpk_mask = np.logical_not(np.array([a.decode() == 'R1' for a in nw_properties.sensor], dtype=bool))
 
@@ -306,15 +357,35 @@ if __name__ == "__main__":
         full_full_nw_data = read_rec_array_sorted_where(h5_conclusion.root.GeneralSummaryTable, full_full_nw_selection, 'sensor')
 
         def enhanced_full_visualisation(pdf, fitter, title, parameter, callback: Optional[Callable], cost=None, labels=None, extension_factor=1.05, **kwargs):
+            """
+            Enhanced visualization handler capable of plotting additanal data series besides the visualization of the
+            measured data and the model agreement.
+            This could also be done for multiple models at once (acting on the same data).
+
+            :author: Dominik Fischer
+            :date: ??
+
+            last update: 2026-09-01
+
+            :param pdf: pdf object to write the figures to visualize model agreement to.
+            :param fitter: :py:class:`iminuit.Minuit` fitting object.
+            :param title: title of the figures
+            :param parameter: dependency of the capacitance's investigated.
+            :param callback: callback function taking an :py:class:`matplotlib.axes.Axes` object as its only parameter.
+             Used to add further measurement series to the figure.
+            :param cost: cost function object used for the fit.
+            :param labels: legend labels for the models
+            :param extension_factor: relative enlargement of the fitting interval
+            :param kwargs: further keyword arguments to be propagated to ??
+            """
             fig, ax = plt.subplots()
-            ax.set(xlabel=parameter, ylabel="$C$ / \\unit{{\\femto\\farad}}")
-            from pixcap65.plotting import GENERATE_THESIS_PLOTS
+            ax.set(xlabel=parameter, ylabel=LABEL_PIXEL_CAPACITANCE)
             if not GENERATE_THESIS_PLOTS:
                 ax.set_title(title)
 
             result = [] if callback is None else callback(ax)
 
-            # need to asses the fit ranges!
+            # need to access the fit ranges!
             minimum_value = np.inf
             maximum_value = -np.inf
             maximum_y_value = -np.inf
@@ -367,8 +438,8 @@ if __name__ == "__main__":
             plt.close(fig)
 
         # could not be extracted to top-level as it has a dependence on local-variables
-        def get_data_plotter(target, property, error=2):
-            def method(axes) -> List[Line2D]:
+        def _get_data_plotter(target, property, error=2):
+            def _method(axes) -> List[Line2D]:
                 from matplotlib import rc_context
                 with rc_context(rc={'axes.prop_cycle': get_error_cycler()}):
                     object_list = []
@@ -423,7 +494,7 @@ if __name__ == "__main__":
                                                     markersize=20)
                     object_list.append(container)
                     return object_list
-            return method
+            return _method
 
         model_mapper = {
             "implantation_area": (linear_model, linear_model),
@@ -437,20 +508,22 @@ if __name__ == "__main__":
                                        dnw_data.biased_capacitance.magnitude,
                                        dnw_data.biased_capacitance.systematic_dispersion,
                                        linear_model, "Area - DNW",
-                                       "A / \\unit{{\\micro\\meter\\squared}}", 0, 1,
+                                       LABEL_PIXEL_AREA, 0, 1,
                                        model_gradient=linear_model_grad)
 
         nw_cost, nw_m = detailed_fit(nw_properties.implantation_area[mask],
-                                       nw_data.biased_capacitance.magnitude,
-                                       nw_data.biased_capacitance.systematic_dispersion,
-                                       linear_model, "Area - NW",
-                                       "A / \\unit{{\\micro\\meter\\squared}}", 0, 1,
-                                       model_gradient=linear_model_grad)
+                                     nw_data.biased_capacitance.magnitude,
+                                     nw_data.biased_capacitance.systematic_dispersion,
+                                     linear_model, "Area - NW",
+                                     LABEL_PIXEL_AREA, 0, 1,
+                                     model_gradient=linear_model_grad)
 
         fig, fig_full, ax, ax_std, ax_log, ax_loglog = get_new_axes()
         visualize_full((fig, fig_full), (ax, ax_std, ax_log, ax_loglog), pdf, pdf_log, (dnw_m, nw_m), "Area",
-                       "A / \\unit{{\\micro\\meter\\squared}}", cost=(dnw_cost, nw_cost))
-        enhanced_full_visualisation(pdf_2, (dnw_m, nw_m), "Area", "A / \\unit{{\\micro\\meter\\squared}}", get_data_plotter("biased_capacitance", "implantation_area", 2), cost=(dnw_cost, nw_cost), labels=("DNW, planar", "NW, planar"))
+                       LABEL_PIXEL_AREA, cost=(dnw_cost, nw_cost))
+        enhanced_full_visualisation(pdf_2, (dnw_m, nw_m), "Area", LABEL_PIXEL_AREA,
+                                    _get_data_plotter("biased_capacitance", "implantation_area", 2),
+                                    cost=(dnw_cost, nw_cost), labels=("DNW, planar", "NW, planar"))
 
         area_depth_poly_offset = np.polyfit([3, 5], [nw_m.values['a'], dnw_m.values['a']], 1)
         area_depth_poly_slope = np.polyfit([3, 5], [nw_m.values['b'], dnw_m.values['b']], 1)
@@ -468,7 +541,6 @@ if __name__ == "__main__":
             pdf_2.savefig(fig, bbox_inches="tight")
         plt.close(fig)
 
-
         print("INVESTIGATE THE PERIMETER DEPENDENCE!")
         print("For R1 we would expect", nw_m.values['a'] + nw_m.values['b'] * 8 * 81, "But measured", 42.568,
               (nw_m.values['a'] + nw_m.values['b'] * 8 * 81) / 42.568)
@@ -477,59 +549,60 @@ if __name__ == "__main__":
         r1_p_a = 2 * (8 + 81)
         r1_p_b = 4 * np.sqrt(8 * 81)
 
-        # this leads to the conclusion that the specific shape leads to a more than doubled perimneter and an almost twice as large capacitance => this could be exponential increase.
-        # we should also compare the parameters of X1 and X2 sensors in the same way!
-        # but if it is exponentially scaling: does it apply only to our exponential offset (which seemingly depends on the implanation depth) or must be rescale the whole model used so far?)
-        # on the other hand the capacitance's could be estimated quite well by a exponential without distinguishing any thing.
-        # So we should perform this one again, distinguishing by the implantation depth.
+        # this leads to the conclusion that the specific shape leads to a more than doubled perimneter and an almost
+        # twice as large capacitance => this could be exponential increase. we should also compare the parameters of
+        # X1 and X2 sensors in the same way! but if it is exponentially scaling: does it apply only to our
+        # exponential offset (which seemingly depends on the implanation depth) or must be rescale the whole model
+        # used so far?) on the other hand the capacitance's could be estimated quite well by a exponential without
+        # distinguishing any thing. So we should perform this one again, distinguishing by the implantation depth.
 
         dnw_cost_p, dnw_m_p = detailed_fit(dnw_properties.Perimeter, dnw_data.biased_capacitance.magnitude,
                                            dnw_data.biased_capacitance.systematic_dispersion,
                                            exponential_model, "Perimeter - DNW",
-                                        "U / \\unit{{\\micro\\meter}}", 15, 0,
+                                           LABEL_PERIMETER_UNIT, 15, 0,
                                            model_gradient=exponential_model_grad)
         plt.errorbar(dnw_properties.Perimeter, dnw_data.biased_capacitance.magnitude, label='all', fmt='+')
 
         dnw_cost_p_2, dnw_m_p_2 = detailed_fit(dnw_properties.Perimeter, dnw_data.biased_capacitance.magnitude,
-                                           dnw_data.biased_capacitance.systematic_dispersion,
-                                           quadratic_model, "Perimeter - DNW - Quad",
-                                           "U / \\unit{{\\micro\\meter}}", 15, 0, 0,
-                                           model_gradient=quadratic_model_grad)
+                                               dnw_data.biased_capacitance.systematic_dispersion,
+                                               quadratic_model, "Perimeter - DNW - Quad",
+                                               LABEL_PERIMETER_UNIT, 15, 0, 0,
+                                               model_gradient=quadratic_model_grad)
 
         fig, fig_full, ax, ax_std, ax_log, ax_loglog = get_new_axes()
         dnw_cost_p_2 = LeastSquares(dnw_properties.Perimeter, dnw_data.biased_capacitance.magnitude,
-                                  dnw_data.biased_capacitance.systematic_dispersion,
-                                  quadratic_model)
+                                    dnw_data.biased_capacitance.systematic_dispersion,
+                                    quadratic_model)
 
         nw_cost_p, nw_m_p = detailed_fit(nw_properties.Perimeter[second_mask], full_nw_data.biased_capacitance.magnitude,
-                                           full_nw_data.biased_capacitance.systematic_dispersion,
-                                           exponential_model, "Perimeter - NW",
-                                           "U / \\unit{{\\micro\\meter}}", 10, 0,
-                                           model_gradient=exponential_model_grad)
+                                         full_nw_data.biased_capacitance.systematic_dispersion,
+                                         exponential_model, "Perimeter - NW",
+                                         LABEL_PERIMETER_UNIT, 10, 0,
+                                         model_gradient=exponential_model_grad)
 
         nw_cost_p_2, nw_m_p_2 = detailed_fit(nw_properties.Perimeter[second_mask],
-                                               full_nw_data.biased_capacitance.magnitude,
-                                               full_nw_data.biased_capacitance.systematic_dispersion,
-                                               quadratic_model, "Perimeter - NW - Quad",
-                                               "U / \\unit{{\\micro\\meter}}", 10, 0, 0,
-                                               model_gradient=quadratic_model_grad)
+                                             full_nw_data.biased_capacitance.magnitude,
+                                             full_nw_data.biased_capacitance.systematic_dispersion,
+                                             quadratic_model, "Perimeter - NW - Quad",
+                                             LABEL_PERIMETER_UNIT, 10, 0, 0,
+                                             model_gradient=quadratic_model_grad)
 
         nw_cost_p_3, nw_m_p_3 = detailed_fit(nw_properties.Perimeter[second_mask],
                                              full_nw_data.biased_capacitance.magnitude,
                                              full_nw_data.biased_capacitance.systematic_dispersion,
                                              get_polynomial_model(4), "Perimeter - NW - 4",
-                                             "U / \\unit{{\\micro\\meter}}", 0, 0, 2.93e-3, -0.27, 20.4)
+                                             LABEL_PERIMETER_UNIT, 0, 0, 2.93e-3, -0.27, 20.4)
 
         fig, fig_full, ax, ax_std, ax_log, ax_loglog = get_new_axes()
         visualize_full((fig, fig_full), (ax, ax_std, ax_log, ax_loglog), pdf, pdf_log,
                        (dnw_m_p, dnw_m_p_2, nw_m_p, nw_m_p_2, nw_m_p_3), "Perimeter",
-                       "U / \\unit{{\\micro\\meter}}",
-                       cost=(dnw_cost_p, dnw_cost_p_2, nw_cost_p, nw_cost_p_2, nw_cost_p_3),)
+                       LABEL_PERIMETER_UNIT,
+                       cost=(dnw_cost_p, dnw_cost_p_2, nw_cost_p, nw_cost_p_2, nw_cost_p_3), )
 
         enhanced_full_visualisation(pdf_2,
                                     (dnw_m_p, dnw_m_p_2, nw_m_p, nw_m_p_2, nw_m_p_3), "Perimeter",
-                                    "U / \\unit{{\\micro\\meter}}",
-                                    get_data_plotter("biased_capacitance", "Perimeter", 2),
+                                    LABEL_PERIMETER_UNIT,
+                                    _get_data_plotter("biased_capacitance", "Perimeter", 2),
                                     cost=(dnw_cost_p, dnw_cost_p_2, nw_cost_p, nw_cost_p_2,),
                                     labels=["DNW, planar, exponentiell", "DNW, planar, quadratisch", "NW, planar, exponentiell", "NW, planar, quadratisch",])
 
@@ -542,74 +615,81 @@ if __name__ == "__main__":
         print(np.polyfit([3, 5], [nw_m_p_2.values['b'], dnw_m_p_2.values['b']], 1))
         print(np.polyfit([3, 5], [nw_m_p_2.values['c'], dnw_m_p_2.values['c']], 1))
 
-        # taking the HPK sensors for the perimeter directly into account leads to strong deviations => exclude them for now from the full data set.
-        # the constant term has here the same slope as the constant offset for the area investigation (but they have quite different starting values)
-        # the variation of the (decay) coefficient with the implantation depth is quite low!
-        # maybe we could apply these here soley on the constant term of the linear model describing the dependence on the implantation area.
-        # but the variation of the decay coefficient seems to be significant enough to be accounted for!
-        # maybe we must directly account also for the difference in the pixel separation and implantation area
+        # taking the HPK sensors for the perimeter directly into account leads to strong deviations => exclude them
+        # for now from the full data set. the constant term has here the same slope as the constant offset for the
+        # area investigation (but they have quite different starting values) the variation of the (decay) coefficient
+        # with the implantation depth is quite low! maybe we could apply these here soley on the constant term of the
+        # linear model describing the dependence on the implantation area. but the variation of the decay coefficient
+        # seems to be significant enough to be accounted for! maybe we must directly account also for the difference
+        # in the pixel separation and implantation area
 
         # this model is able to fully explain the residual for the r1 with linear fit of the implantation area.
 
 
         print("INVESTIGATE THE DEPENDENCE ON THE PIXEL SEPARATION.")
-        # before investigating the dependency on the pixel separation: What capacitances are to expect for the hpk sensor
+        # before investigating the dependency on the pixel separation: What capacitances are to expect for the hpk
+        # sensor
         print(nw_m.values['a'] + nw_m.values['b'] * 50 * 50)
         print(nw_m.values['a'] * np.exp(nw_m_p.values['b'] * 4 * 50))
         print(nw_m_p.values['a'] * np.exp(nw_m_p.values['b'] * 4 * 50) + nw_m.values['b'] * 50 * 50)
         print((nw_m_p.values['a'] + nw_m.values['b'] * 50 * 50) * np.exp(nw_m_p.values['b'] * 4 * 50))
-        # the expected value is in the range (72-75) fF.
-        # but then the last two would require an influence reducing the capacity again (significant reduction required).
-        # or the perimeter model needs to be corrected to account only for combination from perimeter and area
-        # it seems to be quite inprobable that the pixel separation would lead to a decrease in capacitance
-        # or use it such that the perimeter does only have a effect if there is a deviation from the quadratic structure?
-        # p / 4*sqrt(A) for example.
+        # the expected value is in the range (72-75) fF. but then the last two would require an influence reducing
+        # the capacity again (significant reduction required). or the perimeter model needs to be corrected to
+        # account only for combination from perimeter and area it seems to be quite inprobable that the pixel
+        # separation would lead to a decrease in capacitance or use it such that the perimeter does only have a
+        # effect if there is a deviation from the quadratic structure? p / 4*sqrt(A) for example.
 
 
         dnw_cost_s, dnw_m_s = detailed_fit(dnw_properties.pixel_separation_x,
                                            dnw_data.biased_capacitance.magnitude,
                                            dnw_data.biased_capacitance.systematic_dispersion,
                                            reciprocal_model, "Separation - DNW",
-                                           "$\\Delta$ / \\unit{{\\micro\\meter}}", 1, 0)
+                                           LABEL_PIXEL_SEPARATION, 1, 0)
         dnw_cost_s_q, dnw_m_s_q = detailed_fit(dnw_properties.pixel_separation_x,
-                                           dnw_data.biased_capacitance.magnitude,
-                                           dnw_data.biased_capacitance.systematic_dispersion,
-                                           exponential_model, "Separation - DNW - EXP",
-                                           "$\\Delta$ / \\unit{{\\micro\\meter}}", 1, 0,
+                                               dnw_data.biased_capacitance.magnitude,
+                                               dnw_data.biased_capacitance.systematic_dispersion,
+                                               exponential_model, "Separation - DNW - EXP",
+                                               LABEL_PIXEL_SEPARATION, 1, 0,
                                                model_gradient=exponential_model_grad)
         if True:
             nw_cost_s, nw_m_s = detailed_fit(nw_properties.pixel_separation_x[mask],
-                                               nw_data.biased_capacitance.magnitude,
-                                               nw_data.biased_capacitance.systematic_dispersion,
-                                               reciprocal_model, "Separation - NW",
-                                               "$\\Delta$ / \\unit{{\\micro\\meter}}", 1, 0)
+                                             nw_data.biased_capacitance.magnitude,
+                                             nw_data.biased_capacitance.systematic_dispersion,
+                                             reciprocal_model, "Separation - NW",
+                                             LABEL_PIXEL_SEPARATION, 1, 0)
             nw_cost_s_q, nw_m_s_q = detailed_fit(nw_properties.pixel_separation_x[mask],
-                                                   nw_data.biased_capacitance.magnitude,
-                                                   nw_data.biased_capacitance.systematic_dispersion,
-                                                   exponential_model, "Separation - NW - EXP",
-                                                   "$\\Delta$ / \\unit{{\\micro\\meter}}", 1, 0,
-                                                   model_gradient=exponential_model_grad)
+                                                 nw_data.biased_capacitance.magnitude,
+                                                 nw_data.biased_capacitance.systematic_dispersion,
+                                                 exponential_model, "Separation - NW - EXP",
+                                                 LABEL_PIXEL_SEPARATION, 1, 0,
+                                                 model_gradient=exponential_model_grad)
         else:
             nw_cost_s, nw_m_s = detailed_fit(nw_properties.pixel_separation_x[hpk_mask],
                                              hpk_nw_data.biased_capacitance.magnitude,
                                              hpk_nw_data.biased_capacitance.systematic_dispersion,
                                              reciprocal_model, "Separation - NW",
-                                             "$\\Delta$ / \\unit{{\\micro\\meter}}", 1, 0)
+                                             LABEL_PIXEL_SEPARATION, 1, 0)
             nw_cost_s_q, nw_m_s_q = detailed_fit(nw_properties.pixel_separation_x[hpk_mask],
                                                  hpk_nw_data.biased_capacitance.magnitude,
                                                  hpk_nw_data.biased_capacitance.systematic_dispersion,
                                                  exponential_model, "Separation - NW - EXP",
-                                                 "$\\Delta$ / \\unit{{\\micro\\meter}}", 1, 0,
+                                                 LABEL_PIXEL_SEPARATION, 1, 0,
                                                  model_gradient=exponential_model_grad)
         fig, fig_full, ax, ax_std, ax_log, ax_loglog = get_new_axes()
-        visualize_full((fig, fig_full), (ax, ax_std, ax_log, ax_loglog), pdf, pdf_log, (dnw_m_s, nw_m_s, dnw_m_s_q, nw_m_s_q), "Separation",
-                       "$\\Delta$ / \\unit{{\\micro\\meter}}", cost=(dnw_cost_s, nw_cost_s, dnw_cost_s_q, nw_cost_s_q))
+        visualize_full((fig, fig_full), (ax, ax_std, ax_log, ax_loglog), pdf, pdf_log,
+                       (dnw_m_s, nw_m_s, dnw_m_s_q, nw_m_s_q), "Separation",
+                       LABEL_PIXEL_SEPARATION, cost=(dnw_cost_s, nw_cost_s, dnw_cost_s_q, nw_cost_s_q))
         enhanced_full_visualisation(pdf_2,
                                     (dnw_m_s, nw_m_s, dnw_m_s_q, nw_m_s_q), "Separation",
-                                    "$\\Delta$ / \\unit{{\\micro\\meter}}",
-                                    get_data_plotter("biased_capacitance", "pixel_separation_x", 2),
+                                    LABEL_PIXEL_SEPARATION,
+                                    _get_data_plotter("biased_capacitance", "pixel_separation_x", 2),
                                     cost=(dnw_cost_s, nw_cost_s, dnw_cost_s_q, nw_cost_s_q),
-                                    labels=("DNW, planar, reziprok", "DNW, planar, exponentiell", "NW, planar, reziprok", "NW, planar, exponentiell"))
+                                    labels=(
+                                        "DNW, planar, reziprok",
+                                        "DNW, planar, exponentiell",
+                                        "NW, planar, reziprok",
+                                        "NW, planar, exponentiell"
+                                    ))
 
         # from point of the cost function it seems like reciprocal models are better suited
         exp_dnw_s = 19.87
@@ -627,7 +707,7 @@ if __name__ == "__main__":
         print(np.polyfit([3, 5], [nw_m_s.values['b'], dnw_m_s.values['b']], 1))
 
         # also what happends if we also account for R1 in this investigation!
-        def active_model(x):
+        def _active_model(x):
             A, W, p, sep_x, sep_y = x
             # it may be the case that we need to estimate the primary parameters (within the brackets) by a different
             # formula. This will hold in particular if the first 10 residuals are much to large.
@@ -636,7 +716,7 @@ if __name__ == "__main__":
         # calculate some residue for our model
         x_ref_data = (full_properties.implantation_area, full_properties.implantation_depth, full_properties.Perimeter, full_properties.pixel_separation_x, full_properties.pixel_separation_y)
         y_ref_data = full_data.biased_capacitance.magnitude
-        predictions = active_model(x_ref_data)
+        predictions = _active_model(x_ref_data)
         residuals = predictions - y_ref_data
         absolute_residuals = np.abs(residuals)
         print(absolute_residuals[lf_selection_slice])
@@ -654,32 +734,33 @@ if __name__ == "__main__":
         nw_inter_pix_mask = np.isfinite(full_nw_data.biased_inter_capacitance.magnitude)
         dnw_inter_pix_mask = np.isfinite(dnw_data.biased_inter_capacitance.magnitude)
         dnw_inter_cost_p, dnw_inter_m_p = detailed_fit(dnw_properties.Perimeter[dnw_inter_pix_mask],
-                                                     dnw_data.biased_inter_capacitance.magnitude[dnw_inter_pix_mask],
-                                                     dnw_data.biased_inter_capacitance.stat_error[dnw_inter_pix_mask],
-                                                     quadratic_model, "Inter - Perimeter - DNW - LIN",
-                                                     "$U$ / \\unit{{\\micro\\meter}}",
-                                                     1, 0, 0, model_gradient=quadratic_model_grad)
+                                                       dnw_data.biased_inter_capacitance.magnitude[dnw_inter_pix_mask],
+                                                       dnw_data.biased_inter_capacitance.stat_error[dnw_inter_pix_mask],
+                                                       quadratic_model, "Inter - Perimeter - DNW - LIN",
+                                                       LABEL_PERIMETER_UNIT,
+                                                       1, 0, 0, model_gradient=quadratic_model_grad)
 
         dnw_inter_cost_p_2, dnw_inter_m_p_2 = detailed_fit(dnw_properties.Perimeter[dnw_inter_pix_mask],
-                                                         dnw_data.biased_inter_capacitance.magnitude[dnw_inter_pix_mask],
-                                                         dnw_data.biased_inter_capacitance.stat_error[dnw_inter_pix_mask],
-                                                         exponential_model, "Inter - Perimeter - DNW - EXP",
-                                                         "$U$ / \\unit{{\\micro\\meter}}",
-                                                         1, 0, model_gradient=exponential_model_grad)
+                                                           dnw_data.biased_inter_capacitance.magnitude[dnw_inter_pix_mask],
+                                                           dnw_data.biased_inter_capacitance.stat_error[dnw_inter_pix_mask],
+                                                           exponential_model, "Inter - Perimeter - DNW - EXP",
+                                                           LABEL_PERIMETER_UNIT,
+                                                           1, 0, model_gradient=exponential_model_grad)
         print("DNW hypothesis test")
         print(1 - chi2(dnw_inter_m_p_2.fmin.fval - dnw_inter_m_p.fmin.fval, 1))
 
         nw_inter_cost_p, nw_inter_m_p = detailed_fit(nw_properties.Perimeter[second_mask][nw_inter_pix_mask],
                                                      full_nw_data.biased_inter_capacitance.magnitude[nw_inter_pix_mask],
                                                      full_nw_data.biased_inter_capacitance.stat_error[nw_inter_pix_mask],
-                                                     quadratic_model, "Inter - Perimeter - NW - LIN", "$U$ / \\unit{{\\micro\\meter}}",
+                                                     quadratic_model, "Inter - Perimeter - NW - LIN",
+                                                     LABEL_PERIMETER_UNIT,
                                                      1, 0, 0, model_gradient=quadratic_model_grad)
 
         nw_inter_cost_p_2, nw_inter_m_p_2 = detailed_fit(nw_properties.Perimeter[second_mask][nw_inter_pix_mask],
                                                          full_nw_data.biased_inter_capacitance.magnitude[nw_inter_pix_mask],
                                                          full_nw_data.biased_inter_capacitance.stat_error[nw_inter_pix_mask],
                                                          exponential_model, "Inter - Perimeter - NW - EXP",
-                                               "$U$ / \\unit{{\\micro\\meter}}",
+                                                         LABEL_PERIMETER_UNIT,
                                                          1, 0, model_gradient=exponential_model_grad)
         print("NW hypothesis test")
         print(1 - chi2(nw_inter_m_p_2.fmin.fval - nw_inter_m_p.fmin.fval, 1))
@@ -687,16 +768,21 @@ if __name__ == "__main__":
         fig, fig_full, ax, ax_std, ax_log, ax_loglog = get_new_axes()
         visualize_full((fig, fig_full), (ax, ax_std, ax_log, ax_loglog), pdf, pdf_log,
                        (nw_inter_m_p, nw_inter_m_p_2, dnw_inter_m_p, dnw_inter_m_p_2), "Inter - Perimeter",
-                       "$U$ / \\unit{{\\micro\\meter}}", cost=(nw_inter_cost_p, nw_inter_cost_p_2, dnw_inter_cost_p,
+                       LABEL_PERIMETER_UNIT, cost=(nw_inter_cost_p, nw_inter_cost_p_2, dnw_inter_cost_p,
                                                                dnw_inter_cost_p_2),)
 
         enhanced_full_visualisation(pdf_2,
                                     (nw_inter_m_p, nw_inter_m_p_2, dnw_inter_m_p, dnw_inter_m_p_2), "Inter - Perimeter",
-                                    "$U$ / \\unit{{\\micro\\meter}}",
-                                    get_data_plotter("biased_inter_capacitance", "Perimeter", 0),
+                                    LABEL_PERIMETER_UNIT,
+                                    _get_data_plotter("biased_inter_capacitance", "Perimeter", 0),
                                     cost=(nw_inter_cost_p, nw_inter_cost_p_2, dnw_inter_cost_p,
                                           dnw_inter_cost_p_2),
-                                    labels=("NW, planar, quadratisch", "NW, planar, exponentiell", "DNW, planar, quadratisch", "DNW, planar, exponentiell"),)
+                                    labels=(
+                                        "NW, planar, quadratisch",
+                                        "NW, planar, exponentiell",
+                                        "DNW, planar, quadratisch",
+                                        "DNW, planar, exponentiell"
+                                    ), )
 
         print("INTER CAP PERIMETETER QUADRATIC DEPTH DEPENDENCE")
         print(np.polyfit([3, 5],[nw_inter_m_p.values['a'], dnw_inter_m_p.values['a']],1))
@@ -707,50 +793,54 @@ if __name__ == "__main__":
 
         print("INVESTIGATE SEPARATION DEPENDENCE FOR INTER-PIX")
         dnw_inter_cost_s, dnw_inter_m_s = detailed_fit(dnw_properties.pixel_separation_x[dnw_inter_pix_mask],
-                                                     dnw_data.biased_inter_capacitance.magnitude[dnw_inter_pix_mask],
-                                                     dnw_data.biased_inter_capacitance.stat_error[dnw_inter_pix_mask],
-                                                     reciprocal_model, "Inter - Separation - DNW",
-                                                     "$\\Delta$ / \\unit{{\\micro\\meter}}",
-                                                     1, 0)
+                                                       dnw_data.biased_inter_capacitance.magnitude[dnw_inter_pix_mask],
+                                                       dnw_data.biased_inter_capacitance.stat_error[dnw_inter_pix_mask],
+                                                       reciprocal_model, "Inter - Separation - DNW",
+                                                       LABEL_PIXEL_SEPARATION,
+                                                       1, 0)
 
         dnw_inter_cost_s_2, dnw_inter_m_s_2 = detailed_fit(
             dnw_properties.pixel_separation_x[dnw_inter_pix_mask],
             dnw_data.biased_inter_capacitance.magnitude[dnw_inter_pix_mask],
             dnw_data.biased_inter_capacitance.stat_error[dnw_inter_pix_mask],
             exponential_model, "Inter - Separation - DNW - EXP",
-            "$\\Delta$ / \\unit{{\\micro\\meter}}",
+            LABEL_PIXEL_SEPARATION,
             1, 0, model_gradient=exponential_model_grad)
         nw_inter_cost_s, nw_inter_m_s = detailed_fit(nw_properties.pixel_separation_x[second_mask][nw_inter_pix_mask],
                                                      full_nw_data.biased_inter_capacitance.magnitude[nw_inter_pix_mask],
                                                      full_nw_data.biased_inter_capacitance.stat_error[nw_inter_pix_mask],
                                                      reciprocal_model, "Inter - Separation - NW",
-                                               "$\\Delta$ / \\unit{{\\micro\\meter}}",
+                                                     LABEL_PIXEL_SEPARATION,
                                                      1, 0)
 
         nw_inter_cost_s_2, nw_inter_m_s_2 = detailed_fit(nw_properties.pixel_separation_x[second_mask][nw_inter_pix_mask],
                                                          full_nw_data.biased_inter_capacitance.magnitude[nw_inter_pix_mask],
                                                          full_nw_data.biased_inter_capacitance.stat_error[nw_inter_pix_mask],
                                                          exponential_model, "Inter - Separation - NW - EXP",
-                                                   "$\\Delta$ / \\unit{{\\micro\\meter}}",
+                                                         LABEL_PIXEL_SEPARATION,
                                                          1, 0, model_gradient=exponential_model_grad)
         fig, fig_full, ax, ax_std, ax_log, ax_loglog = get_new_axes()
         visualize_full((fig, fig_full), (ax, ax_std, ax_log, ax_loglog), pdf, pdf_log,
                        (nw_inter_m_s, nw_inter_m_s_2, dnw_inter_m_s, dnw_inter_m_s_2), "Inter - Separation",
-                       "$\\Delta$ / \\unit{{\\micro\\meter}}", cost=(nw_inter_cost_s, nw_inter_cost_s_2,
-                                                                     dnw_inter_cost_s, dnw_inter_cost_s_2))
+                       LABEL_PIXEL_SEPARATION, cost=(nw_inter_cost_s, nw_inter_cost_s_2,
+                                                dnw_inter_cost_s, dnw_inter_cost_s_2))
 
         enhanced_full_visualisation(pdf_2,
                                     (nw_inter_m_s, nw_inter_m_s_2, dnw_inter_m_s, dnw_inter_m_s_2),
                                     "Inter - Separation",
-                                    "$\\Delta$ / \\unit{{\\micro\\meter}}",
-                                    get_data_plotter("biased_inter_capacitance", "pixel_separation_x", 0),
+                                    LABEL_PIXEL_SEPARATION,
+                                    _get_data_plotter("biased_inter_capacitance", "pixel_separation_x", 0),
                                     cost=(nw_inter_cost_s, nw_inter_cost_s_2, dnw_inter_cost_s, dnw_inter_cost_s_2),
-                                    labels=("NW, planar, reziprok", "NW, planar, exponentiell", "DNW, planar, reziprok", "DNW, planar, exponentiell"))
-
+                                    labels=(
+                                        "NW, planar, reziprok",
+                                        "NW, planar, exponentiell",
+                                        "DNW, planar, reziprok",
+                                        "DNW, planar, exponentiell"
+                                    ))
 
         fig, ax = plt.subplots()
-        get_data_plotter("biased_inter_capacitance", "implantation_area", 0)(ax)
-        ax.set_xlabel("$A$ / \\unit{{\\micro\\meter\\squared}}")
+        _get_data_plotter("biased_inter_capacitance", "implantation_area", 0)(ax)
+        ax.set_xlabel(LABEL_PIXEL_AREA)
         ax.set_ylabel("$C_\\text{{inter}}$ / \\unit{{\\femto\\farad}}")
         if not GENERATE_THESIS_PLOTS:
             ax.set_title("Inter - Area")
@@ -775,6 +865,7 @@ if __name__ == "__main__":
         # plots for the thesis by the effect of the hpk, fbk and sintef sensors;
         # deeper implants seems to imply higher capacitance!
 
+
         def active_inter_pix_model(xy,a0, a1, a2, a3, a4, a5):
             p, d = xy
             return quadratic_model(p, linear_model(d, a0, a1), linear_model(d, a2, a3), linear_model(d, a4, a5))
@@ -791,7 +882,6 @@ if __name__ == "__main__":
                 second_temp = second_temp.reshape(second_temp.shape[0], second_temp.shape[1], 1)
             second = np.array([second_temp[:, :, i].flatten() for i in range(second_temp.shape[2])]).T
             return np.array([first[k // 2] * sec for k, sec in enumerate(second)])
-
 
 
         slc = slice(0, -5, 1)
@@ -850,7 +940,6 @@ if __name__ == "__main__":
         fig.savefig("residues_total_plot.png")
         plt.close(fig)
 
-
         # need to get an additonal values
         plt.close('all')
         inter_area = full_properties.implantation_depth[inter_pix_mask] * full_properties.Perimeter[inter_pix_mask]
@@ -908,27 +997,32 @@ if __name__ == "__main__":
         from scipy.optimize import newton
         from numpy.random import default_rng
         rng = default_rng(42)
-        def root_model(x, ref, model, *args):
+
+        def _root_model(x, ref, model, *args):
             return model(x, *args) - ref
+
         print("result from optimisation")
         number_bootstraps = 5000
-        print(newton(root_model, 2.75, args=[hpk_nw_data.biased_capacitance.magnitude[-2], reciprocal_model, *nw_m_s.values.to_dict().values()], full_output=True))
-        print(newton(root_model, 2.75, args=[hpk_nw_data.biased_capacitance.magnitude[-1], reciprocal_model, *nw_m_s.values.to_dict().values()], full_output=True))
+        print(newton(_root_model, 2.75, args=[hpk_nw_data.biased_capacitance.magnitude[-2], reciprocal_model, *nw_m_s.values.to_dict().values()], full_output=True))
+        print(newton(_root_model, 2.75, args=[hpk_nw_data.biased_capacitance.magnitude[-1], reciprocal_model, *nw_m_s.values.to_dict().values()], full_output=True))
 
         cap_parameter_values = nw_m_s.values.to_dict().values()
+        cap_parameter_covariance = nw_m_s.covariance
 
-        # FIXME: bootstraping ignores the error on the parameters!
         def perform_bootstrap(rng, idx, data: np.recarray, init):
-            guess = newton(root_model, init, args=[
+            guess = newton(_root_model, init, args=[
                 data.biased_capacitance.magnitude[idx],
                 reciprocal_model,
                 *cap_parameter_values
             ])
 
             bootstrap_data = rng.normal(loc=data.biased_capacitance.magnitude[idx], scale=data.biased_capacitance.stat_error[idx], size=number_bootstraps)
-            bootstrap_result = np.array([newton(root_model, guess,
-                                                args=[cap, reciprocal_model,
-                                                      *nw_m_s.values.to_dict().values()]) for cap in bootstrap_data])
+            # perhaps using another bootstrap approach for the parameter errors?
+            parameter_bootstrap_data = rng.multivariate_normal(np.array([*cap_parameter_values], dtype=np.float64), cap_parameter_covariance,
+                                                               size=number_bootstraps)
+            bootstrap_result = np.array([newton(_root_model, guess,
+                                                args=[cap, reciprocal_model, *parameters]) for (cap, parameters) in
+                                         zip(bootstrap_data, parameter_bootstrap_data)])
             return np.mean(bootstrap_result), np.std(bootstrap_result)
 
 
@@ -938,13 +1032,18 @@ if __name__ == "__main__":
         print(x2_rev_separation)
         print(50 - 4 - 2 * x1_rev_separation[0], np.abs(-2 * x1_rev_separation[1]))
         print(50 - 4 - 2 * x2_rev_separation[0], np.abs(-2 * x2_rev_separation[1]))
-        from jacobi import propagate
-        rev_separation_simple, rev_separation_simple_cov = propagate(lambda x: inverted_reciprocal_model(x, *cap_parameter_values),
-                                                                     hpk_nw_data.biased_capacitance.magnitude,
-                                                                     np.diag(hpk_nw_data.biased_capacitance.stat_error) ** 2)
+
+        print("Same computation with simplified error propagation.")
+        rev_separation_simple, rev_separation_simple_cov = propagate(
+            lambda x: inverted_reciprocal_model(x, *cap_parameter_values),
+            hpk_nw_data.biased_capacitance.magnitude,
+            np.diag(hpk_nw_data.biased_capacitance.stat_error) ** 2)
         rev_separation_simple_err = np.diag(rev_separation_simple_cov) ** 0.5
         print(50 - 4 - 2 * rev_separation_simple[-2], np.abs(-2 * rev_separation_simple_err[-2]))
         print(50 - 4 - 2 * rev_separation_simple[-1], np.abs(-2 * rev_separation_simple_err[-1]))
+
+        # for the full result.
+        print("... and for a whole parameter array?")
         full_parameters = np.full(3, np.nan)
         full_parameters[0] = hpk_nw_data.biased_capacitance.magnitude[-2]
         full_parameters[1:] = [*cap_parameter_values]
@@ -957,39 +1056,5 @@ if __name__ == "__main__":
             full_covariance)
         rev_separation_full_err = rev_separation_full_cov ** 0.5
         print(50 - 4 - 2 * rev_separation_full, np.abs(-2 * rev_separation_full_err))
-        # print(50 - 4 - 2 * rev_separation_full[-1], np.abs(-2 * rev_separation_full_err[-1]))
+
         # TODO: How to perform this calculation for multiple at once?
-        # TODO: How to use bootstrapping to achieve the same result?
-        guess = newton(root_model, 2.75, args=[
-            hpk_nw_data.biased_capacitance.magnitude[-2],
-            reciprocal_model,
-            *cap_parameter_values
-        ])
-
-        bootstrap_data = rng.normal(loc=hpk_nw_data.biased_capacitance.magnitude[-2],
-                                    scale=hpk_nw_data.biased_capacitance.stat_error[-2], size=number_bootstraps)
-        print(type(cap_parameter_values))
-        print(len(cap_parameter_values))
-        print(np.shape(np.array([*cap_parameter_values], dtype=np.float64)))
-        print(cap_parameter_values)
-        bootstrap_parameter = rng.multivariate_normal(mean=np.array([*cap_parameter_values], dtype=np.float64), cov=nw_m_s.covariance, size=number_bootstraps)
-        # print("The bootstrap parameters first.")
-        # for parameters in bootstrap_parameter:
-        #     print(parameters)
-        # print("Finished bootstrapping")
-        bootstrap_result = np.array([newton(root_model, guess,
-                                            args=[cap, reciprocal_model,
-                                                  *parameters]) for (cap, parameters) in zip(bootstrap_data, bootstrap_parameter)])
-        rev_separation_full_boot, rev_separation_full_err_boot = np.mean(bootstrap_result), np.std(bootstrap_result)
-        print(50 - 4 - 2 * rev_separation_full_boot, np.abs(-2 * rev_separation_full_err_boot))
-
-        rev_separation, rev_separation_cov = propagate(lambda p: inverted_reciprocal_model(
-            hpk_nw_data.biased_capacitance.magnitude, *p),
-                                                       nw_m_s.values,
-                                                       nw_m_s.covariance)
-        print("Checkout error propagation")
-        print(inverted_reciprocal_model(hpk_nw_data.biased_capacitance.magnitude, *cap_parameter_values))
-        print(rev_separation, rev_separation_cov, np.diag(rev_separation_cov) ** 0.5)
-        print(50 - 4 - 2 * rev_separation, -2 * np.diag(rev_separation_cov) ** 0.5)
-
-        # at last calculate the predicitons for all the sensors:

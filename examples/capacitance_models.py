@@ -1,4 +1,3 @@
-
 # ----------------------------------------------------------
 #  Copyright (c) 2026. SiLab, Institute of Physics, University of Bonn.
 #
@@ -14,27 +13,13 @@
 #  See the License for the specific language governing permissions and
 #  limitations under the License.
 # ----------------------------------------------------------
+"""
+Utility module collecting the different attempts to sufficiently model the total pixel capacitance for the different
+pixel geometries and implantation sizes during my bachelor's thesis. Provided just as a example on how the results
+of the PixCap65 capacitance measurements could be used further.
+"""
 
-from examples.general_model import exponential_model
-
-
-def linear_model(x, a, b):
-    return a + x * b
-
-
-def reciprocal_model(x, a, b):
-    return a + b / x
-
-
-def reciprocal_deriv(x, a, b):
-    return - b / x ** 2
-
-def inverted_reciprocal_model(y, a, b):
-    return b / (y - a)
-
-
-def combined_model(x, a, b, c):
-    return a + b * x + c / x
+from examples.general_model import exponential_model, quadratic_model, linear_model
 
 
 def simplified_cap_model(xy, a0, a1, a2):
@@ -43,7 +28,6 @@ def simplified_cap_model(xy, a0, a1, a2):
 
 
 def extended_cap_model(xy, a0, a1, a2, a3, a4, a5):
-    from examples.detailed_fits import quadratic_model
     A, d, p, separation_x, separation_y = xy
     return quadratic_model(p, linear_model(d, a0, a1), linear_model(d, a2, a3), linear_model(d, a4, a5))
 

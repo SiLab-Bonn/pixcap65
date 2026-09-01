@@ -1,7 +1,3 @@
-"""
-Analysis and plotting script evaluate all the data taking from the beginning!
-"""
-
 # ----------------------------------------------------------
 #  Copyright (c) 2026. SiLab, Institute of Physics, University of Bonn.
 #
@@ -17,20 +13,10 @@ Analysis and plotting script evaluate all the data taking from the beginning!
 #  See the License for the specific language governing permissions and
 #  limitations under the License.
 # ----------------------------------------------------------
-#
-#  Licensed under the Apache License, Version 2.0 (the "License");
-#  you may not use this file except in compliance with the License.
-#  You may obtain a copy of the License at
-#
-#     http://www.apache.org/licenses/LICENSE-2.0
-#
-#  Unless required by applicable law or agreed to in writing, software
-#  distributed under the License is distributed on an "AS IS" BASIS,
-#  WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
-#  See the License for the specific language governing permissions and
-#  limitations under the License.
-# ----------------------------------------------------------
 
+"""
+Analysis and plotting script evaluate all the data taking from the beginning!
+"""
 from os.path import join as hdf
 
 import multiprocessing as mp
@@ -1372,39 +1358,39 @@ def x1_plotter_first(tb_lock):
     display_name = name
     top_ref = "Thesis/ATLAS_ITk"
     print("Plotting", display_name)
-    # TODO: reformat this files such that the general structure is used!
-    threaded_plotting.plot_data(interpreted_data='pixcap65/Data/ATLAS ITk/New_1_Initial_2_Scan.h5',
+    # TODO: reformat these files such that the general structure is used!
+    plot_data(interpreted_data='pixcap65/Data/ATLAS ITk/New_1_Initial_2_Scan.h5',
                                 base_path="run_1", suffix="test_run", use_group=True, lock=tb_lock)
-    threaded_plotting.plot_data(interpreted_data='pixcap65/Data/ATLAS ITk/New_1_Initial_2_Scan.h5',
+    plot_data(interpreted_data='pixcap65/Data/ATLAS ITk/New_1_Initial_2_Scan.h5',
                                 base_path="run_1", suffix="test_run", use_group=True, use_corrected=True, lock=tb_lock)
-    threaded_plotting.plot_data(interpreted_data='pixcap65/Data/ATLAS ITk/New_1_Initial_2_Scan.h5',
+    plot_data(interpreted_data='pixcap65/Data/ATLAS ITk/New_1_Initial_2_Scan.h5',
                                 base_path="run_2", suffix="test_run", use_group=True, lock=tb_lock)
-    threaded_plotting.plot_data(interpreted_data='pixcap65/Data/ATLAS ITk/New_1_Initial_2_Scan.h5',
+    plot_data(interpreted_data='pixcap65/Data/ATLAS ITk/New_1_Initial_2_Scan.h5',
                                 base_path="run_2", suffix="test_run", use_group=True, use_corrected=True,
                                 lock=tb_lock)
-    threaded_plotting.plot_data(interpreted_data='pixcap65/Data/ATLAS ITk/New_1_Initial_3_Scan.h5',
+    plot_data(interpreted_data='pixcap65/Data/ATLAS ITk/New_1_Initial_3_Scan.h5',
                                 base_path="ATLAS ITk/run_1", suffix="test_run", use_group=True, lock=tb_lock)
-    threaded_plotting.plot_data(interpreted_data='pixcap65/Data/ATLAS ITk/New_1_Initial_3_Scan.h5',
+    plot_data(interpreted_data='pixcap65/Data/ATLAS ITk/New_1_Initial_3_Scan.h5',
                                 base_path="ATLAS ITk/run_1", suffix="test_run", use_group=True, use_corrected=True,
                                 lock=tb_lock)
-    threaded_plotting.plot_data(interpreted_data='pixcap65/Data/ATLAS ITk/New_1_Initial_3_Scan.h5',
+    plot_data(interpreted_data='pixcap65/Data/ATLAS ITk/New_1_Initial_3_Scan.h5',
                                 base_path="ATLAS ITk/run_2", suffix="test_run", use_group=True, lock=tb_lock)
-    threaded_plotting.plot_data(interpreted_data='pixcap65/Data/ATLAS ITk/New_1_Initial_3_Scan.h5',
+    plot_data(interpreted_data='pixcap65/Data/ATLAS ITk/New_1_Initial_3_Scan.h5',
                                 base_path="ATLAS ITk/run_2", suffix="test_run", use_group=True, use_corrected=True,
                                 lock=tb_lock)
-    threaded_plotting.plot_data(interpreted_data='pixcap65/Data/ATLAS ITk/New_1_Initial_Scan.h5', suffix="test_run",
+    plot_data(interpreted_data='pixcap65/Data/ATLAS ITk/New_1_Initial_Scan.h5', suffix="test_run",
                                 use_group=True, lock=tb_lock)
-    threaded_plotting.plot_data(interpreted_data='pixcap65/Data/ATLAS ITk/New_1_Initial_Scan.h5', suffix="test_run",
+    plot_data(interpreted_data='pixcap65/Data/ATLAS ITk/New_1_Initial_Scan.h5', suffix="test_run",
                                 use_group=True, use_corrected=True, lock=tb_lock)
-    threaded_plotting.plot_data(interpreted_data='pixcap65/Data/New_1_Initial_6_Scan.h5',
+    plot_data(interpreted_data='pixcap65/Data/New_1_Initial_6_Scan.h5',
                                 base_path="ATLAS ITk/run_1", suffix="general_data_test_test", use_group=True,
                                 lock=tb_lock)
-    threaded_plotting.plot_data(interpreted_data='pixcap65/Data/New_1_Initial_6_Scan.h5',
+    plot_data(interpreted_data='pixcap65/Data/New_1_Initial_6_Scan.h5',
                                 base_path="ATLAS ITk/run_1", suffix="general_data_test_test", use_group=True,
                                 use_corrected=True, lock=tb_lock)
-    threaded_plotting.plot_data(interpreted_data='pixcap65/Data/New_1_Initial_6_Scan.h5',
+    plot_data(interpreted_data='pixcap65/Data/New_1_Initial_6_Scan.h5',
                                 base_path="ATLAS ITk/run_2", suffix="general_data", use_group=True, lock=tb_lock)
-    threaded_plotting.plot_data(interpreted_data='pixcap65/Data/New_1_Initial_6_Scan.h5',
+    plot_data(interpreted_data='pixcap65/Data/New_1_Initial_6_Scan.h5',
                                 base_path="ATLAS ITk/run_2", suffix="general_data", use_group=True,
                                 use_corrected=True, lock=tb_lock)
     plot_data(interpreted_data='pixcap65/Data/New_1_Initial_6_Scan.h5', base_path="ATLAS ITk/unbiased_3",
@@ -1414,10 +1400,10 @@ def x1_plotter_first(tb_lock):
               suffix="general_data", use_group=True, use_corrected=True,
               mask_pixel=data_constants.x1_second_pixel_mask, test_cap_exclusion=True, distribution=True,
               lock=tb_lock)
-    threaded_plotting.plot_data(interpreted_data='pixcap65/Data/New_1_Initial_6_Scan.h5',
+    plot_data(interpreted_data='pixcap65/Data/New_1_Initial_6_Scan.h5',
                                 base_path="ATLAS ITk/unbiased_4", suffix="general_data", use_group=True,
                                 lock=tb_lock)
-    threaded_plotting.plot_data(interpreted_data='pixcap65/Data/New_1_Initial_6_Scan.h5',
+    plot_data(interpreted_data='pixcap65/Data/New_1_Initial_6_Scan.h5',
                                 base_path="ATLAS ITk/unbiased_4", suffix="general_data", use_group=True,
                                 use_corrected=True, lock=tb_lock)
     threaded_plotting.plot_bias_data(interpreted_data='pixcap65/Data/New_1_Initial_6_Scan.h5',
