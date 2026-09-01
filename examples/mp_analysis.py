@@ -47,6 +47,8 @@ logger = logging.getLogger(__name__)
 
 
 def synchronize_full_model(file, reference, name, bias, p_lock, **kwargs):
+    # perhaps we should refactor this function to be more general applicable?
+    # in particular there are some inconsistencies in the naming scheme.
     unbiased_name = kwargs.get("unbiased_group", "unbiased_full")
     inter_unbiased_name = kwargs.get("inter_unbiased_group", "inter_unbiased_full")
     biased_name = kwargs.get("biased_group", "biased_{}_V_full")
@@ -62,7 +64,7 @@ def synchronize_full_model(file, reference, name, bias, p_lock, **kwargs):
         if biased_name in reference_node:
             h5_file.copy_node(where=reference_node, newname=biased_name + "_model", name=biased_name,
                               recursive=True, overwrite=True)
-        if inter_biased_name in reference_node:
+        if inter_unbiased_name in reference_node:
             h5_file.copy_node(where=reference_node, newname=inter_unbiased_name + "_model", name=inter_unbiased_name,
                               recursive=True, overwrite=True)
         if inter_biased_name in reference_node:
@@ -95,139 +97,146 @@ def r13_analysator_second(tb_lock, correction_args, **kwargs):
 
     synchronize_full_model(R13_2_SCAN_FILE, top_ref, name, 80, tb_lock,
                            unbiased_group="unbiased_1_full")
+    synchronize_full_model(R13_2_SCAN_FILE, top_ref, name, 80, tb_lock,
+                           unbiased_group="unbiased_1_full", inter_unbiased_group="inter_unbiased_full_renew",
+                           inter_biased_group="inter_biased_M_{}_V_full_renew")
+    synchronize_full_model(R13_2_SCAN_FILE, top_ref, name, 80, tb_lock,
+                           inter_unbiased_group="inter_unbiased_renew_Extended_full",
+                           inter_biased_group="inter_biased_M_{}_V_renew_Extended_full")
 
-    # TODO: make this use some common functions instead!
-    with synchronized_process_open_file(R13_2_SCAN_FILE, mode='a', lock=tb_lock) as h5_file:
-        h5_file.copy_node(where="/Reference/R13", newname="inter_unbiased_full_renew_model",
-                          name="inter_unbiased_full_renew",
-                          recursive=True, overwrite=True)
-        h5_file.copy_node(where="/Reference/R13", newname="inter_biased_M_80_V_full_renew_model",
-                          name="inter_biased_M_80_V_full_renew",
-                          recursive=True, overwrite=True)
-        h5_file.copy_node(where="/Reference/R13", newname="inter_unbiased_renew_Extended_full_model",
-                          name="inter_unbiased_renew_Extended_full",
-                          recursive=True, overwrite=True)
-        h5_file.copy_node(where="/Reference/R13", newname="inter_biased_M_80_V_renew_Extended_full_model",
-                          name="inter_biased_M_80_V_renew_Extended_full",
-                          recursive=True, overwrite=True)
+    # TODO: make this use some common functions instead! (Implemented, need to check though)
+    # with synchronized_process_open_file(R13_2_SCAN_FILE, mode='a', lock=tb_lock) as h5_file:
+    #     h5_file.copy_node(where="/Reference/R13", newname="inter_unbiased_full_renew_model",
+    #                       name="inter_unbiased_full_renew",
+    #                       recursive=True, overwrite=True)
+    #     h5_file.copy_node(where="/Reference/R13", newname="inter_biased_M_80_V_full_renew_model",
+    #                       name="inter_biased_M_80_V_full_renew",
+    #                       recursive=True, overwrite=True)
+    #     h5_file.copy_node(where="/Reference/R13", newname="inter_unbiased_renew_Extended_full_model",
+    #                       name="inter_unbiased_renew_Extended_full",
+    #                       recursive=True, overwrite=True)
+    #     h5_file.copy_node(where="/Reference/R13", newname="inter_biased_M_80_V_renew_Extended_full_model",
+    #                       name="inter_biased_M_80_V_renew_Extended_full",
+    #                       recursive=True, overwrite=True)
 
-    # analyze_data(raw_data=R13_2_SCAN_FILE, base_path=hdf(top_ref, name, 'unbiased_1_full'), is_advanced=True,
-    #              lock=tb_lock, test_cap_exclusion=True, distribution=True, full_model=False,
-    #              fit_plot_pdf_name="Fit References/{}/unbiased_reduced_model.pdf".format(name), plot=True,
-    #              **correction_args)
-    # analyze_data(raw_data=R13_2_SCAN_FILE, base_path=hdf(top_ref, name, 'biased_80_V_full'), is_advanced=True,
-    #              lock=tb_lock, distribution=True, test_cap_exclusion=True, full_model=False, plot=True,
-    #              fit_plot_pdf_name="Fit References/{}/biased_reduced_model.pdf".format(name),
-    #              **correction_args)
-    # analyze_data(raw_data=R13_2_SCAN_FILE, base_path=hdf(top_ref, name, 'unbiased_1_full_model'),
-    #              is_advanced=True,
-    #              lock=tb_lock, test_cap_exclusion=True, distribution=True,
-    #              fit_plot_pdf_name="Fit References/{}/unbiased_full_model.pdf".format(name), plot=True,
-    #              **correction_args)
-    # analyze_data(raw_data=R13_2_SCAN_FILE, base_path=hdf(top_ref, name, 'biased_80_V_full_model'),
-    #              is_advanced=True,
-    #              lock=tb_lock, distribution=True, test_cap_exclusion=True,
-    #              fit_plot_pdf_name="Fit References/{}/biased_full_model.pdf".format(name), plot=True,
-    #              **correction_args)
+    analyze_data(raw_data=R13_2_SCAN_FILE, base_path=hdf(top_ref, name, 'unbiased_1_full'), is_advanced=True,
+                 lock=tb_lock, test_cap_exclusion=True, distribution=True, full_model=False,
+                 fit_plot_pdf_name="Fit References/{}/unbiased_reduced_model.pdf".format(name), plot=True,
+                 **correction_args)
+    analyze_data(raw_data=R13_2_SCAN_FILE, base_path=hdf(top_ref, name, 'biased_80_V_full'), is_advanced=True,
+                 lock=tb_lock, distribution=True, test_cap_exclusion=True, full_model=False, plot=True,
+                 fit_plot_pdf_name="Fit References/{}/biased_reduced_model.pdf".format(name),
+                 **correction_args)
+    analyze_data(raw_data=R13_2_SCAN_FILE, base_path=hdf(top_ref, name, 'unbiased_1_full_model'),
+                 is_advanced=True,
+                 lock=tb_lock, test_cap_exclusion=True, distribution=True,
+                 fit_plot_pdf_name="Fit References/{}/unbiased_full_model.pdf".format(name), plot=True,
+                 **correction_args)
+    analyze_data(raw_data=R13_2_SCAN_FILE, base_path=hdf(top_ref, name, 'biased_80_V_full_model'),
+                 is_advanced=True,
+                 lock=tb_lock, distribution=True, test_cap_exclusion=True,
+                 fit_plot_pdf_name="Fit References/{}/biased_full_model.pdf".format(name), plot=True,
+                 **correction_args)
 
-    # analyze_data(raw_data=R13_2_SCAN_FILE, base_path=hdf(top_ref, name, 'inter_unbiased_full'),
-    #              lock=tb_lock, distribution=True, test_cap_exclusion=True,
-    #              is_advanced=True, full_model=False, is_inter_pixel=True,
-    #              total_cap_file=R13_2_SCAN_FILE,
-    #              total_cap_group=hdf(top_ref, name, 'unbiased_1_full_model/total_cap'),
-    #              **correction_args)
-    # analyze_data(
-    #     raw_data=R13_2_SCAN_FILE,
-    #     base_path=hdf(top_ref, name, "inter_biased_M_80_V_full"),
-    #     lock=tb_lock,
-    #     distribution=True,
-    #     test_cap_exclusion=True,
-    #     is_advanced=True,
-    #     full_model=False,
-    #     is_inter_pixel=True,
-    #     total_cap_file=R13_2_SCAN_FILE,
-    #     total_cap_group=hdf(top_ref, name, "biased_80_V_full_model/total_cap"),
-    #     **correction_args
-    # )
-    # analyze_data(
-    #     raw_data=R13_2_SCAN_FILE,
-    #     base_path=hdf(top_ref, name, "inter_unbiased_full_model"),
-    #     lock=tb_lock,
-    #     distribution=True,
-    #     test_cap_exclusion=True,
-    #     is_advanced=True,
-    #     full_model=True,
-    #     is_inter_pixel=True,
-    #     total_cap_file=R13_2_SCAN_FILE,
-    #     total_cap_group=hdf(top_ref, name, "unbiased_1_full_model/total_cap"),
-    #     **correction_args
-    # )
-    # analyze_data(
-    #     raw_data=R13_2_SCAN_FILE,
-    #     base_path=hdf(top_ref, name, "inter_biased_M_80_V_full_model"),
-    #     lock=tb_lock,
-    #     distribution=True,
-    #     test_cap_exclusion=True,
-    #     is_advanced=True,
-    #     full_model=True,
-    #     is_inter_pixel=True,
-    #     total_cap_file=R13_2_SCAN_FILE,
-    #     total_cap_group=hdf(top_ref, name, "biased_80_V_full_model/total_cap"),
-    #     **correction_args
-    # )
+    analyze_data(raw_data=R13_2_SCAN_FILE, base_path=hdf(top_ref, name, 'inter_unbiased_full'),
+                 lock=tb_lock, distribution=True, test_cap_exclusion=True,
+                 is_advanced=True, full_model=False, is_inter_pixel=True,
+                 total_cap_file=R13_2_SCAN_FILE,
+                 total_cap_group=hdf(top_ref, name, 'unbiased_1_full_model/total_cap'),
+                 **correction_args)
 
-    # analyze_data(raw_data=R13_2_SCAN_FILE, base_path=hdf(top_ref, name, 'inter_unbiased_full_renew'),
-    #              lock=tb_lock, distribution=True, test_cap_exclusion=True,
-    #              is_advanced=True, full_model=False, is_inter_pixel=True,
-    #              total_cap_file=R13_2_SCAN_FILE,
-    #              total_cap_group=hdf(top_ref, name, 'unbiased_1_full_model/total_cap'),
-    #              **correction_args)
-    # analyze_data(raw_data=R13_2_SCAN_FILE, base_path=hdf(top_ref, name, 'inter_biased_M_80_V_full_renew'),
-    #              lock=tb_lock, distribution=True, test_cap_exclusion=True,
-    #              is_advanced=True, full_model=False, is_inter_pixel=True,
-    #              total_cap_file=R13_2_SCAN_FILE,
-    #              total_cap_group=hdf(top_ref, name, 'biased_80_V_full_model/total_cap'),
-    #              **correction_args)
-    # analyze_data(raw_data=R13_2_SCAN_FILE, base_path=hdf(top_ref, name, 'inter_unbiased_full_renew_model'),
-    #              lock=tb_lock, distribution=True, test_cap_exclusion=True,
-    #              is_advanced=True, full_model=True, is_inter_pixel=True,
-    #              total_cap_file=R13_2_SCAN_FILE,
-    #              total_cap_group=hdf(top_ref, name, 'unbiased_1_full_model/total_cap'),
-    #              **correction_args)
-    # analyze_data(raw_data=R13_2_SCAN_FILE, base_path=hdf(top_ref, name, 'inter_biased_M_80_V_full_renew_model'),
-    #              lock=tb_lock, distribution=True, test_cap_exclusion=True,
-    #              is_advanced=True, full_model=True, is_inter_pixel=True,
-    #              total_cap_file=R13_2_SCAN_FILE,
-    #              total_cap_group=hdf(top_ref, name, 'biased_80_V_full_model/total_cap'),
-    #              **correction_args)
+    analyze_data(
+        raw_data=R13_2_SCAN_FILE,
+        base_path=hdf(top_ref, name, "inter_biased_M_80_V_full"),
+        lock=tb_lock,
+        distribution=True,
+        test_cap_exclusion=True,
+        is_advanced=True,
+        full_model=False,
+        is_inter_pixel=True,
+        total_cap_file=R13_2_SCAN_FILE,
+        total_cap_group=hdf(top_ref, name, "biased_80_V_full_model/total_cap"),
+        **correction_args
+    )
+    analyze_data(
+        raw_data=R13_2_SCAN_FILE,
+        base_path=hdf(top_ref, name, "inter_unbiased_full_model"),
+        lock=tb_lock,
+        distribution=True,
+        test_cap_exclusion=True,
+        is_advanced=True,
+        full_model=True,
+        is_inter_pixel=True,
+        total_cap_file=R13_2_SCAN_FILE,
+        total_cap_group=hdf(top_ref, name, "unbiased_1_full_model/total_cap"),
+        **correction_args
+    )
+    analyze_data(
+        raw_data=R13_2_SCAN_FILE,
+        base_path=hdf(top_ref, name, "inter_biased_M_80_V_full_model"),
+        lock=tb_lock,
+        distribution=True,
+        test_cap_exclusion=True,
+        is_advanced=True,
+        full_model=True,
+        is_inter_pixel=True,
+        total_cap_file=R13_2_SCAN_FILE,
+        total_cap_group=hdf(top_ref, name, "biased_80_V_full_model/total_cap"),
+        **correction_args
+    )
 
-    # analyze_data(raw_data=R13_2_SCAN_FILE, base_path=hdf(top_ref, name, 'inter_unbiased_renew_Extended_full'),
-    #              lock=tb_lock, distribution=True, test_cap_exclusion=True,
-    #              is_advanced=True, full_model=False, is_inter_pixel=True,
-    #              total_cap_file=R13_2_SCAN_FILE,
-    #              total_cap_group=hdf(top_ref, name, 'unbiased_1_full_model/total_cap'),
-    #              **correction_args)
-    # analyze_data(raw_data=R13_2_SCAN_FILE,
-    #              base_path=hdf(top_ref, name, 'inter_biased_M_80_V_renew_Extended_full'),
-    #              lock=tb_lock, distribution=True, test_cap_exclusion=True,
-    #              is_advanced=True, full_model=False, is_inter_pixel=True,
-    #              total_cap_file=R13_2_SCAN_FILE,
-    #              total_cap_group=hdf(top_ref, name, 'biased_80_V_full_model/total_cap'),
-    #              **correction_args)
-    # analyze_data(raw_data=R13_2_SCAN_FILE,
-    #              base_path=hdf(top_ref, name, 'inter_unbiased_renew_Extended_full_model'),
-    #              lock=tb_lock, distribution=True, test_cap_exclusion=True,
-    #              is_advanced=True, full_model=True, is_inter_pixel=True,
-    #              total_cap_file=R13_2_SCAN_FILE,
-    #              total_cap_group=hdf(top_ref, name, 'unbiased_1_full_model/total_cap'),
-    #              **correction_args)
-    # analyze_data(raw_data=R13_2_SCAN_FILE,
-    #              base_path=hdf(top_ref, name, 'inter_biased_M_80_V_renew_Extended_full_model'),
-    #              lock=tb_lock, distribution=True, test_cap_exclusion=True,
-    #              is_advanced=True, full_model=True, is_inter_pixel=True,
-    #              total_cap_file=R13_2_SCAN_FILE,
-    #              total_cap_group=hdf(top_ref, name, 'biased_80_V_full_model/total_cap'),
-    #              **correction_args)
+    analyze_data(raw_data=R13_2_SCAN_FILE, base_path=hdf(top_ref, name, 'inter_unbiased_full_renew'),
+                 lock=tb_lock, distribution=True, test_cap_exclusion=True,
+                 is_advanced=True, full_model=False, is_inter_pixel=True,
+                 total_cap_file=R13_2_SCAN_FILE,
+                 total_cap_group=hdf(top_ref, name, 'unbiased_1_full_model/total_cap'),
+                 **correction_args)
+    analyze_data(raw_data=R13_2_SCAN_FILE, base_path=hdf(top_ref, name, 'inter_biased_M_80_V_full_renew'),
+                 lock=tb_lock, distribution=True, test_cap_exclusion=True,
+                 is_advanced=True, full_model=False, is_inter_pixel=True,
+                 total_cap_file=R13_2_SCAN_FILE,
+                 total_cap_group=hdf(top_ref, name, 'biased_80_V_full_model/total_cap'),
+                 **correction_args)
+    analyze_data(raw_data=R13_2_SCAN_FILE, base_path=hdf(top_ref, name, 'inter_unbiased_full_renew_model'),
+                 lock=tb_lock, distribution=True, test_cap_exclusion=True,
+                 is_advanced=True, full_model=True, is_inter_pixel=True,
+                 total_cap_file=R13_2_SCAN_FILE,
+                 total_cap_group=hdf(top_ref, name, 'unbiased_1_full_model/total_cap'),
+                 **correction_args)
+    analyze_data(raw_data=R13_2_SCAN_FILE, base_path=hdf(top_ref, name, 'inter_biased_M_80_V_full_renew_model'),
+                 lock=tb_lock, distribution=True, test_cap_exclusion=True,
+                 is_advanced=True, full_model=True, is_inter_pixel=True,
+                 total_cap_file=R13_2_SCAN_FILE,
+                 total_cap_group=hdf(top_ref, name, 'biased_80_V_full_model/total_cap'),
+                 **correction_args)
+
+    analyze_data(raw_data=R13_2_SCAN_FILE, base_path=hdf(top_ref, name, 'inter_unbiased_renew_Extended_full'),
+                 lock=tb_lock, distribution=True, test_cap_exclusion=True,
+                 is_advanced=True, full_model=False, is_inter_pixel=True,
+                 total_cap_file=R13_2_SCAN_FILE,
+                 total_cap_group=hdf(top_ref, name, 'unbiased_1_full_model/total_cap'),
+                 **correction_args)
+    analyze_data(raw_data=R13_2_SCAN_FILE,
+                 base_path=hdf(top_ref, name, 'inter_biased_M_80_V_renew_Extended_full'),
+                 lock=tb_lock, distribution=True, test_cap_exclusion=True,
+                 is_advanced=True, full_model=False, is_inter_pixel=True,
+                 total_cap_file=R13_2_SCAN_FILE,
+                 total_cap_group=hdf(top_ref, name, 'biased_80_V_full_model/total_cap'),
+                 **correction_args)
+    analyze_data(raw_data=R13_2_SCAN_FILE,
+                 base_path=hdf(top_ref, name, 'inter_unbiased_renew_Extended_full_model'),
+                 lock=tb_lock, distribution=True, test_cap_exclusion=True,
+                 is_advanced=True, full_model=True, is_inter_pixel=True,
+                 total_cap_file=R13_2_SCAN_FILE,
+                 total_cap_group=hdf(top_ref, name, 'unbiased_1_full_model/total_cap'),
+                 **correction_args)
+    analyze_data(raw_data=R13_2_SCAN_FILE,
+                 base_path=hdf(top_ref, name, 'inter_biased_M_80_V_renew_Extended_full_model'),
+                 lock=tb_lock, distribution=True, test_cap_exclusion=True,
+                 is_advanced=True, full_model=True, is_inter_pixel=True,
+                 total_cap_file=R13_2_SCAN_FILE,
+                 total_cap_group=hdf(top_ref, name, 'biased_80_V_full_model/total_cap'),
+                 **correction_args)
 
     print("CV -", display_name)
     analyze_data(raw_data=R13_2_SCAN_FILE, base_path=hdf(top_ref, name, 'C_V_Characteristic_refined'),

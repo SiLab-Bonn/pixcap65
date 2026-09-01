@@ -3,9 +3,9 @@ import tables as tb
 from matplotlib import pyplot as plt
 from matplotlib.backends.backend_pdf import PdfPages
 
+from pixcap65.analysis_util.utility import CURRENT_CONVERSION_FACTOR
 from pixcap65.analysis_util.utility import check_leaf_unit, HIST_CURRENT_MEAS_UNIT
-from pixcap65.plotting import CURRENT_CONVERSION_FACTOR
-from pixcap65.plotting import get_base_group
+from pixcap65.plotting_util import get_base_group
 from pixcap65.plotting_util.utility import get_pdf_name
 
 
