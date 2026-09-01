@@ -365,16 +365,16 @@ def advanced_tqdm_iterator(*args, tqdm_class=tqdm, logger: Optional[logging.Logg
     :param tqdm_class: type of tqdm iterator to use here.
     :param logger: additional logger object to be added for the logging redirect.
     :type logger: logging.Logger, optional
-    :key loggers: Which handlers to redirect (default: [logging.root]).
+    :keyword loggers: Which handlers to redirect (default: [logging.root]).
     :type loggers: list, optional
     :param tqdm_kwargs: further keyword arguments, e.g. to configure the additonal output formatters
-    :key postfix_formatter: str, format string, which replacements must be available from the current iteration object.
-    :key iterator_postfix: bool, whether the iteration variable should be considered an iterable for the format string.
-    :key pre_iteration_hook: callable, callback to be executed before starting the first iteration. Take a
+    :keyword postfix_formatter: str, format string, which replacements must be available from the current iteration object.
+    :keyword iterator_postfix: bool, whether the iteration variable should be considered an iterable for the format string.
+    :keyword pre_iteration_hook: callable, callback to be executed before starting the first iteration. Take a
         :py:class:`tqdm.tqdm` object as its only argument.
-    :key post_iteration_hook: callable, callback to be executed after stopping the last iteration. Take a
+    :keyword post_iteration_hook: callable, callback to be executed after stopping the last iteration. Take a
         :py:class:`tqdm.tqdm` object as its only argument.
-    :key propagate_class: callable, type of tqdm iterator to propagate for the setup of the redirects.
+    :keyword propagate_class: callable, type of tqdm iterator to propagate for the setup of the redirects.
     :return: yields a iterator over the provided iterable.
     """
     loggers = tqdm_kwargs.pop('loggers', None)

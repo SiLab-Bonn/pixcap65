@@ -30,7 +30,8 @@ from pixcap65.analysis_util.utility import check_leaf_unit, HIST_CURRENT_MEAS_UN
     HIST_LEAK_CURRENT_UNIT, extract_parasitic_capacitance, CVDistributionData
 from pixcap65.pixcap.pixcap_structure import HIST_PIX_CAP_LABEL, COUNTS_HIST_LABEL, CAPACITANCE_CONVERSION_FACTOR, \
     DEFAULT_BIN_NUMBER
-from pixcap65.plotting_util import GENERATE_THESIS_PLOTS, global_interactive_lock, FREQUENCY_LABEL, CURRENT_LABEL
+from pixcap65.plotting_util import global_interactive_lock, FREQUENCY_LABEL, CURRENT_LABEL
+from pixcap65.plotting_util.constants import GENERATE_THESIS_PLOTS
 from pixcap65.plotting_util.utility import advanced_figure_provider, evaluate_pixel_mask, figure_provider
 
 
@@ -56,32 +57,32 @@ def plot_1d_distribution(data: np.ndarray, label: str, bias_code: int, table: Op
     :param pdf:
     :param group:
     :param kwargs: further keyword arguments to be propagated to sub-calls.
-    :key plotting_lock: synchronization primitve/"lock" to make sure only one **process** is able to create a
+    :keyword plotting_lock: synchronization primitve/"lock" to make sure only one **process** is able to create a
         new figure at the same time as matplotlib is not necessarily thread-safe.
-    :key hist_bins: integer, number of bins to use for the histogram. (default: 50)
+    :keyword hist_bins: integer, number of bins to use for the histogram. (default: 50)
     :type hist_bins: int
-    :key unit: unit of the capacities presented within the plot.
+    :keyword unit: unit of the capacities presented within the plot.
     :type unit: str
-    :key distribution: boolean, indicating whether to investigate the capacitance distribution over the whole sensor.
+    :keyword distribution: boolean, indicating whether to investigate the capacitance distribution over the whole sensor.
         (default: False)
     :type distribution: bool
-    :key test_cap_exclusion: whether to exclude row 0 completely. (default: False)
+    :keyword test_cap_exclusion: whether to exclude row 0 completely. (default: False)
     :type test_cap_exclusion: bool
-    :key mask_pixel: array/iterable of tuple of pixel positions to be masked and therefore ignored for evaluation.
-    :key mask_lower: float, threshold to mask all pixels below this value.
+    :keyword mask_pixel: array/iterable of tuple of pixel positions to be masked and therefore ignored for evaluation.
+    :keyword mask_lower: float, threshold to mask all pixels below this value.
     :type mask_lower: float
-    :key mask_upper: float, threshold to mask all pixels above this value.
+    :keyword mask_upper: float, threshold to mask all pixels above this value.
     :type mask_upper: float
-    :key capacitance: histogram of the capacitance to use instead of those extracted from the provided hdf files group.
-    :key set_parasitic: boolean, whether to set the parasitic capacitance for this data set.
+    :keyword capacitance: histogram of the capacitance to use instead of those extracted from the provided hdf files group.
+    :keyword set_parasitic: boolean, whether to set the parasitic capacitance for this data set.
     :type set_parasitic: bool
-    :key no_plot: boolean, whether to supress (interactive) plotting of the distribution of the capacitance.
-    :key convert: boolean, whether to convert the capacitance to fF, or not (default: True)
-    :key use_kafe2: indicates whether kafe2 is used for the fit. (default: False)
+    :keyword no_plot: boolean, whether to supress (interactive) plotting of the distribution of the capacitance.
+    :keyword convert: boolean, whether to convert the capacitance to fF, or not (default: True)
+    :keyword use_kafe2: indicates whether kafe2 is used for the fit. (default: False)
     :type use_kafe2: bool
-    :key apply_contours: indicates whether to determine the contours and try to plot them. (default: False)
+    :keyword apply_contours: indicates whether to determine the contours and try to plot them. (default: False)
     :type apply_contours: bool
-    :key fit_plot_pdf: PDF object to save the fit figures to.
+    :keyword fit_plot_pdf: PDF object to save the fit figures to.
     """
     unit = kwargs.pop("unit", "\\farad")
     interactive_lock = kwargs.get('plotting_lock', global_interactive_lock)
@@ -118,32 +119,32 @@ def plot_data_delegate(data_group: tb.Group, analysis_group: tb.Group, output_pd
     :param data_group: hdf files hierarchy group containing the raw measurement data.
     :param analysis_group: hdf files hierarchy group containing the analysis results.
     :param output_pdf: PDF object to write the created figures to for long-term saving.
-    :key plotting_lock: synchronization primitve/"lock" to make sure only one **process** is able to create
+    :keyword plotting_lock: synchronization primitve/"lock" to make sure only one **process** is able to create
         a new figure at the same time as matplotlib is not necessarily thread-safe.
-    :key hist_bins: integer, number of bins to use for the histogram. (default: 50)
+    :keyword hist_bins: integer, number of bins to use for the histogram. (default: 50)
     :type hist_bins: int
-    :key test_cap_exclusion: whether to exclude row 0 completely. (default: False)
+    :keyword test_cap_exclusion: whether to exclude row 0 completely. (default: False)
     :type test_cap_exclusion: bool
-    :key mask_pixel: array/iterable of tuple of pixel positions to be masked and therefore ignored for evaluation.
-    :key mask_lower: float, threshold to mask all pixels below this value.
+    :keyword mask_pixel: array/iterable of tuple of pixel positions to be masked and therefore ignored for evaluation.
+    :keyword mask_lower: float, threshold to mask all pixels below this value.
     :type mask_lower: float
-    :key mask_upper: float, threshold to mask all pixels above this value.
+    :keyword mask_upper: float, threshold to mask all pixels above this value.
     :type mask_upper: float
-    :key distribution: boolean, indicating whether to investigate the capacitance distribution over the whole sensor.
+    :keyword distribution: boolean, indicating whether to investigate the capacitance distribution over the whole sensor.
         (default: False)
     :type distribution: bool
-    :key unit: unit of the capacities presented within the plot.
+    :keyword unit: unit of the capacities presented within the plot.
     :type unit: str
-    :key capacitance: histogram of the capacitance to use instead of those extracted from the provided hdf files group.
-    :key set_parasitic: boolean, whether to set the parasitic capacitance for this data set.
+    :keyword capacitance: histogram of the capacitance to use instead of those extracted from the provided hdf files group.
+    :keyword set_parasitic: boolean, whether to set the parasitic capacitance for this data set.
     :type set_parasitic: bool
-    :key no_plot: boolean, whether to supress (interactive) plotting of the distribution of the capacitance.
-    :key convert: boolean, whether to convert the capacitance to fF, or not (default: True)
-    :key use_kafe2: indicates whether kafe2 is used for the fit. (default: False)
+    :keyword no_plot: boolean, whether to supress (interactive) plotting of the distribution of the capacitance.
+    :keyword convert: boolean, whether to convert the capacitance to fF, or not (default: True)
+    :keyword use_kafe2: indicates whether kafe2 is used for the fit. (default: False)
     :type use_kafe2: bool
-    :key apply_contours: indicates whether to determine the contours and try to plot them. (default: False)
+    :keyword apply_contours: indicates whether to determine the contours and try to plot them. (default: False)
     :type apply_contours: bool
-    :key fit_plot_pdf: PDF object to save the fit figures to.
+    :keyword fit_plot_pdf: PDF object to save the fit figures to.
     """
     interactive_lock = kwargs.get('plotting_lock', global_interactive_lock)
 
@@ -275,14 +276,14 @@ def plot_2d_capacitance(data, label, pdf, **kwargs):
     :param label: label/title of the plot/figure when saving it.
     :type label: str
     :param pdf: pdf object to save the final figure to.
-    :key plotting_lock: synchronization primitve/"lock" to make sure only one **process** is able to create a new figure
+    :keyword plotting_lock: synchronization primitve/"lock" to make sure only one **process** is able to create a new figure
         at the same time as matplotlib is not necessarily thread-safe.
-    :key test_cap_exclusion: whether to exclude row 0 completely. (default: False)
+    :keyword test_cap_exclusion: whether to exclude row 0 completely. (default: False)
     :type test_cap_exclusion: bool
-    :key mask_pixel: array of tuple of pixel positions to be masked.
-    :key mask_lower: float, threshold to mask all pixels below this value.
+    :keyword mask_pixel: array of tuple of pixel positions to be masked.
+    :keyword mask_lower: float, threshold to mask all pixels below this value.
     :type mask_lower: float
-    :key mask_upper: float, threshold to mask all pixels above this value.
+    :keyword mask_upper: float, threshold to mask all pixels above this value.
     :type mask_upper: float
     """
     interactive_lock = kwargs.get("plotting_lock", global_interactive_lock)
@@ -364,7 +365,7 @@ def get_model_prediction(col, row, analysis_group: tb.Group, actual_cap: Any, to
     :param resistor_name: name of the dataset containing the on-resistance estimators if such a dataset is present at
         all.
     :param plot_args: further keywords arguments to be propagated to a plotting utility function (unused?)
-    :key parasitic_correction: parasitic capacitance for which the input values are already corrected (this needs to
+    :keyword parasitic_correction: parasitic capacitance for which the input values are already corrected (this needs to
         be accounted for by the model as the currents are not corrected at all).
     :return:
     """
@@ -405,7 +406,7 @@ def plot_current_model(ax: Axes, col, row, analysis_group: tb.Group, actual_cap:
         :param resistor_name: Name of resistance estimator to use for the model functions plot.
         :param color: colour code to use for plotted model.
         :param prefix: prefix for title and legend to use.
-        :key parasitic_correction: if present, it should be the capacitance subtracted during capacitance correction
+        :keyword parasitic_correction: if present, it should be the capacitance subtracted during capacitance correction
             procedure.
         """
     # fetch the model

@@ -18,6 +18,9 @@ documentation for details.
    introduction
    pixcap
    measurements
+   data
+   data_structures
+   analysis
 
 Indices and tables
 ==================

@@ -56,11 +56,11 @@ def plot_bias_delegate(data_group, output_pdf: PdfPages, **kwargs):
 
     :param data_group: hdf file's hierarchy group containing the raw data.
     :param output_pdf: PDF object to write the plots to.
-    :key plotting_lock: synchronization primitve/"lock" to make sure only one **process** is able to create a new figure
+    :keyword plotting_lock: synchronization primitve/"lock" to make sure only one **process** is able to create a new figure
         at the same time as matplotlib is not necessarily thread-safe.
-    :key labels: required for multi-sensor plotting to label the plots from the different sensors correctly such that
+    :keyword labels: required for multi-sensor plotting to label the plots from the different sensors correctly such that
     these could be identified. (Iterable)
-    :key area_normalisation: areas of the individual pixel summed over all contributiong pixels. (Iterable)
+    :keyword area_normalisation: areas of the individual pixel summed over all contributiong pixels. (Iterable)
     """
     interactive_lock = kwargs.get("plotting_lock", global_interactive_lock)
     with figure_provider(interactive_lock) as (fig, ax, _):
@@ -164,17 +164,17 @@ def plot_cv_data_delegate(data_group: Union[tb.Group, SENSOR_ITERABLE],
     :param analysis_group: HDF files hierarchy group containing the analysis results.
     :param output_pdf: PDF object to write the created figures to for long-term saving.
     :param apply_doping: boolean, False, indicates whether to plot the depletion data.
-    :key plotting_lock: synchronization primitve/"lock" to make sure only one **process** is able to create a new figure
+    :keyword plotting_lock: synchronization primitve/"lock" to make sure only one **process** is able to create a new figure
         at the same time as matplotlib is not necessarily thread-safe.
-    :key labels: required for multi-sensor plotting to label the plots from the different sensors correctly such that
+    :keyword labels: required for multi-sensor plotting to label the plots from the different sensors correctly such that
         these could be identified. (Iterable)
-    :key mask_pixel: array/iterable of tuple of pixel positions to be masked and therefore ignored for evaluation.
-    :key verbose: boolean, indicating whether to use verbose output for depletion voltages.
-    :key distribution: boolean, indicating whether also the capacitance distribution of the whole sensor
+    :keyword mask_pixel: array/iterable of tuple of pixel positions to be masked and therefore ignored for evaluation.
+    :keyword verbose: boolean, indicating whether to use verbose output for depletion voltages.
+    :keyword distribution: boolean, indicating whether also the capacitance distribution of the whole sensor
         should be investigated.
-    :key hist_bins: integer, number of bins to use for the histogram. (default: 50)
+    :keyword hist_bins: integer, number of bins to use for the histogram. (default: 50)
     :type hist_bins: int
-    :key use_corrected: boolean, indicating whether to use the corrected capacitance for plotting. (data corrected for
+    :keyword use_corrected: boolean, indicating whether to use the corrected capacitance for plotting. (data corrected for
         parasitic capacitances of PixCap65, default: False)
     :type use_corrected: bool
     """
@@ -334,9 +334,9 @@ def _plot_cv_distribution(group: tb.Group, ax, x_limits=None, y_limits=None, **k
     :param ax: axes object(s) to use for plotting
     :param x_limits: tuple defining the x-axis plotting limits from the data points of the C-V-Curve.
     :param y_limits:tuple defining the y-axis plotting limits from the data points of the C-V-Curve.
-    :key use_corrected: boolean, indicating whether to use the corrected capacitance for plotting. (data corrected for parasitic capacitances of PixCap65, default: False)
+    :keyword use_corrected: boolean, indicating whether to use the corrected capacitance for plotting. (data corrected for parasitic capacitances of PixCap65, default: False)
     :type use_corrected: bool
-    :key is_combining: boolean, indicates whether multiple sensors are to be combined into a single figure. (default: False)
+    :keyword is_combining: boolean, indicates whether multiple sensors are to be combined into a single figure. (default: False)
     :type is_combining: bool
     :return: tuple of the drawing limits for both axis and the final title string for the figure.
     """
@@ -517,7 +517,7 @@ def _cv_plotter(analysis, row, col, ax, voltage_data_sets, labels, **kwargs):
     :param voltage_data_sets: datasets of the applied bias voltages for (different) sensors.
         (could also contain the data for only a single sensor)
     :param labels: identifying names for the different sensors to use in the legend, when plotting for multiple sensors.
-    :key is_distribution_plot: indicates wether we plot for the averaged sensor instead of a particular pixel
+    :keyword is_distribution_plot: indicates wether we plot for the averaged sensor instead of a particular pixel
         (default: False)
     :type is_distribution_plot: bool
     :return:

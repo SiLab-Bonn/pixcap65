@@ -28,7 +28,8 @@ from pixcap65.analysis_util.utility import get_base_group, check_leaf_unit, HIST
     HIST_LEAK_CURRENT_UNIT, extract_parasitic_capacitance
 from pixcap65.pixcap.pixcap_structure import HIST_PIX_CAP_LABEL, COUNTS_HIST_LABEL, CAPACITANCE_CONVERSION_FACTOR, \
     DEFAULT_BIN_NUMBER
-from pixcap65.plotting_util import GENERATE_THESIS_PLOTS, global_interactive_lock, FREQUENCY_LABEL, CURRENT_LABEL
+from pixcap65.plotting_util import global_interactive_lock, FREQUENCY_LABEL, CURRENT_LABEL
+from pixcap65.plotting_util.constants import GENERATE_THESIS_PLOTS
 from pixcap65.plotting_util.general import __get_1d_hist_label, plot_2d_capacitance, plot_current_data, \
     plot_current_model
 from pixcap65.plotting_util.utility import advanced_figure_provider, evaluate_pixel_mask
@@ -93,26 +94,26 @@ def plot_inter_pix_data_delegate(data_group: tb.Group, analysis_group: tb.Group,
     :param total_group: hdf files hierarchy group containing the total cap measurements (results).
     :param inter_group: hdf files hierarchy group containing another inter-pixel measurements (results) for reference
         when extracting the individual contributions to the inter-pixel-capacitance. (default: None)
-    :key plotting_lock: synchronization primitve/"lock" to make sure only one **process** is able to create a new figure
+    :keyword plotting_lock: synchronization primitve/"lock" to make sure only one **process** is able to create a new figure
         at the same time as matplotlib is not necessarily thread-safe.
-    :key distribution: boolean, indicating whether to investigate the capacitance distribution over the whole sensor.
+    :keyword distribution: boolean, indicating whether to investigate the capacitance distribution over the whole sensor.
         (default: False) [boolean]
     :type distribution: bool
-    :key hist_bins: integer, number of bins to use for the histogram. (default: 50)
+    :keyword hist_bins: integer, number of bins to use for the histogram. (default: 50)
     :type hist_bins: int
-    :key test_cap_exclusion: whether to exclude row 0 completely. (default: False)
+    :keyword test_cap_exclusion: whether to exclude row 0 completely. (default: False)
     :type test_cap_exclusion: bool
-    :key mask_pixel: array of tuple of pixel positions to be masked.
-    :key mask_lower: float, threshold to mask all pixels below this value.
+    :keyword mask_pixel: array of tuple of pixel positions to be masked.
+    :keyword mask_lower: float, threshold to mask all pixels below this value.
     :type mask_lower: float
-    :key mask_upper: float, threshold to mask all pixels above this value.
+    :keyword mask_upper: float, threshold to mask all pixels above this value.
     :type mask_upper: float
-    :key no_plot: boolean, whether to supress (interactive) plotting of the distribution of the capacitance.
-    :key use_kafe2: indicates whether kafe2 is used for the fit. (default: False)
+    :keyword no_plot: boolean, whether to supress (interactive) plotting of the distribution of the capacitance.
+    :keyword use_kafe2: indicates whether kafe2 is used for the fit. (default: False)
     :type use_kafe2: bool
-    :key apply_contours: indicates whether to determine the contours and try to plot them. (default: False)
+    :keyword apply_contours: indicates whether to determine the contours and try to plot them. (default: False)
     :type apply_contours: bool
-    :key fit_plot_pdf: PDF object to save the fit figures to.
+    :keyword fit_plot_pdf: PDF object to save the fit figures to.
     """
     interactive_lock = kwargs.get("plotting_lock", global_interactive_lock)
     need_distribution = kwargs.get("distribution", False)

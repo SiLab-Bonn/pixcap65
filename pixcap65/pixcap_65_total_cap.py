@@ -514,7 +514,7 @@ class PixCap65Measurement(Pixcap65BaseMeasurement, metaclass=ABCMeta):
         The array will always be created within the hdf file owned by the measurement object.
         :param where: group where to store the data in
         :param name: name of the data set; it should be unique and a valid python identifier
-        :key input: specifies the device used for input
+        :keyword input: specifies the device used for input
         :param unit: specifies the unit used for input
         :param kwargs: further arguments for :py:mod:`pytables` implementation
         :type unit: str
@@ -995,7 +995,7 @@ class PixCap65Measurement(Pixcap65BaseMeasurement, metaclass=ABCMeta):
         :param data_group_spec: specifier of the hdf files groups to store the results to.
         :param handle_unit: :ref: `unit` specifier/argument for measurement storage.
         :param kwargs: further keyword arguments to be propagated to the progress bar handler.
-        :key pbar: boolean, whether to use tqdm for progress bars or not.
+        :keyword pbar: boolean, whether to use tqdm for progress bars or not.
         :keyword allow_continuous_measurement: indicates whether to measure the settled bias voltage asynchronously
             to the measurements of the leakage current.
         """
@@ -1102,12 +1102,12 @@ class PixCap65Measurement(Pixcap65BaseMeasurement, metaclass=ABCMeta):
         Should only be called on measurement run configuration.
 
         :param voltage_range: maximum voltage which should be sourced by the SMU.
-        :key current_limit: maximum current which should be measured by the SMU. Set the current protection of the SMU.
+        :keyword current_limit: maximum current which should be measured by the SMU. Set the current protection of the SMU.
         :param plc: number of power cycles to average the measured quantity over.
         :param kwargs: further keyword arguments to be propagated to the dut. (all not explicitly named keyword
             arguments are propagated to the dut SMU handler.)
-        :key plc_cycles: `plc`
-        :key current_range: maximum current to be measured by the SMU.
+        :keyword plc_cycles: `plc`
+        :keyword current_range: maximum current to be measured by the SMU.
         """
         if plc is None:
             plc = self.scan_config.get(ScanConfigurationKeys.PLC, STANDARD_NLPC)
@@ -1318,8 +1318,8 @@ class PixCap65Measurement(Pixcap65BaseMeasurement, metaclass=ABCMeta):
 
         :param data_group_spec: specifier of the group containing the data to be plotted.
         :param kwargs: further keyword arguments to be propagated through
-        :key suffix: additional suffix to use for naming the PDF containing the plots.
-        :key use_group: boolean, whether to append the group name of the measurements to the PDF name.
+        :keyword suffix: additional suffix to use for naming the PDF containing the plots.
+        :keyword use_group: boolean, whether to append the group name of the measurements to the PDF name.
         """
         from matplotlib.backends.backend_pdf import PdfPages
         from pixcap65.plotting_util.biasing import plot_bias_delegate

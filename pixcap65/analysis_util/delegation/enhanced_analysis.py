@@ -58,16 +58,16 @@ def advanced_analysis_delegate(file: tb.File, group: tb.Group, current_hist: TAB
     :param current_hist: 2D-Array for the current data to fit the model to.
     :param scan_parameters: table of the scan parameters used for each measurement point within the frequency and/or
         voltage scan.
-    :key full_model: boolean, True, indicates whether the full model for extended frequency range is to be used.
+    :keyword full_model: boolean, True, indicates whether the full model for extended frequency range is to be used.
         Otherwise, the linear model is used.
-    :key current_error_hist: 2D-Array for the errors of the current data. This keyword argument must be present
+    :keyword current_error_hist: 2D-Array for the errors of the current data. This keyword argument must be present
         for the advanced analysis strategy.
-    :key use_kafe2: boolean, indicates whether kafe2 is used for the fit. (default: False)
-    :key plot: boolean, indicates whether to plot the data. An output PDF object could be submitted here instead of an explicitly created one. (Default: False)
-    :key apply_contour: boolean, indicates whether to determine the contours and try to plot them. (default: False)
-    :key fit_plot_pdf: PdfPages object, to save the fit plot figures to (will override the plot object if provided)
-    :key output_pdf: PdfPages object, to save the fit plot figures to (will override the plot object if provided)
-    :key is_inter_b: indicates whether this an analysis for the b-channel of the inter-pixel capacitances measurements, which would change the assumed voltage.
+    :keyword use_kafe2: boolean, indicates whether kafe2 is used for the fit. (default: False)
+    :keyword plot: boolean, indicates whether to plot the data. An output PDF object could be submitted here instead of an explicitly created one. (Default: False)
+    :keyword apply_contour: boolean, indicates whether to determine the contours and try to plot them. (default: False)
+    :keyword fit_plot_pdf: PdfPages object, to save the fit plot figures to (will override the plot object if provided)
+    :keyword output_pdf: PdfPages object, to save the fit plot figures to (will override the plot object if provided)
+    :keyword is_inter_b: indicates whether this an analysis for the b-channel of the inter-pixel capacitances measurements, which would change the assumed voltage.
     """
     plot = kwargs.pop("plot", False)
     plot_fit = HandleFitterStubClass()
@@ -115,16 +115,16 @@ def _perform_advanced_fit(file: tb.File, group: tb.Group, current_hist: np.ndarr
     :param current_hist: histogram/array-like of the measured currents.
     :param plot_fit: object handling the control plots for the fit.
     :param scan_parameters: mapping of scan-parameters used when measuring the capacitances'.
-    :key full_model: boolean, True, indicates whether the full model for extended frequency range is to be used.
+    :keyword full_model: boolean, True, indicates whether the full model for extended frequency range is to be used.
         Otherwise, the linear model is used.
-    :key current_error_hist: 2D-Array for the errors of the current data. This keyword argument must be present
+    :keyword current_error_hist: 2D-Array for the errors of the current data. This keyword argument must be present
         for the advanced analysis strategy.
-        :key use_kafe2: boolean, indicates whether kafe2 is used for the fit. (default: False)
-    :key plot: boolean, indicates whether to plot the data. An output PDF object could be submitted here instead of
+        :keyword use_kafe2: boolean, indicates whether kafe2 is used for the fit. (default: False)
+    :keyword plot: boolean, indicates whether to plot the data. An output PDF object could be submitted here instead of
         an explicitly created one. (Default: False)
-    :key apply_contour: boolean, indicates whether to determine the contours and try to plot them. (default: False)
-    :key output_pdf: PdfPages object, to save the fit plot figures to (will override the plot object if provided)
-    :key is_inter_b: indicates whether this an analysis for the b-channel of the inter-pixel capacitances measurements,
+    :keyword apply_contour: boolean, indicates whether to determine the contours and try to plot them. (default: False)
+    :keyword output_pdf: PdfPages object, to save the fit plot figures to (will override the plot object if provided)
+    :keyword is_inter_b: indicates whether this an analysis for the b-channel of the inter-pixel capacitances measurements,
         which would change the assumed voltage.
     """
     # extract the additional keyword arguments

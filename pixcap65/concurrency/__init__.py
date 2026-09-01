@@ -79,8 +79,8 @@ def get_context_manager(**kwargs):
     last update: 2026-08-25
 
     :param kwargs: further arguments to connect to a already running manager or create a new one with well-defined parameters. For this keywords you may also take a look at :py:func:`pixcap65.analysis.get_manager_keywords`.
-    :key address: address of the socket of the multiprocessing.Manager object we want to connect to.
-    :key authkey: authentication key necessary to connect to the socket. (It is recommended not to use this parameter as
+    :keyword address: address of the socket of the multiprocessing.Manager object we want to connect to.
+    :keyword authkey: authentication key necessary to connect to the socket. (It is recommended not to use this parameter as
         it is not pickable)
     :return: context manager to use a multiprocessing.Manager object suitable for sharing resources.
     """
@@ -102,8 +102,8 @@ def get_manager(**kwargs):
 
     :param kwargs: further arguments to connect to a already running manager or create a new one with well-defined parameters. For this keywords you may also take a look at :py:func:`pixcap65.analysis.get_manager_keywords`.
 
-    :key address: address of the socket of the multiprocessing.Manager object we want to connect to.
-    :key authkey: authentication key necessary to connect to the socket. (It is recommended not to use this parameter as
+    :keyword address: address of the socket of the multiprocessing.Manager object we want to connect to.
+    :keyword authkey: authentication key necessary to connect to the socket. (It is recommended not to use this parameter as
         it is not pickable)
     :return: multiprocessing.Manager object suitable for sharing resources.
     :rtype: :py:class:`multiprocessing.managers.Manager`
@@ -163,8 +163,8 @@ def get_mp_context_manager(**kwargs):
     last update: 2026-08-25
 
     :param kwargs: further arguments to connect to a already running manager or create a new one with well-defined parameters. For this keywords you may also take a look at :py:func:`pixcap65.analysis.get_manager_keywords`.
-    :key address: address of the socket of the multiprocessing.Manager object we want to connect to.
-    :key authkey: authentication key necessary to connect to the socket. (It is recommended not to use this parameter as
+    :keyword address: address of the socket of the multiprocessing.Manager object we want to connect to.
+    :keyword authkey: authentication key necessary to connect to the socket. (It is recommended not to use this parameter as
         it is not pickable)
     :return: context manager to use a multiprocessing.Manager object suitable for sharing resources.
     """
@@ -187,8 +187,8 @@ def get_mp_manager(**kwargs):
     last update: 2026-08-25
 
     :param kwargs: further arguments to connect to a already running manager or create a new one with well-defined parameters. For this keywords you may also take a look at :py:func:`pixcap65.analysis.get_manager_keywords`.
-    :key address: address of the socket of the multiprocessing.Manager object we want to connect to.
-    :key authkey: authentication key necessary to connect to the socket. (It is recommended not to use this parameter as
+    :keyword address: address of the socket of the multiprocessing.Manager object we want to connect to.
+    :keyword authkey: authentication key necessary to connect to the socket. (It is recommended not to use this parameter as
         it is not pickable)
     :return: multiprocessing.Manager object suitable for sharing resources.
     :rtype: :py:class:`pixcap65.concurrency.manager.DepletionMPManager`
@@ -315,8 +315,8 @@ def initialize_worker_manager(**kwargs):
     last update: 2026-08-25
 
     :param kwargs: further arguments to connect to a already running manager or create a new one with well-defined parameters. For this keywords you may also take a look at :py:func:`pixcap65.analysis.get_manager_keywords`.
-    :key address: address of the socket of the multiprocessing.Manager object we want to connect to.
-    :key authkey: authentication key necessary to connect to the socket. (It is recommended not to use this parameter as
+    :keyword address: address of the socket of the multiprocessing.Manager object we want to connect to.
+    :keyword authkey: authentication key necessary to connect to the socket. (It is recommended not to use this parameter as
         it is not pickable)
     """
     _ = get_manager(**kwargs)
