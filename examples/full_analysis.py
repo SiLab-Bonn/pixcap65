@@ -13,7 +13,6 @@
 #  See the License for the specific language governing permissions and
 #  limitations under the License.
 # ----------------------------------------------------------
-
 """
 Analysis and plotting script evaluate all the data taking from the beginning!
 """
@@ -38,17 +37,11 @@ from pixcap65.utility.homogenize_plots import set_params
 from pixcap65.utility.tables_util import get_group_attribute
 
 INTER_UNBIASED_MODEL = 'inter_unbiased_full_model'
-
 UNBIASED_MODEL = 'unbiased_full_model'
-
 INTER_MIX = "inter-mix"
-
 UNBIASED = 'unbiased_full'
-
 INTER_UNBIASED = 'inter_unbiased_full'
-
 LOG_FINISHED_ANALYSIS = "Finished the Analysis for"
-
 LOG_CV_ANALYSIS = "CV Analysis for"
 
 
