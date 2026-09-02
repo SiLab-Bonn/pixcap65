@@ -170,10 +170,13 @@ source-exclude = [
     "data_local",
     "dist",
     "dist*",
-    "data*",
+    # "data*",
     "Data*",
     "*.egg-info",
     "results",
+    "*_back.yaml",
+    "*_template.yaml",
+    "*.log",
 ]
 
 [[tool.uv.index]]
