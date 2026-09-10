@@ -219,6 +219,7 @@ def plot_cv_data_delegate(data_group: Union[tb.Group, SENSOR_ITERABLE],
         # Plot the doping analysis only for single-sensor samplings.
         if apply_doping:
             # TODO: better use the actual voltages here.
+            # Check: is there a better implementation for this?
             voltage_collection_idx = 0
             if isinstance(data_group, tb.Group):
                 depletion_width_plate = check_leaf_unit(analysis_group.DepletionWidth, "um")
@@ -280,6 +281,7 @@ def plot_cv_data_delegate(data_group: Union[tb.Group, SENSOR_ITERABLE],
         combiner = False
         iterator = filter(iterator_filter, enumerate(voltage_data_sets[0]))
         for k, bias_voltage in iterator:
+            # complicated to use the 1d plotting handler here?
             with figure_provider(interactive_lock, output=output_pdf) as (fig, ax, _):
                 if not GENERATE_THESIS_PLOTS:
                     ax.set_title("Capacitance distribution for bias voltage {}".format(bias_voltage))
