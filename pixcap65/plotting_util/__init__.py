@@ -440,18 +440,6 @@ def plot_depletion_delegate(data_group: tb.Group, analysis_group: GroupType, out
     view_table = [group.DepletionParamTable for group in analysis_groups]
     view_effective_resistivity_table = np.array(
         [check_leaf_unit(group.DepletionResistivity, "Ocm") for group in analysis_groups])
-    # CHECK: what about here with handling multiple-sensors? (under investigation)
-
-    # depletion_width_plate = check_leaf_unit(analysis_group.DepletionWidth, "um")
-    # depletion_width_plate_error = check_leaf_unit(analysis_group.DepletionWidthErr, "um")
-    # effective_doping_table = check_leaf_unit(analysis_group.DepletionEffDoping, "cm^-3")
-    # bias_voltages = check_leaf_unit(data_group.BiasVoltageHist, HIST_BIAS_MEAS_UNIT)
-    # table = analysis_group.DepletionParamTable
-    # view_depletion_width_plate = depletion_width_plate[None, :]
-    # view_depletion_width_plate_error = depletion_width_plate_error[None, :]
-    # view_effective_doping_table = effective_doping_table[None, :]
-    # view_bias_voltages = np.atleast_2d(bias_voltages)
-    # view_table = [table]
 
     for col, row in np.ndindex(GENERAL_PIXCAP_SHAPE):
         plot_depletion_pixel_delegate(view_bias_voltages, col, view_depletion_width_plate,

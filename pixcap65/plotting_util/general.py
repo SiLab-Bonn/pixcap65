@@ -261,7 +261,6 @@ def __get_1d_hist_label(bias_code: int, label: str, table: Optional[tb.Table], u
     return "{}{}{}".format(label, uncorrected_label, corrected_label)
 
 
-# CHECK: Should we use such helper functions everywhere?
 def plot_2d_capacitance(data, label, pdf, **kwargs):
     """
     plot_2d_capacitance
