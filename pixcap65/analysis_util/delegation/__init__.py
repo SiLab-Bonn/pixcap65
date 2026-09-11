@@ -20,13 +20,11 @@ measurements.
 import numpy as np
 import tables as tb
 
-# FIXME: be careful when importing from __init__ scripts (maybe solved)
-# this here seems not to be an issue as delegation is not used from the init script!
-from pixcap65.analysis_util import get_manager_keywords
 from pixcap65.analysis_util.constants import SI_MOBILITY, BOUNDARY_TYPE, BIAS_VOLTAGE_ACCESS_IDX
 from pixcap65.analysis_util.delegation.cv.doping import analyze_doping_profile
 from pixcap65.analysis_util.delegation.depletion import depletion_delegation_impl
 from pixcap65.analysis_util.modelling.data_store import DopingArrayStore
+from pixcap65.analysis_util.multiprocessing import get_manager_keywords
 from pixcap65.concurrency import get_context_manager
 from pixcap65.utility.tables_util import group_get_file
 from pixcap65.utility.utils_2 import create_carray
