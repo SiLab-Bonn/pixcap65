@@ -917,7 +917,8 @@ class Pixcap65(Dut):
         """
         smu_read_multiple_current
 
-        @author: Dominik Fischer
+        :author: Dominik Fischer
+
         last update: 2026-08-25
 
         Performs a current measurement by reading multiple current values from the SMU.
@@ -927,8 +928,8 @@ class Pixcap65(Dut):
         If no number of measurements is explicitly specified the number of measurements properties for the specified
         smu is used.
 
-
         This is the fast implementation for this purpose using directly dedicated functions of the SMU.
+
         :param n: number of measurements performed or None when the property should be used to determine the
          number of measurements to perform.
         :param smu: smu dut key of the SMU to configure.
@@ -960,7 +961,8 @@ class Pixcap65(Dut):
         """
         smu_read_multiple_voltage
 
-        @author: Dominik Fischer
+        :author: Dominik Fischer
+
         last update: 2026-08-25
 
         Performs a voltage measurement by reading multiple voltage values from the SMU.
@@ -970,8 +972,8 @@ class Pixcap65(Dut):
         If no number of measurements is explicitly specified the number of measurements properties for the specified
         smu is used.
 
-
         This is the fast implementation for this purpose using directly dedicated functions of the SMU.
+
         :param n: umber of measurements to be performed or None when the property should be used to determine the
          number of measurements to perform.
         :param smu: smu dut key of the SMU to configure.
@@ -1077,7 +1079,8 @@ class Pixcap65(Dut):
         """
         smu_advanced_current_multiple
 
-        @author: Dominik Fischer
+        :author: Dominik Fischer
+
         last update: 2026-08-25
 
         Performs a current measurement by reading multiple current values from the SMU. The full dataset of
@@ -1086,14 +1089,13 @@ class Pixcap65(Dut):
         If no number of measurements is explicitly specified the number of measurements properties for the specified
         smu is used.
 
-
         This is the fast implementation for this purpose using directly dedicated functions of the SMU.
 
         :param n: number of measurements to be performed or None when the property should be used to determine the
          number of measurements to perform.
         :param smu: smu dut key of the SMU to configure.
         :param kwargs: further keyword arguments to be forwarded to the call to the lab device by basil or additionally
-        'binary_enabled' in the case that the special binary readout mode should be used.
+         'binary_enabled' in the case that the special binary readout mode should be used.
         :return: array of the measured currents in A; If the SMU is not active only NaN will be returned within the
          array.
         """
@@ -1127,7 +1129,8 @@ class Pixcap65(Dut):
         """
         smu_advanced_voltage_multiple
 
-        @author: Dominik Fischer
+        :author: Dominik Fischer
+
         last update: 2026-08-25
 
         Performs a voltage measurement by reading multiple voltage values from the SMU. The full dataset of
@@ -1136,14 +1139,13 @@ class Pixcap65(Dut):
         If no number of measurements is explicitly specified the number of measurements properties for the specified
         smu is used.
 
-
         This is the fast implementation for this purpose using directly dedicated functions of the SMU.
 
         :param n: number of measurements to be performed or None when the property should be used to determine the
          number of measurements to perform.
         :param smu: smu dut key of the SMU to configure.
         :param kwargs: further keyword arguments to be forwarded to the call to the lab device by basil or additionally
-        'binary_enabled' in the case that the special binary readout mode should be used.
+         'binary_enabled' in the case that the special binary readout mode should be used.
         :return: array of the measured voltages in V; If the SMU is not active only NaN will be returned within the
          array.
         """
@@ -1466,7 +1468,8 @@ class Pixcap65(Dut):
         """
         averaged_current
 
-        @author: Dominik Fischer
+        :author: Dominik Fischer
+
         last update: 2026-08-25
 
         Will perform a current measurement at the primary SMU by measuring multiple times and read only
@@ -1476,7 +1479,7 @@ class Pixcap65(Dut):
         The call to the SMU is only performed when the SMU is connected and active.
 
         :param n: number of measurements to be performed or None when the property should be used to determine the
-        number of measurements to perform
+         number of measurements to perform
         :return: (average current reading, uncertainty of the current reading) in A
         """
         return self.smu_averaged_current(n, self.__primary_smu_key, kwargs=self.smu_kwargs)
@@ -1485,7 +1488,8 @@ class Pixcap65(Dut):
         """
         averaged_voltage
 
-        @author: Dominik Fischer
+        :author: Dominik Fischer
+
         last update: 2026-08-25
 
         Will perform a voltage measurement at the primary SMU by measuring multiple times and read only
@@ -1495,7 +1499,7 @@ class Pixcap65(Dut):
         The call to the SMU is only performed when the SMU is connected and active.
 
         :param n: number of measurements to be performed or None when the property should be used to determine the
-        number of measurements to perform.
+         number of measurements to perform.
         :return: (average voltage reading, uncertainty of the voltage reading) in V
         """
         return self.smu_averaged_voltage(n, self.__primary_smu_key, kwargs=self.smu_kwargs)
@@ -1599,7 +1603,8 @@ class Pixcap65(Dut):
         """
         initiate_multiple_current
 
-        @author: Dominik Fischer
+        :author: Dominik Fischer
+
         last update: 2026-08-25
 
         Performs a current measurement by reading multiple current values from the primary SMU.
@@ -1610,8 +1615,8 @@ class Pixcap65(Dut):
         If no number of measurements is explicitly specified the number of measurements properties for the specified
         smu is used.
 
-
         This is the fast implementation for this purpose using directly dedicated functions of the SMU.
+
         :param n: number of measurements to be performed or None when the property should be used to determine the
          number of measurements to perform.
         :param kwargs: further keyword arguments to be forwarded to the call to the lab device by basil.
@@ -1622,7 +1627,8 @@ class Pixcap65(Dut):
         """
         initiate_multiple_voltage
 
-        @author: Dominik Fischer
+        :author: Dominik Fischer
+
         last update: 2026-08-25
 
         Performs a voltage measurement by reading multiple voltage values from the SMU.
@@ -1632,8 +1638,8 @@ class Pixcap65(Dut):
         If no number of measurements is explicitly specified the number of measurements properties for the specified
         smu is used.
 
-
         This is the fast implementation for this purpose using directly dedicated functions of the SMU.
+
         :param n: umber of measurements to be performed or None when the property should be used to determine the
          number of measurements to perform.
         :param kwargs: further keyword arguments to be forwarded to the call to the lab device by basil.
@@ -1644,7 +1650,8 @@ class Pixcap65(Dut):
         """
         get_read_multiple_current
 
-        @author: Dominik Fischer
+        :author: Dominik Fischer
+
         last update: 2026-08-25
 
         Performs a current measurement by reading multiple current values from the primary SMU.
@@ -1654,8 +1661,8 @@ class Pixcap65(Dut):
         If no number of measurements is explicitly specified the number of measurements properties for the specified
         smu is used.
 
-
         This is the fast implementation for this purpose using directly dedicated functions of the SMU.
+
         :param n: number of measurements performed or None when the property should be used to determine the
          number of measurements to perform.
         :param kwargs: further keyword arguments to be forwarded to the call to the lab device by basil.
@@ -1668,7 +1675,8 @@ class Pixcap65(Dut):
         """
         get_read_multiple_voltage
 
-        @author: Dominik Fischer
+        :author: Dominik Fischer
+
         last update: 2026-08-25
 
         Performs a voltage measurement by reading multiple voltage values from the SMU.
@@ -1678,8 +1686,8 @@ class Pixcap65(Dut):
         If no number of measurements is explicitly specified the number of measurements properties for the specified
         smu is used.
 
-
         This is the fast implementation for this purpose using directly dedicated functions of the SMU.
+
         :param n: umber of measurements to be performed or None when the property should be used to determine the
          number of measurements to perform.
         :param kwargs: further keyword arguments to be forwarded to the call to the lab device by basil.
@@ -2004,8 +2012,8 @@ class Pixcap65(Dut):
         If no number of measurements is explicitly specified the number of measurements properties for the specified
         smu is used.
 
-
         This is the fast implementation for this purpose using directly dedicated functions of the SMU.
+
         :param n: number of measurements to be performed or None when the property should be used to determine the
          number of measurements to perform.
         :param kwargs: further keyword arguments to be forwarded to the call to the lab device by basil.
@@ -2027,8 +2035,8 @@ class Pixcap65(Dut):
         If no number of measurements is explicitly specified the number of measurements properties for the specified
         smu is used.
 
-
         This is the fast implementation for this purpose using directly dedicated functions of the SMU.
+
         :param n: umber of measurements to be performed or None when the property should be used to determine the
          number of measurements to perform.
         :param kwargs: further keyword arguments to be forwarded to the call to the lab device by basil.
@@ -2039,7 +2047,8 @@ class Pixcap65(Dut):
         """
         bias_read_multiple_current
 
-        @author: Dominik Fischer
+        :author: Dominik Fischer
+
         last update: 2026-08-25
 
         Performs a current measurement by reading multiple current values from the HV SMU.
@@ -2049,8 +2058,8 @@ class Pixcap65(Dut):
         If no number of measurements is explicitly specified the number of measurements properties for the specified
         smu is used.
 
-
         This is the fast implementation for this purpose using directly dedicated functions of the SMU.
+
         :param n: number of measurements performed or None when the property should be used to determine the
          number of measurements to perform.
         :param kwargs: further keyword arguments to be forwarded to the call to the lab device by basil.
@@ -2063,7 +2072,8 @@ class Pixcap65(Dut):
         """
         bias_read_multiple_voltage
 
-        @author: Dominik Fischer
+        :author: Dominik Fischer
+
         last update: 2026-08-25
 
         Performs a voltage measurement by reading multiple voltage values from the HV SMU.
@@ -2073,8 +2083,8 @@ class Pixcap65(Dut):
         If no number of measurements is explicitly specified the number of measurements properties for the specified
         smu is used.
 
-
         This is the fast implementation for this purpose using directly dedicated functions of the SMU.
+
         :param n: umber of measurements to be performed or None when the property should be used to determine the
          number of measurements to perform.
         :param kwargs: further keyword arguments to be forwarded to the call to the lab device by basil.
@@ -2343,7 +2353,8 @@ class Pixcap65(Dut):
         """
         vm1_initiate_multiple_current
 
-        @author: Dominik Fischer
+        :author: Dominik Fischer
+
         last update: 2026-08-25
 
         Performs a current measurement by reading multiple current values from the SMU connected to the PCBs VM1 port.
@@ -2354,8 +2365,8 @@ class Pixcap65(Dut):
         If no number of measurements is explicitly specified the number of measurements properties for the specified
         smu is used.
 
-
         This is the fast implementation for this purpose using directly dedicated functions of the SMU.
+
         :param n: number of measurements to be performed or None when the property should be used to determine the
          number of measurements to perform.
         :param kwargs: further keyword arguments to be forwarded to the call to the lab device by basil.
@@ -2366,7 +2377,8 @@ class Pixcap65(Dut):
         """
         vm1_initiate_multiple_voltage
 
-        @author: Dominik Fischer
+        :author: Dominik Fischer
+
         last update: 2026-08-25
 
         Performs a voltage measurement by reading multiple voltage values from the SMU connected to the PCBs VM1 port.
@@ -2376,8 +2388,8 @@ class Pixcap65(Dut):
         If no number of measurements is explicitly specified the number of measurements properties for the specified
         smu is used.
 
-
         This is the fast implementation for this purpose using directly dedicated functions of the SMU.
+
         :param n: umber of measurements to be performed or None when the property should be used to determine the
          number of measurements to perform.
         :param kwargs: further keyword arguments to be forwarded to the call to the lab device by basil.
@@ -2388,7 +2400,8 @@ class Pixcap65(Dut):
         """
         vm1_read_multiple_current
 
-        @author: Dominik Fischer
+        :author: Dominik Fischer
+
         last update: 2026-08-25
 
         Performs a current measurement by reading multiple current values from the SMU connected to the PCBs VM1 port.
@@ -2398,8 +2411,8 @@ class Pixcap65(Dut):
         If no number of measurements is explicitly specified the number of measurements properties for the specified
         smu is used.
 
-
         This is the fast implementation for this purpose using directly dedicated functions of the SMU.
+
         :param n: number of measurements performed or None when the property should be used to determine the
          number of measurements to perform.
         :param kwargs: further keyword arguments to be forwarded to the call to the lab device by basil.
@@ -2412,7 +2425,8 @@ class Pixcap65(Dut):
         """
         vm1_read_multiple_voltage
 
-        @author: Dominik Fischer
+        :author: Dominik Fischer
+
         last update: 2026-08-25
 
         Performs a voltage measurement by reading multiple voltage values from the SMU connected to the PCBs VM1 port.
@@ -2424,6 +2438,7 @@ class Pixcap65(Dut):
 
 
         This is the fast implementation for this purpose using directly dedicated functions of the SMU.
+
         :param n: umber of measurements to be performed or None when the property should be used to determine the
          number of measurements to perform.
         :param kwargs: further keyword arguments to be forwarded to the call to the lab device by basil.
@@ -2693,7 +2708,8 @@ class Pixcap65(Dut):
         """
         vm2_initiate_multiple_current
 
-        @author: Dominik Fischer
+        :author: Dominik Fischer
+
         last update: 2026-08-25
 
         Performs a current measurement by reading multiple current values from the SMU connected to the PCBs VM2 port.
@@ -2706,6 +2722,7 @@ class Pixcap65(Dut):
 
 
         This is the fast implementation for this purpose using directly dedicated functions of the SMU.
+
         :param n: number of measurements to be performed or None when the property should be used to determine the
          number of measurements to perform.
         :param kwargs: further keyword arguments to be forwarded to the call to the lab device by basil.
@@ -2716,7 +2733,8 @@ class Pixcap65(Dut):
         """
         vm2_initiate_multiple_voltage
 
-        @author: Dominik Fischer
+        :author: Dominik Fischer
+
         last update: 2026-08-25
 
         Performs a voltage measurement by reading multiple voltage values from the SMU connected to the PCBs VM2 port.
@@ -2728,6 +2746,7 @@ class Pixcap65(Dut):
 
 
         This is the fast implementation for this purpose using directly dedicated functions of the SMU.
+
         :param n: umber of measurements to be performed or None when the property should be used to determine the
          number of measurements to perform.
         :param kwargs: further keyword arguments to be forwarded to the call to the lab device by basil.
@@ -2738,7 +2757,8 @@ class Pixcap65(Dut):
         """
         vm2_read_multiple_current
 
-        @author: Dominik Fischer
+        :author: Dominik Fischer
+
         last update: 2026-08-25
 
         Performs a current measurement by reading multiple current values from the SMU connected to the PCBs VM2 port.
@@ -2750,6 +2770,7 @@ class Pixcap65(Dut):
 
 
         This is the fast implementation for this purpose using directly dedicated functions of the SMU.
+
         :param n: number of measurements performed or None when the property should be used to determine the
          number of measurements to perform.
         :param kwargs: further keyword arguments to be forwarded to the call to the lab device by basil.
@@ -2762,7 +2783,8 @@ class Pixcap65(Dut):
         """
         vm2_read_multiple_voltage
 
-        @author: Dominik Fischer
+        :author: Dominik Fischer
+
         last update: 2026-08-25
 
         Performs a voltage measurement by reading multiple voltage values from the SMU connected to the PCBs VM2 port.
@@ -2774,6 +2796,7 @@ class Pixcap65(Dut):
 
 
         This is the fast implementation for this purpose using directly dedicated functions of the SMU.
+
         :param n: umber of measurements to be performed or None when the property should be used to determine the
          number of measurements to perform.
         :param kwargs: further keyword arguments to be forwarded to the call to the lab device by basil.
@@ -3044,7 +3067,8 @@ class Pixcap65(Dut):
         """
         vm3_initiate_multiple_current
 
-        @author: Dominik Fischer
+        :author: Dominik Fischer
+
         last update: 2026-08-25
 
         Performs a current measurement by reading multiple current values from the SMU connected to the PCBs VM3 port.
@@ -3057,6 +3081,7 @@ class Pixcap65(Dut):
 
 
         This is the fast implementation for this purpose using directly dedicated functions of the SMU.
+
         :param n: number of measurements to be performed or None when the property should be used to determine the
          number of measurements to perform.
         :param kwargs: further keyword arguments to be forwarded to the call to the lab device by basil.
@@ -3067,7 +3092,8 @@ class Pixcap65(Dut):
         """
         vm3_initiate_multiple_voltage
 
-        @author: Dominik Fischer
+        :author: Dominik Fischer
+
         last update: 2026-08-25
 
         Performs a voltage measurement by reading multiple voltage values from the SMU connected to the PCBs VM3 port.
@@ -3079,6 +3105,7 @@ class Pixcap65(Dut):
 
 
         This is the fast implementation for this purpose using directly dedicated functions of the SMU.
+
         :param n: umber of measurements to be performed or None when the property should be used to determine the
          number of measurements to perform.
         :param kwargs: further keyword arguments to be forwarded to the call to the lab device by basil.
@@ -3089,7 +3116,8 @@ class Pixcap65(Dut):
         """
         vm3_read_multiple_current
 
-        @author: Dominik Fischer
+        :author: Dominik Fischer
+
         last update: 2026-08-25
 
         Performs a current measurement by reading multiple current values from the SMU connected to the PCBs VM3 port.
@@ -3101,6 +3129,7 @@ class Pixcap65(Dut):
 
 
         This is the fast implementation for this purpose using directly dedicated functions of the SMU.
+
         :param n: number of measurements performed or None when the property should be used to determine the
          number of measurements to perform.
         :param kwargs: further keyword arguments to be forwarded to the call to the lab device by basil.
@@ -3113,7 +3142,8 @@ class Pixcap65(Dut):
         """
         vm3_read_multiple_voltage
 
-        @author: Dominik Fischer
+        :author: Dominik Fischer
+
         last update: 2026-08-25
 
         Performs a voltage measurement by reading multiple voltage values from the SMU connected to the PCBs VM3 port.
@@ -3125,6 +3155,7 @@ class Pixcap65(Dut):
 
 
         This is the fast implementation for this purpose using directly dedicated functions of the SMU.
+
         :param n: umber of measurements to be performed or None when the property should be used to determine the
          number of measurements to perform.
         :param kwargs: further keyword arguments to be forwarded to the call to the lab device by basil.
