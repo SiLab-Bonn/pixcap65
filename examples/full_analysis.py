@@ -29,7 +29,8 @@ import pixcap65.plotting_util.threaded_plotting as threaded_plotting
 from examples.data_constants import E1_SCAN_FILE, E1_2_SCAN_FILE, R13_2_SCAN_FILE, R11_SCAN_FILE, X4_SCAN_FILE
 from examples.data_constants import X1_SCAN_2_FILE, X2_SCAN_2_FILE, X2_SCAN_FILE
 from examples.data_constants import X5_SCAN_FILE, X6_SCAN_FILE, X7_SCAN_FILE
-from pixcap65.analysis import analyze_data, analyze_capacitance_distribution
+from pixcap65.analysis_util import analyze_data
+from pixcap65.analysis_util.delegation.distribution import analyze_capacitance_distribution
 from pixcap65.analysis_util.utility import get_base_group
 from pixcap65.plotting_util import plot_data, plot_inter_pix_data, plot_bias_data, plot_cv_data, plot_combined_data
 from pixcap65.utility import synchronized_process_open_file

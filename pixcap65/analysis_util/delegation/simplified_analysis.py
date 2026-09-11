@@ -22,7 +22,8 @@ could not be handled when using this analysis strategy.
 import numpy as np
 import tables as tb
 
-from pixcap65.analysis_util import TABLES_ARRAY_TYPE, TABLES_TABLE_TYPE, GENERAL_PIXCAP_SHAPE, FARAD_CONVERSION_FACTOR, \
+from pixcap65.analysis_util.utility import TABLES_ARRAY_TYPE, TABLES_TABLE_TYPE, GENERAL_PIXCAP_SHAPE, \
+    FARAD_CONVERSION_FACTOR, \
     CURRENT_CONVERSION_FACTOR, transform_covariance, GLOBAL_FILTERS
 from pixcap65.utility.utils_2 import create_carray
 

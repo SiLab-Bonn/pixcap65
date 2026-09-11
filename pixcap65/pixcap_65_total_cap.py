@@ -58,7 +58,7 @@ from contextlib import contextmanager
 from numpy import ndarray
 from tqdm import tqdm
 
-from pixcap65.analysis import analysis_data_handle
+from pixcap65.analysis_util.general import analysis_data_handle
 from pixcap65.analysis_util.utility import HIST_CURRENT_MEAS_UNIT, HIST_BIAS_MEAS_UNIT, handle_analysis_mix_up
 from pixcap65.configs.config_handler import extract_smu_current_error, extract_smu_voltage_error
 from pixcap65.pixcap.pixcap65 import Pixcap65

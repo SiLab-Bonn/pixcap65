@@ -20,8 +20,7 @@ except ImportError:
     # noinspection PyProtectedMember,PyUnresolvedReferences
     from typing import Iterable
 
-from pixcap65.analysis import analyze_data
-from pixcap65.analysis_util import GENERAL_PIXCAP_SHAPE, CURRENT_CONVERSION_FACTOR
+from pixcap65.analysis_util import GENERAL_PIXCAP_SHAPE, CURRENT_CONVERSION_FACTOR, analyze_data
 from pixcap65.analysis_util.utility import get_base_group
 from pixcap65.pixcap_65_total_cap import scan_configuration, PixCap65TotalCap
 from pixcap65.utility.tqdm_logging_utils import logging_redirect_tqdm
