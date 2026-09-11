@@ -258,7 +258,7 @@ def r13_analysator_first(tb_lock, correction_args, **kwargs):
                  **correction_args)
     print("Finished the Analysis for", name)
 
-
+# TODO: consolidate the two plotting handler functions.
 def e1_plotter_first(tb_lock):
     name = "E1"
     display_name = name
