@@ -1001,7 +1001,7 @@ class Pixcap65(Dut):
             return result
         return np.array(result.split(','), dtype=float_initialiser)
 
-    def smu_averaged_current(self, n: int, smu: str, kwargs=None) -> tuple[float, ...]:
+    def smu_averaged_current(self, n: Optional[int], smu: str, kwargs=None) -> tuple[float, ...]:
         """
         smu_averaged_current
 
@@ -1038,7 +1038,7 @@ class Pixcap65(Dut):
         split = result.split(',', 1)
         return float(split[0]), float(split[1])
 
-    def smu_averaged_voltage(self, n: int, smu: str, kwargs=None) -> tuple[float, float]:
+    def smu_averaged_voltage(self, n: Optional[int], smu: str, kwargs=None) -> tuple[float, float]:
         """
         smu_averaged_voltage
 
@@ -1125,7 +1125,7 @@ class Pixcap65(Dut):
             return result
         return np.array(result.split(','), dtype=float_initialiser)
 
-    def smu_advanced_voltage_multiple(self, n: int, smu: str, kwargs=None) -> ndarray:
+    def smu_advanced_voltage_multiple(self, n: Optional[int], smu: str, kwargs=None) -> ndarray:
         """
         smu_advanced_voltage_multiple
 
@@ -1174,7 +1174,7 @@ class Pixcap65(Dut):
             return result
         return np.array(result.split(','), dtype=float_initialiser)
 
-    def general_smu_current_multiple(self, smu: str, n: int, kwargs=None) -> ndarray:
+    def general_smu_current_multiple(self, smu: str, n: Optional[int], kwargs=None) -> ndarray:
         """
         general_smu_current_multiple
 
@@ -1218,7 +1218,7 @@ class Pixcap65(Dut):
 
         return np.array([measurement_step() for _ in range(n)])
 
-    def general_smu_voltage_multiple(self, smu: str, n: int, kwargs=None) -> ndarray:
+    def general_smu_voltage_multiple(self, smu: str, n: Optional[int], kwargs=None) -> ndarray:
         """
         general_smu_voltage_multiple
 
