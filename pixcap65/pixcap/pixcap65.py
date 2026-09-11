@@ -1216,7 +1216,7 @@ class Pixcap65(Dut):
             time.sleep(1e-6)
             return current
 
-        return np.array([measurement_step() for _ in range(n)])
+        return np.array([measurement_step() for _ in range(n if n is not None else 1)])
 
     def general_smu_voltage_multiple(self, smu: str, n: Optional[int], kwargs=None) -> ndarray:
         """
@@ -1261,7 +1261,7 @@ class Pixcap65(Dut):
             time.sleep(1e-6)
             return current
 
-        return np.array([measurement_step() for _ in range(n)])
+        return np.array([measurement_step() for _ in range(n if n is not None else 1)])
 
     def smu_output_on(self, smu: str, kwargs=None):
         """
