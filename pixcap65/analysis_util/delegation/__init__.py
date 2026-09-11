@@ -344,6 +344,7 @@ def analyze_depletion_delegate(data_group: tb.Group, analysis_group: tb.Group,
                                                                       pixel_cap_error_data, **kwargs)
 
         # could compute the resistivity from here!
+        pixel_depletion_parameter = None
         try:
             pixel_depletion_parameter = np.atleast_2d(depletion_fit_parameters[col, row])
             pixel_depletion_parameter_errors = np.atleast_2d(depletion_fit_parameter_errors[col, row])
