@@ -17,7 +17,6 @@ from typing import Optional, Any
 
 from pixcap65.analysis_util.correction import _handle_parasitic_cap
 from pixcap65.analysis_util.delegation.depletion import __depletion_iterator_implementation
-from pixcap65.analysis_util.delegation.distribution import analyze_capacitance_distribution_delegate
 from pixcap65.pixcap.pixcap_structure import CAPACITANCE_CONVERSION_FACTOR
 from pixcap65.utility import synchronized_process_open_file
 
@@ -36,6 +35,8 @@ def __mp_init_distribution_delegate(cap_data, kargs):
 
 
 def __mp_handle_distribution_delegate(offset):
+    from pixcap65.analysis_util.delegation.distribution import analyze_capacitance_distribution_delegate
+
     global mp_shared_cap_ref, mp_shared_keyword_args
     return analyze_capacitance_distribution_delegate(None, None, capacitance=mp_shared_cap_ref + offset, convert=False,
                                                      **mp_shared_keyword_args)
@@ -116,3 +117,20 @@ def init_pool(storage):
     """
     global fit_result_mp_storage
     fit_result_mp_storage = storage[0]
+
+
+def get_manager_keywords(**kwargs):
+    """
+    get_manager_keywords
+
+    @author: Dominik Fischer
+    @date: 2026-08-12
+
+    extract the multiprocessing.Manager keyword arguments from the provided keyword arguments.
+
+    :keyword address: address of the socket of the multiprocessing.Manager object we want to connect to.
+    :keyword authkey: authentication key necessary to connect to the socket. (It is recommended not to use this parameter as
+        it is not pickable)
+    :return: dict-like mapping of keys suitable to instantiate a multiprocessing.Manager object.
+    """
+    return {key: value for key, value in kwargs.items() if key in ("address", "authkey")}

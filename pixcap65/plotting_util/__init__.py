@@ -25,7 +25,7 @@ from matplotlib.backends.backend_pdf import PdfPages
 from typing import Union, List, Tuple, Iterable
 from warnings import warn
 
-from pixcap65.analysis_util import GENERAL_PIXCAP_SHAPE
+from pixcap65.analysis_util.utility import GENERAL_PIXCAP_SHAPE
 from pixcap65.analysis_util.utility import get_base_group, get_analysis_group, check_leaf_unit, HIST_BIAS_MEAS_UNIT
 from pixcap65.plotting_util.utility import get_pdf_name, multi_sensor_file_handler_simple, \
     multi_sensor_file_handler_advanced

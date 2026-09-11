@@ -7,13 +7,14 @@
 Analysis module to implement the correction of measured capacitances for the parasitic capacitances' of the measurement
 circuit.
 """
+import logging
+
 import numpy as np
 import tables as tb
 import threading
 from typing import Optional, Any
 
-# TODO: we need to get rid of the logger here!
-from pixcap65.analysis import logger
+logger = logging.getLogger(__name__)
 from pixcap65.analysis_util.utility import get_base_group, PARASITIC_SUBTRACTION
 from pixcap65.utility import synchronized_process_open_file
 from pixcap65.utility.tables_util import get_parent_group, group_get_file, get_groups, get_leaves, copy_node, \

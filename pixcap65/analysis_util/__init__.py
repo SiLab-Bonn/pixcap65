@@ -22,6 +22,7 @@ from warnings import warn, filterwarnings
 
 from pixcap65.analysis_util.constants import BOUNDARY_TYPE, RANDOM_SEED
 from pixcap65.analysis_util.general import _analyze_data
+from pixcap65.analysis_util.multiprocessing import get_manager_keywords
 from pixcap65.analysis_util.utility import GENERAL_PIXCAP_SHAPE, FARAD_CONVERSION_FACTOR, CURRENT_CONVERSION_FACTOR, \
     GLOBAL_FILTERS
 from pixcap65.analysis_util.utility import TABLES_ARRAY_TYPE, TABLES_TABLE_TYPE, GENERAL_PIXCAP_SHAPE, \
@@ -36,39 +37,6 @@ except ImportError:
     # no action required if iminuit is not present
     pass
 filterwarnings("ignore", category=np.exceptions.RankWarning, module="jacobi")
-
-global_rng = np.random.default_rng(RANDOM_SEED)
-
-
-def get_manager_keywords(**kwargs):
-    """
-    get_manager_keywords
-
-    @author: Dominik Fischer
-    @date: 2026-08-12
-
-    extract the multiprocessing.Manager keyword arguments from the provided keyword arguments.
-
-    :keyword address: address of the socket of the multiprocessing.Manager object we want to connect to.
-    :keyword authkey: authentication key necessary to connect to the socket. (It is recommended not to use this parameter as
-        it is not pickable)
-    :return: dict-like mapping of keys suitable to instantiate a multiprocessing.Manager object.
-    """
-    return {key: value for key, value in kwargs.items() if key in ("address", "authkey")}
-
-
-def get_rng():
-    """
-    get_rng
-
-    @author: Dominik Fischer
-    @date: 2026-08-12
-
-    Helper function to spawn a new random number generator for each boostrapping step within the analysis.
-
-    :return: requested numpy-based random number generator.
-    """
-    return global_rng.spawn(1)[0]
 
 
 def analyze_data(raw_data, base_path=None, is_advanced=False, is_cv=False,

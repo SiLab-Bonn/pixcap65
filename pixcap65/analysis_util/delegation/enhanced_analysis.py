@@ -31,9 +31,6 @@ from typing import Union, Any
 
 from pixcap65.analysis_util.utility import TABLES_ARRAY_TYPE, TABLES_TABLE_TYPE, GENERAL_PIXCAP_SHAPE, transform_covariance, \
     GLOBAL_FILTERS, FARAD_CONVERSION_FACTOR, CURRENT_CONVERSION_FACTOR
-# FIXME: be careful when importing from __init__ scripts (maybe harmless)
-# might be the case that this does not result in circular import as the __init__ does not import
-# this submodule?
 from pixcap65.analysis_util.delegation import __declare_fit_model, ANALYSIS_FIT_X_LABEL, ANALYSIS_FIT_Y_LABEL, \
     ANALYSIS_FIT_PLOT_LEGEND, ANALYSIS_FIT_CONTOUR_LEGEND
 from pixcap65.analysis_util.utility import HandleFitterStubClass, HandleFitterGeneral, HIST_CAP_UNIT, \

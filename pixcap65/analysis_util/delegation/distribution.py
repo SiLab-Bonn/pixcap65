@@ -17,13 +17,11 @@ import numpy as np
 import tables as tb
 from typing import Optional
 
-# FIXME: be careful when importing from __init__ scripts
-# difficult to say whether this will result in a circular import!
-from pixcap65.analysis_util import get_rng
 from pixcap65.analysis_util.constants import UNITS_ATTRIBUTE_KEY, REDUCED_SYSTEMATICS_SAMPLE_SIZE, \
     DISPERSION_PARASITIC_DEVIATION
 from pixcap65.analysis_util.modelling.physics_modelling import gauss_model, extended_gauss_integral
 from pixcap65.analysis_util.multiprocessing import __mp_init_distribution_delegate, __mp_handle_distribution_delegate
+from pixcap65.analysis_util.stats.sampling import get_rng
 from pixcap65.analysis_util.utility import check_leaf_unit, HIST_CAP_UNIT, handle_fitter_advanced_options, \
     investigate_fit_convergence, get_base_group
 from pixcap65.pixcap.pixcap_structure import CAPACITANCE_CONVERSION_FACTOR, DEFAULT_BIN_NUMBER

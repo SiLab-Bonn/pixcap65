@@ -15,6 +15,8 @@
 # ----------------------------------------------------------
 import numpy as np
 
+from pixcap65.analysis_util import RANDOM_SEED
+
 
 def __generate_gaussian_samples(loc: np.ndarray, scale: float, size: int, rng: np.random.Generator) -> np.ndarray:
     result_shape = tuple((*loc.shape, size))
@@ -33,3 +35,20 @@ def __second_generate_gaussian_samples(loc: np.ndarray, scale: float, size: int,
         result_data[indices] = rng.normal(loc[indices], scale, size)
 
     return np.moveaxis(result_data, -1, 0)
+
+
+global_rng = np.random.default_rng(RANDOM_SEED)
+
+
+def get_rng():
+    """
+    get_rng
+
+    @author: Dominik Fischer
+    @date: 2026-08-12
+
+    Helper function to spawn a new random number generator for each boostrapping step within the analysis.
+
+    :return: requested numpy-based random number generator.
+    """
+    return global_rng.spawn(1)[0]
