@@ -116,6 +116,7 @@ def analyze_capacitance_distribution_delegate(analysis_group: Optional[tb.Group]
         from pixcap65.analysis_util.stats import distribution_norm as norm
         assert isinstance(gauss_model, Model)
         assert isinstance(extended_gauss_integral, Model)
+        assert isinstance(norm.cdf, Model)
         initial_estimator_2 = initial_estimator.copy()
         initial_estimator_2["b"] = 1.0
         cost = BinnedNLL(hist_data, bins, cdf=norm.cdf, name=('u', 's'))
