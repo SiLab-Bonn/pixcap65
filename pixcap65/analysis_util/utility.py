@@ -17,10 +17,13 @@
 This file contains some utilities needed for the analysis and the plotting.
 In particular it should help with defining constants of values used quite often.
 """
-
 import logging
 import numpy as np
 import tables as tb
+from warnings import warn
+
+from pixcap65.utility.tables_util import group_get_file
+
 try:
     # noinspection PyCompatibility
     from collections.abc import Sequence, Mapping
@@ -29,9 +32,12 @@ except ImportError:
     # noinspection PyProtectedMember,PyUnresolvedReferences
     from collections import Sequence
     from typing import Mapping
+finally:
+    from typing import Union, Any
+
+# TODO: think about these imports again.
 from tables import File
 from tables.group import RootGroup
-from typing import Union, Any
 
 from pixcap65.utility.utils_2 import walk_to_node, UNITS_ATTRIBUTE_KEY, prevent_group_mix_up
 
@@ -912,3 +918,96 @@ class CVDepletionCapacitanceData(tb.IsDescription):
     d = tb.Float64Col(pos=22)
     d_error = tb.Float64Col(pos=23)
 # endregion
+def adjust_dist_table(group: tb.Group, conversion_factor: float, name="DistResultfF"):
+    """
+    adjust_dist_table
+
+    @author: Dominik Fischer
+    last update: 2026-08-12
+
+    Helper function to collect the summarised data for the pixel capacitance distribution from the corresponding table
+    and converts the units of the capacitance's to femtofarads.
+
+    :param group: hdf files' hierarchy group where to look for the summary data.
+    :param conversion_factor: numerical factor to convert the capacitance to femtofarads.
+    :param name: title/name of the table to newly create with the converted capacitances.
+    """
+    if "DistResult" in group:
+        standard_table = group.DistResult
+        assert isinstance(standard_table, tb.Table)
+        old_table_data = standard_table[:]
+        new_table_data = np.rec.array(old_table_data, dtype=tb.dtype_from_descr(CVDistributionData()))
+        assert isinstance(new_table_data, np.recarray)
+        assert new_table_data.dtype == standard_table.dtype
+        new_table_data.capacitance *= conversion_factor
+        new_table_data.cap_err *= conversion_factor
+        new_table_data.cap_std *= conversion_factor
+        new_table_data.cap_std_err *= conversion_factor
+        new_table_data.cap_corrected *= conversion_factor
+        new_table_data.cap_corrected_err *= conversion_factor
+        new_table_data.cap_systematic_error *= conversion_factor
+        new_table_data.cap_corrected_est_error *= conversion_factor
+        new_table_data.cap_corrected_std_error *= conversion_factor
+        new_table_data.cap_systematic_dispersion *= conversion_factor
+
+        new_table = group_get_file(group).create_table(where=group, name=name, title=standard_table.title,
+                                                       description=new_table_data, filters=standard_table.filters)
+        new_table.flush()
+
+
+def fetch_bias_voltage(data_group, selection, scan_parameters=None):
+    """
+    fetch_bias_voltage
+
+    @author: Dominik Fischer
+    last update: 2026-08-13
+
+    Utility function to extract usable bias voltages from the dataset and update if necessary the dataset to the
+    new api.
+    The new api contains the source voltage set, the measured source voltage and should also contain the measured
+    leakage current.
+
+    :param data_group: hdf files group which contains the raw measurement data.
+    :param selection: index of the new storage api, to select which bias voltage series should be extracted.
+    :param scan_parameters: optionally: scan parameters used when performing the measurements. This could be required
+        to determine the set and measured bias voltages if the new api has to be reconstructed.
+    :return: tuple of new api array, extract voltage dataset and extracted voltage uncertainties dataset.
+    :rtype: tuple
+    """
+    bias_voltages = check_leaf_unit(data_group.BiasVoltageHist, HIST_BIAS_MEAS_UNIT)
+    if scan_parameters is None:
+        try:
+            scan_parameters = data_group.scan_params[:]
+        except:
+            pass
+    if len(bias_voltages.shape) > 1:
+        bias_voltage_errors = bias_voltages[:, 2]
+        return bias_voltages, bias_voltages[:, selection], bias_voltage_errors
+    else:
+        renew_bias_voltages = np.full((bias_voltages.shape[0], 3,), fill_value=np.nan)
+        if np.any(np.isfinite(bias_voltages)):
+            voltages = bias_voltages
+            voltage_errors = np.full_like(voltages, np.nan)
+            voltage_settings = voltages.copy()
+        elif scan_parameters is not None:
+            voltages = scan_parameters["hv_voltage"]
+            voltage_errors = np.full_like(voltages, np.nan)
+        else:
+            warn("The scan parameters required to recalculate the bias voltage errors were not found", stacklevel=2)
+
+        if np.all(~np.isfinite(voltage_errors)):
+            from pixcap65.configs.config_handler import extract_smu_voltage_error
+            import yaml
+            try:
+                voltage_settings = scan_parameters["bias_voltage"]
+                with open("pixcap65/configs/keithley_2410_range.yaml") as f:
+                    range_config = yaml.safe_load(f)
+                    voltage_errors = extract_smu_voltage_error(range_config, voltages, 1000)
+            except:
+                voltage_errors = np.full_like(voltages, np.nan)
+
+        renew_bias_voltages[:, 0] = voltage_settings
+        renew_bias_voltages[:, 1] = voltages
+        renew_bias_voltages[:, 2] = voltage_errors
+
+        return renew_bias_voltages, voltages, voltage_errors

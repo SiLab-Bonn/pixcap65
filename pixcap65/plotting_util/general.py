@@ -97,7 +97,7 @@ def plot_1d_distribution(data: np.ndarray, label: str, bias_code: int, table: Op
         ax.grid()
         pdf.savefig(fig, bbox_inches='tight')
     if kwargs.pop("distribution", False):
-        from pixcap65.analysis import analyze_capacitance_distribution_delegate
+        from pixcap65.analysis_util.delegation.distribution import analyze_capacitance_distribution_delegate
 
         analyze_capacitance_distribution_delegate(group, pdf, set_parasitic=False, **kwargs)
 

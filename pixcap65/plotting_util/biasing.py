@@ -412,7 +412,7 @@ def _plot_cv_distribution(group: tb.Group, ax, x_limits=None, y_limits=None, **k
     # to solve it, it is only necessary to wrap it into an iterator.
     depletion_data = group.CVDistribution[:]
     voltage_data = depletion_data["bias"]
-    from pixcap65.analysis import _extract_table_data
+    from pixcap65.analysis_util.correction import _extract_table_data
 
     cap_data = _extract_table_data("capacitance", corrected_data, depletion_data,)
     cap_data_errors = _extract_table_data("cap_std", corrected_data, depletion_data,)

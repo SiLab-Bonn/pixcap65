@@ -30,7 +30,7 @@ from examples.data_constants import E1_2_SCAN_FILE, R13_2_SCAN_FILE
 from examples.data_constants import X1_SCAN_2_FILE, X2_SCAN_2_FILE
 from examples.data_constants import X6_SCAN_FILE, X7_SCAN_FILE, X5_SCAN_FILE
 from examples.full_analysis import r1_analysator, x4_analysator
-from pixcap65.analysis import analyze_data
+from pixcap65.analysis_util import analyze_data
 from pixcap65.utility import synchronized_process_open_file
 
 AUTHKEY_OUTPUT = "Fetch new authkey:"

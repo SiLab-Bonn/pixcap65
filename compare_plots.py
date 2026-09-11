@@ -171,7 +171,7 @@ def plot_data_delegate(data_group: tb.Group, reference_group: tb.Group, output_p
 
 
 if __name__ == "__main__":
-    from pixcap65.analysis import analyze_data
+    from pixcap65.analysis_util import analyze_data
     from pixcap65.plotting_util import plot_cv_data, FREQUENCY_LABEL, CURRENT_LABEL, BIAS_CURVE_Y_LABEL, \
         BIAS_CURVE_X_LABEL
 

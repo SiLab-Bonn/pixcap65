@@ -15,8 +15,8 @@ import time
 import warnings
 from contextlib import contextmanager
 
-from pixcap65.analysis import analysis_data_handle
 from pixcap65.analysis_util import GENERAL_PIXCAP_SHAPE
+from pixcap65.analysis_util.general import analysis_data_handle
 from pixcap65.analysis_util.utility import HIST_CURRENT_MEAS_UNIT, handle_analysis_mix_up
 from pixcap65.pixcap.pixcap65_measurement import ScanConfigurationKeys, declare_logger, NUMBER_INITIAL_MEASUREMENTS, \
     MeasurementAttributes, CapType, REDUCED_NPLC, STANDARD_NLPC
