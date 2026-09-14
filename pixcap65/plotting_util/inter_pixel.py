@@ -169,25 +169,6 @@ def plot_inter_pix_data_delegate(data_group: tb.Group, analysis_group: tb.Group,
                                  kwargs.get('grouped_inter_pix_id', 18000),
                                  distribution_result_data, output_pdf, analysis_group, unit=actual_unit,
                                  capacitance=effective_inter_cap_hist, **kwargs)
-            # with advanced_figure_provider(interactive_lock) as (fig, ax):
-            #     hist_inter_cap_hist = evaluate_pixel_mask(effective_inter_cap_hist, **lockless_propagation)
-            #     ax.hist(hist_inter_cap_hist[~np.isnan(hist_inter_cap_hist)].reshape(-1) * CAPACITANCE_CONVERSION_FACTOR,
-            #             bins=n_bins)
-            #     ax.set_ylabel(COUNTS_HIST_LABEL)
-            #     ax.set_xlabel(HIST_PIX_CAP_LABEL)
-            #     if not GENERATE_THESIS_PLOTS:
-            #         ax.set_title(
-            #             __get_1d_hist_label(kwargs.get('grouped_inter_pix_id', 18000),
-            #                                 "Component of Inter-Capacitance Distribution",
-            #                                 distribution_result_data,
-            #                                 unit=actual_unit))
-            #     ax.grid()
-            #     output_pdf.savefig(fig, bbox_inches='tight')
-            # if need_distribution:
-            #     from pixcap65.analysis import analyze_capacitance_distribution_delegate
-            #     analyze_capacitance_distribution_delegate(analysis_group, output_pdf,
-            #                                               capacitance=effective_inter_cap_hist,
-            #                                               set_parasitic=False, **lockless_propagation)
 
         # handle the inter-pixel capacitanes by making use of the provided total capacitance measurement
         if total_ref_cap_hist is not None:
@@ -196,65 +177,18 @@ def plot_inter_pix_data_delegate(data_group: tb.Group, analysis_group: tb.Group,
                                  14000,
                                  distribution_result_data, output_pdf, analysis_group, unit=actual_unit,
                                  capacitance=effective_inter_cap_hist, **kwargs)
-            # with advanced_figure_provider(interactive_lock) as (fig, ax):
-            #     hist_inter_cap_hist = evaluate_pixel_mask(effective_inter_cap_hist, **lockless_propagation)
-            #     ax.hist(hist_inter_cap_hist[~np.isnan(hist_inter_cap_hist)].reshape(-1) * CAPACITANCE_CONVERSION_FACTOR,
-            #             bins=n_bins)
-            #     ax.set_ylabel(COUNTS_HIST_LABEL)
-            #     ax.set_xlabel(HIST_PIX_CAP_LABEL)
-            #     if not GENERATE_THESIS_PLOTS:
-            #         ax.set_title(__get_1d_hist_label(14000, "Pixel Inter Capacitance Distribution",
-            #                                          distribution_result_data, unit=actual_unit))
-            #     ax.grid()
-            #     output_pdf.savefig(fig, bbox_inches='tight')
-            # if need_distribution:
-            #     from pixcap65.analysis import analyze_capacitance_distribution_delegate
-            #     analyze_capacitance_distribution_delegate(analysis_group, output_pdf,
-            #                                               capacitance=effective_inter_cap_hist,
-            #                                               set_parasitic=False, **kwargs)
 
     if np.count_nonzero(np.isfinite(inter_a_cap_hist)) > 2:
         plot_1d_distribution(inter_a_cap_hist, "Inter-Pixel A Capacitance Distribution",
                              11000,
                              distribution_result_data, output_pdf, analysis_group, unit=actual_unit,
                              capacitance=inter_a_cap_hist, **kwargs)
-        # with advanced_figure_provider(interactive_lock) as (fig, ax):
-        #     hist_cap_hist = evaluate_pixel_mask(inter_a_cap_hist, **kwargs)
-        #     ax.hist(hist_cap_hist[~np.isnan(hist_cap_hist)].reshape(-1) * CAPACITANCE_CONVERSION_FACTOR,
-        #             bins=n_bins)
-        #     ax.set_ylabel(COUNTS_HIST_LABEL)
-        #     ax.set_xlabel(HIST_PIX_CAP_LABEL)
-        #     if not GENERATE_THESIS_PLOTS:
-        #         ax.set_title(__get_1d_hist_label(11000, "Inter-Pixel A Capacitance Distribution",
-        #                                          distribution_result_data, unit=actual_unit))
-        #     ax.grid()
-        #     output_pdf.savefig(fig, bbox_inches='tight')
-        # if need_distribution:
-        #     from pixcap65.analysis import analyze_capacitance_distribution_delegate
-        #     analyze_capacitance_distribution_delegate(analysis_group, output_pdf, capacitance=inter_a_cap_hist,
-        #                                               set_parasitic=False, **kwargs)
 
     if np.count_nonzero(np.isfinite(inter_b_cap_hist)) > 2:
         plot_1d_distribution(inter_b_cap_hist, "Inter-Pixel B Capacitance Distribution",
                              12000,
                              distribution_result_data, output_pdf, analysis_group, unit=actual_unit,
                              capacitance=inter_b_cap_hist, **kwargs)
-        # with advanced_figure_provider(interactive_lock) as (fig, ax):
-        #     hist_cap_hist = evaluate_pixel_mask(inter_b_cap_hist, **kwargs)
-        #     ax.hist(hist_cap_hist[~np.isnan(hist_cap_hist)].reshape(-1) * CAPACITANCE_CONVERSION_FACTOR,
-        #             bins=n_bins)
-        #     ax.set_ylabel(COUNTS_HIST_LABEL)
-        #     ax.set_xlabel(HIST_PIX_CAP_LABEL)
-        #     if not GENERATE_THESIS_PLOTS:
-        #         ax.set_title(__get_1d_hist_label(12000, "Inter-Pixel B Capacitance Distribution",
-        #                                          distribution_result_data, unit=actual_unit))
-        #     ax.grid()
-        #     output_pdf.savefig(fig, bbox_inches='tight')
-        # if need_distribution:
-        #     from pixcap65.analysis import analyze_capacitance_distribution_delegate
-        #     analyze_capacitance_distribution_delegate(analysis_group, output_pdf, capacitance=inter_b_cap_hist,
-        #                                               set_parasitic=False,
-        #                                               **kwargs)
 
     # Current vs. frequency (Will try to plot all into just one coordinate system)
     verify_mask_pixel = "mask_pixel" in kwargs and isinstance(kwargs["mask_pixel"], Iterable)
