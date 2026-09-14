@@ -1215,6 +1215,7 @@ class PixCap65Measurement(Pixcap65BaseMeasurement, metaclass=ABCMeta):
         self.pixcap.bias_off()
 
     # TODO: do not forget to remove this part if everything is working fine.
+    # requires checking the new measurements and comparing them to the existing ones.
     # @deprecated("Use directly Pixcap65.bias_voltage attribute instead.")
     # def set_bias_voltage(self, voltage: float):
     #     """

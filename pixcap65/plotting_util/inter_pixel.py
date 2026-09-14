@@ -22,15 +22,23 @@ import os
 import tables as tb
 from contextlib import contextmanager
 from matplotlib.backends.backend_pdf import PdfPages
-from typing import Iterable
+
+try:
+    # noinspection PyCompatibility
+    from collections.abc import Iterable
+except ImportError:
+    # python 2.7
+    # noinspection PyProtectedMember,PyUnresolvedReferences
+    from collections import Iterable
+finally:
+    from typing import Any, Optional
 
 from pixcap65.analysis_util.utility import get_base_group, check_leaf_unit, HIST_CURRENT_MEAS_UNIT, HIST_CAP_UNIT, \
-    HIST_LEAK_CURRENT_UNIT, extract_parasitic_capacitance
-from pixcap65.pixcap.pixcap_structure import CAPACITANCE_CONVERSION_FACTOR, \
-    DEFAULT_BIN_NUMBER
+    HIST_LEAK_CURRENT_UNIT, extract_parasitic_capacitance, CURRENT_CONVERSION_FACTOR
+from pixcap65.pixcap.pixcap_structure import CAPACITANCE_CONVERSION_FACTOR
 from pixcap65.plotting_util import global_interactive_lock, FREQUENCY_LABEL, CURRENT_LABEL
 from pixcap65.plotting_util.general import plot_2d_capacitance, plot_current_data, \
-    plot_current_model, plot_1d_distribution
+    plot_current_model, plot_1d_distribution, get_model_prediction
 from pixcap65.plotting_util.utility import advanced_figure_provider
 from pixcap65.utility import synchronized_process_open_file
 
@@ -51,7 +59,7 @@ def inter_pix_data_fetch(path, group, lock, active_file: tb.File, type_name: str
     :param group: hierarchical group of the total-pix measurement within the file.
     :type group: str
     :param lock: synchronization object to prevent multiple overlapping accesses to the pytables api and simultaneously
-  write/read operations on the same file.
+     write/read operations on the same file.
     :param active_file: active hdf file by the ongoing plotting handlers
     :param type_name: type of analysis results to be fetched, e.g. 'total_cap'
     """
@@ -59,12 +67,16 @@ def inter_pix_data_fetch(path, group, lock, active_file: tb.File, type_name: str
         yield None
     elif os.path.abspath(path) == os.path.abspath(active_file.filename):
         total_base_group = get_base_group(group, active_file)
-        yield total_base_group[type_name].analysis
+        gr = total_base_group[type_name]
+        assert isinstance(gr, tb.Group)
+        yield gr.analysis
 
     elif os.path.exists(path):
         with synchronized_process_open_file(path, mode='r', lock=lock) as total_file_h5:
             total_base_group = get_base_group(group, total_file_h5)
-            yield total_base_group[type_name].analysis
+            gr = total_base_group[type_name]
+            assert isinstance(gr, tb.Group)
+            yield gr.analysis
 
 
 def plot_inter_pix_data_delegate(data_group: tb.Group, analysis_group: tb.Group, output_pdf: PdfPages, total_group=None,
@@ -92,11 +104,11 @@ def plot_inter_pix_data_delegate(data_group: tb.Group, analysis_group: tb.Group,
     :param output_pdf: PDF object to write the created figures to for long-term saving.
     :param total_group: hdf files hierarchy group containing the total cap measurements (results).
     :param inter_group: hdf files hierarchy group containing another inter-pixel measurements (results) for reference
-        when extracting the individual contributions to the inter-pixel-capacitance. (default: None)
-    :keyword plotting_lock: synchronization primitve/"lock" to make sure only one **process** is able to create a new figure
-        at the same time as matplotlib is not necessarily thread-safe.
-    :keyword distribution: boolean, indicating whether to investigate the capacitance distribution over the whole sensor.
-        (default: False) [boolean]
+     when extracting the individual contributions to the inter-pixel-capacitance. (default: None)
+    :keyword plotting_lock: synchronization primitve/"lock" to make sure only one **process** is able to create
+     a new figure at the same time as matplotlib is not necessarily thread-safe.
+    :keyword distribution: boolean, indicating whether to investigate the capacitance distribution
+     over the whole sensor. (default: False) [boolean]
     :type distribution: bool
     :keyword hist_bins: integer, number of bins to use for the histogram. (default: 50)
     :type hist_bins: int
@@ -115,8 +127,6 @@ def plot_inter_pix_data_delegate(data_group: tb.Group, analysis_group: tb.Group,
     :keyword fit_plot_pdf: PDF object to save the fit figures to.
     """
     interactive_lock = kwargs.get("plotting_lock", global_interactive_lock)
-    need_distribution = kwargs.get("distribution", False)
-    lockless_propagation = {key: value for key, value in kwargs.items() if "lock" not in key}
 
     # Read pixel map and verify that the assumed units are correct
     total_current_hist = check_leaf_unit(data_group.TotalHistCurr, HIST_CURRENT_MEAS_UNIT)
@@ -141,7 +151,8 @@ def plot_inter_pix_data_delegate(data_group: tb.Group, analysis_group: tb.Group,
     # 2D Pixel Capacitance Hist
     plot_2d_capacitance(total_cap_hist, "Total Pixel Capacitance", output_pdf, **kwargs)
     if in_ref_cap_hist is not None:
-        plot_2d_capacitance(total_cap_hist - in_ref_cap_hist, "Grouped Inter-Pixel Capacitance", output_pdf, **kwargs)
+        plot_2d_capacitance(total_cap_hist - in_ref_cap_hist, "Grouped Inter-Pixel Capacitance",
+                            output_pdf, **kwargs)
     if total_ref_cap_hist is not None:
         plot_2d_capacitance(total_ref_cap_hist-total_cap_hist, "Inter Pixel Capacitance from In-Pix C",
                             output_pdf, **kwargs)
@@ -154,17 +165,32 @@ def plot_inter_pix_data_delegate(data_group: tb.Group, analysis_group: tb.Group,
     if distribution_result_data is None:
         actual_unit = "\\farad"
         distribution_result_data = analysis_group.DistResult if "DistResult" in analysis_group else None
-    n_bins = kwargs.get("hist_bins", DEFAULT_BIN_NUMBER)
 
     # Investigate the counts of individual capacitance's
+    _investigate_distribution(actual_unit, analysis_group, distribution_result_data, in_ref_cap_hist, inter_a_cap_hist,
+                              inter_b_cap_hist, output_pdf, total_cap_hist, total_ref_cap_hist, **kwargs)
+
+    # Current vs. frequency (Will try to plot all into just one coordinate system)
+    _plot_individual_pixel(analysis_group, inter_a_cap_hist, inter_a_current_err_hist, inter_a_current_hist,
+                           inter_a_leak_hist, inter_b_cap_hist, inter_b_current_err_hist, inter_b_current_hist,
+                           inter_b_leak_hist, interactive_lock, output_pdf, scan_parameters, total_cap_hist,
+                           total_current_err_hist, total_current_hist, total_leak_hist, **kwargs)
+
+
+def _investigate_distribution(actual_unit: str, analysis_group: tb.Group, distribution_result_data,
+                              in_ref_cap_hist: Optional[np.ndarray],
+                              inter_a_cap_hist: np.ndarray,
+                              inter_b_cap_hist: np.ndarray, output_pdf: PdfPages,
+                              total_cap_hist: np.ndarray,
+                              total_ref_cap_hist: Optional[np.ndarray], **kwargs):
     if np.count_nonzero(np.isfinite(total_cap_hist)) > 2:
         # handle the in-pix capacitance and perform distribution fits if necessary
-        plot_1d_distribution(total_cap_hist, "Total Pixel Capacitance Distribution", 10000, distribution_result_data, output_pdf, analysis_group, unit=actual_unit, capacitance=total_cap_hist, **kwargs)
+        plot_1d_distribution(total_cap_hist, "Total Pixel Capacitance Distribution", 10000, distribution_result_data,
+                             output_pdf, analysis_group, unit=actual_unit, capacitance=total_cap_hist, **kwargs)
 
         # handle the inter-pix contributions by making use of the reference in-pix capacitance's
         if in_ref_cap_hist is not None:
             effective_inter_cap_hist = total_cap_hist - in_ref_cap_hist
-            # FIXME: this is ignoring the special case of lockless propagation! (needs verification)
             plot_1d_distribution(effective_inter_cap_hist, "Component of Inter-Capacitance Distribution",
                                  kwargs.get('grouped_inter_pix_id', 18000),
                                  distribution_result_data, output_pdf, analysis_group, unit=actual_unit,
@@ -190,7 +216,14 @@ def plot_inter_pix_data_delegate(data_group: tb.Group, analysis_group: tb.Group,
                              distribution_result_data, output_pdf, analysis_group, unit=actual_unit,
                              capacitance=inter_b_cap_hist, **kwargs)
 
-    # Current vs. frequency (Will try to plot all into just one coordinate system)
+
+def _plot_individual_pixel(analysis_group: tb.Group, inter_a_cap_hist: np.ndarray, inter_a_current_err_hist: np.ndarray,
+                           inter_a_current_hist: np.ndarray, inter_a_leak_hist: np.ndarray,
+                           inter_b_cap_hist: np.ndarray, inter_b_current_err_hist: np.ndarray,
+                           inter_b_current_hist: np.ndarray, inter_b_leak_hist: np.ndarray, interactive_lock,
+                           output_pdf: PdfPages, scan_parameters, total_cap_hist: np.ndarray,
+                           total_current_err_hist: np.ndarray, total_current_hist: np.ndarray,
+                           total_leak_hist: np.ndarray, **kwargs):
     verify_mask_pixel = "mask_pixel" in kwargs and isinstance(kwargs["mask_pixel"], Iterable)
     effective_pixel_mask = [(i[0], i[1]) for i in kwargs.get("mask_pixel", [])]
     for col, row in np.ndindex(total_current_hist.shape[:2]):
@@ -199,11 +232,21 @@ def plot_inter_pix_data_delegate(data_group: tb.Group, analysis_group: tb.Group,
         elif np.isfinite(total_current_hist[col, row, 0]):
             with advanced_figure_provider(interactive_lock) as (fig, ax):
                 f = np.arange(0, scan_parameters['frequency'].max() * 1.1, 0.1)
+
+                # need to make sure that the fitted line will not exceed the finite data to much.
+                nan_mask = np.isfinite(total_current_hist[col, row, :])
+                frequencies = scan_parameters['frequency'][nan_mask]
                 actual_cap = total_cap_hist[col, row] * CAPACITANCE_CONVERSION_FACTOR
                 plot_current_model(ax, col, row, analysis_group, actual_cap, total_leak_hist, f, prefix="Total ",
                                    parasitic_correction=extract_parasitic_capacitance(analysis_group.HistCap))
                 plot_current_data(ax, col, row, scan_parameters, total_current_hist, total_current_err_hist,
                                   prefix="Total current for ", marker='o', ls='')
+                f_res, cap_pred = get_model_prediction(col, row, analysis_group, actual_cap, total_leak_hist,
+                                                       frequencies,
+                                                       parasitic_correction=extract_parasitic_capacitance(
+                                                           analysis_group.HistCap))
+                residues = total_current_hist[col, row, nan_mask] * CURRENT_CONVERSION_FACTOR - cap_pred
+                ax[1].errorbar(f_res, residues, fmt='o')
                 if np.isfinite(inter_a_current_hist[col, row, 0]):
                     plot_current_model(ax, col, row, analysis_group,
                                        inter_a_cap_hist[col, row] * CAPACITANCE_CONVERSION_FACTOR, inter_a_leak_hist, f,
@@ -211,6 +254,12 @@ def plot_inter_pix_data_delegate(data_group: tb.Group, analysis_group: tb.Group,
                                        parasitic_correction=extract_parasitic_capacitance(analysis_group.HistCapInterA))
                     plot_current_data(ax, col, row, scan_parameters, inter_a_current_hist, inter_a_current_err_hist,
                                       prefix="Inter A current for", marker='v')
+                    f_res, cap_pred = get_model_prediction(col, row, analysis_group, actual_cap, inter_a_leak_hist,
+                                                           frequencies,
+                                                           parasitic_correction=extract_parasitic_capacitance(
+                                                               analysis_group.HistCap))
+                    residues = inter_a_current_hist[col, row, nan_mask] * CURRENT_CONVERSION_FACTOR - cap_pred
+                    ax[1].errorbar(f_res, residues, fmt='v')
                 if np.isfinite(inter_b_current_hist[col, row, 0]):
                     plot_current_model(ax, col, row, analysis_group,
                                        inter_b_cap_hist[col, row] * CAPACITANCE_CONVERSION_FACTOR, inter_b_leak_hist, f,
@@ -218,6 +267,12 @@ def plot_inter_pix_data_delegate(data_group: tb.Group, analysis_group: tb.Group,
                                        parasitic_correction=extract_parasitic_capacitance(analysis_group.HistCapInterB))
                     plot_current_data(ax, col, row, scan_parameters, inter_b_current_hist, inter_b_current_err_hist,
                                       prefix="Inter B current for", marker='s')
+                    f_res, cap_pred = get_model_prediction(col, row, analysis_group, actual_cap, inter_b_leak_hist,
+                                                           frequencies,
+                                                           parasitic_correction=extract_parasitic_capacitance(
+                                                               analysis_group.HistCap))
+                    residues = inter_b_current_hist[col, row, nan_mask] * CURRENT_CONVERSION_FACTOR - cap_pred
+                    ax[1].errorbar(f_res, residues, fmt='s')
                 ax.set_ylabel(CURRENT_LABEL)
                 ax.set_xlabel(FREQUENCY_LABEL)
                 ax.legend()

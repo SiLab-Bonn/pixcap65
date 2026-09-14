@@ -289,8 +289,8 @@ def multi_sensor_file_handler_simple(interpreted_data, base_path, **kwargs):
     :param interpreted_data: paths to the files containing the data to plot. (Iterable)
     :param base_path: hdf files hierarchy groups paths (Iterable)
     :keyword pdf_name: file name for the output pdf file.
-    :keyword lock: synchronization object to prevent multiple overlapping accesses to the pytables api and simultaneously
-        write/read operations on the same file.
+    :keyword lock: synchronization object to prevent multiple overlapping accesses to the pytables api
+     and simultaneously write/read operations on the same file.
     """
     pdf_name = kwargs.pop("pdf_name", "I-V-Collection.pdf")
     file_lock = kwargs.pop("lock", None)
@@ -341,8 +341,8 @@ def multi_sensor_file_handler_advanced(interpreted_data, base_path, **kwargs):
     :param interpreted_data: paths to the files containing the data to plot. (Iterable)
     :param base_path: hdf files hierarchy groups paths (Iterable)
     :keyword pdf_name: file name for the output pdf file.
-    :keyword lock: synchronization object to prevent multiple overlapping accesses to the pytables api and simultaneously
-        write/read operations on the same file.
+    :keyword lock: synchronization object to prevent multiple overlapping accesses to the pytables api
+     and simultaneously write/read operations on the same file.
     """
     pdf_name = kwargs.pop("pdf_name", "I-V-Collection.pdf")
     file_lock = kwargs.pop("lock", None)

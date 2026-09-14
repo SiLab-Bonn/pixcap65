@@ -63,8 +63,8 @@ def plot_1d_distribution(data: np.ndarray, label: str, bias_code: int, table: Op
     :type hist_bins: int
     :keyword unit: unit of the capacities presented within the plot.
     :type unit: str
-    :keyword distribution: boolean, indicating whether to investigate the capacitance distribution over the whole sensor.
-        (default: False)
+    :keyword distribution: boolean, indicating whether to investigate the capacitance distribution over
+     the whole sensor. (default: False)
     :type distribution: bool
     :keyword test_cap_exclusion: whether to exclude row 0 completely. (default: False)
     :type test_cap_exclusion: bool
@@ -73,7 +73,8 @@ def plot_1d_distribution(data: np.ndarray, label: str, bias_code: int, table: Op
     :type mask_lower: float
     :keyword mask_upper: float, threshold to mask all pixels above this value.
     :type mask_upper: float
-    :keyword capacitance: histogram of the capacitance to use instead of those extracted from the provided hdf files group.
+    :keyword capacitance: histogram of the capacitance to use instead of those extracted from the provided
+     hdf files group.
     :keyword set_parasitic: boolean, whether to set the parasitic capacitance for this data set.
     :type set_parasitic: bool
     :keyword no_plot: boolean, whether to supress (interactive) plotting of the distribution of the capacitance.
@@ -86,8 +87,9 @@ def plot_1d_distribution(data: np.ndarray, label: str, bias_code: int, table: Op
     """
     unit = kwargs.pop("unit", "\\farad")
     interactive_lock = kwargs.get('plotting_lock', global_interactive_lock)
+    lockless_propagation = {key: value for key, value in kwargs.items() if "lock" not in key}
     with advanced_figure_provider(interactive_lock) as (fig, ax):
-        hist_cap_hist = evaluate_pixel_mask(data, **kwargs)
+        hist_cap_hist = evaluate_pixel_mask(data, **lockless_propagation)
         ax.hist(hist_cap_hist[~np.isnan(hist_cap_hist)].reshape(-1) * CAPACITANCE_CONVERSION_FACTOR,
                 bins=kwargs.get("hist_bins", DEFAULT_BIN_NUMBER))
         ax.set_ylabel(COUNTS_HIST_LABEL)
@@ -99,7 +101,7 @@ def plot_1d_distribution(data: np.ndarray, label: str, bias_code: int, table: Op
     if kwargs.pop("distribution", False):
         from pixcap65.analysis_util.delegation.distribution import analyze_capacitance_distribution_delegate
 
-        analyze_capacitance_distribution_delegate(group, pdf, set_parasitic=False, **kwargs)
+        analyze_capacitance_distribution_delegate(group, pdf, set_parasitic=False, **lockless_propagation)
 
 
 def plot_data_delegate(data_group: tb.Group, analysis_group: tb.Group, output_pdf: PdfPages, **kwargs):
@@ -130,12 +132,13 @@ def plot_data_delegate(data_group: tb.Group, analysis_group: tb.Group, output_pd
     :type mask_lower: float
     :keyword mask_upper: float, threshold to mask all pixels above this value.
     :type mask_upper: float
-    :keyword distribution: boolean, indicating whether to investigate the capacitance distribution over the whole sensor.
-        (default: False)
+    :keyword distribution: boolean, indicating whether to investigate the capacitance distribution
+     over the whole sensor. (default: False)
     :type distribution: bool
     :keyword unit: unit of the capacities presented within the plot.
     :type unit: str
-    :keyword capacitance: histogram of the capacitance to use instead of those extracted from the provided hdf files group.
+    :keyword capacitance: histogram of the capacitance to use instead of those extracted from the provided
+     hdf files group.
     :keyword set_parasitic: boolean, whether to set the parasitic capacitance for this data set.
     :type set_parasitic: bool
     :keyword no_plot: boolean, whether to supress (interactive) plotting of the distribution of the capacitance.
@@ -163,7 +166,8 @@ def plot_data_delegate(data_group: tb.Group, analysis_group: tb.Group, output_pd
     # another heat map which do not consider masked or boundary caps
     assert isinstance(cap_hist, np.ndarray)
     masked_cap_hist = evaluate_pixel_mask(cap_hist.copy(), **kwargs)
-    if kwargs.get("exclude_test_cap", False) or kwargs.get("test_cap_exclusion", False) or kwargs.get("exclude_cap_test", False) or kwargs.get("exclude_cap_hist", False):
+    if kwargs.get("exclude_test_cap", False) or kwargs.get("test_cap_exclusion", False)\
+            or kwargs.get("exclude_cap_test", False) or kwargs.get("exclude_cap_hist", False):
         plot_2d_capacitance(masked_cap_hist, "Masked Pixel Capacitance distribution", output_pdf)
 
     # 1D Pixel Capacitance Hist
@@ -275,8 +279,8 @@ def plot_2d_capacitance(data, label, pdf, **kwargs):
     :param label: label/title of the plot/figure when saving it.
     :type label: str
     :param pdf: pdf object to save the final figure to.
-    :keyword plotting_lock: synchronization primitve/"lock" to make sure only one **process** is able to create a new figure
-        at the same time as matplotlib is not necessarily thread-safe.
+    :keyword plotting_lock: synchronization primitve/"lock" to make sure only one **process** is able to create
+     a new figure at the same time as matplotlib is not necessarily thread-safe.
     :keyword test_cap_exclusion: whether to exclude row 0 completely. (default: False)
     :type test_cap_exclusion: bool
     :keyword mask_pixel: array of tuple of pixel positions to be masked.
@@ -379,7 +383,8 @@ def get_model_prediction(col, row, analysis_group: tb.Group, actual_cap: Any, to
         y = full_capacitance_model(f,
                                    c=(actual_cap + parasitic_correction) * ADVANCED_CAPACITANCE_CONVERSION_FACTOR,
                                    r=hist_resistance[col, row],
-                                   i=total_leak_hist[col, row] / CURRENT_CONVERSION_FACTOR, u0=1) * CURRENT_CONVERSION_FACTOR
+                                   i=total_leak_hist[col, row] / CURRENT_CONVERSION_FACTOR, u0=1
+                                   ) * CURRENT_CONVERSION_FACTOR
         return f, y
 
     else:
