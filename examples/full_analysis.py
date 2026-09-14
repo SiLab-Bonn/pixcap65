@@ -67,15 +67,6 @@ def r1_analysator(tb_lock, correction_args, **kwargs):
                            inter_biased_group="inter_biased_M_80_V_full_Extended",
                            inter_pix_extension_active=True,
                            api=False)
-    # TODO: needs to be refactored for new api of measurement duplication for different models. (Under investigation)
-    # with synchronized_process_open_file(R11_SCAN_FILE, 'a',tb_lock) as fp:
-    #     fp.copy_node(where="/Reference/R1", newname="inter_biased_M_80_V_full_model_Extended__sides", name="inter_biased_M_80_V_full_Extended__sides", overwrite=True, recursive=True)
-    #     fp.copy_node(where="/Reference/R1", newname="inter_biased_M_80_V_full_model_Extended__diagonals",
-    #                  name="inter_biased_M_80_V_full_Extended__diagonals", overwrite=True, recursive=True)
-    #     fp.copy_node(where="/Reference/R1", newname="inter_biased_M_80_V_full_model_Extended__tops",
-    #                  name="inter_biased_M_80_V_full_Extended__tops", overwrite=True, recursive=True)
-    #     fp.copy_node(where="/Reference/R1", newname="inter_biased_M_80_V_full_model_Extended",
-    #                  name="inter_biased_M_80_V_full_Extended", overwrite=True, recursive=True)
 
     # handle the full sensor analysis
     analyze_data(raw_data=R11_SCAN_FILE, base_path=hdf(top_ref, name, 'unbiased_full'),

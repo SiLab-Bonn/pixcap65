@@ -35,10 +35,6 @@ except ImportError:
 finally:
     from typing import Union, Any
 
-# TODO: think about these imports again.
-from tables import File
-from tables.group import RootGroup
-
 from pixcap65.utility.utils_2 import walk_to_node, UNITS_ATTRIBUTE_KEY, prevent_group_mix_up
 
 logger = logging.getLogger(__name__)
@@ -464,7 +460,7 @@ def investigate_fit_convergence(fitter):
     return convergence
 
 
-def get_base_group(base_path, in_file_h5: File) -> Union[tb.Group, RootGroup]:
+def get_base_group(base_path, in_file_h5: tb.File) -> Union[tb.Group, tb.group.RootGroup]:
     """
     get_base_group
 

@@ -29,7 +29,7 @@ import examples.data_constants as data_constants
 from examples.data_constants import E1_2_SCAN_FILE, R13_2_SCAN_FILE
 from examples.data_constants import X1_SCAN_2_FILE, X2_SCAN_2_FILE
 from examples.data_constants import X6_SCAN_FILE, X7_SCAN_FILE, X5_SCAN_FILE
-from examples.full_analysis import r1_analysator, x4_analysator
+from examples.full_analysis import r1_analysator
 from pixcap65.analysis_util import analyze_data
 from pixcap65.utility import synchronized_process_open_file
 
@@ -45,31 +45,69 @@ bare_correction_args = {
 
 logger = logging.getLogger(__name__)
 
+OLD_API = True
+
+def get_name_appendix(name, api=OLD_API):
+    if "full" in name and not api:
+        return name.replace('full', 'full_model')
+    else:
+        return name + '_model'
 
 def synchronize_full_model(file, reference, name, bias, p_lock, **kwargs):
+    from tables import Group
     # perhaps we should refactor this function to be more general applicable?
     # in particular there are some inconsistencies in the naming scheme.
     unbiased_name = kwargs.get("unbiased_group", "unbiased_full")
     inter_unbiased_name = kwargs.get("inter_unbiased_group", "inter_unbiased_full")
     biased_name = kwargs.get("biased_group", "biased_{}_V_full")
     inter_biased_name = kwargs.get("inter_biased_group", "inter_biased_M_{}_V_full")
+    add_extensions = kwargs.get("inter_pix_extension_active", False)
 
     biased_name = biased_name.format(bias)
     inter_biased_name = inter_biased_name.format(bias)
+
+    inter_pixel_names = [
+        inter_unbiased_name,
+        inter_biased_name,
+    ]
+
+    if add_extensions:
+        for add_on in ['sides', 'diagonals', 'tops']:
+            inter_pixel_names.append("{}__{}".format(inter_unbiased_name, add_on))
+            inter_pixel_names.append("{}__{}".format(inter_biased_name, add_on))
+
+    if not kwargs.get('api', False):
+        from warnings import warn
+        warn("It is highly encouraged to change the implementation such that the new replacement api is used. This might require the adjustment of paths.", stacklevel=2)
+
     with synchronized_process_open_file(file, mode='a', lock=p_lock) as h5_file:
         reference_node = h5_file._get_or_create_path("/{}/{}".format(reference, name), create=False)
+        assert isinstance(reference_node, Group)
         if unbiased_name in reference_node:
-            h5_file.copy_node(where=reference_node, newname=unbiased_name + "_model", name=unbiased_name,
+            h5_file.copy_node(where=reference_node, newname=get_name_appendix(unbiased_name, api=kwargs.get("api", OLD_API)), name=unbiased_name,
                               recursive=True, overwrite=True)
         if biased_name in reference_node:
-            h5_file.copy_node(where=reference_node, newname=biased_name + "_model", name=biased_name,
+            h5_file.copy_node(where=reference_node, newname=get_name_appendix(biased_name,
+                                                                              api=kwargs.get("api", OLD_API)), name=biased_name,
                               recursive=True, overwrite=True)
-        if inter_unbiased_name in reference_node:
-            h5_file.copy_node(where=reference_node, newname=inter_unbiased_name + "_model", name=inter_unbiased_name,
-                              recursive=True, overwrite=True)
-        if inter_biased_name in reference_node:
-            h5_file.copy_node(where=reference_node, newname=inter_biased_name + "_model", name=inter_biased_name,
-                              recursive=True, overwrite=True)
+
+        # handle the inter-pixel analysis
+        for inter_pixel_name in inter_pixel_names:
+            if inter_pixel_name in reference_node:
+                h5_file.copy_node(where=reference_node,
+                                  newname=get_name_appendix(inter_pixel_name, api=kwargs.get("api", OLD_API)),
+                                  name=inter_pixel_name,
+                                  recursive=True,
+                                  overwrite=True
+                                  )
+        # if inter_unbiased_name in reference_node:
+        #     h5_file.copy_node(where=reference_node, newname=get_name_appendix(inter_unbiased_name,
+        #                                                                       api=kwargs.get("api", OLD_API)), name=inter_unbiased_name,
+        #                       recursive=True, overwrite=True)
+        # if inter_biased_name in reference_node:
+        #     h5_file.copy_node(where=reference_node, newname=get_name_appendix(inter_biased_name,
+        #                                                                       api=kwargs.get("api", OLD_API)), name=inter_biased_name,
+        #                       recursive=True, overwrite=True)
 
 
 def r13_analysator_second(tb_lock, correction_args, **kwargs):
@@ -103,21 +141,6 @@ def r13_analysator_second(tb_lock, correction_args, **kwargs):
     synchronize_full_model(R13_2_SCAN_FILE, top_ref, name, 80, tb_lock,
                            inter_unbiased_group="inter_unbiased_renew_Extended_full",
                            inter_biased_group="inter_biased_M_{}_V_renew_Extended_full")
-
-    # TODO: make this use some common functions instead! (Implemented, need to check though)
-    # with synchronized_process_open_file(R13_2_SCAN_FILE, mode='a', lock=tb_lock) as h5_file:
-    #     h5_file.copy_node(where="/Reference/R13", newname="inter_unbiased_full_renew_model",
-    #                       name="inter_unbiased_full_renew",
-    #                       recursive=True, overwrite=True)
-    #     h5_file.copy_node(where="/Reference/R13", newname="inter_biased_M_80_V_full_renew_model",
-    #                       name="inter_biased_M_80_V_full_renew",
-    #                       recursive=True, overwrite=True)
-    #     h5_file.copy_node(where="/Reference/R13", newname="inter_unbiased_renew_Extended_full_model",
-    #                       name="inter_unbiased_renew_Extended_full",
-    #                       recursive=True, overwrite=True)
-    #     h5_file.copy_node(where="/Reference/R13", newname="inter_biased_M_80_V_renew_Extended_full_model",
-    #                       name="inter_biased_M_80_V_renew_Extended_full",
-    #                       recursive=True, overwrite=True)
 
     analyze_data(raw_data=R13_2_SCAN_FILE, base_path=hdf(top_ref, name, 'unbiased_1_full'), is_advanced=True,
                  lock=tb_lock, test_cap_exclusion=True, distribution=True, full_model=False,
@@ -1129,15 +1152,15 @@ if __name__ == "__main__":
     start_time = time.time()
 
     process_handles = [
-        x1_analysator,
-        x2_analysator,
-        x5_analysator,
-        x6_analysator,
-        x7_analysator,
-        e1_analysator_second,
+        # x1_analysator,
+        # x2_analysator,
+        # x5_analysator,
+        # x6_analysator,
+        # x7_analysator,
+        # e1_analysator_second,
         r13_analysator_second,
         r1_analysator,
-        x4_analysator,
+        # x4_analysator,
     ]
 
 

@@ -233,8 +233,8 @@ def analyze_depletion_delegate(data_group: tb.Group, analysis_group: tb.Group,
     if len(voltage_data.shape) > 1:
         voltage_data = voltage_data[:, BIAS_VOLTAGE_ACCESS_IDX]
 
-    # FIXME: provide here the correct manager arguments!
-    with get_context_manager() as manager:
+    # FIXME: provide here the correct manager arguments! (put it under investigation for now)
+    with get_context_manager(**manager_keywords) as manager:
         if isinstance(first_boundaries, Iterable) and not isinstance(first_boundaries, Tuple):
             assert first_boundaries is not None
             assert second_boundaries is not None
