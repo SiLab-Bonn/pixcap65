@@ -33,7 +33,7 @@ filterwarnings("ignore", category=NaturalNameWarning)
 filterwarnings("ignore", category=IMinuitWarning)
 filterwarnings("ignore", category=np.exceptions.RankWarning, module="jacobi")
 
-
+# TODO: these implementations are still to be moved to another module (a more suitable module)
 def get_test_capacitance_data(group: tb.Group, **kwargs):
     """
     get_test_capacitance_data
@@ -55,7 +55,7 @@ def get_test_capacitance_data(group: tb.Group, **kwargs):
         for k, (cap, err) in enumerate(zip(test_cap, test_cap_error)):
             eff_cap = cap * 1e15
             eff_err = err * 1e15
-            print(k, f"{eff_cap:.3n}+-{eff_err:.3n}")
+            print(k, "{:.3n}+-{:.3n}".format(eff_cap, eff_err))
 
     test_cap[16] = np.nan
     test_cap_error[16] = np.nan

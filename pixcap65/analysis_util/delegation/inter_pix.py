@@ -174,8 +174,7 @@ def __perform_inter_pix_deeper(apply_correction_arg, get_total_cap_group: str, i
                                inter_h5_group: Optional[str] = None) -> tb.Group:
     # this reference implementation has the drawback that always the uncorrected data is used.
     # this should not make any difference as we are taking the differences (BUT: the in-pix capacitances are still effected).
-    # FIXME: Why is there no escape channel in the case there is no total_cap data provided
-    total_cap_data, _ = walk_to_node(total_h5_file.root, get_total_cap_group, create=False, verify_create=True)
+    total_cap_data, _ = (None, None) if total_h5_file is None or get_total_cap_group is None else walk_to_node(total_h5_file.root, get_total_cap_group, create=False, verify_create=True)
     # Why going here to the root layer?
     inter_cap_data, _ = (None, None) if inter_h5_file is None or inter_h5_group is None else walk_to_node(
         inter_h5_file.root, inter_h5_group, create=False, verify_create=True)
