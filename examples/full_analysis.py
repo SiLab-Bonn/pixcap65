@@ -2960,3 +2960,60 @@ if __name__ == '__main__':
     print("Plot X7")
     x7_plotter(global_processing_lock)
 CV_DATA_FOR_ = "CV Data for {}"
+
+
+def bare_analysis_handler(tb_lock):
+    with synchronized_process_open_file("packaged/Reference_Bare_renewed.h5", 'a', lock=tb_lock) as h5_file:
+        h5_file.copy_node(where="/Reference/Bare", name="unbiased_31_renew", newname="unbiased_31_renew_full_model",
+                          overwrite=True, recursive=True)
+
+    with synchronized_process_open_file("packaged/data/Bare_Sample_05_Extended_Scan.h5", 'a', lock=tb_lock) as h5_file:
+        h5_file.copy_node(where="/Reference/Bare", name="unbiased_full", newname="unbiased_full_model",
+                          overwrite=True, recursive=True)
+        h5_file.copy_node(where="/Reference/Bare", name="unbiased_full", newname="unbiased_full_kafe2",
+                          overwrite=True, recursive=True)
+        h5_file.copy_node(where="/Reference/Bare", name="unbiased_full", newname="unbiased_full_extended",
+                          overwrite=True, recursive=True)
+        h5_file.copy_node(where="/Reference/Bare", name="unbiased_full", newname="unbiased_full_quad",
+                          overwrite=True, recursive=True)
+
+    analyze_data(raw_data="packaged/Reference_Bare_renewed.h5", base_path="Reference/Bare/unbiased_31_renew",
+                 is_advanced=True, full_model=False, lock=tb_lock)
+    analyze_data(raw_data="packaged/Reference_Bare_renewed.h5",
+                 base_path="Reference/Bare/unbiased_31_renew_full_model", is_advanced=True,
+                 full_model=True, lock=tb_lock)
+    analyze_data(raw_data="packaged/data/Bare_Sample_05_Extended_Scan.h5", base_path="Reference/Bare/unbiased_full",
+                 is_advanced=True, full_model=False, lock=tb_lock)
+    analyze_data(raw_data="packaged/data/Bare_Sample_05_Extended_Scan.h5",
+                 base_path="Reference/Bare/unbiased_full_model", is_advanced=True,
+                 full_model=True, lock=tb_lock)
+    analyze_data(raw_data="packaged/data/Bare_Sample_05_Extended_Scan.h5",
+                 base_path="Reference/Bare/unbiased_full_kafe2", is_advanced=True,
+                 full_model=True, lock=tb_lock, use_kafe2=True)
+    analyze_data(raw_data="packaged/data/Bare_Sample_05_Extended_Scan.h5",
+                 base_path="Reference/Bare/unbiased_full_extended", is_advanced=True,
+                 full_model='extended', lock=tb_lock)
+    analyze_data(raw_data="packaged/data/Bare_Sample_05_Extended_Scan.h5",
+                 base_path="Reference/Bare/unbiased_full_quad", is_advanced=True,
+                 full_model='quad', lock=tb_lock)
+    analyze_capacitance_distribution(raw_data="packaged/Reference_Bare_renewed.h5",
+                                     base_path="Reference/Bare/unbiased_31_renew",
+                                     corrected_distribution=False,
+                                     exclude_test_cap=True, use_kafe2=False,
+                                     fit_plot_pdf_name="Bare_analysis_renew_parasitic.pdf", lock=tb_lock)
+    analyze_capacitance_distribution(raw_data="packaged/Reference_Bare_renewed.h5",
+                                     base_path="Reference/Bare/unbiased_31_renew_full_model",
+                                     corrected_distribution=False,
+                                     exclude_test_cap=True, use_kafe2=False,
+                                     fit_plot_pdf_name="Bare_analysis_renew_parasitic_full_model.pdf", lock=tb_lock)
+    analyze_capacitance_distribution(raw_data='Bare_Repeat_2_Scan.h5',
+                                     base_path="Reference/bare/unbiased_8_full_model",
+                                     corrected_distribution=False,
+                                     exclude_test_cap=True, use_kafe2=False,
+                                     fit_plot_pdf_name="Bare_analysis_parasitic_full_model.pdf", lock=tb_lock)
+    analyze_capacitance_distribution(raw_data="packaged/data/Bare_Sample_05_Extended_Scan.h5",
+                                     base_path="Reference/Bare/unbiased_full",
+                                     corrected_distribution=False,
+                                     exclude_test_cap=True, use_kafe2=False,
+                                     fit_plot_pdf_name="Bare_analysis_parasitic_extended_renew_full_model.pdf",
+                                     lock=tb_lock)
