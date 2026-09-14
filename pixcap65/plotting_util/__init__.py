@@ -453,3 +453,7 @@ FREQUENCY_LABEL = '$f$ / \\unit{{\\mega\\hertz}}'
 CURRENT_LABEL = '$I$ / \\unit{{\\nano\\ampere}}'
 BIAS_CURVE_Y_LABEL = "$I$ / \\unit{{\\nano\\ampere}}"
 BIAS_CURVE_X_LABEL = "$U$ / \\unit{{\\volt}}"
+
+# TODO: refactor these here for recursive usage within submodules.
+# FIXME: labeling of the distribution plots for CV analysis.
+# TODO: Inter-pixel plotting is missing the residues.

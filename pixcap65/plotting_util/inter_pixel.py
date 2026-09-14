@@ -160,22 +160,6 @@ def plot_inter_pix_data_delegate(data_group: tb.Group, analysis_group: tb.Group,
     if np.count_nonzero(np.isfinite(total_cap_hist)) > 2:
         # handle the in-pix capacitance and perform distribution fits if necessary
         plot_1d_distribution(total_cap_hist, "Total Pixel Capacitance Distribution", 10000, distribution_result_data, output_pdf, analysis_group, unit=actual_unit, capacitance=total_cap_hist, **kwargs)
-        # with advanced_figure_provider(interactive_lock) as (fig, ax):
-        #     hist_cap_hist = evaluate_pixel_mask(total_cap_hist, **kwargs)
-        #     ax.hist(hist_cap_hist[~np.isnan(hist_cap_hist)].reshape(-1) * CAPACITANCE_CONVERSION_FACTOR,
-        #             bins=n_bins)
-        #     ax.set_ylabel(COUNTS_HIST_LABEL)
-        #     ax.set_xlabel(HIST_PIX_CAP_LABEL)
-        #     title_str = "Pixel Total Capacitance Distribution"
-        #     if not GENERATE_THESIS_PLOTS:
-        #         ax.set_title(__get_1d_hist_label(10000, title_str, distribution_result_data, unit=actual_unit))
-        #     ax.grid()
-        #     output_pdf.savefig(fig, bbox_inches='tight')
-        # if need_distribution:
-        #     from pixcap65.analysis import analyze_capacitance_distribution_delegate
-        #     # FIXME: when using the replacement handler this here might break! (needs verification)
-        #     analyze_capacitance_distribution_delegate(analysis_group, output_pdf, capacitance=total_cap_hist,
-        #                                               set_parasitic=False, **kwargs)
 
         # handle the inter-pix contributions by making use of the reference in-pix capacitance's
         if in_ref_cap_hist is not None:
