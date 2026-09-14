@@ -33,7 +33,6 @@ from pixcap65.plotting_util import logger
 from pixcap65.plotting_util.constants import GENERATE_THESIS_PLOTS, CV_USE_SEPARATE_PAGES, SENSOR_ITERABLE
 from pixcap65.plotting_util.utility import figure_provider
 from pixcap65.utility.homogenize_plots import enhanced_error_bar
-from pixcap65.utility.tables_util import group_get_file
 
 LABEL_RESISTIVITY = '$\\rho$ / \\unit{{\\ohm\\centi\\meter}}'
 
@@ -56,10 +55,10 @@ def plot_bias_delegate(data_group, output_pdf: PdfPages, **kwargs):
 
     :param data_group: hdf file's hierarchy group containing the raw data.
     :param output_pdf: PDF object to write the plots to.
-    :keyword plotting_lock: synchronization primitve/"lock" to make sure only one **process** is able to create a new figure
-        at the same time as matplotlib is not necessarily thread-safe.
-    :keyword labels: required for multi-sensor plotting to label the plots from the different sensors correctly such that
-    these could be identified. (Iterable)
+    :keyword plotting_lock: synchronization primitve/"lock" to make sure only one **process** is able to
+     create a new figure at the same time as matplotlib is not necessarily thread-safe.
+    :keyword labels: required for multi-sensor plotting to label the plots from the different sensors correctly
+     such that these could be identified. (Iterable)
     :keyword area_normalisation: areas of the individual pixel summed over all contributiong pixels. (Iterable)
     """
     interactive_lock = kwargs.get("plotting_lock", global_interactive_lock)
@@ -164,18 +163,18 @@ def plot_cv_data_delegate(data_group: Union[tb.Group, SENSOR_ITERABLE],
     :param analysis_group: HDF files hierarchy group containing the analysis results.
     :param output_pdf: PDF object to write the created figures to for long-term saving.
     :param apply_doping: boolean, False, indicates whether to plot the depletion data.
-    :keyword plotting_lock: synchronization primitve/"lock" to make sure only one **process** is able to create a new figure
-        at the same time as matplotlib is not necessarily thread-safe.
-    :keyword labels: required for multi-sensor plotting to label the plots from the different sensors correctly such that
-        these could be identified. (Iterable)
+    :keyword plotting_lock: synchronization primitve/"lock" to make sure only one **process** is able to
+     create a new figure at the same time as matplotlib is not necessarily thread-safe.
+    :keyword labels: required for multi-sensor plotting to label the plots from the different sensors correctly
+     such that these could be identified. (Iterable)
     :keyword mask_pixel: array/iterable of tuple of pixel positions to be masked and therefore ignored for evaluation.
     :keyword verbose: boolean, indicating whether to use verbose output for depletion voltages.
     :keyword distribution: boolean, indicating whether also the capacitance distribution of the whole sensor
         should be investigated.
     :keyword hist_bins: integer, number of bins to use for the histogram. (default: 50)
     :type hist_bins: int
-    :keyword use_corrected: boolean, indicating whether to use the corrected capacitance for plotting. (data corrected for
-        parasitic capacitances of PixCap65, default: False)
+    :keyword use_corrected: boolean, indicating whether to use the corrected capacitance for plotting.
+     (data corrected for parasitic capacitances of PixCap65, default: False)
     :type use_corrected: bool
     """
     interactive_lock = kwargs.get('plotting_lock', global_interactive_lock)
@@ -197,9 +196,15 @@ def plot_cv_data_delegate(data_group: Union[tb.Group, SENSOR_ITERABLE],
     for ii, jj in np.ndindex(GENERAL_PIXCAP_SHAPE):
         if (ii, jj) in masked_pixels:
             continue
-        response = lambda x: x.suptitle("C-V Characterization for Pixel ({}, {})".format(ii, jj))
         if GENERATE_THESIS_PLOTS or CV_USE_SEPARATE_PAGES:
             response = None
+        else:
+            def response(figure):
+                """
+                Stub-Function for adding a title to a externally managed figure.
+                :param figure: figure to add the title to.
+                """
+                figure.suptitle("C-V Characterization for Pixel ({}, {})".format(ii, jj))
         with figure_provider(interactive_lock, ncols=2, callback=response,
                              output=output_pdf, separate_plots=CV_USE_SEPARATE_PAGES) as (_, ax, back_pipe):
             # will not only generate the title string of the figure but also the figure with the depletion fits.
@@ -218,9 +223,8 @@ def plot_cv_data_delegate(data_group: Union[tb.Group, SENSOR_ITERABLE],
 
         # Plot the doping analysis only for single-sensor samplings.
         if apply_doping:
-            # TODO: better use the actual voltages here.
-            # Check: is there a better implementation for this?
-            voltage_collection_idx = 0
+            # CHECK: is there a better implementation for this?
+            voltage_collection_idx = 1
             if isinstance(data_group, tb.Group):
                 depletion_width_plate = check_leaf_unit(analysis_group.DepletionWidth, "um")
                 depletion_width_plate_error = check_leaf_unit(analysis_group.DepletionWidthErr, "um")
@@ -254,8 +258,10 @@ def plot_cv_data_delegate(data_group: Union[tb.Group, SENSOR_ITERABLE],
                     view_bias_voltages = view_origin_bias_voltages[:, :, voltage_collection_idx]
                 else:
                     view_bias_voltages = view_origin_bias_voltages
-            plot_depletion_pixel_delegate(view_bias_voltages, ii, view_depletion_width_plate, view_depletion_width_plate_error,
-                                          view_effective_doping_table, output_pdf, jj, view_table, view_effective_resistivity_table)
+            plot_depletion_pixel_delegate(view_bias_voltages, ii, view_depletion_width_plate,
+                                          view_depletion_width_plate_error,
+                                          view_effective_doping_table, output_pdf, jj, view_table,
+                                          view_effective_resistivity_table)
 
     if not (kwargs.pop("distribution", False) and True):
         return
@@ -304,7 +310,8 @@ def plot_cv_data_delegate(data_group: Union[tb.Group, SENSOR_ITERABLE],
         for ana_group, label in zip(group_handle, label_handle):
             if "CVDistribution" not in ana_group:
                 continue
-            x_limits, y_limits, title_str = _plot_cv_distribution(ana_group, ax, x_limits, y_limits, label=label, is_combining=combiner, **kwargs)
+            x_limits, y_limits, title_str = _plot_cv_distribution(ana_group, ax, x_limits, y_limits, label=label,
+                                                                  is_combining=combiner, **kwargs)
 
         if x_limits is not None:
             assert isinstance(x_limits, (tuple, list, set))
@@ -336,9 +343,11 @@ def _plot_cv_distribution(group: tb.Group, ax, x_limits=None, y_limits=None, **k
     :param ax: axes object(s) to use for plotting
     :param x_limits: tuple defining the x-axis plotting limits from the data points of the C-V-Curve.
     :param y_limits:tuple defining the y-axis plotting limits from the data points of the C-V-Curve.
-    :keyword use_corrected: boolean, indicating whether to use the corrected capacitance for plotting. (data corrected for parasitic capacitances of PixCap65, default: False)
+    :keyword use_corrected: boolean, indicating whether to use the corrected capacitance for plotting.
+     (data corrected for parasitic capacitances of PixCap65, default: False)
     :type use_corrected: bool
-    :keyword is_combining: boolean, indicates whether multiple sensors are to be combined into a single figure. (default: False)
+    :keyword is_combining: boolean, indicates whether multiple sensors are to be combined into a single figure.
+     (default: False)
     :type is_combining: bool
     :return: tuple of the drawing limits for both axis and the final title string for the figure.
     """
@@ -405,7 +414,8 @@ def _plot_cv_distribution(group: tb.Group, ax, x_limits=None, y_limits=None, **k
                     second_cap_calc = depletion_fit_c[dep_idx] * second_voltage_x + depletion_fit_d[dep_idx]
                     ax[1].plot(-first_voltage_x, first_cap_calc, '-', label="First section fit")
                     ax[1].plot(-second_voltage_x, second_cap_calc, '-', label="Second section fit")
-            title_str += "U = {} V\n".format(dep_voltage_2)
+            # CHECK: perhaps this is not the whisest idea?
+            # title_str += "U = {} V\n".format(dep_voltage_2)
 
     # since distribution is selected we should assume that this condition is always fulfilled.
     assert "CVDistribution" in group
@@ -421,14 +431,9 @@ def _plot_cv_distribution(group: tb.Group, ax, x_limits=None, y_limits=None, **k
 
     if np.any(np.isnan(cap_data)):
         return None, None, ""
-    try:
-        x_limits, y_limits = __cv_plot_instance(ax, voltage_data, cap_data, cap_data_errors, label,
-                                                title_format, x_limits, y_limits)
-    except:
-        print(depletion_data)
-        print(group.CVDistribution.dtype)
-        print(group_get_file(group).filename)
-        raise
+
+    x_limits, y_limits = __cv_plot_instance(ax, voltage_data, cap_data, cap_data_errors, label,
+                                            title_format, x_limits, y_limits)
     return x_limits, y_limits, title_str
 
 
@@ -469,9 +474,10 @@ def __plot_depletion_estimation(analysis_group: Union[tb.Group, SENSOR_ITERABLE]
                     full_covariance_matrix = full_covariance_matrix[:, :, None, :, :]
                 first_covariance = full_covariance_matrix[ii, jj, dep_idx, :2, :2]
                 second_covariance = full_covariance_matrix[ii, jj, dep_idx, 2:, 2:]
-                first_y, first_y_cov = propagate(lambda p: p[0] * first_voltage_x + p[1], first_dep_parameters, first_covariance)
-                second_y, second_y_cov = propagate(lambda p: p[0] * second_voltage_x + p[1], second_dep_parameters,
-                                                   second_covariance)
+                first_y, first_y_cov = propagate(lambda p: p[0] * first_voltage_x + p[1],
+                                                 first_dep_parameters, first_covariance)
+                second_y, second_y_cov = propagate(lambda p: p[0] * second_voltage_x + p[1],
+                                                   second_dep_parameters, second_covariance)
 
                 ax[1].plot(-first_voltage_x, first_y, '-', label="First section fit")
                 ax[1].plot(-second_voltage_x, second_y, '-', label="Second section fit")
@@ -521,7 +527,7 @@ def _cv_plotter(analysis, row, col, ax, voltage_data_sets, labels, **kwargs):
     :param labels: identifying names for the different sensors to use in the legend, when plotting for multiple sensors.
     :keyword is_distribution_plot: indicates wether we plot for the averaged sensor instead of a particular pixel
         (default: False)
-    :type is_distribution_plot: bool
+    :type is_distribution_plot: bool !!!currently unused!!!
     :return:
     """
     title_format = "pixel ({col},{row})".format(col=col, row=row)
@@ -531,22 +537,17 @@ def _cv_plotter(analysis, row, col, ax, voltage_data_sets, labels, **kwargs):
         labels = ["Bias Data"]
 
     analysis = np.atleast_1d(analysis)
-
-    is_distribution_plot = kwargs.pop("is_distribution_plot", False)
-    if is_distribution_plot and False:
-        pass
-    else:
-        cap_data_sets = [check_leaf_unit(item.UCHist, HIST_CAP_UNIT)[col, row, :] for item in analysis]
-        cap_data_errors_sets = [check_leaf_unit(item.UCErrHist, HIST_CAP_UNIT)[col, row, :] for item in analysis]
+    cap_data_sets = [check_leaf_unit(item.UCHist, HIST_CAP_UNIT)[col, row, :] for item in analysis]
+    cap_data_errors_sets = [check_leaf_unit(item.UCErrHist, HIST_CAP_UNIT)[col, row, :] for item in analysis]
 
     eff_cap_data = None
     y_limits = None
     x_limits = None
-    # TODO: document the different meanings of this array! (refers to the voltage_data array)
-    for cap_data, cap_data_errors, voltage_data, label in zip(cap_data_sets, cap_data_errors_sets, voltage_data_sets, labels):
+    zip_iterator = zip(cap_data_sets, cap_data_errors_sets, voltage_data_sets, labels)
+    for cap_data, cap_data_errors, voltage_data, label in zip_iterator:
         if len(voltage_data.shape) > 1:
-            # FIXME: this might lead to biased results!
-            voltage_data = voltage_data[:, 0]
+            # FIXME: this might lead to biased results! (Need to be verified by the next run)
+            voltage_data = voltage_data[:, 1]
         eff_cap_data = cap_data
         # could this be made common?
         if np.any(np.isnan(cap_data)):
@@ -569,7 +570,10 @@ def _cv_plotter(analysis, row, col, ax, voltage_data_sets, labels, **kwargs):
 
 def __cv_plot_instance(ax, voltage_data: np.ndarray, cap_data: np.ndarray, cap_data_errors: np.ndarray, label: str,
                        title_format, x_limits, y_limits) -> tuple[Iterable, Iterable]:
-    effective_capacitance_error_data = np.reciprocal(cap_data * CAPACITANCE_CONVERSION_FACTOR) ** 3 * cap_data_errors * CAPACITANCE_CONVERSION_FACTOR if np.all(np.isfinite(cap_data_errors)) else None
+    converted_cap = cap_data * CAPACITANCE_CONVERSION_FACTOR
+    converted_errors = cap_data_errors * CAPACITANCE_CONVERSION_FACTOR
+    cond = np.all(np.isfinite(cap_data_errors))
+    effective_capacitance_error_data = np.reciprocal(converted_cap) ** 3 * converted_errors if cond else None
     eff_cap_errors = cap_data_errors * CAPACITANCE_CONVERSION_FACTOR if np.all(np.isfinite(cap_data_errors)) else None
     adjusted_cap_data = 1 / (cap_data * CAPACITANCE_CONVERSION_FACTOR) ** 2
     if not GENERATE_THESIS_PLOTS:
@@ -577,7 +581,8 @@ def __cv_plot_instance(ax, voltage_data: np.ndarray, cap_data: np.ndarray, cap_d
         ax[1].set_title("Suited Bias data from the \nmeasurement for {}".format(title_format))
     ax[0].set(xlabel=BIAS_CURVE_X_LABEL,
               ylabel=CAPACITANCE_LABEL)
-    enhanced_error_bar(ax[0], -voltage_data, cap_data * CAPACITANCE_CONVERSION_FACTOR, yerr=eff_cap_errors, label=label)
+    enhanced_error_bar(ax[0], -voltage_data, cap_data * CAPACITANCE_CONVERSION_FACTOR,
+                       yerr=eff_cap_errors, label=label)
     ax[1].set(xlabel=BIAS_CURVE_X_LABEL, ylabel="$1 / C^2$ / \\unit{{\\per\\femto\\farad\\squared}}")
     enhanced_error_bar(ax[1], -voltage_data, adjusted_cap_data, yerr=np.abs(effective_capacitance_error_data),
                        label=label, alpha=0.5)

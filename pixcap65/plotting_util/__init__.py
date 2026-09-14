@@ -18,11 +18,9 @@ Plotting of Pixcap65 data.
 """
 import atexit
 import logging
-import numpy as np
-import tables as tb
 import threading
 from matplotlib.backends.backend_pdf import PdfPages
-from typing import Union, List, Tuple, Iterable
+from typing import Iterable
 from warnings import warn
 
 from pixcap65.analysis_util.utility import GENERAL_PIXCAP_SHAPE
@@ -31,6 +29,7 @@ from pixcap65.plotting_util.utility import get_pdf_name, multi_sensor_file_handl
     multi_sensor_file_handler_advanced
 from pixcap65.utility import synchronized_process_open_file
 from pixcap65.utility.utils_2 import GroupType
+from .constants import *
 
 LATEX_PREAMBLE = r"\sisetup{separate-uncertainty}\sisetup{locale = DE}\sisetup{uncertainty-descriptors={" \
                  r"stat,sys,sys-disp.}}\sisetup{uncertainty-descriptor-mode=subscript}\sisetup{" \
@@ -135,9 +134,10 @@ def plot_data(interpreted_data, base_path=None, suffix="general_data", use_group
     :param use_group: whether to append the group name of the measurements to the PDF name.
     :type use_group: bool
     :keyword use_corrected: boolean, indicating whether to use the corrected capacitance for plotting.
-        (data corrected for parasitic capacitances of PixCap65, default: False)
+     (data corrected for parasitic capacitances of PixCap65, default: False)
     :type use_corrected: bool
-    :keyword test_cap_exclusion: boolean, whether to exclude the test capacitator row from the histograms. (default: False)
+    :keyword test_cap_exclusion: boolean, whether to exclude the test capacitator row from the histograms.
+     (default: False)
     :type test_cap_exclusion: bool
     :keyword hist_bins: integer, number of bins to use for the histogram. (default: 50)
     :type hist_bins: int
@@ -146,18 +146,19 @@ def plot_data(interpreted_data, base_path=None, suffix="general_data", use_group
     :type mask_lower: float
     :keyword mask_upper: float, threshold to mask all pixels above this value.
     :type mask_upper: float
-    :keyword distribution: boolean, indicating whether to investigate the capacitance distribution over the whole sensor.
-        (default: False)
+    :keyword distribution: boolean, indicating whether to investigate the capacitance distribution over
+     the whole sensor. (default: False)
     :type distribution: bool
-    :keyword lock: synchronization object to prevent multiple overlapping accesses to the pytables api and simultaneously
-        write/read operations on the same file.
+    :keyword lock: synchronization object to prevent multiple overlapping accesses to the pytables api
+     and simultaneously write/read operations on the same file.
     :keyword plotting_lock: synchronization primitve/"lock" to make sure only one **process** is able to create
-        a new figure at the same time as matplotlib is not necessarily thread-safe.
+     a new figure at the same time as matplotlib is not necessarily thread-safe.
     :keyword unit: unit of the capacities presented within the plot.
     :type unit: str
-    :keyword capacitance: histogram of the capacitance to use instead of those extracted from the provided hdf files group.
+    :keyword capacitance: histogram of the capacitance to use instead of those extracted from the provided
+     hdf files group.
     :keyword no_plot: boolean, whether to supress (interactive) plotting of the distribution of the capacitance.
-        When investigating the capacitance distribution.
+     When investigating the capacitance distribution.
     :keyword use_kafe2: indicates whether kafe2 is used for the fit. (default: False)
     :type use_kafe2: bool
     :keyword apply_contours: indicates whether to determine the contours and try to plot them. (default: False)
@@ -212,12 +213,12 @@ def plot_inter_pix_data(interpreted_data, base_path=None, suffix="general_inter_
     :param total_path: hdf group path inside the hdf file containing the total cap analysis results.
     :param inter_data: path to the hdf file which holds the in-pix measurement
     :param inter_path: hdf group path inside the hdf file containing the in-pix measurement
-    :keyword lock: synchronization object to prevent multiple overlapping accesses to the pytables api and simultaneously
-        write/read operations on the same file.
-    :keyword plotting_lock: synchronization primitve/"lock" to make sure only one **process** is able to create a new figure
-        at the same time as matplotlib is not necessarily thread-safe.
-    :keyword distribution: boolean, indicating whether to investigate the capacitance distribution over the whole sensor.
-        (default: False) [boolean]
+    :keyword lock: synchronization object to prevent multiple overlapping accesses to the pytables api
+     and simultaneously write/read operations on the same file.
+    :keyword plotting_lock: synchronization primitve/"lock" to make sure only one **process**
+     is able to create a new figure at the same time as matplotlib is not necessarily thread-safe.
+    :keyword distribution: boolean, indicating whether to investigate the capacitance distribution
+     over the whole sensor. (default: False) [boolean]
     :type distribution: bool
     :keyword hist_bins: integer, number of bins to use for the histogram. (default: 50)
     :type hist_bins: int
@@ -267,10 +268,10 @@ def plot_bias_data(interpreted_data, base_path=None, suffix="bias_curve", use_gr
     :param base_path: path within the files hierarchy for the base group.
     :param suffix: additional suffix to use for naming the PDF containing the plots.
     :param use_group: boolean, whether to append the group name of the measurements to the PDF name.
-    :keyword lock: locking object used to synchronize the access to the file handles by the pytables library. It is highly
-        encouraged to provide an explicit lock here.
-    :keyword plotting_lock: synchronization primitve/"lock" to make sure only one **process** is able to create a new figure
-        at the same time as matplotlib is not necessarily thread-safe.
+    :keyword lock: locking object used to synchronize the access to the file handles by the pytables library.
+     It is highly encouraged to provide an explicit lock here.
+    :keyword plotting_lock: synchronization primitve/"lock" to make sure only one **process** is able to create
+     a new figure at the same time as matplotlib is not necessarily thread-safe.
     :keyword labels: required for multi-sensor plotting to label the plots from the different sensors correctly
         such that these could be identified. (Iterable)
     :keyword area_normalisation: areas of the individual pixel summed over all contributiong pixels. (Iterable)
@@ -315,8 +316,8 @@ def plot_cv_data(interpreted_data, base_path=None, suffix="C_V_characteristic", 
     :param base_path: path to the base group in the hdf files hierarchy.
     :param suffix:  additional suffix to use for naming the PDF containing the plots.
     :param use_group:   boolean, whether to append the group name of the measurements to the PDF name.
-    :keyword lock: synchronization object to prevent multiple overlapping accesses to the pytables api and simultaneously
-        write/read operations on the same file.
+    :keyword lock: synchronization object to prevent multiple overlapping accesses to the pytables api
+     and simultaneously write/read operations on the same file.
     :keyword pdf_name: file name for the output pdf file.
     :keyword use_corrected: boolean, whether to use the corrected capacitance's for plotting.
     :type use_corrected: bool
@@ -325,10 +326,10 @@ def plot_cv_data(interpreted_data, base_path=None, suffix="C_V_characteristic", 
     :keyword verbose: boolean, indicating whether to use verbose output for depletion voltages
     :keyword distribution: boolean, indicating whether also the capacitance distribution of the whole sensor
         should be investigated.
-    :keyword plotting_lock: synchronization primitve/"lock" to make sure only one **process** is able to create a new figure
-        at the same time as matplotlib is not necessarily thread-safe.
-    :keyword labels: required for multi-sensor plotting to label the plots from the different sensors correctly such that
-        these could be identified. (Iterable)
+    :keyword plotting_lock: synchronization primitve/"lock" to make sure only one **process** is able to
+     create a new figure at the same time as matplotlib is not necessarily thread-safe.
+    :keyword labels: required for multi-sensor plotting to label the plots from the different sensors correctly
+     such that these could be identified. (Iterable)
     :keyword mask_pixel: array/iterable of tuple of pixel positions to be masked and therefore ignored for evaluation.
     :keyword hist_bins: integer, number of bins to use for the histogram. (default: 50)
     :type hist_bins: int
@@ -376,8 +377,8 @@ def plot_combined_data(interpreted_data, base_path=None, suffix="combined_bias_c
     :param base_path: path to the base group in the hdf files hierarchy.
     :param suffix: additional suffix to use for naming the PDF containing the plots.
     :param use_group: boolean, whether to append the group name of the measurements to the PDF name.
-    :keyword lock: synchronization object to prevent multiple overlapping accesses to the pytables api and simultaneously
-        write/read operations on the same file.
+    :keyword lock: synchronization object to prevent multiple overlapping accesses to the pytables api
+     and simultaneously write/read operations on the same file.
     :keyword pdf_name: file name for the output pdf file.
     :keyword use_corrected: boolean, whether to use the corrected capacitance's for plotting.
     :type use_corrected: bool
@@ -385,16 +386,16 @@ def plot_combined_data(interpreted_data, base_path=None, suffix="combined_bias_c
     :type apply_correction: bool
     :keyword verbose: boolean, indicating whether to use verbose output for depletion voltages
     :keyword distribution: boolean, indicating whether also the capacitance distribution of the whole sensor
-        should be investigated.
-    :keyword plotting_lock: synchronization primitve/"lock" to make sure only one **process** is able to create a new figure
-        at the same time as matplotlib is not necessarily thread-safe.
-    :keyword labels: required for multi-sensor plotting to label the plots from the different sensors correctly such that
-        these could be identified. (Iterable)
+     should be investigated.
+    :keyword plotting_lock: synchronization primitve/"lock" to make sure only one **process** is able to
+     create a new figure at the same time as matplotlib is not necessarily thread-safe.
+    :keyword labels: required for multi-sensor plotting to label the plots from the different sensors correctly
+     such that these could be identified. (Iterable)
     :keyword mask_pixel: array/iterable of tuple of pixel positions to be masked and therefore ignored for evaluation.
     :keyword hist_bins: integer, number of bins to use for the histogram. (default: 50)
     :type hist_bins: int
-    :keyword labels: required for multi-sensor plotting to label the plots from the different sensors correctly such that
-        these could be identified. (Iterable)
+    :keyword labels: required for multi-sensor plotting to label the plots from the different sensors correctly
+     such that these could be identified. (Iterable)
     :keyword area_normalisation: areas of the individual pixel summed over all contributiong pixels. (Iterable)
     """
     from pixcap65.plotting_util.biasing import plot_bias_delegate, plot_cv_data_delegate
@@ -447,13 +448,5 @@ def plot_depletion_delegate(data_group: tb.Group, analysis_group: GroupType, out
                                       view_effective_doping_table, output_pdf, row, view_table,
                                       view_effective_resistivity_table)
 
-
-CAPACITANCE_LABEL = "$C$ / \\unit{{\\femto\\farad}}"
-FREQUENCY_LABEL = '$f$ / \\unit{{\\mega\\hertz}}'
-CURRENT_LABEL = '$I$ / \\unit{{\\nano\\ampere}}'
-BIAS_CURVE_Y_LABEL = "$I$ / \\unit{{\\nano\\ampere}}"
-BIAS_CURVE_X_LABEL = "$U$ / \\unit{{\\volt}}"
-
-# TODO: refactor these here for recursive usage within submodules.
-# FIXME: labeling of the distribution plots for CV analysis.
-# TODO: Inter-pixel plotting is missing the residues.
+# FIXME: labeling of the distribution plots for CV analysis. (Found the issue?)
+# TODO: Inter-pixel plotting is missing the residues. (under investigation, should be implemented by now)

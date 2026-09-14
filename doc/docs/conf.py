@@ -45,3 +45,5 @@ html_static_path = ['_static']
 sys.path.append('./')
 sys.path.append('../')
 sys.path.append('../../')
+
+# TODO: missing documentation of the array forms like those currently indicated by AdvancedThoughts.md!

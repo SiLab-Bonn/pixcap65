@@ -1,7 +1,3 @@
-import numpy as np
-import tables as tb
-from typing import Union, List, Tuple
-
 # ----------------------------------------------------------
 #  Copyright (c) 2026. SiLab, Institute of Physics, University of Bonn.
 #
@@ -17,7 +13,18 @@ from typing import Union, List, Tuple
 #  See the License for the specific language governing permissions and
 #  limitations under the License.
 # ----------------------------------------------------------
+"""
+Collection of constants used by the implementations of the different plotting handlers used after the analysis.
+"""
+import numpy as np
+import tables as tb
+from typing import Union, List, Tuple
 
 GENERATE_THESIS_PLOTS = False
 CV_USE_SEPARATE_PAGES = True
 SENSOR_ITERABLE = Union[List[tb.Group], Tuple[tb.Group, ...], np.ndarray[tb.Group]]
+CAPACITANCE_LABEL = "$C$ / \\unit{{\\femto\\farad}}"
+FREQUENCY_LABEL = '$f$ / \\unit{{\\mega\\hertz}}'
+CURRENT_LABEL = '$I$ / \\unit{{\\nano\\ampere}}'
+BIAS_CURVE_Y_LABEL = "$I$ / \\unit{{\\nano\\ampere}}"
+BIAS_CURVE_X_LABEL = "$U$ / \\unit{{\\volt}}"

@@ -3,9 +3,12 @@
 /*-measurement/**
 **.h5
 /.venv
+.venv
+.venv-uv
 gpgkey
 /data/bare-measurement/
 /data/advanced-bare-measurement/
+test-data
 
 PresentationNotes.MD
 *.pdf
