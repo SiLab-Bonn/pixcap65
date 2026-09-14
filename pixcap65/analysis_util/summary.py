@@ -19,6 +19,7 @@ single file, such that these results could be easily post processed.
 """
 from os import PathLike
 
+import locale
 import logging
 import numpy as np
 import tables as tb
@@ -35,7 +36,6 @@ except ImportError:
 from examples.data_constants import R11_SCAN_FILE, R13_2_SCAN_FILE, E1_2_SCAN_FILE, X4_SCAN_FILE
 from examples.data_constants import X1_SCAN_2_FILE, X2_SCAN_2_FILE
 from examples.data_constants import X5_SCAN_FILE, X6_SCAN_FILE, X7_SCAN_FILE
-from pixcap65.analysis import get_test_capacitance_data
 from pixcap65.utility import synchronized_process_open_file
 from pixcap65.utility.utils_2 import walk_to_node
 
@@ -354,6 +354,34 @@ def generate_test_summary(files: Iterable[PathLike], groups: Iterable[PathLike],
         table.flush()
         table.cols.Sensor.create_csindex()
         table.flush()
+
+
+def get_test_capacitance_data(group: tb.Group, **kwargs):
+    """
+    get_test_capacitance_data
+
+    @author: Dominik Fischer
+    @date: 2026-08-12
+
+    Utility function to print out the determined test capacitance values and their corresponding (statistical) uncertainties for the provided sensor.
+
+    :param group: analysis group of the sensor and measurement series from which to take the test capacitances.
+    :keyword print_result: whether to print out the test capacitance values on the standard output (default: True)
+    :type print_result: bool
+    :return: tuple of array of the test capacitances and their uncertainties.
+    """
+    locale.setlocale(locale.LC_NUMERIC, "de_DE")
+    test_cap = group.HistCap[:][:, 0]
+    test_cap_error = group.HistCapErr[:][:, 0]
+    if kwargs.get("print_result", True):
+        for k, (cap, err) in enumerate(zip(test_cap, test_cap_error)):
+            eff_cap = cap * 1e15
+            eff_err = err * 1e15
+            print(k, "{:.3n}+-{:.3n}".format(eff_cap, eff_err))
+
+    test_cap[16] = np.nan
+    test_cap_error[16] = np.nan
+    return test_cap[np.isfinite(test_cap)], test_cap_error[np.isfinite(test_cap_error)]
 
 
 if __name__ == "__main__":
