@@ -450,3 +450,4 @@ def plot_depletion_delegate(data_group: tb.Group, analysis_group: GroupType, out
 
 # FIXME: labeling of the distribution plots for CV analysis. (Found the issue?)
 # TODO: Inter-pixel plotting is missing the residues. (under investigation, should be implemented by now)
+# it is implemented, but it looks a bit off.

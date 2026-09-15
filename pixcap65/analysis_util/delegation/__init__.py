@@ -25,7 +25,6 @@ from pixcap65.analysis_util.delegation.cv.doping import analyze_doping_profile
 from pixcap65.analysis_util.delegation.depletion import depletion_delegation_impl
 from pixcap65.analysis_util.modelling.data_store import DopingArrayStore
 from pixcap65.analysis_util.multiprocessing import get_manager_keywords
-from pixcap65.concurrency import get_context_manager
 from pixcap65.utility.tables_util import group_get_file
 from pixcap65.utility.utils_2 import create_carray
 from ..utility import GLOBAL_FILTERS, GENERAL_PIXCAP_SHAPE
@@ -212,6 +211,8 @@ def analyze_depletion_delegate(data_group: tb.Group, analysis_group: tb.Group,
         be set automatically.
     """
     from scipy.constants import epsilon_0
+    from pixcap65.concurrency import get_context_manager
+
     # extract the additional parameters for advanced fitting procedures
     kwargs.setdefault('output_pdf', kwargs.get('fit_plot_pdf', None))
     manager_keywords = get_manager_keywords(**kwargs)
