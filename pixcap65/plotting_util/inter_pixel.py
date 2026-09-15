@@ -39,7 +39,7 @@ from pixcap65.pixcap.pixcap_structure import CAPACITANCE_CONVERSION_FACTOR
 from pixcap65.plotting_util import global_interactive_lock, FREQUENCY_LABEL, CURRENT_LABEL
 from pixcap65.plotting_util.general import plot_2d_capacitance, plot_current_data, \
     plot_current_model, plot_1d_distribution, get_model_prediction
-from pixcap65.plotting_util.utility import advanced_figure_provider
+from pixcap65.plotting_util.utility import figure_provider
 from pixcap65.utility import synchronized_process_open_file
 
 
@@ -230,29 +230,29 @@ def _plot_individual_pixel(analysis_group: tb.Group, inter_a_cap_hist: np.ndarra
         if verify_mask_pixel and (col, row) in effective_pixel_mask:
             continue
         elif np.isfinite(total_current_hist[col, row, 0]):
-            with advanced_figure_provider(interactive_lock) as (fig, ax):
+            with figure_provider(interactive_lock, nrows=2, sharex=True, height_ratios=[4, 1]) as (fig, ax, _):
                 f = np.arange(0, scan_parameters['frequency'].max() * 1.1, 0.1)
 
                 # need to make sure that the fitted line will not exceed the finite data to much.
                 nan_mask = np.isfinite(total_current_hist[col, row, :])
                 frequencies = scan_parameters['frequency'][nan_mask]
                 actual_cap = total_cap_hist[col, row] * CAPACITANCE_CONVERSION_FACTOR
-                plot_current_model(ax, col, row, analysis_group, actual_cap, total_leak_hist, f, prefix="Total ",
+                plot_current_model(ax[0], col, row, analysis_group, actual_cap, total_leak_hist, f, prefix="Total ",
                                    parasitic_correction=extract_parasitic_capacitance(analysis_group.HistCap))
-                plot_current_data(ax, col, row, scan_parameters, total_current_hist, total_current_err_hist,
+                plot_current_data(ax[0], col, row, scan_parameters, total_current_hist, total_current_err_hist,
                                   prefix="Total current for ", marker='o', ls='')
                 f_res, cap_pred = get_model_prediction(col, row, analysis_group, actual_cap, total_leak_hist,
                                                        frequencies,
                                                        parasitic_correction=extract_parasitic_capacitance(
                                                            analysis_group.HistCap))
                 residues = total_current_hist[col, row, nan_mask] * CURRENT_CONVERSION_FACTOR - cap_pred
-                ax[1].errorbar(f_res, residues, fmt='o')
+                ax[0].errorbar(f_res, residues, fmt='o')
                 if np.isfinite(inter_a_current_hist[col, row, 0]):
-                    plot_current_model(ax, col, row, analysis_group,
+                    plot_current_model(ax[0], col, row, analysis_group,
                                        inter_a_cap_hist[col, row] * CAPACITANCE_CONVERSION_FACTOR, inter_a_leak_hist, f,
                                        resistor_name="HistResInterA", prefix="Inter A ", ls='-.',
                                        parasitic_correction=extract_parasitic_capacitance(analysis_group.HistCapInterA))
-                    plot_current_data(ax, col, row, scan_parameters, inter_a_current_hist, inter_a_current_err_hist,
+                    plot_current_data(ax[0], col, row, scan_parameters, inter_a_current_hist, inter_a_current_err_hist,
                                       prefix="Inter A current for", marker='v')
                     f_res, cap_pred = get_model_prediction(col, row, analysis_group, actual_cap, inter_a_leak_hist,
                                                            frequencies,
@@ -261,11 +261,11 @@ def _plot_individual_pixel(analysis_group: tb.Group, inter_a_cap_hist: np.ndarra
                     residues = inter_a_current_hist[col, row, nan_mask] * CURRENT_CONVERSION_FACTOR - cap_pred
                     ax[1].errorbar(f_res, residues, fmt='v')
                 if np.isfinite(inter_b_current_hist[col, row, 0]):
-                    plot_current_model(ax, col, row, analysis_group,
+                    plot_current_model(ax[0], col, row, analysis_group,
                                        inter_b_cap_hist[col, row] * CAPACITANCE_CONVERSION_FACTOR, inter_b_leak_hist, f,
                                        resistor_name="HistResInterB", prefix="Inter B ", ls=':',
                                        parasitic_correction=extract_parasitic_capacitance(analysis_group.HistCapInterB))
-                    plot_current_data(ax, col, row, scan_parameters, inter_b_current_hist, inter_b_current_err_hist,
+                    plot_current_data(ax[0], col, row, scan_parameters, inter_b_current_hist, inter_b_current_err_hist,
                                       prefix="Inter B current for", marker='s')
                     f_res, cap_pred = get_model_prediction(col, row, analysis_group, actual_cap, inter_b_leak_hist,
                                                            frequencies,
@@ -273,8 +273,10 @@ def _plot_individual_pixel(analysis_group: tb.Group, inter_a_cap_hist: np.ndarra
                                                                analysis_group.HistCap))
                     residues = inter_b_current_hist[col, row, nan_mask] * CURRENT_CONVERSION_FACTOR - cap_pred
                     ax[1].errorbar(f_res, residues, fmt='s')
-                ax.set_ylabel(CURRENT_LABEL)
-                ax.set_xlabel(FREQUENCY_LABEL)
-                ax.legend()
-                ax.grid()
+                ax[0].set_ylabel(CURRENT_LABEL)
+                ax[1].set_ylabel(CURRENT_LABEL)
+                ax[1].set_xlabel(FREQUENCY_LABEL)
+                ax[0].legend()
+                ax[0].grid()
+                ax[1].grid()
                 output_pdf.savefig(fig, bbox_inches='tight')
