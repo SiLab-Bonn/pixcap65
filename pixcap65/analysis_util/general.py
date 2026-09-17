@@ -233,8 +233,8 @@ def _analyze_data(raw_data, base_path=None, is_advanced=False, is_cv=False,
         if apply_correction_arg:
             adjust_dist_table(reference_group.analysis_correction, CAPACITANCE_CONVERSION_FACTOR)
 
-    global cap_counter
-    print("The last correction counter is", cap_counter)
+    # global cap_counter
+    # print("The last correction counter is", cap_counter)
 
 
 def _cv_analysis(in_file_h5: tb.File, bare_file_arg, bare_path_arg, base_group: tb.Group,

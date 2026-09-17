@@ -21,6 +21,7 @@ from pixcap65.utility.tables_util import get_parent_group, group_get_file, get_g
     list_attributes, get_group_attributes, get_group_attribute
 from pixcap65.utility.utils_2 import GroupType, prevent_group_mix_up, walk_to_node
 
+cap_counter = 0
 
 def apply_correction(raw_data, base_path=None, bare_data_path=None, bare_group=None, **tb_kwargs):
     """
