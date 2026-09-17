@@ -20,12 +20,6 @@ Here the different dependencies of the capacitance's and the modelling is invest
 
 import numpy as np
 import tables as tb
-
-LABEL_PIXEL_CAPACITANCE = "$C$ / \\unit{{\\femto\\farad}}"
-
-ENHANCED_OR_SENSOR_FILTER = """ | (sensor == {})"""
-
-SIMPLE_SENSOR_FILTER = """(sensor == {})"""
 try:
     # noinspection PyCompatibility
     from collections.abc import Iterable, Callable, Sequence
@@ -57,6 +51,9 @@ from pixcap65.utility.homogenize_plots import set_params, get_error_cycler
 LABEL_PIXEL_SEPARATION = "$\\Delta$ / \\unit{{\\micro\\meter}}"
 LABEL_PERIMETER_UNIT = "U / \\unit{{\\micro\\meter}}"
 LABEL_PIXEL_AREA = "A / \\unit{{\\micro\\meter\\squared}}"
+LABEL_PIXEL_CAPACITANCE = "$C$ / \\unit{{\\femto\\farad}}"
+ENHANCED_OR_SENSOR_FILTER = """ | (sensor == {})"""
+SIMPLE_SENSOR_FILTER = """(sensor == {})"""
 
 
 def get_new_axes():
@@ -144,20 +141,20 @@ def get_advanced_visualizer(obj):
         x, y, ye = obj._masked.T
         plt.errorbar(x, y, ye, fmt=kwargs.setdefault('fmt', 'ok'))
 
-        xmin = np.min(x)
-        xmax = np.max(x)
+        x_min = np.min(x)
+        x_max = np.max(x)
         if isinstance(model_points, Iterable):
             xm = np.array(model_points)
             ym = obj.model(xm, *args)
         elif model_points > 0:
             # beware, x may not be sorted
             if _detect_log_spacing(x):
-                xm = np.geomspace(xmin, xmax, model_points)
+                xm = np.geomspace(x_min, x_max, model_points)
             else:
-                xm = np.linspace(xmin, xmax, model_points)
+                xm = np.linspace(x_min, x_max, model_points)
             ym = obj.model(xm, *args)
         else:
-            xm, ym = _smart_sampling(lambda x: obj.model(x, *args), xmin, xmax)
+            xm, ym = _smart_sampling(lambda x: obj.model(x, *args), x_min, x_max)
         plt.plot(xm, ym)
         return (x, y, ye), (xm, ym)
 
@@ -241,6 +238,7 @@ def detailed_fit(x, y, error, model, title, parameter, *args, model_gradient=Non
     if model_gradient is not None and model_gradient == "numeric":
         # use numdifftools for accurate numeric derivatives
         import numdifftools as nd
+
         def __gradient_method(x, *args):
             def __method(*args, **keys):
                 return model_gradient(x, *args, **keys)
@@ -250,7 +248,10 @@ def detailed_fit(x, y, error, model, title, parameter, *args, model_gradient=Non
         model_gradient = __gradient_method
 
     fig, fig_full, ax, ax_std, ax_log, ax_loglog = get_new_axes()
+    # noinspection argument-list
     cost = LeastSquares(x, y, error, model, grad=model_gradient)
+    # assert isinstance(cost, Cost)
+    # type-inspection is false-positive here!
     m = Minuit(cost, *args)
     m.migrad()
     m.hesse()
@@ -277,19 +278,19 @@ if __name__ == "__main__":
     # need a fit for the areas with the same implantation depth
     # => thus could only use effectively R13 and E1 sensors
     # afterwards estimate the dependence of the A parameter on the depletion width.
-    with tb.open_file('conclude_summary.h5', mode='r') as h5_conclusion,\
-        PdfPages("Dependencies_fitted.pdf") as pdf,\
-        PdfPages("Dependencies_fitted_full.pdf") as pdf_log,\
+    with tb.open_file('conclude_summary.h5', mode='r') as h5_conclusion, \
+        PdfPages("Dependencies_fitted.pdf") as pdf, \
+        PdfPages("Dependencies_fitted_full.pdf") as pdf_log, \
             PdfPages("Dependencies_fitted_full_full.pdf") as pdf_2:
 
         print("HANDLE THE AREA REDUCTION")
         full_properties = read_rec_array_sorted(h5_conclusion.root.SensorTypes, 'sensor')
         dnw_properties_raw = read_rec_array_sorted_where(h5_conclusion.root.SensorTypes,
-                                                     """(implantation_depth >= {})""".format(4.),
-                                                     'sensor')
+                                                         """(implantation_depth >= {})""".format(4.),
+                                                         'sensor')
         nw_properties = read_rec_array_sorted_where(h5_conclusion.root.SensorTypes,
-                                                     """(implantation_depth < {})""".format(4.),
-                                                     'sensor')
+                                                    """(implantation_depth < {})""".format(4.),
+                                                    'sensor')
 
         full_properties = read_rec_array_sorted(h5_conclusion.root.SensorTypes, "sensor")
 
@@ -354,9 +355,11 @@ if __name__ == "__main__":
         full_nw_data = read_rec_array_sorted_where(h5_conclusion.root.GeneralSummaryTable, full_nw_selection, 'sensor')
         hpk_nw_data = read_rec_array_sorted_where(h5_conclusion.root.GeneralSummaryTable, hpk_nw_selection, 'sensor')
         full_data = read_rec_array_sorted(h5_conclusion.root.GeneralSummaryTable, 'sensor')
-        full_full_nw_data = read_rec_array_sorted_where(h5_conclusion.root.GeneralSummaryTable, full_full_nw_selection, 'sensor')
+        full_full_nw_data = read_rec_array_sorted_where(h5_conclusion.root.GeneralSummaryTable, full_full_nw_selection,
+                                                        'sensor')
 
-        def enhanced_full_visualisation(pdf, fitter, title, parameter, callback: Optional[Callable], cost=None, labels=None, extension_factor=1.05, **kwargs):
+        def enhanced_full_visualisation(pdf, fitter, title, parameter, callback: Optional[Callable], cost=None,
+                                        labels=None, extension_factor=1.05, **kwargs):
             """
             Enhanced visualization handler capable of plotting additanal data series besides the visualization of the
             measured data and the model agreement.
@@ -422,8 +425,10 @@ if __name__ == "__main__":
                     if actual_maximum < maximum_value:
                         actual_maximum = maximum_value
 
-                    actual_minimum = actual_minimum / extension_factor if actual_minimum >= 0 else actual_minimum * extension_factor
-                    actual_maximum = actual_maximum * extension_factor if actual_maximum >= 0 else actual_maximum / extension_factor
+                    actual_minimum = actual_minimum / extension_factor if actual_minimum >= 0 else\
+                        actual_minimum * extension_factor
+                    actual_maximum = actual_maximum * extension_factor if actual_maximum >= 0 else\
+                        actual_maximum / extension_factor
 
                     x_data = np.linspace(actual_minimum, actual_maximum * 1.2, 10000)
                     y_data = cost_m.model(x_data, *fit_m.values.to_dict().values())
@@ -447,8 +452,9 @@ if __name__ == "__main__":
                     # dnw_y_data = dnw_data[target].magnitude[:-4]
                     dnw_x_data = dnw_properties[property]
                     dnw_y_data = dnw_data[target].magnitude
+                    # noinspection compatibility
                     match error:
-                        case 0: dnw_y_error= dnw_data[target].stat_error
+                        case 0: dnw_y_error = dnw_data[target].stat_error
                         case 1:
                             dnw_y_error = dnw_data[target].systematic_general
                         case 2:
@@ -457,11 +463,14 @@ if __name__ == "__main__":
                             raise RuntimeError
 
                     dnw_mask = np.isfinite(dnw_y_data)
-                    container, _, _ = axes.errorbar(dnw_x_data[dnw_mask], dnw_y_data[dnw_mask], yerr=dnw_y_error[dnw_mask], fmt="x", label="DNW, planar", capsize=15, markersize=20)
+                    container, _, _ = axes.errorbar(dnw_x_data[dnw_mask], dnw_y_data[dnw_mask],
+                                                    yerr=dnw_y_error[dnw_mask], fmt="x", label="DNW, planar",
+                                                    capsize=15, markersize=20)
                     object_list.append(container)
 
                     nw_x_data = nw_properties[property]
                     nw_y_data = full_full_nw_data[target].magnitude
+                    # noinspection compatibility
                     match error:
                         case 0:
                             nw_y_error = full_full_nw_data[target].stat_error
@@ -472,12 +481,14 @@ if __name__ == "__main__":
                         case _:
                             raise RuntimeError
                     nw_mask = np.isfinite(nw_y_data)
-                    container, _, _ = axes.errorbar(nw_x_data[nw_mask], nw_y_data[nw_mask], yerr=nw_y_error[nw_mask], fmt="x", label="NW, planar", capsize=15, markersize=20)
+                    container, _, _ = axes.errorbar(nw_x_data[nw_mask], nw_y_data[nw_mask], yerr=nw_y_error[nw_mask],
+                                                    fmt="x", label="NW, planar", capsize=15, markersize=20)
                     assert isinstance(container, Line2D)
                     object_list.append(container)
 
                     d3_x_data = d3_properties[property]
                     d3_y_data = d3_data[target].magnitude
+                    # noinspection compatibility
                     match error:
                         case 0:
                             d3_y_error = d3_data[target].stat_error
@@ -533,7 +544,10 @@ if __name__ == "__main__":
         print("SKIP THE IMPLANTATION DEPTH REDUCTION")
         fig, ax = plt.subplots()
         with rc_context(rc={'axes.prop_cycle': get_error_cycler()}):
-            ax.errorbar(full_properties.implantation_depth[dnw_planar_slice], full_data.biased_capacitance.magnitude[dnw_planar_slice], yerr=full_data.biased_capacitance.systematic_dispersion[dnw_planar_slice], fmt='x', capsize=3.0)
+            ax.errorbar(full_properties.implantation_depth[dnw_planar_slice],
+                        full_data.biased_capacitance.magnitude[dnw_planar_slice],
+                        yerr=full_data.biased_capacitance.systematic_dispersion[dnw_planar_slice],
+                        fmt='x', capsize=3.0)
             ax.set_xlabel("$d$ / \\unit{{\\micro\\meter}}")
             ax.set_ylabel("$C$ / \\unit{{\\femto\\farad}}")
             if not GENERATE_THESIS_PLOTS:
@@ -574,7 +588,8 @@ if __name__ == "__main__":
                                     dnw_data.biased_capacitance.systematic_dispersion,
                                     quadratic_model)
 
-        nw_cost_p, nw_m_p = detailed_fit(nw_properties.Perimeter[second_mask], full_nw_data.biased_capacitance.magnitude,
+        nw_cost_p, nw_m_p = detailed_fit(nw_properties.Perimeter[second_mask],
+                                         full_nw_data.biased_capacitance.magnitude,
                                          full_nw_data.biased_capacitance.systematic_dispersion,
                                          exponential_model, "Perimeter - NW",
                                          LABEL_PERIMETER_UNIT, 10, 0,
@@ -604,7 +619,12 @@ if __name__ == "__main__":
                                     LABEL_PERIMETER_UNIT,
                                     _get_data_plotter("biased_capacitance", "Perimeter", 2),
                                     cost=(dnw_cost_p, dnw_cost_p_2, nw_cost_p, nw_cost_p_2,),
-                                    labels=["DNW, planar, exponentiell", "DNW, planar, quadratisch", "NW, planar, exponentiell", "NW, planar, quadratisch",])
+                                    labels=[
+                                        "DNW, planar, exponentiell",
+                                        "DNW, planar, quadratisch",
+                                        "NW, planar, exponentiell",
+                                        "NW, planar, quadratisch",
+                                    ])
 
         print("parameter depth dependence for the exponential model!")
         print(np.polyfit([3, 5], [nw_m_p.values['a'], dnw_m_p.values['a']], 1))
@@ -624,8 +644,6 @@ if __name__ == "__main__":
         # in the pixel separation and implantation area
 
         # this model is able to fully explain the residual for the r1 with linear fit of the implantation area.
-
-
         print("INVESTIGATE THE DEPENDENCE ON THE PIXEL SEPARATION.")
         # before investigating the dependency on the pixel separation: What capacitances are to expect for the hpk
         # sensor
@@ -638,7 +656,6 @@ if __name__ == "__main__":
         # account only for combination from perimeter and area it seems to be quite inprobable that the pixel
         # separation would lead to a decrease in capacitance or use it such that the perimeter does only have a
         # effect if there is a deviation from the quadratic structure? p / 4*sqrt(A) for example.
-
 
         dnw_cost_s, dnw_m_s = detailed_fit(dnw_properties.pixel_separation_x,
                                            dnw_data.biased_capacitance.magnitude,
@@ -695,7 +712,7 @@ if __name__ == "__main__":
         exp_dnw_s = 19.87
         exp_nw_s = 29.09
 
-        print(1- chi2(exp_dnw_s - dnw_m_s.fmin.fval, 1))
+        print(1 - chi2(exp_dnw_s - dnw_m_s.fmin.fval, 1))
         print(1 - chi2(exp_nw_s - nw_m_s.fmin.fval, 1))
         # by p-value test reject the exponential model.
         # but this will introduce significant divergences for the HPK sensors.
@@ -711,10 +728,12 @@ if __name__ == "__main__":
             A, W, p, sep_x, sep_y = x
             # it may be the case that we need to estimate the primary parameters (within the brackets) by a different
             # formula. This will hold in particular if the first 10 residuals are much to large.
-            return (area_depth_poly_offset[1] + area_depth_poly_offset[0] * W + area_depth_poly_slope[1] * A + area_depth_poly_slope[0] * A * W) * np.exp(nw_m_p.values['b'] * (p - 4 * np.sqrt(A)))
+            return (area_depth_poly_offset[1] + area_depth_poly_offset[0] * W + area_depth_poly_slope[1] * A
+                    + area_depth_poly_slope[0] * A * W) * np.exp(nw_m_p.values['b'] * (p - 4 * np.sqrt(A)))
 
         # calculate some residue for our model
-        x_ref_data = (full_properties.implantation_area, full_properties.implantation_depth, full_properties.Perimeter, full_properties.pixel_separation_x, full_properties.pixel_separation_y)
+        x_ref_data = (full_properties.implantation_area, full_properties.implantation_depth, full_properties.Perimeter,
+                      full_properties.pixel_separation_x, full_properties.pixel_separation_y)
         y_ref_data = full_data.biased_capacitance.magnitude
         predictions = _active_model(x_ref_data)
         residuals = predictions - y_ref_data
@@ -740,28 +759,31 @@ if __name__ == "__main__":
                                                        LABEL_PERIMETER_UNIT,
                                                        1, 0, 0, model_gradient=quadratic_model_grad)
 
-        dnw_inter_cost_p_2, dnw_inter_m_p_2 = detailed_fit(dnw_properties.Perimeter[dnw_inter_pix_mask],
-                                                           dnw_data.biased_inter_capacitance.magnitude[dnw_inter_pix_mask],
-                                                           dnw_data.biased_inter_capacitance.stat_error[dnw_inter_pix_mask],
-                                                           exponential_model, "Inter - Perimeter - DNW - EXP",
-                                                           LABEL_PERIMETER_UNIT,
-                                                           1, 0, model_gradient=exponential_model_grad)
+        dnw_inter_cost_p_2, dnw_inter_m_p_2 = \
+            detailed_fit(dnw_properties.Perimeter[dnw_inter_pix_mask],
+                         dnw_data.biased_inter_capacitance.magnitude[dnw_inter_pix_mask],
+                         dnw_data.biased_inter_capacitance.stat_error[dnw_inter_pix_mask],
+                         exponential_model, "Inter - Perimeter - DNW - EXP",
+                         LABEL_PERIMETER_UNIT,
+                         1, 0, model_gradient=exponential_model_grad)
         print("DNW hypothesis test")
         print(1 - chi2(dnw_inter_m_p_2.fmin.fval - dnw_inter_m_p.fmin.fval, 1))
 
-        nw_inter_cost_p, nw_inter_m_p = detailed_fit(nw_properties.Perimeter[second_mask][nw_inter_pix_mask],
-                                                     full_nw_data.biased_inter_capacitance.magnitude[nw_inter_pix_mask],
-                                                     full_nw_data.biased_inter_capacitance.stat_error[nw_inter_pix_mask],
-                                                     quadratic_model, "Inter - Perimeter - NW - LIN",
-                                                     LABEL_PERIMETER_UNIT,
-                                                     1, 0, 0, model_gradient=quadratic_model_grad)
+        nw_inter_cost_p, nw_inter_m_p = \
+            detailed_fit(nw_properties.Perimeter[second_mask][nw_inter_pix_mask],
+                         full_nw_data.biased_inter_capacitance.magnitude[nw_inter_pix_mask],
+                         full_nw_data.biased_inter_capacitance.stat_error[nw_inter_pix_mask],
+                         quadratic_model, "Inter - Perimeter - NW - LIN",
+                         LABEL_PERIMETER_UNIT,
+                         1, 0, 0, model_gradient=quadratic_model_grad)
 
-        nw_inter_cost_p_2, nw_inter_m_p_2 = detailed_fit(nw_properties.Perimeter[second_mask][nw_inter_pix_mask],
-                                                         full_nw_data.biased_inter_capacitance.magnitude[nw_inter_pix_mask],
-                                                         full_nw_data.biased_inter_capacitance.stat_error[nw_inter_pix_mask],
-                                                         exponential_model, "Inter - Perimeter - NW - EXP",
-                                                         LABEL_PERIMETER_UNIT,
-                                                         1, 0, model_gradient=exponential_model_grad)
+        nw_inter_cost_p_2, nw_inter_m_p_2 = \
+            detailed_fit(nw_properties.Perimeter[second_mask][nw_inter_pix_mask],
+                         full_nw_data.biased_inter_capacitance.magnitude[nw_inter_pix_mask],
+                         full_nw_data.biased_inter_capacitance.stat_error[nw_inter_pix_mask],
+                         exponential_model, "Inter - Perimeter - NW - EXP",
+                         LABEL_PERIMETER_UNIT,
+                         1, 0, model_gradient=exponential_model_grad)
         print("NW hypothesis test")
         print(1 - chi2(nw_inter_m_p_2.fmin.fval - nw_inter_m_p.fmin.fval, 1))
 
@@ -769,7 +791,7 @@ if __name__ == "__main__":
         visualize_full((fig, fig_full), (ax, ax_std, ax_log, ax_loglog), pdf, pdf_log,
                        (nw_inter_m_p, nw_inter_m_p_2, dnw_inter_m_p, dnw_inter_m_p_2), "Inter - Perimeter",
                        LABEL_PERIMETER_UNIT, cost=(nw_inter_cost_p, nw_inter_cost_p_2, dnw_inter_cost_p,
-                                                               dnw_inter_cost_p_2),)
+                                                   dnw_inter_cost_p_2),)
 
         enhanced_full_visualisation(pdf_2,
                                     (nw_inter_m_p, nw_inter_m_p_2, dnw_inter_m_p, dnw_inter_m_p_2), "Inter - Perimeter",
@@ -785,11 +807,11 @@ if __name__ == "__main__":
                                     ), )
 
         print("INTER CAP PERIMETETER QUADRATIC DEPTH DEPENDENCE")
-        print(np.polyfit([3, 5],[nw_inter_m_p.values['a'], dnw_inter_m_p.values['a']],1))
+        print(np.polyfit([3, 5], [nw_inter_m_p.values['a'], dnw_inter_m_p.values['a']], 1))
 
-        print(np.polyfit([3, 5],[nw_inter_m_p.values['b'], dnw_inter_m_p.values['b']],1))
+        print(np.polyfit([3, 5], [nw_inter_m_p.values['b'], dnw_inter_m_p.values['b']], 1))
 
-        print(np.polyfit([3, 5],[nw_inter_m_p.values['c'], dnw_inter_m_p.values['c']],1))
+        print(np.polyfit([3, 5], [nw_inter_m_p.values['c'], dnw_inter_m_p.values['c']], 1))
 
         print("INVESTIGATE SEPARATION DEPENDENCE FOR INTER-PIX")
         dnw_inter_cost_s, dnw_inter_m_s = detailed_fit(dnw_properties.pixel_separation_x[dnw_inter_pix_mask],
@@ -806,30 +828,31 @@ if __name__ == "__main__":
             exponential_model, "Inter - Separation - DNW - EXP",
             LABEL_PIXEL_SEPARATION,
             1, 0, model_gradient=exponential_model_grad)
-        nw_inter_cost_s, nw_inter_m_s = detailed_fit(nw_properties.pixel_separation_x[second_mask][nw_inter_pix_mask],
-                                                     full_nw_data.biased_inter_capacitance.magnitude[nw_inter_pix_mask],
-                                                     full_nw_data.biased_inter_capacitance.stat_error[nw_inter_pix_mask],
-                                                     reciprocal_model, "Inter - Separation - NW",
-                                                     LABEL_PIXEL_SEPARATION,
-                                                     1, 0)
+        nw_inter_cost_s, nw_inter_m_s = \
+            detailed_fit(nw_properties.pixel_separation_x[second_mask][nw_inter_pix_mask],
+                         full_nw_data.biased_inter_capacitance.magnitude[nw_inter_pix_mask],
+                         full_nw_data.biased_inter_capacitance.stat_error[nw_inter_pix_mask],
+                         reciprocal_model, "Inter - Separation - NW", LABEL_PIXEL_SEPARATION, 1, 0)
 
-        nw_inter_cost_s_2, nw_inter_m_s_2 = detailed_fit(nw_properties.pixel_separation_x[second_mask][nw_inter_pix_mask],
-                                                         full_nw_data.biased_inter_capacitance.magnitude[nw_inter_pix_mask],
-                                                         full_nw_data.biased_inter_capacitance.stat_error[nw_inter_pix_mask],
-                                                         exponential_model, "Inter - Separation - NW - EXP",
-                                                         LABEL_PIXEL_SEPARATION,
-                                                         1, 0, model_gradient=exponential_model_grad)
+        nw_inter_cost_s_2, nw_inter_m_s_2 = \
+            detailed_fit(nw_properties.pixel_separation_x[second_mask][nw_inter_pix_mask],
+                         full_nw_data.biased_inter_capacitance.magnitude[nw_inter_pix_mask],
+                         full_nw_data.biased_inter_capacitance.stat_error[nw_inter_pix_mask],
+                         exponential_model, "Inter - Separation - NW - EXP",
+                         LABEL_PIXEL_SEPARATION,
+                         1, 0, model_gradient=exponential_model_grad)
         fig, fig_full, ax, ax_std, ax_log, ax_loglog = get_new_axes()
         visualize_full((fig, fig_full), (ax, ax_std, ax_log, ax_loglog), pdf, pdf_log,
                        (nw_inter_m_s, nw_inter_m_s_2, dnw_inter_m_s, dnw_inter_m_s_2), "Inter - Separation",
                        LABEL_PIXEL_SEPARATION, cost=(nw_inter_cost_s, nw_inter_cost_s_2,
-                                                dnw_inter_cost_s, dnw_inter_cost_s_2))
+                                                     dnw_inter_cost_s, dnw_inter_cost_s_2))
 
         enhanced_full_visualisation(pdf_2,
                                     (nw_inter_m_s, nw_inter_m_s_2, dnw_inter_m_s, dnw_inter_m_s_2),
                                     "Inter - Separation",
                                     LABEL_PIXEL_SEPARATION,
-                                    _get_data_plotter("biased_inter_capacitance", "pixel_separation_x", 0),
+                                    _get_data_plotter("biased_inter_capacitance",
+                                                      "pixel_separation_x", 0),
                                     cost=(nw_inter_cost_s, nw_inter_cost_s_2, dnw_inter_cost_s, dnw_inter_cost_s_2),
                                     labels=(
                                         "NW, planar, reziprok",
@@ -849,7 +872,8 @@ if __name__ == "__main__":
         plt.close(fig)
         with plt.rc_context(rc={'axes.prop_cycle': get_error_cycler()}):
             fig, ax = plt.subplots()
-            ax.errorbar(full_properties.implantation_depth[dnw_planar_slice], full_data.biased_inter_capacitance.magnitude[dnw_planar_slice],
+            ax.errorbar(full_properties.implantation_depth[dnw_planar_slice],
+                        full_data.biased_inter_capacitance.magnitude[dnw_planar_slice],
                         yerr=full_data.biased_inter_capacitance.stat_error[dnw_planar_slice], fmt='x', capsize=3.0)
             ax.set_xlabel("$d$ / \\unit{{\\micro\\meter}}")
             ax.set_ylabel("$C_\\text{{inter}}$ / \\unit{{\\femto\\farad}}")
@@ -860,17 +884,17 @@ if __name__ == "__main__":
             print(plt.rcParams["axes.prop_cycle"])
         plt.close(fig)
 
-
         # the first results from detailed inter-pix fits imply a dependence on the implantation depth invisible in the
         # plots for the thesis by the effect of the hpk, fbk and sintef sensors;
         # deeper implants seems to imply higher capacitance!
 
 
-        def active_inter_pix_model(xy,a0, a1, a2, a3, a4, a5):
+        def active_inter_pix_model(xy, a0, a1, a2, a3, a4, a5):
             p, d = xy
             return quadratic_model(p, linear_model(d, a0, a1), linear_model(d, a2, a3), linear_model(d, a4, a5))
 
-        def active_inter_pix_grad(xy,a0, a1, a2, a3, a4, a5):
+
+        def active_inter_pix_grad(xy, a0, a1, a2, a3, a4, a5):
             p, d = xy
             first = quadratic_model_grad(p, linear_model(d, a0, a1), linear_model(d, a2, a3), linear_model(d, a4, a5))
             second_temp = np.array([
@@ -885,7 +909,8 @@ if __name__ == "__main__":
 
 
         slc = slice(0, -5, 1)
-        active_inter_pix_cost = LeastSquares((full_properties.Perimeter[inter_pix_mask][slc], full_properties.implantation_depth[inter_pix_mask][slc]),
+        active_inter_pix_cost = LeastSquares((full_properties.Perimeter[inter_pix_mask][slc],
+                                             full_properties.implantation_depth[inter_pix_mask][slc]),
                                              full_data.biased_inter_capacitance.magnitude[inter_pix_mask][slc],
                                              full_data.biased_inter_capacitance.stat_error[inter_pix_mask][slc],
                                              active_inter_pix_model)
@@ -902,8 +927,10 @@ if __name__ == "__main__":
         print(active_inter_pix_minuit.params)
         print(1 - chi2(active_inter_pix_minuit.fmin.fval, active_inter_pix_minuit.ndof))
 
-        active_pix_dependents = (full_properties.implantation_area[lf_selection_slice], full_properties.implantation_depth[lf_selection_slice],
-                                 full_properties.Perimeter[lf_selection_slice], full_properties.pixel_separation_x[lf_selection_slice],
+        active_pix_dependents = (full_properties.implantation_area[lf_selection_slice],
+                                 full_properties.implantation_depth[lf_selection_slice],
+                                 full_properties.Perimeter[lf_selection_slice],
+                                 full_properties.pixel_separation_x[lf_selection_slice],
                                  full_properties.pixel_separation_y[lf_selection_slice])
         active_pix_cost = LeastSquares(
             active_pix_dependents,
@@ -922,14 +949,21 @@ if __name__ == "__main__":
         print(active_pix_minuit.fmin)
         print(active_pix_minuit.params)
         print(1 - chi2(active_pix_minuit.fmin.fval, active_pix_minuit.ndof))
-        active_pix_predictions = np.array([extended_cap_model_5(np.asarray(active_pix_dependents)[:, i], *active_pix_minuit.values.to_dict().values()) for i in range(len(active_pix_dependents[0]))])
+        active_pix_predictions = np.array([
+            extended_cap_model_5(
+                np.asarray(active_pix_dependents)[:, i],
+                *active_pix_minuit.values.to_dict().values()) for i in range(len(active_pix_dependents[0]))])
         full_prediction_coordinates = np.vstack([full_properties.implantation_area,
                                                  full_properties.implantation_depth,
                                                  full_properties.Perimeter,
                                                  full_properties.pixel_separation_x,
                                                  full_properties.pixel_separation_y]).T
-        full_total_predictions = np.array([extended_cap_model_5(coord,
-                                                         *active_pix_minuit.values.to_dict().values()) for coord in full_prediction_coordinates])
+        full_total_predictions = np.array([
+            extended_cap_model_5(
+                coord,
+                *active_pix_minuit.values.to_dict().values()
+            ) for coord in full_prediction_coordinates
+        ])
 
         active_pix_residues = active_pix_predictions - full_data.biased_capacitance.magnitude[lf_selection_slice]
         print(active_pix_residues)
@@ -946,38 +980,43 @@ if __name__ == "__main__":
         print(inter_area)
         fig, ax = plt.subplots()
         slc = slice(0, -5, 1)
-        ax.errorbar(inter_area[slc], full_data.biased_inter_capacitance.magnitude[inter_pix_mask][slc], yerr=
-        full_data.biased_inter_capacitance.stat_error[inter_pix_mask][slc], fmt='ok')
+        ax.errorbar(inter_area[slc], full_data.biased_inter_capacitance.magnitude[inter_pix_mask][slc],
+                    yerr=full_data.biased_inter_capacitance.stat_error[inter_pix_mask][slc], fmt='ok')
         for record, sensor in zip(full_data[inter_pix_mask][slc], full_properties[inter_pix_mask][slc]):
             xy = (sensor.implantation_depth * sensor.Perimeter, record.biased_inter_capacitance.magnitude)
-            ax.annotate(record.sensor.decode(),xy)
+            ax.annotate(record.sensor.decode(), xy)
         fig.savefig("inter_pix_area.png")
         fig, ax = plt.subplots()
         slc = slice(0, -5, 1)
-        inter_area_divide = full_properties.implantation_depth[inter_pix_mask] * full_properties.Perimeter[inter_pix_mask] / \
-                            full_properties.pixel_separation_x[inter_pix_mask]
-        ax.errorbar(inter_area_divide[slc], full_data.biased_inter_capacitance.magnitude[inter_pix_mask][slc], yerr=
-        full_data.biased_inter_capacitance.stat_error[inter_pix_mask][slc], fmt='ok')
+        inter_area_divide = full_properties.implantation_depth[inter_pix_mask]\
+            * full_properties.Perimeter[inter_pix_mask] / \
+            full_properties.pixel_separation_x[inter_pix_mask]
+        ax.errorbar(inter_area_divide[slc], full_data.biased_inter_capacitance.magnitude[inter_pix_mask][slc],
+                    yerr=full_data.biased_inter_capacitance.stat_error[inter_pix_mask][slc], fmt='ok')
         for record, sensor in zip(full_data[inter_pix_mask][slc], full_properties[inter_pix_mask][slc]):
-            xy = (sensor.implantation_depth * sensor.Perimeter / \
+            xy = (sensor.implantation_depth * sensor.Perimeter /
                   sensor.pixel_separation_x, record.biased_inter_capacitance.magnitude)
             ax.annotate(record.sensor.decode(), xy)
         fig.savefig("inter_pix_area_divide_dist.png")
         fig, ax = plt.subplots()
         slc = slice(0, -5, 1)
-        inter_area_divide = full_properties.Perimeter[inter_pix_mask] / full_properties.pixel_separation_x[inter_pix_mask]
-        ax.errorbar(inter_area_divide[slc], full_data.biased_inter_capacitance.magnitude[inter_pix_mask][slc], yerr=
-        full_data.biased_inter_capacitance.stat_error[inter_pix_mask][slc], fmt='ok')
+        inter_area_divide = full_properties.Perimeter[inter_pix_mask]\
+            / full_properties.pixel_separation_x[inter_pix_mask]
+        ax.errorbar(inter_area_divide[slc], full_data.biased_inter_capacitance.magnitude[inter_pix_mask][slc],
+                    yerr=full_data.biased_inter_capacitance.stat_error[inter_pix_mask][slc], fmt='ok')
         for record, sensor in zip(full_data[inter_pix_mask][slc], full_properties[inter_pix_mask][slc]):
             xy = (sensor.Perimeter / sensor.pixel_separation_x, record.biased_inter_capacitance.magnitude)
             ax.annotate(record.sensor.decode(), xy)
         fig.savefig("inter_pix_area_divide_dist_2.png")
         fig, ax = plt.subplots()
         slc = slice(0, -6, 1)
-        inter_area_divide = full_properties.implantation_depth * full_properties.Perimeter / full_properties.pixel_separation_x
-        ax.errorbar(inter_area_divide[slc], full_data.biased_capacitance.magnitude[slc], yerr=full_data.biased_inter_capacitance.stat_error[slc], fmt='ok')
+        inter_area_divide = full_properties.implantation_depth\
+            * full_properties.Perimeter / full_properties.pixel_separation_x
+        ax.errorbar(inter_area_divide[slc], full_data.biased_capacitance.magnitude[slc],
+                    yerr=full_data.biased_inter_capacitance.stat_error[slc], fmt='ok')
         for record, sensor in zip(full_data[slc], full_properties[slc]):
-            xy = (sensor.implantation_depth * sensor.Perimeter / sensor.pixel_separation_x, record.biased_capacitance.magnitude)
+            xy = (sensor.implantation_depth * sensor.Perimeter / sensor.pixel_separation_x,
+                  record.biased_capacitance.magnitude)
             ax.annotate(record.sensor.decode(), xy)
         fig.savefig("total_pix_area_divide_dist.png")
 
@@ -986,7 +1025,9 @@ if __name__ == "__main__":
         print(full_data.biased_capacitance.magnitude)
         print(full_data.sensor)
         print(np.abs(full_total_predictions - full_data.biased_capacitance.magnitude))
-        print(np.sum((np.abs(full_total_predictions[dnw_planar_slice] - full_data.biased_capacitance.magnitude[dnw_planar_slice]) / full_data.biased_capacitance.systematic_dispersion[dnw_planar_slice])**2))
+        print(np.sum((np.abs(full_total_predictions[dnw_planar_slice]
+                             - full_data.biased_capacitance.magnitude[dnw_planar_slice])
+                      / full_data.biased_capacitance.systematic_dispersion[dnw_planar_slice])**2))
         print(*active_pix_minuit.values.to_dict().values())
         print(active_pix_minuit.values)
 
@@ -1003,8 +1044,16 @@ if __name__ == "__main__":
 
         print("result from optimisation")
         number_bootstraps = 5000
-        print(newton(_root_model, 2.75, args=[hpk_nw_data.biased_capacitance.magnitude[-2], reciprocal_model, *nw_m_s.values.to_dict().values()], full_output=True))
-        print(newton(_root_model, 2.75, args=[hpk_nw_data.biased_capacitance.magnitude[-1], reciprocal_model, *nw_m_s.values.to_dict().values()], full_output=True))
+        print(newton(_root_model, 2.75, args=[
+            hpk_nw_data.biased_capacitance.magnitude[-2],
+            reciprocal_model,
+            *nw_m_s.values.to_dict().values()
+        ], full_output=True))
+        print(newton(_root_model, 2.75, args=[
+            hpk_nw_data.biased_capacitance.magnitude[-1],
+            reciprocal_model,
+            *nw_m_s.values.to_dict().values()
+        ], full_output=True))
 
         cap_parameter_values = nw_m_s.values.to_dict().values()
         cap_parameter_covariance = nw_m_s.covariance
@@ -1016,9 +1065,13 @@ if __name__ == "__main__":
                 *cap_parameter_values
             ])
 
-            bootstrap_data = rng.normal(loc=data.biased_capacitance.magnitude[idx], scale=data.biased_capacitance.stat_error[idx], size=number_bootstraps)
+            bootstrap_data = rng.normal(loc=data.biased_capacitance.magnitude[idx],
+                                        scale=data.biased_capacitance.stat_error[idx],
+                                        size=number_bootstraps)
             # perhaps using another bootstrap approach for the parameter errors?
-            parameter_bootstrap_data = rng.multivariate_normal(np.array([*cap_parameter_values], dtype=np.float64), cap_parameter_covariance,
+            parameter_bootstrap_data = rng.multivariate_normal(np.array([*cap_parameter_values],
+                                                                        dtype=np.float64),
+                                                               cap_parameter_covariance,
                                                                size=number_bootstraps)
             bootstrap_result = np.array([newton(_root_model, guess,
                                                 args=[cap, reciprocal_model, *parameters]) for (cap, parameters) in

@@ -42,9 +42,8 @@ def inter_cap_model_4(xy, a0, a1, a2, a3, a4, a5):
     return quadratic_model(p, linear_model(d, a0, a1), linear_model(d, a2, a3), linear_model(d, a4, a5))
 
 def inter_cap_model_5(xy, a0, a1, a2, a3, a4, a5):
-    from examples.general_model import quadratic_model
-    A, d, p, separation_x, separation_y = xy
-    return quadratic_model(p / separation_x, linear_model(d, a0, a1), linear_model(d, a2, a3), linear_model(d, a4, a5))
+    from examples.capacitance_models import extended_cap_model_6
+    return extended_cap_model_6(xy, a0, a1, a2, a3, a4, a5)
 
 def inter_cap_model_6(xy, a0, a1, a2, a3):
     A, d, p, separation_x, separation_y = xy
@@ -55,4 +54,5 @@ def inter_cap_model_7(xy, a0, a1, a2, a3, a4, a5, a6, a7):
     # larger than the parameters itself.
     from examples.general_model import quadratic_model
     A, d, p, separation_x, separation_y = xy
-    return quadratic_model(p, linear_model(d, a0, a1), linear_model(d, a2, a3), linear_model(d, a4, a5)) + linear_model(d, a6, a7) / separation_x
+    return quadratic_model(p, linear_model(d, a0, a1), linear_model(d, a2, a3), linear_model(d, a4, a5))\
+        + linear_model(d, a6, a7) / separation_x

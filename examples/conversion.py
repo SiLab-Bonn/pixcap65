@@ -22,6 +22,23 @@ from .data_constants import *
 
 
 if __name__ == '__main__':
+    def internal_node_copy(grouping, h5_file: tb.File, parent=tb.Group,
+                           exclude_iv=False, exclude_cv=False):
+        for group in grouping._f_iter_nodes():
+            if not isinstance(group, tb.Group):
+                continue
+            if group == grouping:
+                continue
+            if group._v_name == "C_V_Characteristic_refined" and exclude_cv:
+                continue
+            if group._v_name == "I_V_Characteristic" and exclude_iv:
+                continue
+            print(group)
+            h5_file.copy_node(where=grouping, name=group._v_name,
+                              newname=group._v_name,
+                              newparent=parent, recursive=True, overwrite=True)
+
+
     with tb.open_file(X1_SCAN_2_FILE, "a") as h5_file:
         generate_bias_table(h5_file.root.ATLAS_ITk.X1.I_V_Characteristic.biasing.measurements, transform_api=True)
         regenerate_c_v_errors(h5_file.root.ATLAS_ITk.X1.C_V_Characteristic_refined.biasing.measurements)
@@ -34,15 +51,7 @@ if __name__ == '__main__':
                           newname="C_V_Characteristic_refined_Extended_Combined",
                           overwrite=True, recursive=True)
         old_x1 = h5_file.root.ATLAS_ITk.X1
-        for group in old_x1._f_iter_nodes():
-            if not isinstance(group, tb.Group):
-                continue
-            if group == old_x1:
-                continue
-            print(group)
-            h5_file.copy_node(where=old_x1, name=group._v_name,
-                              newname=group._v_name,
-                              newparent=h5_file.root.Thesis.ATLAS_ITk.X1, recursive=True, overwrite=True)
+        internal_node_copy(h5_file.root.ATLAS_ITk.X1, h5_file, h5_file.root.Thesis.ATLAS_ITk.X1)
         generate_pixel_dimensions(h5_file.root.Thesis.ATLAS_ITk.X1)
 
     with tb.open_file(X2_SCAN_2_FILE, "a") as h5_file:
@@ -53,36 +62,19 @@ if __name__ == '__main__':
         h5_file.root.ATLAS_ITk.X2.C_V_Characteristic_refined.biasing.measurements.BiasVoltageHist.attrs["Units"] = "V"
         old_x2 = h5_file.root.ATLAS_ITk.X2
         assert isinstance(old_x2, tb.Group)
-        for group in old_x2._f_iter_nodes():
-            if not isinstance(group, tb.Group):
-                continue
-            if group == old_x2:
-                continue
-            print(group)
-            h5_file.copy_node(where=old_x2, name=group._v_name,
-                              newname=group._v_name,
-                              newparent=h5_file.root.Thesis.ATLAS_ITk.X2, recursive=True, overwrite=True)
+        internal_node_copy(h5_file.root.ATLAS_ITk.X2, h5_file, h5_file.root.Thesis.ATLAS_ITk.X2)
 
         with tb.open_file("packaged/data/X2_12_Renew_Scan.h5") as backing_file:
-            backing_file.copy_children(backing_file.root.Thesis.ATLAS_ITk.X2, h5_file.root.Thesis.ATLAS_ITk.X2, recursive=True, overwrite=True)
+            backing_file.copy_children(backing_file.root.Thesis.ATLAS_ITk.X2, h5_file.root.Thesis.ATLAS_ITk.X2,
+                                       recursive=True, overwrite=True)
 
     with tb.open_file(R11_SCAN_FILE, "a") as h5_file:
         generate_pixel_dimensions(h5_file.root.Reference.R1)
         old_sensor = h5_file.root.Reference.R11
-        for group in old_sensor._f_iter_nodes():
-            if not isinstance(group, tb.Group):
-                continue
-            if group == old_sensor:
-                continue
-            if group._v_name == "C_V_Characteristic_refined":
-                continue
-            if group._v_name == "I_V_Characteristic":
-                continue
-            print(group)
-            h5_file.copy_node(where=old_sensor, name=group._v_name,
-                              newname=group._v_name,
-                              newparent=h5_file.root.Reference.R1, recursive=True, overwrite=True)
+        internal_node_copy(h5_file.root.Reference.R11, h5_file, h5_file.root.Reference.R1,
+                           exclude_cv=True, exclude_iv=True)
 
+        # noinspection DuplicatedCode
         physical_dimensions = h5_file.root.Reference.R1.sensor.PhysicalDimensions[:]
         physical_dimensions[:, :] = np.asarray([6, 81], dtype=np.float64)
         physical_dimensions[:, 0] = np.nan
@@ -105,7 +97,8 @@ if __name__ == '__main__':
 
     with tb.open_file("packaged/data/R13_3_Scan.h5", "a") as h5_file:
         with tb.open_file(R13_2_SCAN_FILE, "a") as second_file:
-            h5_file.copy_children(h5_file.root.Reference.R13, second_file.root.Reference.R13, recursive=True, overwrite=True)
+            h5_file.copy_children(h5_file.root.Reference.R13, second_file.root.Reference.R13,
+                                  recursive=True, overwrite=True)
 
     with tb.open_file(R13_2_SCAN_FILE, 'a') as h5_file:
         generate_pixel_dimensions(h5_file.root.Reference.R13, 30)
@@ -128,8 +121,9 @@ if __name__ == '__main__':
         physical_dimensions[:, 0] = np.nan
         for key, region in data_constants.e1_pixel_groups.items():
             for col_range, row_range in zip(region["columns"], region["rows"]):
-                physical_dimensions[col_range[0]:col_range[1], row_range[0]:row_range[1]] = [data_constants.e1_pixel_dimensions[key],
-                                                                                             data_constants.e1_pixel_dimensions[key]]
+                physical_dimensions[col_range[0]:col_range[1], row_range[0]:row_range[1]]\
+                    = [data_constants.e1_pixel_dimensions[key],
+                       data_constants.e1_pixel_dimensions[key]]
 
         h5_file.root.Reference.E1.sensor.PhysicalDimensions[:] = physical_dimensions
         h5_file.root.Reference.E1.sensor.PhysicalDimensions.flush()
@@ -160,9 +154,12 @@ if __name__ == '__main__':
         right_parent = h5_file.root.Thesis.ATLAS_ITk.X6
         if "inter_unbiased_full" in wrong_parent:
             h5_file.move_node(where=wrong_parent, name="inter_unbiased_full", newparent=right_parent,)
-            h5_file.move_node(where=wrong_parent, name="inter_biased_M_45.0_V_full", newparent=right_parent, newname="inter_biased_M_45_V_full")
-            h5_file.move_node(where=wrong_parent, name="biased_45.0_V_full", newparent=right_parent, newname="biased_45_V_full")
-            h5_file.move_node(where=wrong_parent, name="C_V_Characteristic_refined", newparent=right_parent, overwrite=True)
+            h5_file.move_node(where=wrong_parent, name="inter_biased_M_45.0_V_full", newparent=right_parent,
+                              newname="inter_biased_M_45_V_full")
+            h5_file.move_node(where=wrong_parent, name="biased_45.0_V_full", newparent=right_parent,
+                              newname="biased_45_V_full")
+            h5_file.move_node(where=wrong_parent, name="C_V_Characteristic_refined", newparent=right_parent,
+                              overwrite=True)
 
         generate_pixel_dimensions(h5_file.root.Thesis.ATLAS_ITk.X6)
 
@@ -170,4 +167,5 @@ if __name__ == '__main__':
         generate_pixel_dimensions(h5_file.root.Thesis.ATLAS_ITk.X7)
 
     # When have I repaired all the implementations.
-    # All the first try measurement series needs to consolidated and their entries needs to be adjusted for the new formats
+    # All the first try measurement series needs to consolidated
+    # and their entries needs to be adjusted for the new formats
