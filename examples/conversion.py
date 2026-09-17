@@ -22,7 +22,7 @@ from .data_constants import *
 
 
 if __name__ == '__main__':
-    def internal_node_copy(grouping, h5_file: tb.File, parent=tb.Group,
+    def internal_node_copy(grouping, h5_file: tb.File, parent: tb.Group,
                            exclude_iv=False, exclude_cv=False):
         for group in grouping._f_iter_nodes():
             if not isinstance(group, tb.Group):

@@ -1589,8 +1589,6 @@ def general_plotter(tb_lock, file_name, bias, **kwargs):
     In a first run overview pdf of the unbiased and biased measurements are created including the distributions of these
     capacitances over the whole sensor.
 
-    TODO: this docstring requires improvement.
-
     Next the analysis of the leakage current over the a large range of reversed biasing voltages.
     Then the Inter-Pixel-Capacitance analysis is plotted.
     There are two methods/models for extracting the capacitance applicable for both the in-pix-capacitance and the
