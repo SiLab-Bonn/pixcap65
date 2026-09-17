@@ -92,6 +92,7 @@ And the same after processing the data
 # Data structures used for now
 ## BiasTableHist
 
-* first column: 'bias_range' data from scan parameters. What are these for data?
-* second column: 'hv_voltage' data from scan parameters. What are these for data?
+
+* first column: 'bias_range' data from scan parameters. Sourced voltage (voltage set to the SMU; this is a SMU setting not a measured value)
+* second column: 'hv_voltage' data from scan parameters. measured value of the sourced voltage.
 * third column: measurement uncertainties of the measured/applied bias voltages.

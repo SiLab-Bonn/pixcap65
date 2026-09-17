@@ -427,11 +427,12 @@ def investigate_dependences_graphical(summary_data: np.recarray, property_data: 
     """
     spatial_mask = np.array([sensor.decode() in spatial_identifier for sensor in summary_data.sensor], dtype=bool)
 
-    plotter("../Dependencies.pdf", spatial_mask, interesting_data, summary_data, property_data, **keys)
+    plotter("../sides/Dependencies.pdf", spatial_mask, interesting_data, summary_data, property_data, **keys)
 
-    plotter("../Dependencies-log.pdf", spatial_mask, interesting_data, summary_data, property_data, scaley='log', **keys)
+    plotter("../sides/Dependencies-log.pdf", spatial_mask, interesting_data, summary_data, property_data,
+            scaley='log', **keys)
 
-    plotter("../Dependencies-log-log.pdf", spatial_mask, interesting_data, summary_data, property_data,
+    plotter("../sides/Dependencies-log-log.pdf", spatial_mask, interesting_data, summary_data, property_data,
             scalex='log', scaley='log', **keys)
 
 def get_test_capacitance_data_correction(group: tb.Group, **kwargs):
@@ -1076,7 +1077,7 @@ if __name__ == "__main__":
         sensor_trans_list = [
         ]
 
-        with open("../tab_test_capacitance.tex", "w") as f:
+        with open("../sides/tab_test_capacitance.tex", "w") as f:
             print_args = {
                 "file": f
             }
@@ -1122,7 +1123,7 @@ if __name__ == "__main__":
             print("\\bottomrule", **print_args)
             print("\\end{tabular}", **print_args)
 
-        with open("../tab_test_capacitance_trans.tex", "w") as f:
+        with open("../sides/tab_test_capacitance_trans.tex", "w") as f:
             print_args = {
                 "file": f
             }
@@ -1147,7 +1148,7 @@ if __name__ == "__main__":
 
         # generate the biased capacitance latex table
         print("Create the tables to use.")
-        with open("../tab_capacitance_data.tex", "w") as f:
+        with open("../sides/tab_capacitance_data.tex", "w") as f:
             print_args = {
                 "file": f
             }
@@ -1184,7 +1185,7 @@ if __name__ == "__main__":
             print("\\end{tabular}", **print_args)
 
         # generate the planar depletion voltages latex table
-        with open("../tab_depletion_planar_data.tex", "w") as f:
+        with open("../sides/tab_depletion_planar_data.tex", "w") as f:
             print_args = {
                 "file": f
             }
@@ -1219,7 +1220,7 @@ if __name__ == "__main__":
             print("\\end{tabular}", **print_args)
 
         # generate the 3d depletion voltages latex table
-        with open("../tab_depletion_3d_data.tex", "w") as f:
+        with open("../sides/tab_depletion_3d_data.tex", "w") as f:
             print_args = {
                 "file": f
             }
