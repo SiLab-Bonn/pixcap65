@@ -13,6 +13,10 @@
 #  See the License for the specific language governing permissions and
 #  limitations under the License.
 # ----------------------------------------------------------
+"""
+Main script for analyzing the different dependencies of the measured capacitances' in my bachelor thesis.
+This script is dominantly used to model the capacitances'.
+"""
 
 import locale
 import numpy as np
@@ -46,9 +50,18 @@ from pixcap65.utility.homogenize_plots import set_params
 USE_OUTPUT_FITTING = False
 LABEL_HYPOTHESIS_TEST = "Hypothesis test!"
 
-def chi2(x: float, dof: int):
-    return sample_chi2.cdf(x, dof)
+# format the table output
+GENERAL_SI_UNIT_X_FORMAT = "\\qty{{{:#0.6g}({:d})({:d})({:d})}}{{{}}}"
+GENERAL_SI_UNIT_X_FORMAT_2 = "\\qty{{{:.6f}({:.6f})({:.6f})({:.6f})}}{{{}}}"
 
+GENERAL_PART = "\\qty{{{{{{:#0.{}g}}({{:d}})({{:d}})({{:d}})}}}}{{{{{{}}}}}}"
+REDUCED_GENERAL_PART = "{{:#0.{}g}}({{:d}})({{:d}})({{:d}})"
+SECOND_GENERAL_PART = "{{:#0.{}f}}({{:d}})({{:d}})({{:d}})"
+THIRD_GENERAL_PART = "{{:#0.{}f}}({{:d}})"
+
+GENERAL_PRECISION = 6
+GENERAL_TEST_FORMAT = "{:-6g}"
+GENERAL_UNCERT_MULTIPLIER = 1e6
 
 interesting_keys = [
     "implantation_area",
@@ -59,6 +72,36 @@ interesting_keys = [
     "pitch_x",
     "implantation_size_x",
 ]
+axis_mapping = {
+    "pitch_x": "$p_\\text{{x}}$ / \\unit{{\\micro\\meter}}",
+    "pitch_y": "$p_\\text{{y}}$ / \\unit{{\\micro\\meter}}",
+    "implantation_size_x": "$w_\\text{{x}}$ / \\unit{{\\micro\\meter}}",
+    "implantation_size_y": "$w_\\text{{y}}$ / \\unit{{\\micro\\meter}}",
+    "pixel_area": "$A$ / \\unit{{\\micro\\meter\\squared}}",
+    "implantation_area": "$A$ / \\unit{{\\micro\\meter\\squared}}",
+    "pixel_separation_x": "$\\Delta x$ / \\unit{{\\micro\\meter}}",
+    "pixel_separation_y": "$\\Delta y$ / \\unit{{\\micro\\meter}}",
+    "pixel_separation_area": "$A_\\text{{separation}}$ / \\unit{{\\micro\\meter\\squared}}",
+    "implantation_depth": "$d$ / \\unit{{\\micro\\meter}}",
+    "sensor_depth": "$D$ / \\unit{{\\micro\\meter}}",
+    "Perimeter": "$U$ / \\unit{{\\micro\\meter}}",
+}
+marker_list = ['X1', 'X2', 'R1']
+
+def chi2(x: float, dof: int):
+    """
+    Wrapper function for chi^2 hypothesis tests, e.g. to calculate the p-value.
+
+    :author: Dominik Fischer
+    :date: 2026-06-19
+
+    last update: 2026-09-17
+
+    :param x: location at which to evaluate the cdf.
+    :param dof: degrees of freedom of the hypothesis test
+    :return: cumulative distribution value
+    """
+    return sample_chi2.cdf(x, dof)
 
 
 def read_sorted_where(table: tb.Table,
@@ -70,6 +113,31 @@ def read_sorted_where(table: tb.Table,
                       start: Optional[str] = None,
                       stop: Optional[str] = None,
                       step: Optional[str] = None, ) -> np.ndarray:
+    """
+    read_sorted_where
+
+    :author: Dominik Fischer
+    :date: 2026-07-04
+
+    last update: 2026-09-17
+
+    Wrapper around :py:class:`tables.Table` read function to enhance functionality.
+    It reads rows from a table and returns them.
+    It works pretty much like :py:func:`tables.Table.read`.
+    In Addition it could also the sort the returned values and filter them by an arbitrary condition
+    compatible with :py:func:`tables.Table.where`.
+
+    :param table: hdf table to read from.
+    :param sortby: column of the table (:py:class:`tables.Table`) to sort by.`
+    :param condition: filter condition to apply on the results before returning them.
+    :param condvars: additional variables/mapping of variables to be used within the filtering condition.
+    :param check_csi: check whether the complete indexing is enabled and the indices are up to date.
+    :param field: if supplied only values from these column are returned.
+    :param start: start of the slice to return from the read rows.
+    :param stop: last index of the slice to return from the read rows.
+    :param step: index step size of the slice to return from the read rows.
+    :return: ndarray of the rows and their values in the table.
+    """
     table._g_check_open()
     index = table._check_sortby_csi(sortby, check_csi)
 
@@ -88,35 +156,20 @@ def read_sorted_where(table: tb.Table,
     return table.read_coordinates(coords, field)
 
 
-# format the table output
-GENERAL_SI_UNIT_X_FORMAT = "\\qty{{{:#0.6g}({:d})({:d})({:d})}}{{{}}}"
-GENERAL_SI_UNIT_X_FORMAT_2 = "\\qty{{{:.6f}({:.6f})({:.6f})({:.6f})}}{{{}}}"
-
-GENERAL_PART = "\\qty{{{{{{:#0.{}g}}({{:d}})({{:d}})({{:d}})}}}}{{{{{{}}}}}}"
-REDUCED_GENERAL_PART = "{{:#0.{}g}}({{:d}})({{:d}})({{:d}})"
-SECOND_GENERAL_PART = "{{:#0.{}f}}({{:d}})({{:d}})({{:d}})"
-THIRD_GENERAL_PART = "{{:#0.{}f}}({{:d}})"
-
-GENERAL_PRECISION = 6
-GENERAL_TEST_FORMAT = "{:-6g}"
-GENERAL_UNCERT_MULTIPLIER = 1e6
-
-axis_mapping = {
-    "pitch_x": "$p_\\text{{x}}$ / \\unit{{\\micro\\meter}}",
-    "pitch_y": "$p_\\text{{y}}$ / \\unit{{\\micro\\meter}}",
-    "implantation_size_x": "$w_\\text{{x}}$ / \\unit{{\\micro\\meter}}",
-    "implantation_size_y": "$w_\\text{{y}}$ / \\unit{{\\micro\\meter}}",
-    "pixel_area": "$A$ / \\unit{{\\micro\\meter\\squared}}",
-    "implantation_area": "$A$ / \\unit{{\\micro\\meter\\squared}}",
-    "pixel_separation_x": "$\\Delta x$ / \\unit{{\\micro\\meter}}",
-    "pixel_separation_y": "$\\Delta y$ / \\unit{{\\micro\\meter}}",
-    "pixel_separation_area": "$A_\\text{{separation}}$ / \\unit{{\\micro\\meter\\squared}}",
-    "implantation_depth": "$d$ / \\unit{{\\micro\\meter}}",
-    "sensor_depth": "$D$ / \\unit{{\\micro\\meter}}",
-    "Perimeter": "$U$ / \\unit{{\\micro\\meter}}",
-}
-
 def enhanced_logical_or(*args):
+    """
+    enhanced version of the numpy logical or function :py:func`numpy.logical_or` which is capable of element-whise
+    logical-or of arbitrary many arguments.
+
+    :author: Dominik Fischer
+    :date: 2026-07-04
+
+    last update: 2026-09-17
+
+    :param args: arguments from which to build the element-whise or.
+    :return: Boolean result of the logical OR operation applied to the elements given as arguments;
+     the boolean shape is determined by broadcasting.
+    """
     if len(args) == 1:
         return args[0]
     if len(args) == 2:
@@ -129,6 +182,25 @@ def enhanced_logical_or(*args):
     return current_result
 
 def generate_siunitx(data_set: np.recarray, depletion=False) -> str:
+    """
+    generate_siunitx
+
+    :author: Dominik Fischer
+    :date: 2026-06-19
+
+    last update: 2026-09-17
+
+    Utility function to generate a siunitx latex expression from the entries of the summary tables for capacitances'
+    and/or depletion voltages to express these with their correct uncertainties (statistical as well as systematic).
+    Could be distinguished from :py:func:`examples.plot_dependencies.generate_siunitx_2` and
+    :py:func:`examples.plot_dependencies.generate_siunitx_3` by the template used.
+
+    :param data_set: array of numpy records of the (one-element array) of the entity to be represented in the tabel
+     with the magnitude and all the different uncertainties as distrinct fields.
+    :param depletion: whether the provided record or :py:class:`numpy.recarray` is a depletion voltage set.
+     (default: False)
+    :return: latex expression to be used for the tex tables in e.g. a thesis.
+    """
     if depletion:
         test_format = "{:.3g}".format(data_set.stat_error)
         _, text_n_digits = test_format.removeprefix('-').split('.', 1)
@@ -160,6 +232,26 @@ def generate_siunitx(data_set: np.recarray, depletion=False) -> str:
 
 
 def generate_siunitx_2(data_set: np.recarray, depletion=False) -> str:
+    """
+    generate_siunitx_2
+
+    :author: Dominik Fischer
+    :date: 2026-06-19
+
+    last update: 2026-09-17
+
+    Utility function to generate a siunitx latex expression from the entries of the summary tables for capacitances'
+    and/or depletion voltages to express these with their correct uncertainties (statistical as well as systematic).
+
+    Could be distinguished from :py:func:`examples.plot_dependencies.generate_siunitx_1` and
+    :py:func:`examples.plot_dependencies.generate_siunitx_3` by the template used.
+
+    :param data_set: array of numpy records of the (one-element array) of the entity to be represented in the tabel
+     with the magnitude and all the different uncertainties as distrinct fields.
+    :param depletion: whether the provided record or :py:class:`numpy.recarray` is a depletion voltage set.
+     (default: False)
+    :return: latex expression to be used for the tex tables in e.g. a thesis.
+    """
     if depletion:
         return GENERAL_SI_UNIT_X_FORMAT_2.format(data_set.magnitude,
                                                  data_set.stat_error,
@@ -175,6 +267,26 @@ def generate_siunitx_2(data_set: np.recarray, depletion=False) -> str:
 
 
 def generate_siunitx_3(data_set: np.recarray, depletion=False) -> str:
+    """
+    generate_siunitx_3
+
+    :author: Dominik Fischer
+    :date: 2026-06-19
+
+    last update: 2026-09-17
+
+    Utility function to generate a siunitx latex expression from the entries of the summary tables for capacitances'
+    and/or depletion voltages to express these with their correct uncertainties (statistical as well as systematic).
+    Could be distinguished from :py:func:`examples.plot_dependencies.generate_siunitx_1` and
+    :py:func:`examples.plot_dependencies.generate_siunitx_2` by the template used.
+    In Addition this implementation also features a alternative text if the value of a quantity is unavailable or NaN.
+
+    :param data_set: array of numpy records of the (one-element array) of the entity to be represented in the tabel
+     with the magnitude and all the different uncertainties as distrinct fields.
+    :param depletion: whether the provided record or :py:class:`numpy.recarray` is a depletion voltage set.
+     (default: False)
+    :return: latex expression to be used for the tex tables in e.g. a thesis.
+    """
     if depletion:
         test_format = "{:.3g}".format(data_set.stat_error)
         _, text_n_digits = test_format.removeprefix('-').split('.', 1)
@@ -197,23 +309,122 @@ def generate_siunitx_3(data_set: np.recarray, depletion=False) -> str:
 
 
 def read_rec_array(table: tb.Table, *args, **kwargs) -> np.recarray:
+    """
+    read_rec_array
+
+    :author: Dominik Fischer
+    :date: 2026-06-16
+
+    last update: 2026-09-17
+
+    Reads a :py:class:`tables.Table` object into a
+    :py:class:`numpy.recarray` object that can be used to later on.
+
+    :param table: pytables table to be read.
+    :param args: further arguments to be passed to :py:func:`tables.Table.read`.
+    :param kwargs: further keyword arguments to be passed to :py:func:`tables.Table.read`.
+    :return: numpy record array corresponding to the table. The columns are now the fields of the array.
+    """
     return np.rec.array(table.read(*args, **kwargs), dtype=table.dtype)
 
 
 def read_rec_array_sorted(table: tb.Table, primary_key, *args, **kwargs) -> np.recarray:
+    """
+    read_rec_array_sorted
+
+    :author: Dominik Fischer
+    :date: 2026-06-16
+
+    last update: 2026-09-17
+
+    Reads a :py:class:`tables.Table` object into a
+    :py:class:`numpy.recarray` object that can be used to later on.
+    The rows are sorted before the transformation.
+
+    :param table: pytables table to be read.
+    :param primary_key: primary key of the :py:class:`tables.Table` object to sort the entries by before transforming
+     them to a numpy record array.
+    :param args: further arguments to be passed to :py:func:`tables.Table.read_sorted`.
+    :param kwargs: further keyword arguments to be passed to :py:func:`tables.Table.read_sorted`.
+    :return: numpy record array corresponding to the table. The columns are now the fields of the array.
+    """
     return np.rec.array(table.read_sorted(primary_key, *args, **kwargs), dtype=table.dtype)
 
 
 def read_rec_array_where(table: tb.Table, condition, *args, **kwargs) -> np.recarray:
+    """
+    read_rec_array_where
+
+    :author: Dominik Fischer
+    :date: 2026-06-16
+
+    last update: 2026-09-17
+
+    Reads a :py:class:`tables.Table` object into a
+    :py:class:`numpy.recarray` object that can be used to later on.
+    Only those rows in the table which fulfill the condition `condition` are extracted.
+
+    :param table: pytables table to be read.
+    :param condition: condition to apply to the :py:class:`tables.Table` object. This string must be compatible with
+     :py:func:`tables.Table.where`.
+    :param args: further arguments to be passed to :py:func:`tables.Table.read_where`.
+    :param kwargs: further keyword arguments to be passed to :py:func:`tables.Table.read_where`.
+    :return: numpy record array corresponding to the table. The columns are now the fields of the array.
+    """
     return np.rec.array(table.read_where(condition, *args, **kwargs), dtype=table.dtype)
 
 
 def read_rec_array_sorted_where(table: tb.Table, condition, primary_key, *args, **kwargs) -> np.recarray:
+    """
+    read_rec_array_sorted_where
+
+    :author: Dominik Fischer
+    :date: 2026-07-04
+
+    last update: 2026-09-17
+
+    Reads a :py:class:`tables.Table` object into a
+    :py:class:`numpy.recarray` object that can be used to later on.
+    Only those rows in the table which fulfill the condition `condition` are extracted.
+    The rows are sorted before the transformation.
+
+    :param table: pytables table to be read.
+    :param condition: condition to apply to the :py:class:`tables.Table` object. This string must be compatible with
+     :py:func:`tables.Table.where`.
+    :param primary_key: primary key of the :py:class:`tables.Table` object to sort the entries by before transforming
+     them to a numpy record array.
+    :param args: further arguments to be passed to :py:func:`read_sorted_where`.
+    :param kwargs: further keyword arguments to be passed to :py:func:`read_sorted_where`.
+    :return: numpy record array corresponding to the table. The columns are now the fields of the array.
+    """
     return np.rec.array(read_sorted_where(table, primary_key, condition, *args, **kwargs), dtype=table.dtype)
 
 
 def investigate_dependences_graphical(summary_data: np.recarray, property_data: np.recarray,
                                       interesting_data: Iterable, **keys):
+    """
+    investigate_dependences_graphical
+
+    :author: Dominik Fischer
+    :date: 2026-06-22
+
+    last update: 2026-09-17
+
+    Investigate the dependencies of the measured capacitances by representing them graphically using different
+    scalings.
+    There will be plots without any re-scaling, there will be plots with a logarithmic y-scale and plots where both
+    axis are scaled logarithmically.
+
+    :param summary_data: record arrays from which to read the summaries data to be used for modelling.
+    :param property_data: record array of the properties of the individual investigated sensors.
+    :param interesting_data: iterable of names of interesting properties of the sensors which should be investigated
+     w.r.t. their impact on the pixel capacitance measured.
+    :param keys: further keyword arguments to be passed to :py:func:`plotter`.
+    :keyword scalex: matplotlib axis scaling value for the x-axis.
+    :keyword scaley: matplotlib axis scaling value for the y-axis.
+    :keyword no_plot: whether to ignore figure title (default: False)
+    :keyword condition: callable, additional condition to enforce for the y-values (the capacitances)
+    """
     spatial_mask = np.array([sensor.decode() in spatial_identifier for sensor in summary_data.sensor], dtype=bool)
 
     plotter("../Dependencies.pdf", spatial_mask, interesting_data, summary_data, property_data, **keys)
@@ -224,10 +435,24 @@ def investigate_dependences_graphical(summary_data: np.recarray, property_data: 
             scalex='log', scaley='log', **keys)
 
 def get_test_capacitance_data_correction(group: tb.Group, **kwargs):
+    """
+    get_test_capacitance_data_correction
+
+    :author: Dominik Fischer
+    :date: 2026-07-30
+
+    last update: 2026-09-17
+
+    Will read and print-out the corrected test capacitances.
+
+    :param group: group from which to read the table of the corrected test capacitances.
+    :keyword exclusion_list: iterable if sensor names to be excluded from the investigation of the test capacitances.
+    :keyword print_result: whether print the read capacitances on the standard output. (default: True)
+    """
     locale.setlocale(locale.LC_NUMERIC, "DE")
     table = read_rec_array(group.TestCapCorrected)
     capacitances = [item for item in table.dtype.names if item != "sensor" and not item.endswith('_error')]
-    exclusion_list = kwargs.get("exlusion_list", [])
+    exclusion_list = kwargs.get("exclusion_list", [])
     if kwargs.get("print_result", True):
         for sensor in np.strings.decode(table.sensor):
             if sensor in exclusion_list:
@@ -268,6 +493,26 @@ def __dependence_fit(spatial_mask, properties: np.recarray, y_data_set: np.recar
 
 def investigate_dependencies_fitting(summary_data: np.recarray, property_data: np.recarray, interesting_data: Mapping,
                                      x_log=False, y_log=False):
+    """
+    investigate_dependencies_fitting
+
+    :author: Dominik Fischer
+    :date: 2026-06-22
+
+    last update: 2026-09-17
+
+    Investigate the dependencies of the measured capacitances by fitting some (ex)sample models to them and representing
+    them graphically afterwards.
+    The fitting dependency investigation will be performed w.r.t. to the given properties of the different sensors.
+
+    :param summary_data: record arrays from which to read the summaries data to be used for modelling.
+    :param property_data: record array of the properties of the individual investigated sensors.
+    :param interesting_data: mapping of names of interesting properties of the sensors which should be investigated
+     w.r.t. their impact on the pixel capacitance measured. (each element *must* be a tuple of the total model and the
+     inter-pixel capacitance model).
+    :param x_log: whether to use logarithmic scaling for the x-axis.
+    :param y_log: whether to use logarithmic scaling for the y-axis.
+    """
     spatial_mask = np.array([sensor.decode() in spatial_identifier for sensor in summary_data.sensor], dtype=bool)
     for key, models in interesting_data.items():
         total_model, inter_model = models
@@ -298,9 +543,32 @@ def investigate_dependencies_fitting(summary_data: np.recarray, property_data: n
             handle_model_simple_fit(x_data, y_data, y_error, inter_model, 'inter' + key)
 
 
-marker_list = ['X1', 'X2', 'R1']
-
 def plotter(file, spatial_mask, keys: Iterable, data: np.recarray, properties: np.recarray, **keywords):
+    """
+    plotter
+
+    :author: Dominik Fischer
+    :date: 2026-06-22
+
+    last update: 2026-09-17
+
+    Handler to plot the dependencies of the capacitances' on different parameters for specific scaling of the figure
+    axis.
+    The plotting will be performed for the total pixel capacitance, the inter-pixel capacitance and the backplane
+    capacitance.
+
+    :param file: output file (:py:class:`PdfPages` instance) to write the figures to.
+    :param spatial_mask: filtering mask for the spatial attributes of the sensors. (if necessary)
+    :param keys: iterable of names of interesting properties of the sensors which should be investigated
+     w.r.t. their impact on the pixel capacitance measured.
+    :param data: record arrays from which to read the summaries data to be used for modelling.
+    :param properties: record array of the properties of the individual investigated sensors.
+    :param keywords: further keyword arguments to be proagated down.
+    :keyword scalex: matplotlib axis scaling value for the x-axis.
+    :keyword scaley: matplotlib axis scaling value for the y-axis.
+    :keyword no_plot: whether to ignore figure title (default: False)
+    :keyword condition: callable, additional condition to enforce for the y-values (the capacitances)
+    """
     def __plot_dependence(pdf: PdfPages, spatial_mask, physical_property, name, quantity, unit, x, y, **kwargs):
         scalex = kwargs.pop("scalex", None)
         scaley = kwargs.pop("scaley", None)
@@ -391,6 +659,25 @@ def plotter(file, spatial_mask, keys: Iterable, data: np.recarray, properties: n
 
 
 def handle_model_simple_fit(x_data, y_data, y_errors, model_function, name, *initial_args, **limits):
+    """
+    handle_model_simple_fit
+
+    :author: Dominik Fischer
+    :date: 2026-06-22
+
+    last update: 2026-09-17
+
+    Utility function handling the routines associated with fitting using the `iminuit` framework.
+    The model predicition will be plotted in the end together with the measured values.
+
+    :param x_data: variable values on which the capacitances' depend.
+    :param y_data: capacitances'
+    :param y_errors: uncertainties of the capacitances' (only the ones necessary for the fit)
+    :param model_function: callable, model to use for this dependence.
+    :param name: name of the modelling.
+    :param initial_args: initial guess for the fitting algorithm of the parameters of the model.
+    :param limits: iterable/mapping of suitable limits to some of the parameters.
+    """
     from inspect import signature
     from warnings import warn
     print("Handle", name)
@@ -435,6 +722,28 @@ def handle_model_simple_fit(x_data, y_data, y_errors, model_function, name, *ini
 
 
 def handle_model_fit(x_data, y_data, y_errors, model_function, name, *initial_args, **limits):
+    """
+    handle_model_simple_fit
+
+    :author: Dominik Fischer
+    :date: 2026-06-22
+
+    last update: 2026-09-17
+
+    Utility function handling the routines associated with fitting using the `iminuit` framework.
+    The model predicition will be plotted in the end together with the measured values.
+    In contrast to :py:func:èxamples.plot_dependencies.handle_model_simple_fit`, the residues of the fit are
+    investigated and a hypothesis test is performed.
+
+    :param x_data: variable values on which the capacitances' depend.
+    :param y_data: capacitances'
+    :param y_errors: uncertainties of the capacitances' (only the ones necessary for the fit)
+    :param model_function: callable, model to use for this dependence.
+    :param name: name of the modelling.
+    :param initial_args: initial guess for the fitting algorithm of the parameters of the model.
+    :param limits: iterable/mapping of suitable limits to some of the parameters.
+    :return optimal cost value, d.o.f. of this fit.
+    """
     from inspect import signature
     from warnings import warn
     print("Handle the", name, "model for capacitance's.")

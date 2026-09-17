@@ -27,9 +27,9 @@ from matplotlib.backends.backend_pdf import PdfPages
 
 import pixcap65.plotting_util.threaded_plotting as threaded_plotting
 from examples import data_constants as data_constants
-from examples.data_constants import E1_SCAN_FILE, E1_2_SCAN_FILE, R13_2_SCAN_FILE, R11_SCAN_FILE, X4_SCAN_FILE
+from examples.data_constants import E1_SCAN_FILE, E1_2_SCAN_FILE, R13_2_SCAN_FILE, R11_SCAN_FILE
 from examples.data_constants import X1_SCAN_2_FILE, X2_SCAN_2_FILE, X2_SCAN_FILE
-from examples.data_constants import X5_SCAN_FILE, X6_SCAN_FILE, X7_SCAN_FILE
+from examples.data_constants import X4_SCAN_FILE, X5_SCAN_FILE, X6_SCAN_FILE, X7_SCAN_FILE
 from pixcap65.analysis_util import analyze_data
 from pixcap65.analysis_util.delegation.distribution import analyze_capacitance_distribution
 from pixcap65.analysis_util.utility import get_base_group
@@ -52,6 +52,36 @@ logger = logging.getLogger(__name__)
 
 # define the analysis handling
 def bare_analysis_handler(tb_lock):
+    """
+    Handles the plotting of the measurements with the sensor-less (bare) sample.
+
+    :author: Dominik Fischer
+    :date: 2026-06-16
+
+    last update: 2026-09-17
+
+
+    First all the measurements are duplicated to apply both the linear model and the full enhanced model for analysis
+    and estimation of the capacitances'.
+
+    In a second step all the total pixel capacitances (unbiased as well as fully depleted (biased)) are investigated.
+    In this step the correction for the circuits parasitic capacitances' is applied directly.
+    Also it is tried to characterize the distribution of these capacitances' over the measured sensor.
+
+    Then the Inter-Pixel-Capacitance analysis is investigated.
+    There are two methods/models for extracting the capacitance applicable for both the in-pix-capacitance and the
+    total-pixel capacitance. So for each biasing state, there four possibilities to combine these two methods to
+    extract the inter-pixel capacitance.
+
+    The applied biasing states are:
+    .. list-table:: Table Bias States
+        :widths: 20 50 30
+        :header-rows: 1
+
+    * - 0V (unbiased)
+
+    :param tb_lock: multiprocessing lock to make operations on the hdf files process- and thread-safe.
+    """
     with synchronized_process_open_file("packaged/Reference_Bare_renewed.h5", 'a', lock=tb_lock) as h5_file:
         h5_file.copy_node(where="/Reference/Bare", name="unbiased_31_renew", newname="unbiased_31_renew_full_model",
                           overwrite=True, recursive=True)
@@ -109,15 +139,48 @@ def bare_analysis_handler(tb_lock):
 
 
 def r1_analysator(tb_lock, correction_args, **kwargs):
+    """
+    Handles the plotting of the measurements with the R1/R11 (LF (CMOS)) sample.
+
+    :author: Dominik Fischer
+    :date: 2026-06-16
+
+    last update: 2026-09-17
+
+
+    First all the measurements are duplicated to apply both the linear model and the full enhanced model for analysis
+    and estimation of the capacitances'.
+
+    In a second step all the total pixel capacitances (unbiased as well as fully depleted (biased)) are investigated.
+    In this step the correction for the circuits parasitic capacitances' is applied directly.
+    Also it is tried to characterize the distribution of these capacitances' over the measured sensor.
+
+    Then the Inter-Pixel-Capacitance analysis is investigated.
+    There are two methods/models for extracting the capacitance applicable for both the in-pix-capacitance and the
+    total-pixel capacitance. So for each biasing state, there four possibilities to combine these two methods to
+    extract the inter-pixel capacitance.
+
+    The applied biasing states are:
+    .. list-table:: Table Bias States
+        :widths: 20 50 30
+        :header-rows: 1
+
+    * - 0V (unbiased)
+    * - -80V (biased, full depletion?)
+
+
+    In this special case also measurements for only considering top-bottom neighbours, only considering left-right
+    neighbours or diagonal neighbours are investigated.
+
+    :param tb_lock: multiprocessing lock to make operations on the hdf files process- and thread-safe.
+    :param correction_args: keyword arguments/dict to define how to correct for parasitic capacitances'.
+    """
     import pixcap65.concurrency
     from examples.mp_analysis import synchronize_full_model
     name = "R1"
     display_name = name
     top_ref = "Reference"
     print("Analyze", display_name)
-    print(threading.get_native_id())
-    print(mp.current_process().name)
-    print(mp.current_process().pid)
 
     _ = pixcap65.concurrency.get_manager(**kwargs)
     # this is not necessary for the ExtendedSyncManager as this accessed right here.
@@ -275,12 +338,36 @@ def r1_analysator(tb_lock, correction_args, **kwargs):
 
 
 def r13_analysator_first(tb_lock, correction_args, **kwargs):
+    """
+    Handles the plotting of the measurements with the R13 (LF (CMOS)) sample.
+
+    :author: Dominik Fischer
+    :date: 2026-06-16
+
+    last update: 2026-09-17
+
+
+    First all the measurements are duplicated to apply both the linear model and the full enhanced model for analysis
+    and estimation of the capacitances'. This implementation acts on the first run of measurements.
+
+    In a second step all the total pixel capacitances (unbiased as well as fully depleted (biased)) are investigated.
+    In this step the correction for the circuits parasitic capacitances' is applied directly.
+    Also it is tried to characterize the distribution of these capacitances' over the measured sensor.
+
+    The applied biasing states are:
+    .. list-table:: Table Bias States
+        :widths: 20 50 30
+        :header-rows: 1
+
+    * - 0V (unbiased)
+    * - -80V (biased, fully depleted?)
+
+    :param tb_lock: multiprocessing lock to make operations on the hdf files process- and thread-safe.
+    :param correction_args: keyword arguments/dict to define how to correct for parasitic capacitances'.
+    """
     import pixcap65.concurrency
     name = "R13"
     print("Analyze", name)
-    print(threading.get_native_id())
-    print(mp.current_process().name)
-    print(mp.current_process().pid)
 
     _ = pixcap65.concurrency.get_manager(**kwargs)
     correction_args = correction_args.copy()
@@ -317,6 +404,39 @@ def r13_analysator_first(tb_lock, correction_args, **kwargs):
 
 
 def r13_analysator_second(tb_lock, correction_args, **kwargs):
+    """
+    Handles the plotting of the measurements with the R13 (LF (CMOS)) sample.
+
+    :author: Dominik Fischer
+    :date: 2026-06-16
+
+    last update: 2026-09-17
+
+
+    First all the measurements are duplicated to apply both the linear model and the full enhanced model for analysis
+    and estimation of the capacitances'.
+    This implementation is used of the second measurement runs with full accuracy.
+
+    In a second step all the total pixel capacitances (unbiased as well as fully depleted (biased)) are investigated.
+    In this step the correction for the circuits parasitic capacitances' is applied directly.
+    Also it is tried to characterize the distribution of these capacitances' over the measured sensor.
+
+    Then the Inter-Pixel-Capacitance analysis is investigated.
+    There are two methods/models for extracting the capacitance applicable for both the in-pix-capacitance and the
+    total-pixel capacitance. So for each biasing state, there four possibilities to combine these two methods to
+    extract the inter-pixel capacitance.
+
+    The applied biasing states are:
+    .. list-table:: Table Bias States
+        :widths: 20 50 30
+        :header-rows: 1
+
+    * - 0V (unbiased)
+    * - -80V (biased, fully depleted?)
+
+    :param tb_lock: multiprocessing lock to make operations on the hdf files process- and thread-safe.
+    :param correction_args: keyword arguments/dict to define how to correct for parasitic capacitances'.
+    """
     import pixcap65.concurrency
     name = "R13"
     display_name = "R13" + SECOND_LABEL
@@ -477,6 +597,39 @@ def r13_analysator_second(tb_lock, correction_args, **kwargs):
 
 
 def e1_analysator_second(tb_lock, correction_args, **kwargs):
+    """
+    Handles the plotting of the measurements with the E1 (LF (CMOS)) sample.
+
+    :author: Dominik Fischer
+    :date: 2026-06-16
+
+    last update: 2026-09-17
+
+
+    First all the measurements are duplicated to apply both the linear model and the full enhanced model for analysis
+    and estimation of the capacitances'.
+    This implementation is based on the second measurement runs with full accuracy.
+
+    In a second step all the total pixel capacitances (unbiased as well as fully depleted (biased)) are investigated.
+    In this step the correction for the circuits parasitic capacitances' is applied directly.
+    Also it is tried to characterize the distribution of these capacitances' over the measured sensor.
+
+    Then the Inter-Pixel-Capacitance analysis is investigated.
+    There are two methods/models for extracting the capacitance applicable for both the in-pix-capacitance and the
+    total-pixel capacitance. So for each biasing state, there four possibilities to combine these two methods to
+    extract the inter-pixel capacitance.
+
+    The applied biasing states are:
+    .. list-table:: Table Bias States
+        :widths: 20 50 30
+        :header-rows: 1
+
+    * - 0V (unbiased)
+    * - -80V (biased, fully depleted?)
+
+    :param tb_lock: multiprocessing lock to make operations on the hdf files process- and thread-safe.
+    :param correction_args: keyword arguments/dict to define how to correct for parasitic capacitances'.
+    """
     import pixcap65.concurrency
     name = "E1"
     display_name = name + SECOND_LABEL
@@ -615,12 +768,40 @@ def e1_analysator_second(tb_lock, correction_args, **kwargs):
 
 
 def x1_analysator_first(tb_lock, correction_args, **kwargs):
+    """
+    Handles the plotting of the measurements with the X1 (HPK) sample.
+
+    :author: Dominik Fischer
+    :date: 2026-06-16
+
+    last update: 2026-09-17
+
+
+    First all the measurements are duplicated to apply both the linear model and the full enhanced model for analysis
+    and estimation of the capacitances'.
+    This implementation used the first measurement runs with reduced accuracy for the analysis.
+
+    In a second step all the total pixel capacitances (unbiased as well as fully depleted (biased)) are investigated.
+    In this step the correction for the circuits parasitic capacitances' is applied directly.
+    Also it is tried to characterize the distribution of these capacitances' over the measured sensor.
+
+    Last the C-V-Characterization is investigated.
+    This in particular includes the estimation of depletion voltage.
+
+    The applied biasing states are:
+    .. list-table:: Table Bias States
+        :widths: 20 50 30
+        :header-rows: 1
+
+    * - 0V (unbiased)
+    * - -80V (biased, fully depleted?)
+
+    :param tb_lock: multiprocessing lock to make operations on the hdf files process- and thread-safe.
+    :param correction_args: keyword arguments/dict to define how to correct for parasitic capacitances'.
+    """
     import pixcap65.concurrency
     name = "X1"
     print("Analyze", name)
-    print(threading.get_native_id())
-    print(mp.current_process().name)
-    print(mp.current_process().pid)
 
     _ = pixcap65.concurrency.get_manager(**kwargs)
     correction_args = correction_args.copy()
@@ -658,6 +839,42 @@ def x1_analysator_first(tb_lock, correction_args, **kwargs):
 
 
 def x1_analysator_second(tb_lock, correction_args, **kwargs):
+    """
+    Handles the plotting of the measurements with the X1 (HPK) sample.
+
+    :author: Dominik Fischer
+    :date: 2026-06-16
+
+    last update: 2026-09-17
+
+
+    First all the measurements are duplicated to apply both the linear model and the full enhanced model for analysis
+    and estimation of the capacitances'.
+    This implementation used the second measurement runs with full accuracy for the analysis.
+
+    In a second step all the total pixel capacitances (unbiased as well as fully depleted (biased)) are investigated.
+    In this step the correction for the circuits parasitic capacitances' is applied directly.
+    Also it is tried to characterize the distribution of these capacitances' over the measured sensor.
+
+    Then the Inter-Pixel-Capacitance analysis is investigated.
+    There are two methods/models for extracting the capacitance applicable for both the in-pix-capacitance and the
+    total-pixel capacitance. So for each biasing state, there four possibilities to combine these two methods to
+    extract the inter-pixel capacitance.
+
+    Last the C-V-Characterization is investigated.
+    This in particular includes the estimation of depletion voltage.
+
+    The applied biasing states are:
+    .. list-table:: Table Bias States
+        :widths: 20 50 30
+        :header-rows: 1
+
+    * - 0V (unbiased)
+    * - -80V (biased, fully depleted?)
+
+    :param tb_lock: multiprocessing lock to make operations on the hdf files process- and thread-safe.
+    :param correction_args: keyword arguments/dict to define how to correct for parasitic capacitances'.
+    """
     import pixcap65.concurrency
     name = "X1"
     display_name = name + SECOND_LABEL
@@ -962,12 +1179,40 @@ def x1_analysator_second(tb_lock, correction_args, **kwargs):
 
 
 def x2_analysator_first(tb_lock, correction_args, **kwargs):
+    """
+    Handles the plotting of the measurements with the X2 (HPK) sample.
+
+    :author: Dominik Fischer
+    :date: 2026-06-16
+
+    last update: 2026-09-17
+
+
+    First all the measurements are duplicated to apply both the linear model and the full enhanced model for analysis
+    and estimation of the capacitances'.
+    This implementation used the first measurement runs with reduced accuracy for the analysis.
+
+    In a second step all the total pixel capacitances (unbiased as well as fully depleted (biased)) are investigated.
+    In this step the correction for the circuits parasitic capacitances' is applied directly.
+    Also it is tried to characterize the distribution of these capacitances' over the measured sensor.
+
+    Last the C-V-Characterization is investigated.
+    This in particular includes the estimation of depletion voltage.
+
+    The applied biasing states are:
+    .. list-table:: Table Bias States
+        :widths: 20 50 30
+        :header-rows: 1
+
+    * - 0V (unbiased)
+    * - -80V (biased, fully depleted?)
+
+    :param tb_lock: multiprocessing lock to make operations on the hdf files process- and thread-safe.
+    :param correction_args: keyword arguments/dict to define how to correct for parasitic capacitances'.
+    """
     import pixcap65.concurrency
     name = "X2"
     print("Analyze", name)
-    print(threading.get_native_id())
-    print(mp.current_process().name)
-    print(mp.current_process().pid)
 
     _ = pixcap65.concurrency.get_manager(**kwargs)
     correction_args = correction_args.copy()
@@ -995,15 +1240,42 @@ def x2_analysator_first(tb_lock, correction_args, **kwargs):
 
 
 def x2_analysator_second(tb_lock, correction_args, **kwargs):
+    """
+    Handles the plotting of the measurements with the X2 (HPK) sample.
+
+    :author: Dominik Fischer
+    :date: 2026-06-16
+
+    last update: 2026-09-17
+
+
+    First all the measurements are duplicated to apply both the linear model and the full enhanced model for analysis
+    and estimation of the capacitances'.
+    This implementation used the second measurement runs with full accuracy for the analysis.
+
+    In a second step all the total pixel capacitances (unbiased as well as fully depleted (biased)) are investigated.
+    In this step the correction for the circuits parasitic capacitances' is applied directly.
+    Also it is tried to characterize the distribution of these capacitances' over the measured sensor.
+
+    Last the C-V-Characterization is investigated.
+    This in particular includes the estimation of depletion voltage.
+
+    The applied biasing states are:
+    .. list-table:: Table Bias States
+        :widths: 20 50 30
+        :header-rows: 1
+
+    * - 0V (unbiased)
+    * - -80V (biased, fully depleted?)
+
+    :param tb_lock: multiprocessing lock to make operations on the hdf files process- and thread-safe.
+    :param correction_args: keyword arguments/dict to define how to correct for parasitic capacitances'.
+    """
     import pixcap65.concurrency
     name = "X2"
     display_name = name + SECOND_LABEL
     top_ref = "Thesis/ATLAS_ITk"
     print("Analyze", display_name)
-    print(threading.get_native_id())
-    print(mp.current_process().name)
-    print(mp.current_process().pid)
-    print(AUTHKEY_OUTPUT, mp.current_process().authkey)
 
     _ = pixcap65.concurrency.get_manager(**kwargs)
     x2_depletion_args = {
@@ -1070,15 +1342,47 @@ def x2_analysator_second(tb_lock, correction_args, **kwargs):
 
 
 def x4_analysator(tb_lock, correction_args, **kwargs):
+    """
+    Handles the plotting of the measurements with the X4 (HPK) 3D-sample.
+
+    :author: Dominik Fischer
+    :date: 2026-07-30
+
+    last update: 2026-09-17
+
+
+    First all the measurements are duplicated to apply both the linear model and the full enhanced model for analysis
+    and estimation of the capacitances'.
+
+    In a second step all the total pixel capacitances (unbiased as well as fully depleted (biased)) are investigated.
+    In this step the correction for the circuits parasitic capacitances' is applied directly.
+    Also it is tried to characterize the distribution of these capacitances' over the measured sensor.
+
+    Then the Inter-Pixel-Capacitance analysis is investigated.
+    There are two methods/models for extracting the capacitance applicable for both the in-pix-capacitance and the
+    total-pixel capacitance. So for each biasing state, there four possibilities to combine these two methods to
+    extract the inter-pixel capacitance.
+
+    Last the C-V-Characterization is investigated.
+    This in particular includes the estimation of depletion voltage.
+
+    The applied biasing states are:
+    .. list-table:: Table Bias States
+        :widths: 20 50 30
+        :header-rows: 1
+
+    * - 0V (unbiased)
+    * - -80V (biased, fully depleted?)
+
+    :param tb_lock: multiprocessing lock to make operations on the hdf files process- and thread-safe.
+    :param correction_args: keyword arguments/dict to define how to correct for parasitic capacitances'.
+    """
     import pixcap65.concurrency
     from examples.mp_analysis import synchronize_full_model
     name = "X4"
     display_name = name
     top_ref = "Thesis/ATLAS_ITk"
     print("Analyze", display_name)
-    print(threading.get_native_id())
-    print(mp.current_process().name)
-    print(mp.current_process().pid)
 
     _ = pixcap65.concurrency.get_manager(**kwargs)
     # this is not necessary for the ExtendedSyncManager as this accessed right here.
@@ -1168,15 +1472,47 @@ def x4_analysator(tb_lock, correction_args, **kwargs):
 
 
 def x5_analysator(tb_lock, correction_args, **kwargs):
+    """
+    Handles the plotting of the measurements with the X5 (HPK) 3D-sample.
+
+    :author: Dominik Fischer
+    :date: 2026-06-16
+
+    last update: 2026-09-17
+
+
+    First all the measurements are duplicated to apply both the linear model and the full enhanced model for analysis
+    and estimation of the capacitances'.
+
+    In a second step all the total pixel capacitances (unbiased as well as fully depleted (biased)) are investigated.
+    In this step the correction for the circuits parasitic capacitances' is applied directly.
+    Also it is tried to characterize the distribution of these capacitances' over the measured sensor.
+
+    Then the Inter-Pixel-Capacitance analysis is investigated.
+    There are two methods/models for extracting the capacitance applicable for both the in-pix-capacitance and the
+    total-pixel capacitance. So for each biasing state, there four possibilities to combine these two methods to
+    extract the inter-pixel capacitance.
+
+    Last the C-V-Characterization is investigated.
+    This in particular includes the estimation of depletion voltage.
+
+    The applied biasing states are:
+    .. list-table:: Table Bias States
+        :widths: 20 50 30
+        :header-rows: 1
+
+    * - 0V (unbiased)
+    * - -40V (biased, fully depleted?)
+    * - -90V (biased, fully depleted?)
+
+    :param tb_lock: multiprocessing lock to make operations on the hdf files process- and thread-safe.
+    :param correction_args: keyword arguments/dict to define how to correct for parasitic capacitances'.
+    """
     import pixcap65.concurrency
     name = "X5"
     display_name = name
     top_ref = "Thesis/ATLAS_ITk"
     print("Analyze", display_name)
-    print(threading.get_native_id())
-    print(mp.current_process().name)
-    print(mp.current_process().pid)
-    print(AUTHKEY_OUTPUT, mp.current_process().authkey)
 
     _ = pixcap65.concurrency.get_manager(**kwargs)
     # new data store for FBK:
@@ -1310,6 +1646,41 @@ def x5_analysator(tb_lock, correction_args, **kwargs):
 
 
 def x6_analysator(tb_lock, correction_args, **kwargs):
+    """
+    Handles the plotting of the measurements with the X6 (HPK) 3D-sample.
+
+    :author: Dominik Fischer
+    :date: 2026-06-16
+
+    last update: 2026-09-17
+
+
+    First all the measurements are duplicated to apply both the linear model and the full enhanced model for analysis
+    and estimation of the capacitances'.
+
+    In a second step all the total pixel capacitances (unbiased as well as fully depleted (biased)) are investigated.
+    In this step the correction for the circuits parasitic capacitances' is applied directly.
+    Also it is tried to characterize the distribution of these capacitances' over the measured sensor.
+
+    Then the Inter-Pixel-Capacitance analysis is investigated.
+    There are two methods/models for extracting the capacitance applicable for both the in-pix-capacitance and the
+    total-pixel capacitance. So for each biasing state, there four possibilities to combine these two methods to
+    extract the inter-pixel capacitance.
+
+    Last the C-V-Characterization is investigated.
+    This in particular includes the estimation of depletion voltage.
+
+    The applied biasing states are:
+    .. list-table:: Table Bias States
+        :widths: 20 50 30
+        :header-rows: 1
+
+    * - 0V (unbiased)
+    * - -45V (biased, fully depleted?)
+
+    :param tb_lock: multiprocessing lock to make operations on the hdf files process- and thread-safe.
+    :param correction_args: keyword arguments/dict to define how to correct for parasitic capacitances'.
+    """
     import pixcap65.concurrency
     name = "X6"
     display_name = name
@@ -1409,6 +1780,41 @@ def x6_analysator(tb_lock, correction_args, **kwargs):
 
 
 def x7_analysator(tb_lock, correction_args, **kwargs):
+    """
+    Handles the plotting of the measurements with the X7 (HPK) 3D-sample.
+
+    :author: Dominik Fischer
+    :date: 2026-06-16
+
+    last update: 2026-09-17
+
+
+    First all the measurements are duplicated to apply both the linear model and the full enhanced model for analysis
+    and estimation of the capacitances'.
+
+    In a second step all the total pixel capacitances (unbiased as well as fully depleted (biased)) are investigated.
+    In this step the correction for the circuits parasitic capacitances' is applied directly.
+    Also it is tried to characterize the distribution of these capacitances' over the measured sensor.
+
+    Then the Inter-Pixel-Capacitance analysis is investigated.
+    There are two methods/models for extracting the capacitance applicable for both the in-pix-capacitance and the
+    total-pixel capacitance. So for each biasing state, there four possibilities to combine these two methods to
+    extract the inter-pixel capacitance.
+
+    Last the C-V-Characterization is investigated.
+    This in particular includes the estimation of depletion voltage.
+
+    The applied biasing states are:
+    .. list-table:: Table Bias States
+        :widths: 20 50 30
+        :header-rows: 1
+
+    * - 0V (unbiased)
+    * - -40V (biased, fully depleted?)
+
+    :param tb_lock: multiprocessing lock to make operations on the hdf files process- and thread-safe.
+    :param correction_args: keyword arguments/dict to define how to correct for parasitic capacitances'.
+    """
     import pixcap65.concurrency
     name = "X7"
     display_name = name
@@ -1507,7 +1913,7 @@ def bare_sample_plotter_first(tb_lock):
     capacitances over the whole sensor.
 
     :param tb_lock: multiprocessing lock to make operations on the hdf files process- and thread-safe.
-        """
+    """
     name = "bare sample"
     print("Plotting", name)
     plot_data(interpreted_data='pixcap65/Data/bare-measurement/TEST.h5', suffix="general_bare_data_1-1",
@@ -1529,7 +1935,7 @@ def bare_sample_plotter_second(tb_lock):
     capacitances over the whole sensor.
 
     :param tb_lock: multiprocessing lock to make operations on the hdf files process- and thread-safe.
-        """
+    """
     name = "bare"
     display_name = name + "Second Try"
     top_ref = "Thesis/ATLAS_ITk"
@@ -1601,15 +2007,8 @@ def general_plotter(tb_lock, file_name, bias, **kwargs):
         :widths: 20 50 30
         :header-rows: 1
 
-    * - HV
-      - Column B
-      - Column C
     * - 0V (unbiased)
-      - A
-      - A
-    * - -40V (biased)
-      - B
-      - C
+    * - -40V (biased, exact value will depend here on the provided parameters.)
 
     :param tb_lock: multiprocessing lock to make operations on the hdf files process- and thread-safe.
     :param file_name: name of the hdf file, where the measurement data is stored together with the results of the
@@ -1743,15 +2142,8 @@ def r1_plotter(tb_lock):
         :widths: 20 50 30
         :header-rows: 1
 
-    * - HV
-      - Column B
-      - Column C
     * - 0V (unbiased)
-      - A
-      - A
     * - -80V (biased)
-      - B
-      - C
 
     :param tb_lock: multiprocessing lock to make operations on the hdf files process- and thread-safe.
     """
@@ -1976,15 +2368,8 @@ def r13_plotter_first(tb_lock):
         :widths: 20 50 30
         :header-rows: 1
 
-    * - HV
-      - Column B
-      - Column C
     * - 0V (unbiased)
-      - A
-      - A
     * - -80V (biased)
-      - B
-      - C
 
     :param tb_lock: multiprocessing lock to make operations on the hdf files process- and thread-safe.
     """
@@ -2055,15 +2440,8 @@ def r13_plotter_second(tb_lock):
         :widths: 20 50 30
         :header-rows: 1
 
-    * - HV
-      - Column B
-      - Column C
     * - 0V (unbiased)
-      - A
-      - A
     * - -80V (biased)
-      - B
-      - C
 
     :param tb_lock: multiprocessing lock to make operations on the hdf files process- and thread-safe.
     """
@@ -2205,6 +2583,32 @@ def r13_plotter_second(tb_lock):
 
 
 def e1_plotter_first(tb_lock):
+    """
+    Handles the plotting of the measurements with the planar Sensor E1 (LF (CMOS) sample) in the second measurement
+    run group with enhanced accuracy.
+
+    In a first run overview pdf of the unbiased and biased measurements are created including the distributions of these
+    capacitances over the whole sensor.
+    This is the implementation for the first measurements and therefore ignores the different sizes of the pixel
+    implants.
+
+    Next the analysis of the leakage current over the a large range of reversed biasing voltages.
+    Then the Inter-Pixel-Capacitance analysis is plotted.
+    There are two methods/models for extracting the capacitance applicable for both the in-pix-capacitance and the
+    total-pixel capacitance. So for each biasing state, there four possibilities to combine these two methods to
+    extract the inter-pixel capacitance.
+    The plots are then created for each possibility for each biasing state.
+
+    The applied biasing states are:
+    .. list-table:: Table Bias States
+        :widths: 20 50 30
+        :header-rows: 1
+
+    * - 0V (unbiased)
+    * - -80V (biased)
+
+    :param tb_lock: multiprocessing lock to make operations on the hdf files process- and thread-safe.
+    """
     name = "E1"
     display_name = name
     top_ref = "Reference"
@@ -2237,6 +2641,37 @@ def e1_plotter_first(tb_lock):
 
 
 def e1_plotter_second(tb_lock):
+    """
+    :author: Dominik Fischer
+    :date: 2026-06-16
+
+    last update: 2026-09-17
+
+    Handles the plotting of the measurements with the planar Sensor E1 (LF (CMOS) sample) in the second measurement
+    run group with enhanced accuracy.
+    This special in the sense that it has different pixel implantation sizes and depths.
+    So we will iterate over the different regions to generate the plots.
+
+    In a first run overview pdf of the unbiased and biased measurements are created including the distributions of these
+    capacitances over the whole sensor.
+
+    Next the analysis of the leakage current over the a large range of reversed biasing voltages.
+    Then the Inter-Pixel-Capacitance analysis is plotted.
+    There are two methods/models for extracting the capacitance applicable for both the in-pix-capacitance and the
+    total-pixel capacitance. So for each biasing state, there four possibilities to combine these two methods to
+    extract the inter-pixel capacitance.
+    The plots are then created for each possibility for each biasing state.
+
+    The applied biasing states are:
+    .. list-table:: Table Bias States
+        :widths: 20 50 30
+        :header-rows: 1
+
+    * - 0V (unbiased)
+    * - -80V (biased)
+
+    :param tb_lock: multiprocessing lock to make operations on the hdf files process- and thread-safe.
+    """
     name = "E1"
     display_name = name + "Second Try."
     top_ref = "Reference"
@@ -2948,15 +3383,8 @@ def x4_plotter(tb_lock):
         :widths: 20 50 30
         :header-rows: 1
 
-    * - HV
-      - Column B
-      - Column C
     * - 0V (unbiased)
-      - A
-      - A
     * - -80V (biased)
-      - B
-      - C
 
     :param tb_lock: multiprocessing lock to make operations on the hdf files process- and thread-safe.
     """
@@ -3052,6 +3480,7 @@ def x4_plotter(tb_lock):
     threaded_plotting.joint_plotting()
     print("Finished -", display_name)
 
+
 def x5_plotter(tb_lock):
     """
     Handles the plotting of the measurements with the 3D-Sensor X5 (FBK sample).
@@ -3071,15 +3500,8 @@ def x5_plotter(tb_lock):
         :widths: 20 50 30
         :header-rows: 1
 
-    * - HV
-      - Column B
-      - Column C
     * - 0V (unbiased)
-      - A
-      - A
     * - -40V (biased)
-      - B
-      - C
 
     :param tb_lock: multiprocessing lock to make operations on the hdf files process- and thread-safe.
     """
@@ -3215,16 +3637,8 @@ def x6_plotter(tb_lock):
     .. list-table:: Table Bias States
         :widths: 20 50 30
         :header-rows: 1
-
-    * - HV
-      - Column B
-      - Column C
     * - 0V (unbiased)
-      - A
-      - A
     * - -40V (biased)
-      - B
-      - C
 
     :param tb_lock: multiprocessing lock to make operations on the hdf files process- and thread-safe.
     """
@@ -3331,15 +3745,8 @@ def x7_plotter(tb_lock):
         :widths: 20 50 30
         :header-rows: 1
 
-    * - HV
-      - Column B
-      - Column C
     * - 0V (unbiased)
-      - A
-      - A
     * - -40V (biased)
-      - B
-      - C
 
     :param tb_lock: multiprocessing lock to make operations on the hdf files process- and thread-safe.
     """
@@ -3429,6 +3836,22 @@ def x7_plotter(tb_lock):
 
 
 def presentation_plotter(tb_lock):
+    """
+    presentation_plotter
+
+    :author: Dominik Fischer
+    :date: 2026-06-16
+
+    last update: 2026-09-17
+
+    Utility function to generate the (final) plots for my bachelors' thesis.+
+    This only applies to the plots for c-v characterization.
+    In this case the different c-v-curves of the different sensors are combined into a single plot.
+
+    For the I-V Characterization the leakage current will be normalised onto the area of the pixel implantations.
+
+    :param tb_lock: multiprocessing lock to make operations on the hdf files process- and thread-safe.
+    """
     e1_full_size = 0
     for key, content in data_constants.e1_pixel_groups.items():
         size_parameter, _ = key.removeprefix("dnw").removeprefix("nw").split("_", 1)
@@ -3800,6 +4223,9 @@ def presentation_plotter(tb_lock):
 
 
 def mp_plotting_init():
+    """
+    Make sure that all sub-processes are initialized such that the matplotlib PDF backend is used anyway.
+    """
     import matplotlib
     matplotlib.use('PDF')
 

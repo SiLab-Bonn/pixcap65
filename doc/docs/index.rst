@@ -21,6 +21,7 @@ documentation for details.
    data
    data_structures
    analysis
+   examples
 
 Indices and tables
 ==================
