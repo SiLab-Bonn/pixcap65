@@ -13,6 +13,11 @@
 #  See the License for the specific language governing permissions and
 #  limitations under the License.
 # ----------------------------------------------------------
+"""
+Handling and demonstration script to generate all the plots used for my bachelor's thesis.
+Here only an example on how to use the plotting part of this framework.
+"""
+
 import logging
 import matplotlib
 import time

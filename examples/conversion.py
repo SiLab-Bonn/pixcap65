@@ -21,24 +21,38 @@ from pixcap65.utility.converter import *
 from .data_constants import *
 
 
+def internal_node_copy(grouping: tb.Group, h5_file: tb.File, parent: tb.Group,
+                       exclude_iv=False, exclude_cv=False):
+    """
+    internal copy function of nodes used at the wrong group in the initial measurement definition.
+
+    :author: Dominik Fischer
+    :date: 2026-09-17
+
+    last updated: 2026-09-17
+
+    :param grouping: group under which the measurement or anaylsis is currently sitting
+    :param h5_file: hdf file where the data is stored.
+    :param parent: new node/group under which to put the data.
+    :param exclude_iv: whether to exlude sole i-v characterization measurements.
+    :param exclude_cv: whether to exlude sole c-v characterization measurements.
+    """
+    for group in grouping._f_iter_nodes():
+        if not isinstance(group, tb.Group):
+            continue
+        if group == grouping:
+            continue
+        if group._v_name == "C_V_Characteristic_refined" and exclude_cv:
+            continue
+        if group._v_name == "I_V_Characteristic" and exclude_iv:
+            continue
+        print(group)
+        h5_file.copy_node(where=grouping, name=group._v_name,
+                          newname=group._v_name,
+                          newparent=parent, recursive=True, overwrite=True)
+
+
 if __name__ == '__main__':
-    def internal_node_copy(grouping, h5_file: tb.File, parent: tb.Group,
-                           exclude_iv=False, exclude_cv=False):
-        for group in grouping._f_iter_nodes():
-            if not isinstance(group, tb.Group):
-                continue
-            if group == grouping:
-                continue
-            if group._v_name == "C_V_Characteristic_refined" and exclude_cv:
-                continue
-            if group._v_name == "I_V_Characteristic" and exclude_iv:
-                continue
-            print(group)
-            h5_file.copy_node(where=grouping, name=group._v_name,
-                              newname=group._v_name,
-                              newparent=parent, recursive=True, overwrite=True)
-
-
     with tb.open_file(X1_SCAN_2_FILE, "a") as h5_file:
         generate_bias_table(h5_file.root.ATLAS_ITk.X1.I_V_Characteristic.biasing.measurements, transform_api=True)
         regenerate_c_v_errors(h5_file.root.ATLAS_ITk.X1.C_V_Characteristic_refined.biasing.measurements)
@@ -165,7 +179,3 @@ if __name__ == '__main__':
 
     with tb.open_file(X7_SCAN_FILE, 'a') as h5_file:
         generate_pixel_dimensions(h5_file.root.Thesis.ATLAS_ITk.X7)
-
-    # When have I repaired all the implementations.
-    # All the first try measurement series needs to consolidated
-    # and their entries needs to be adjusted for the new formats

@@ -13,6 +13,10 @@
 #  See the License for the specific language governing permissions and
 #  limitations under the License.
 # ----------------------------------------------------------
+"""
+Implementation and script-like usage handler for performing the analysis of my bachelor thesis' measurements as an
+example while simultaneously providing utility functions for multiprocessing operation.
+"""
 
 import datetime
 import logging
@@ -20,7 +24,9 @@ import multiprocessing as mp
 import time
 from contextlib import contextmanager
 
-from examples.full_analysis import r1_analysator, r13_analysator_second
+from examples.full_analysis import r1_analysator, r13_analysator_second, e1_analysator_second
+from examples.full_analysis import x1_analysator_second as x1_analysator, x2_analysator_second as x2_analysator, \
+    x4_analysator, x5_analysator, x6_analysator, x7_analysator
 from pixcap65.utility import synchronized_process_open_file
 
 AUTHKEY_OUTPUT = "Fetch new authkey:"
@@ -34,7 +40,21 @@ bare_correction_args = {
 }
 logger = logging.getLogger(__name__)
 
+
 def get_name_appendix(name, api=OLD_API):
+    """
+    Utility function to get the name to use for storing a copy of the measurement data for an additonal analysis
+    using the full enhanced model.
+
+    :author: Dominik Fischer
+    :date: 2026-09-14
+
+    last update: 2026-09-17
+
+    :param name: original name of the measurement group.
+    :param api: whether to use the new api to determine the new group name. (default: False)
+    :return: group name to be used for the full enhanced model copy of the data.
+    """
     if "full" in name and not api:
         return name.replace('full', 'full_model')
     else:
@@ -42,6 +62,34 @@ def get_name_appendix(name, api=OLD_API):
 
 
 def synchronize_full_model(file, reference, name, bias, p_lock, **kwargs):
+    """
+    synchronize_full_model(file, reference, name, bias, p_lock, **kwargs)
+
+    :author: Dominik Fischer
+    :date: 2026-08-11
+
+    last update: 2026-09-17
+
+    Performs a duplication of some of the measurement groups to apply the full enhanced model onto them when analyzing,
+    while the linear model could still be used for the original data set.
+    The operation is synchronized (when accessing the hdf file) to make it thread-safe and multi-processing safe.
+
+    :param file: hdf file for which copies of certain data sets should be synchronized.
+    :param reference: in which hdf file's group to look for the measurements.
+    :param name: name of the sensor for which the duplication should be performed.
+    :param bias: bias voltage used for measurement with a fully depleted sensor.
+    :param p_lock: synchronization object to prevent multiple overlapping accesses to the pytables api and simultaneously
+        write/read operations on the same file. IT IS STRONGLY RECOMMENDED TO EXPLICITLY SUPPLY A LOCK
+        for synchronization.
+    :param kwargs: further keyword arguments to be propagated and used here.
+    :keyword unbiased_group: name of the group for the unbiased total-cap measurement.
+    :keyword inter_unbiased_group: name of the group for the unbiased inter-pix capacitance measurement.
+    :keyword biased_group: name of the group for the biased total-cap measurement.
+    :keyword inter_biased_group: name of the group for the biased inter-pix capacitance measurement.
+    :keyword inter_pix_extension_active: whether to also duplicate optional extension measurements which only include
+     contributions from specific pixels. (default: False)
+    :keyword api: whether to use the new api to determine the new group name. (default: False)
+    """
     from tables import Group
     # perhaps we should refactor this function to be more general applicable?
     # in particular there are some inconsistencies in the naming scheme.
@@ -93,11 +141,36 @@ def synchronize_full_model(file, reference, name, bias, p_lock, **kwargs):
 
 
 def error_handler(exc):
+    """
+    Handling exceptions in sub-processes and print them out by the logger.
+
+    :author: Dominik Fischer
+    :date: 2026-08-11
+
+    last update: 2026-09-17
+    """
     logger.error("While performing the analysis in multiple processes an error occured.", exc_info=exc)
 
 
 @contextmanager
 def processed_manager(**kwargs):
+    """
+    processed_manager
+
+    :author: Dominik Fischer
+    :date: 2026-08-11
+
+    last update: 2026-09-17
+
+    Create a manager process or connects to an already existing one and obtains an reentrant lock for synchronization
+    from them, which will be de-initialized by this context manager before exiting accordingly.
+
+    :param kwargs: further keyword arguments.
+    :keyword address: address of the socket of the :py:class:`multiprocessing.Manager` object we want to connect to.
+    :keyword authkey: authentication key necessary to connect to the socket. (It is recommended not to use this
+     parameter as it is not pickable)
+    :return manager, lock
+    """
     import pixcap65.concurrency
     import gc
     with pixcap65.concurrency.get_context_manager(**kwargs) as manager_ctx:
@@ -118,15 +191,15 @@ if __name__ == "__main__":
     start_time = time.time()
 
     process_handles = [
-        # x1_analysator,
-        # x2_analysator,
-        # x5_analysator,
-        # x6_analysator,
-        # x7_analysator,
-        # e1_analysator_second,
+        x1_analysator,
+        x2_analysator,
+        x5_analysator,
+        x6_analysator,
+        x7_analysator,
+        e1_analysator_second,
         r13_analysator_second,
         r1_analysator,
-        # x4_analysator,
+        x4_analysator,
     ]
 
     with processed_manager() as (manager, tables_lock):
