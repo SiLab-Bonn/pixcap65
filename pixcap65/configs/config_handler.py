@@ -287,7 +287,7 @@ if __name__ == '__main__':
         if file.endswith('_Range.yaml'):
             update_smu_range_configuration(file)
 
-    with open("../../pixcap_logging.yml", 'r') as temp_file:
+    with open("../../sides/pixcap_logging.yml", 'r') as temp_file:
         logging.config.dictConfig(yaml.safe_load(temp_file))
 
     for logger in logging.getLogger().getChildren():
