@@ -10,6 +10,8 @@ from pixcap65.plotting_util import get_base_group, FREQUENCY_LABEL, CURRENT_LABE
 from pixcap65.plotting_util.utility import get_pdf_name
 
 
+# CHECK: What 'to do' with this file?
+
 def plot_bias_data(interpreted_data, base_path=None, second_data=None, second_path=None, suffix="bias_curve",
                    use_group=False):
     pdf_name = get_pdf_name(base_path, interpreted_data, suffix, use_group)

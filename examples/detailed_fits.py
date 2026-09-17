@@ -1056,5 +1056,3 @@ if __name__ == "__main__":
             full_covariance)
         rev_separation_full_err = rev_separation_full_cov ** 0.5
         print(50 - 4 - 2 * rev_separation_full, np.abs(-2 * rev_separation_full_err))
-
-        # TODO: How to perform this calculation for multiple at once?

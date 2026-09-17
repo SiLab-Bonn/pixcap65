@@ -238,7 +238,7 @@ def r13_analysator_first(tb_lock, correction_args, **kwargs):
                  base_path="Reference/R13/demo_measurement_65_unbiased_1_discharge",
                  is_inter_pixel=True, is_advanced=True, lock=tb_lock, )
 
-    print("CV Analysis for", name)
+    print(LOG_CV_ANALYSIS, name)
     # r13-measurements/R13_BIAS_CV_2.h5 could not be directly investigated as it is incomplete.
     analyze_data(raw_data='pixcap65/Data/r13-measurement/R13_BIAS_CV_COMBI_2.h5', is_advanced=False, is_cv=True,
                  use_corrected=True, apply_doping=True, chip_group_name="sensor",
@@ -252,9 +252,9 @@ def r13_analysator_first(tb_lock, correction_args, **kwargs):
                  first_boundaries=(-100, -40),
                  second_boundaries=(-10, 0), apply_doping=True, chip_group_name="sensor", use_corrected=True,
                  **correction_args)
-    print("Finished the Analysis for", name)
+    print(LOG_FINISHED_ANALYSIS, name)
 
-# TODO: consolidate the two plotting handler functions.
+# TODO: consolidate the two plotting handler functions. (consolidated now on temporary stack, waiting for test run to finish)
 def e1_plotter_first(tb_lock):
     name = "E1"
     display_name = name
@@ -312,13 +312,13 @@ def x1_analysator_first(tb_lock, correction_args, **kwargs):
                  is_advanced=True,
                  **correction_args)
 
-    print("CV Analysis for", name)
+    print(LOG_CV_ANALYSIS, name)
     analyze_data(raw_data='pixcap65/Data/New_1_Initial_6_Scan.h5', base_path="ATLAS ITk/C_V_Characteristic",
                  is_advanced=False, is_cv=True, use_corrected=True, apply_doping=True,
                  chip_group_name="ATLAS ITk/sensor",
                  first_boundaries=[(-60, -40), (-80, -75)], second_boundaries=[(-5, 0), (-70, -65)],
                  **correction_args)
-    print("Finished the Analysis for", name)
+    print(LOG_FINISHED_ANALYSIS, name)
 
 
 def x2_analysator_first(tb_lock, correction_args, **kwargs):
@@ -338,7 +338,7 @@ def x2_analysator_first(tb_lock, correction_args, **kwargs):
     analyze_data(raw_data='New_2_Scan.h5', base_path="ATLAS_Itk/X2/biased_80_V", is_advanced=True,
                  **correction_args)
 
-    print("CV Analysis for", name)
+    print(LOG_CV_ANALYSIS, name)
     analyze_data(raw_data='New_2_Scan.h5', base_path="ATLAS_Itk/X2/C_V_Characteristic", is_advanced=True,
                  is_cv=True,
                  first_boundaries=[(-60, -40), (-80, -75)], second_boundaries=[(-5, 0), (-70, -65)],
@@ -351,7 +351,7 @@ def x2_analysator_first(tb_lock, correction_args, **kwargs):
                      first_boundaries=(-60, -20), second_boundaries=(-5, 0), use_corrected=True, apply_doping=True,
                      chip_group_name="ATLAS_Itk/X2/sensor", distribution=True, set_parasitic=False,
                      distribution_output_pdf=pdf, **correction_args)
-    print("Finished the Analysis for", name)
+    print(LOG_FINISHED_ANALYSIS, name)
 
 
 def x4_analysator(tb_lock, correction_args, **kwargs):
@@ -443,7 +443,7 @@ def x4_analysator(tb_lock, correction_args, **kwargs):
                  test_cap_exclusion=True, mask_pixel=data_constants.x4_pixel_mask,
                  lock=tb_lock, **x4_depletion_args)
 
-    with PdfPages("../Fit References/X4/fine_reference_fits.pdf") as pdf:
+    with PdfPages("Fit References/X4/fine_reference_fits.pdf") as pdf:
         analyze_data(raw_data=X4_SCAN_FILE, base_path=hdf(top_ref, name, 'C_V_Characteristic_refined_Extended'),
                      is_advanced=True, full_model=False, is_cv=True, use_corrected=True,
                      test_cap_exclusion=True, mask_pixel=data_constants.x4_pixel_mask,
@@ -929,7 +929,6 @@ def r13_plotter_first(tb_lock):
     display_name = name
     top_ref = "Reference"
     print("Plotting", display_name)
-    # TODO: Combine all these hdf files into a single file!
     plot_data(interpreted_data='pixcap65/Data/r13-measurement/data.h5', suffix="test_run", use_group=False)
     plot_data(interpreted_data='pixcap65/Data/r13-measurement/data.h5', suffix="test_run", use_group=False,
               use_corrected=True, lock=tb_lock)
@@ -1348,7 +1347,6 @@ def x1_plotter_first(tb_lock):
     display_name = name
     top_ref = "Thesis/ATLAS_ITk"
     print("Plotting", display_name)
-    # TODO: reformat these files such that the general structure is used!
     plot_data(interpreted_data='pixcap65/Data/ATLAS ITk/New_1_Initial_2_Scan.h5',
                                 base_path="run_1", suffix="test_run", use_group=True, lock=tb_lock)
     plot_data(interpreted_data='pixcap65/Data/ATLAS ITk/New_1_Initial_2_Scan.h5',
@@ -2869,14 +2867,14 @@ if __name__ == '__main__':
             "pixel_mask": [[39, 1]]
         }
         e1_depletion_args.update(**correction_args)
-        print("CV Analysis for", name)
+        print(LOG_CV_ANALYSIS, name)
         with PdfPages("../Fit References/E1_C_V_Verify.pdf") as pdf:
             analyze_data(raw_data=E1_SCAN_FILE, base_path="Reference/E1/C_V_Characteristic",
                          is_advanced=True, full_model=False, is_cv=True, use_corrected=True, cv_fit_plot_pdf=pdf,
                          **e1_depletion_args)
-        print("Finished the Analysis for", name)
+        print(LOG_FINISHED_ANALYSIS, name)
 
-        print("Finished the Analysis for", name)
+        print(LOG_FINISHED_ANALYSIS, name)
 
 
     from examples.mp_analysis import e1_analysator_second
