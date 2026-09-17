@@ -54,7 +54,8 @@ def extended_cap_model_5(xy, a0, a1, a2, a3, a4, a5, a6, a7):
     from examples.detailed_fits import quadratic_model
     # make a try in not using depletion width at all, but in using the pixel separation here!
     A, d, p, w_x, w_y = xy
-    return quadratic_model(p, linear_model(d, a0, a1), linear_model(d, a2, a3), linear_model(d, a4, a5)) + linear_model(d, a6, a7) / w_x
+    return quadratic_model(p, linear_model(d, a0, a1), linear_model(d, a2, a3), linear_model(d, a4, a5))\
+        + linear_model(d, a6, a7) / w_x
 
 
 def extended_cap_model_6(xy, a0, a1, a2, a3, a4, a5):

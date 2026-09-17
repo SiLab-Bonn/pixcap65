@@ -18,14 +18,15 @@ Analysis and plotting script evaluate all the data taking from the beginning!
 """
 from os.path import join as hdf
 
+import logging
 import multiprocessing as mp
 import numpy as np
 import tables as tb
 import threading
 from matplotlib.backends.backend_pdf import PdfPages
 
-import examples.data_constants as data_constants
 import pixcap65.plotting_util.threaded_plotting as threaded_plotting
+from examples import data_constants as data_constants
 from examples.data_constants import E1_SCAN_FILE, E1_2_SCAN_FILE, R13_2_SCAN_FILE, R11_SCAN_FILE, X4_SCAN_FILE
 from examples.data_constants import X1_SCAN_2_FILE, X2_SCAN_2_FILE, X2_SCAN_FILE
 from examples.data_constants import X5_SCAN_FILE, X6_SCAN_FILE, X7_SCAN_FILE
@@ -44,9 +45,69 @@ UNBIASED = 'unbiased_full'
 INTER_UNBIASED = 'inter_unbiased_full'
 LOG_FINISHED_ANALYSIS = "Finished the Analysis for"
 LOG_CV_ANALYSIS = "CV Analysis for"
+CV_DATA_FOR_ = "CV Data for {}"
+
+logger = logging.getLogger(__name__)
 
 
 # define the analysis handling
+def bare_analysis_handler(tb_lock):
+    with synchronized_process_open_file("packaged/Reference_Bare_renewed.h5", 'a', lock=tb_lock) as h5_file:
+        h5_file.copy_node(where="/Reference/Bare", name="unbiased_31_renew", newname="unbiased_31_renew_full_model",
+                          overwrite=True, recursive=True)
+
+    with synchronized_process_open_file("packaged/data/Bare_Sample_05_Extended_Scan.h5", 'a', lock=tb_lock) as h5_file:
+        h5_file.copy_node(where="/Reference/Bare", name="unbiased_full", newname="unbiased_full_model",
+                          overwrite=True, recursive=True)
+        h5_file.copy_node(where="/Reference/Bare", name="unbiased_full", newname="unbiased_full_kafe2",
+                          overwrite=True, recursive=True)
+        h5_file.copy_node(where="/Reference/Bare", name="unbiased_full", newname="unbiased_full_extended",
+                          overwrite=True, recursive=True)
+        h5_file.copy_node(where="/Reference/Bare", name="unbiased_full", newname="unbiased_full_quad",
+                          overwrite=True, recursive=True)
+
+    analyze_data(raw_data="packaged/Reference_Bare_renewed.h5", base_path="Reference/Bare/unbiased_31_renew",
+                 is_advanced=True, full_model=False, lock=tb_lock)
+    analyze_data(raw_data="packaged/Reference_Bare_renewed.h5",
+                 base_path="Reference/Bare/unbiased_31_renew_full_model", is_advanced=True,
+                 full_model=True, lock=tb_lock)
+    analyze_data(raw_data="packaged/data/Bare_Sample_05_Extended_Scan.h5", base_path="Reference/Bare/unbiased_full",
+                 is_advanced=True, full_model=False, lock=tb_lock)
+    analyze_data(raw_data="packaged/data/Bare_Sample_05_Extended_Scan.h5",
+                 base_path="Reference/Bare/unbiased_full_model", is_advanced=True,
+                 full_model=True, lock=tb_lock)
+    analyze_data(raw_data="packaged/data/Bare_Sample_05_Extended_Scan.h5",
+                 base_path="Reference/Bare/unbiased_full_kafe2", is_advanced=True,
+                 full_model=True, lock=tb_lock, use_kafe2=True)
+    analyze_data(raw_data="packaged/data/Bare_Sample_05_Extended_Scan.h5",
+                 base_path="Reference/Bare/unbiased_full_extended", is_advanced=True,
+                 full_model='extended', lock=tb_lock)
+    analyze_data(raw_data="packaged/data/Bare_Sample_05_Extended_Scan.h5",
+                 base_path="Reference/Bare/unbiased_full_quad", is_advanced=True,
+                 full_model='quad', lock=tb_lock)
+    analyze_capacitance_distribution(raw_data="packaged/Reference_Bare_renewed.h5",
+                                     base_path="Reference/Bare/unbiased_31_renew",
+                                     corrected_distribution=False,
+                                     exclude_test_cap=True, use_kafe2=False,
+                                     fit_plot_pdf_name="Bare_analysis_renew_parasitic.pdf", lock=tb_lock)
+    analyze_capacitance_distribution(raw_data="packaged/Reference_Bare_renewed.h5",
+                                     base_path="Reference/Bare/unbiased_31_renew_full_model",
+                                     corrected_distribution=False,
+                                     exclude_test_cap=True, use_kafe2=False,
+                                     fit_plot_pdf_name="Bare_analysis_renew_parasitic_full_model.pdf", lock=tb_lock)
+    analyze_capacitance_distribution(raw_data='Bare_Repeat_2_Scan.h5',
+                                     base_path="Reference/bare/unbiased_8_full_model",
+                                     corrected_distribution=False,
+                                     exclude_test_cap=True, use_kafe2=False,
+                                     fit_plot_pdf_name="Bare_analysis_parasitic_full_model.pdf", lock=tb_lock)
+    analyze_capacitance_distribution(raw_data="packaged/data/Bare_Sample_05_Extended_Scan.h5",
+                                     base_path="Reference/Bare/unbiased_full",
+                                     corrected_distribution=False,
+                                     exclude_test_cap=True, use_kafe2=False,
+                                     fit_plot_pdf_name="Bare_analysis_parasitic_extended_renew_full_model.pdf",
+                                     lock=tb_lock)
+
+
 def r1_analysator(tb_lock, correction_args, **kwargs):
     import pixcap65.concurrency
     from examples.mp_analysis import synchronize_full_model
@@ -142,7 +203,8 @@ def r1_analysator(tb_lock, correction_args, **kwargs):
                  total_cap_group=hdf(top_ref, name, 'biased_80_V_full_model/total_cap'),
                  in_cap_file=R11_SCAN_FILE, in_cap_group=hdf(top_ref, name, 'inter_biased_M_80_V_full/inter_cap'),
                  inter_pix_id=20000, **correction_args)
-    analyze_data(raw_data=R11_SCAN_FILE, base_path=hdf(top_ref, name, 'inter_biased_M_80_V_full_model_Extended__diagonals'),
+    analyze_data(raw_data=R11_SCAN_FILE,
+                 base_path=hdf(top_ref, name, 'inter_biased_M_80_V_full_model_Extended__diagonals'),
                  is_advanced=True, full_model=True, is_inter_pixel=True,
                  test_cap_exclusion=True, distribution=True,
                  lock=tb_lock, mask_pixel=data_constants.r1_pixel_mask,
@@ -174,7 +236,6 @@ def r1_analysator(tb_lock, correction_args, **kwargs):
                  total_cap_group=hdf(top_ref, name, 'biased_80_V_full_model/total_cap'),
                  in_cap_file=R11_SCAN_FILE, in_cap_group=hdf(top_ref, name, 'inter_biased_M_80_V_full/inter_cap'),
                  inter_pix_id=19000, **correction_args)
-
 
     # handle the C-V-analysis
     r11_depletion_args = {
@@ -254,28 +315,303 @@ def r13_analysator_first(tb_lock, correction_args, **kwargs):
                  **correction_args)
     print(LOG_FINISHED_ANALYSIS, name)
 
-# TODO: consolidate the two plotting handler functions. (consolidated now on temporary stack, waiting for test run to finish)
-def e1_plotter_first(tb_lock):
-    name = "E1"
-    display_name = name
+
+def r13_analysator_second(tb_lock, correction_args, **kwargs):
+    import pixcap65.concurrency
+    name = "R13"
+    display_name = "R13" + SECOND_LABEL
     top_ref = "Reference"
-    print("Plotting", display_name)
-    threaded_plotting.plot_data(interpreted_data=E1_SCAN_FILE, base_path=hdf(top_ref, name, 'unbiased_1_test'),
-                                use_group=True, lock=tb_lock)
-    threaded_plotting.plot_data(interpreted_data=E1_SCAN_FILE, base_path=hdf(top_ref, name, 'unbiased_2_test'),
-                                use_group=True, lock=tb_lock)
-    threaded_plotting.plot_data(interpreted_data=E1_SCAN_FILE, base_path=hdf(top_ref, name, 'unbiased_3_test'),
-                                use_group=True, lock=tb_lock)
-    threaded_plotting.plot_data(interpreted_data=E1_SCAN_FILE, base_path=hdf(top_ref, name, 'unbiased_4_full'),
-                                use_group=True, lock=tb_lock)
-    plot_data(interpreted_data=E1_SCAN_FILE, base_path=hdf(top_ref, name, 'unbiased_4_full'),
-              use_group=True, use_corrected=True, distribution=True, test_cap_exclusion=True, lock=tb_lock)
-    threaded_plotting.plot_bias_data(interpreted_data=E1_SCAN_FILE,
-                                     base_path=hdf(top_ref, name, 'I_V_Characteristic'),
-                                     use_group=True, lock=tb_lock)
-    print(display_name, "- CV")
-    threaded_plotting.joint_plotting()
-    print("Finished -", display_name)
+    print("Analyze", display_name)
+    print(threading.get_native_id())
+    print(mp.current_process().name)
+    print(mp.current_process().pid)
+    print(AUTHKEY_OUTPUT, mp.current_process().authkey)
+
+    _ = pixcap65.concurrency.get_manager(**kwargs)
+    r13_depletion_args = {
+        "first_boundaries": (-85, -25),
+        "second_boundaries": (-3.4, 0),
+        "distribution": True,
+        "apply_contour": True,
+        "apply_contours": True,
+        "chip_group_name": hdf(top_ref, name, "sensor"),
+        "apply_doping": True,
+    }
+    r13_depletion_args.update(**correction_args)
+
+    synchronize_full_model(R13_2_SCAN_FILE, top_ref, name, 80, tb_lock,
+                           unbiased_group="unbiased_1_full")
+    synchronize_full_model(R13_2_SCAN_FILE, top_ref, name, 80, tb_lock,
+                           unbiased_group="unbiased_1_full", inter_unbiased_group="inter_unbiased_full_renew",
+                           inter_biased_group="inter_biased_M_{}_V_full_renew")
+    synchronize_full_model(R13_2_SCAN_FILE, top_ref, name, 80, tb_lock,
+                           inter_unbiased_group="inter_unbiased_renew_Extended_full",
+                           inter_biased_group="inter_biased_M_{}_V_renew_Extended_full")
+
+    analyze_data(raw_data=R13_2_SCAN_FILE, base_path=hdf(top_ref, name, 'unbiased_1_full'), is_advanced=True,
+                 lock=tb_lock, test_cap_exclusion=True, distribution=True, full_model=False,
+                 fit_plot_pdf_name="Fit References/{}/unbiased_reduced_model.pdf".format(name), plot=True,
+                 **correction_args)
+    analyze_data(raw_data=R13_2_SCAN_FILE, base_path=hdf(top_ref, name, 'biased_80_V_full'), is_advanced=True,
+                 lock=tb_lock, distribution=True, test_cap_exclusion=True, full_model=False, plot=True,
+                 fit_plot_pdf_name="Fit References/{}/biased_reduced_model.pdf".format(name),
+                 **correction_args)
+    analyze_data(raw_data=R13_2_SCAN_FILE, base_path=hdf(top_ref, name, 'unbiased_1_full_model'),
+                 is_advanced=True,
+                 lock=tb_lock, test_cap_exclusion=True, distribution=True,
+                 fit_plot_pdf_name="Fit References/{}/unbiased_full_model.pdf".format(name), plot=True,
+                 **correction_args)
+    analyze_data(raw_data=R13_2_SCAN_FILE, base_path=hdf(top_ref, name, 'biased_80_V_full_model'),
+                 is_advanced=True,
+                 lock=tb_lock, distribution=True, test_cap_exclusion=True,
+                 fit_plot_pdf_name="Fit References/{}/biased_full_model.pdf".format(name), plot=True,
+                 **correction_args)
+
+    analyze_data(raw_data=R13_2_SCAN_FILE, base_path=hdf(top_ref, name, 'inter_unbiased_full'),
+                 lock=tb_lock, distribution=True, test_cap_exclusion=True,
+                 is_advanced=True, full_model=False, is_inter_pixel=True,
+                 total_cap_file=R13_2_SCAN_FILE,
+                 total_cap_group=hdf(top_ref, name, 'unbiased_1_full_model/total_cap'),
+                 **correction_args)
+
+    analyze_data(
+        raw_data=R13_2_SCAN_FILE,
+        base_path=hdf(top_ref, name, "inter_biased_M_80_V_full"),
+        lock=tb_lock,
+        distribution=True,
+        test_cap_exclusion=True,
+        is_advanced=True,
+        full_model=False,
+        is_inter_pixel=True,
+        total_cap_file=R13_2_SCAN_FILE,
+        total_cap_group=hdf(top_ref, name, "biased_80_V_full_model/total_cap"),
+        **correction_args
+    )
+    analyze_data(
+        raw_data=R13_2_SCAN_FILE,
+        base_path=hdf(top_ref, name, "inter_unbiased_full_model"),
+        lock=tb_lock,
+        distribution=True,
+        test_cap_exclusion=True,
+        is_advanced=True,
+        full_model=True,
+        is_inter_pixel=True,
+        total_cap_file=R13_2_SCAN_FILE,
+        total_cap_group=hdf(top_ref, name, "unbiased_1_full_model/total_cap"),
+        **correction_args
+    )
+    analyze_data(
+        raw_data=R13_2_SCAN_FILE,
+        base_path=hdf(top_ref, name, "inter_biased_M_80_V_full_model"),
+        lock=tb_lock,
+        distribution=True,
+        test_cap_exclusion=True,
+        is_advanced=True,
+        full_model=True,
+        is_inter_pixel=True,
+        total_cap_file=R13_2_SCAN_FILE,
+        total_cap_group=hdf(top_ref, name, "biased_80_V_full_model/total_cap"),
+        **correction_args
+    )
+
+    analyze_data(raw_data=R13_2_SCAN_FILE, base_path=hdf(top_ref, name, 'inter_unbiased_full_renew'),
+                 lock=tb_lock, distribution=True, test_cap_exclusion=True,
+                 is_advanced=True, full_model=False, is_inter_pixel=True,
+                 total_cap_file=R13_2_SCAN_FILE,
+                 total_cap_group=hdf(top_ref, name, 'unbiased_1_full_model/total_cap'),
+                 **correction_args)
+    analyze_data(raw_data=R13_2_SCAN_FILE, base_path=hdf(top_ref, name, 'inter_biased_M_80_V_full_renew'),
+                 lock=tb_lock, distribution=True, test_cap_exclusion=True,
+                 is_advanced=True, full_model=False, is_inter_pixel=True,
+                 total_cap_file=R13_2_SCAN_FILE,
+                 total_cap_group=hdf(top_ref, name, 'biased_80_V_full_model/total_cap'),
+                 **correction_args)
+    analyze_data(raw_data=R13_2_SCAN_FILE, base_path=hdf(top_ref, name, 'inter_unbiased_full_renew_model'),
+                 lock=tb_lock, distribution=True, test_cap_exclusion=True,
+                 is_advanced=True, full_model=True, is_inter_pixel=True,
+                 total_cap_file=R13_2_SCAN_FILE,
+                 total_cap_group=hdf(top_ref, name, 'unbiased_1_full_model/total_cap'),
+                 **correction_args)
+    analyze_data(raw_data=R13_2_SCAN_FILE, base_path=hdf(top_ref, name, 'inter_biased_M_80_V_full_renew_model'),
+                 lock=tb_lock, distribution=True, test_cap_exclusion=True,
+                 is_advanced=True, full_model=True, is_inter_pixel=True,
+                 total_cap_file=R13_2_SCAN_FILE,
+                 total_cap_group=hdf(top_ref, name, 'biased_80_V_full_model/total_cap'),
+                 **correction_args)
+
+    analyze_data(raw_data=R13_2_SCAN_FILE, base_path=hdf(top_ref, name, 'inter_unbiased_renew_Extended_full'),
+                 lock=tb_lock, distribution=True, test_cap_exclusion=True,
+                 is_advanced=True, full_model=False, is_inter_pixel=True,
+                 total_cap_file=R13_2_SCAN_FILE,
+                 total_cap_group=hdf(top_ref, name, 'unbiased_1_full_model/total_cap'),
+                 **correction_args)
+    analyze_data(raw_data=R13_2_SCAN_FILE,
+                 base_path=hdf(top_ref, name, 'inter_biased_M_80_V_renew_Extended_full'),
+                 lock=tb_lock, distribution=True, test_cap_exclusion=True,
+                 is_advanced=True, full_model=False, is_inter_pixel=True,
+                 total_cap_file=R13_2_SCAN_FILE,
+                 total_cap_group=hdf(top_ref, name, 'biased_80_V_full_model/total_cap'),
+                 **correction_args)
+    analyze_data(raw_data=R13_2_SCAN_FILE,
+                 base_path=hdf(top_ref, name, 'inter_unbiased_renew_Extended_full_model'),
+                 lock=tb_lock, distribution=True, test_cap_exclusion=True,
+                 is_advanced=True, full_model=True, is_inter_pixel=True,
+                 total_cap_file=R13_2_SCAN_FILE,
+                 total_cap_group=hdf(top_ref, name, 'unbiased_1_full_model/total_cap'),
+                 **correction_args)
+    analyze_data(raw_data=R13_2_SCAN_FILE,
+                 base_path=hdf(top_ref, name, 'inter_biased_M_80_V_renew_Extended_full_model'),
+                 lock=tb_lock, distribution=True, test_cap_exclusion=True,
+                 is_advanced=True, full_model=True, is_inter_pixel=True,
+                 total_cap_file=R13_2_SCAN_FILE,
+                 total_cap_group=hdf(top_ref, name, 'biased_80_V_full_model/total_cap'),
+                 **correction_args)
+
+    print("CV -", display_name)
+    analyze_data(raw_data=R13_2_SCAN_FILE, base_path=hdf(top_ref, name, 'C_V_Characteristic_refined'),
+                 is_advanced=True, full_model=False, is_cv=True,
+                 lock=tb_lock,
+                 **r13_depletion_args)
+
+    print("Finished", display_name)
+
+
+def e1_analysator_second(tb_lock, correction_args, **kwargs):
+    import pixcap65.concurrency
+    name = "E1"
+    display_name = name + SECOND_LABEL
+    top_ref = "Reference"
+    print("Analyze", display_name)
+    print(AUTHKEY_OUTPUT, mp.current_process().authkey)
+
+    _ = pixcap65.concurrency.get_manager(**kwargs)
+    e1_depletion_args = {
+        "first_boundaries": (-100, -35),
+        "second_boundaries": (-5, 0),
+        "distribution": True,
+        "apply_contour": False,
+        "apply_contours": False,
+        "mask_pixel": data_constants.e1_pixel_mask,
+        "chip_group_name": hdf(top_ref, name, 'sensor'),
+        "apply_doping": True,
+    }
+    e1_depletion_args.update(**correction_args)
+    synchronize_full_model(E1_2_SCAN_FILE, top_ref, name, 80, tb_lock)
+
+    analyze_data(raw_data=E1_2_SCAN_FILE, base_path=hdf(top_ref, name, 'unbiased_full'), is_advanced=True,
+                 lock=tb_lock,
+                 full_model=False, distribution=True, test_cap_exclusion=True, mask_pixel=data_constants.e1_pixel_mask,
+                 **correction_args)
+    analyze_data(raw_data=E1_2_SCAN_FILE, base_path=hdf(top_ref, name, 'biased_80_V_full'), is_advanced=True,
+                 lock=tb_lock,
+                 full_model=False, distribution=True, test_cap_exclusion=True, mask_pixel=data_constants.e1_pixel_mask,
+                 **correction_args)
+    analyze_data(raw_data=E1_2_SCAN_FILE, base_path=hdf(top_ref, name, 'unbiased_full_model'), is_advanced=True,
+                 lock=tb_lock,
+                 distribution=True, test_cap_exclusion=True, mask_pixel=data_constants.e1_pixel_mask, **correction_args)
+    analyze_data(raw_data=E1_2_SCAN_FILE, base_path=hdf(top_ref, name, 'biased_80_V_full_model'),
+                 is_advanced=True, lock=tb_lock,
+                 distribution=True, test_cap_exclusion=True, mask_pixel=data_constants.e1_pixel_mask, **correction_args)
+
+    analyze_data(raw_data=E1_2_SCAN_FILE, base_path=hdf(top_ref, name, 'inter_unbiased_full'),
+                 is_advanced=True, full_model=False, is_inter_pixel=True, lock=tb_lock,
+                 distribution=True, test_cap_exclusion=True, mask_pixel=data_constants.e1_pixel_mask,
+                 total_cap_file=E1_2_SCAN_FILE,
+                 total_cap_group=hdf(top_ref, name, 'unbiased_full/total_cap'),
+                 **correction_args)
+    analyze_data(raw_data=E1_2_SCAN_FILE, base_path=hdf(top_ref, name, 'inter_biased_M_80_V_full'),
+                 is_advanced=True, full_model=False, is_inter_pixel=True, lock=tb_lock,
+                 distribution=True, test_cap_exclusion=True, mask_pixel=data_constants.e1_pixel_mask,
+                 total_cap_file=E1_2_SCAN_FILE,
+                 total_cap_group=hdf(top_ref, name, 'biased_80_V_full/total_cap'),
+                 **correction_args)
+    analyze_data(raw_data=E1_2_SCAN_FILE, base_path=hdf(top_ref, name, 'inter_unbiased_full_model'),
+                 is_advanced=True, full_model=True, is_inter_pixel=True, lock=tb_lock,
+                 distribution=True, test_cap_exclusion=True, mask_pixel=data_constants.e1_pixel_mask,
+                 total_cap_file=E1_2_SCAN_FILE,
+                 total_cap_group=hdf(top_ref, name, 'unbiased_full/total_cap'),
+                 **correction_args)
+    analyze_data(raw_data=E1_2_SCAN_FILE, base_path=hdf(top_ref, name, 'inter_biased_M_80_V_full_model'),
+                 is_advanced=True, full_model=True, is_inter_pixel=True, lock=tb_lock,
+                 distribution=True, test_cap_exclusion=True, mask_pixel=data_constants.e1_pixel_mask,
+                 total_cap_file=E1_2_SCAN_FILE,
+                 total_cap_group=hdf(top_ref, name, 'biased_80_V_full/total_cap'),
+                 **correction_args)
+
+    analyze_data(raw_data=E1_2_SCAN_FILE, base_path=hdf(top_ref, name, 'C_V_Characteristic_refined'),
+                 is_advanced=True, full_model=False, is_cv=True, use_corrected=True,
+                 lock=tb_lock, test_cap_exclusion=True,
+                 **e1_depletion_args)
+
+    for type_name in data_constants.e1_pixel_groups.keys():
+        with synchronized_process_open_file(E1_2_SCAN_FILE, mode='a', lock=tb_lock) as h5_file:
+            h5_file.copy_node(where="/Reference/E1", newname="unbiased_full_model_{}".format(type_name),
+                              name="unbiased_full_{}".format(type_name), recursive=True, overwrite=True)
+            h5_file.copy_node(where="/Reference/E1", newname="biased_80_V_full_model_{}".format(type_name),
+                              name="biased_80_V_full_{}".format(type_name), recursive=True, overwrite=True)
+            h5_file.copy_node(where="/Reference/E1", newname="inter_unbiased_full_model_{}".format(type_name),
+                              name="inter_unbiased_full_{}".format(type_name), recursive=True, overwrite=True)
+            h5_file.copy_node(where="/Reference/E1", newname="inter_biased_M_80_V_full_model_{}".format(type_name),
+                              name="inter_biased_M_80_V_full_{}".format(type_name), recursive=True, overwrite=True)
+
+        analyze_data(raw_data=E1_2_SCAN_FILE, base_path="{}/{}/unbiased_full_{}".format(top_ref, name, type_name),
+                     is_advanced=True, lock=tb_lock, full_model=False, distribution=True, test_cap_exclusion=True,
+                     mask_pixel=data_constants.e1_pixel_mask,
+                     **correction_args)
+        analyze_data(raw_data=E1_2_SCAN_FILE, base_path="{}/{}/biased_80_V_full_{}".format(top_ref, name, type_name),
+                     is_advanced=True, lock=tb_lock, full_model=False, distribution=True, test_cap_exclusion=True,
+                     mask_pixel=data_constants.e1_pixel_mask,
+                     **correction_args)
+        analyze_data(raw_data=E1_2_SCAN_FILE, base_path="{}/{}/unbiased_full_model_{}".format(top_ref, name, type_name),
+                     is_advanced=True, lock=tb_lock, distribution=True, test_cap_exclusion=True,
+                     mask_pixel=data_constants.e1_pixel_mask,
+                     **correction_args)
+        analyze_data(raw_data=E1_2_SCAN_FILE,
+                     base_path="{}/{}/biased_80_V_full_model_{}".format(top_ref, name, type_name),
+                     is_advanced=True, lock=tb_lock, distribution=True, test_cap_exclusion=True,
+                     mask_pixel=data_constants.e1_pixel_mask,
+                     **correction_args)
+
+        analyze_data(raw_data=E1_2_SCAN_FILE, base_path="{}/{}/inter_unbiased_full_{}".format(top_ref, name, type_name),
+                     is_advanced=True, full_model=False, is_inter_pixel=True, lock=tb_lock,
+                     distribution=True, test_cap_exclusion=True, mask_pixel=data_constants.e1_pixel_mask,
+                     total_cap_file=E1_2_SCAN_FILE,
+                     total_cap_group="{}/{}/unbiased_full_model_{}/total_cap".format(top_ref, name, type_name),
+                     **correction_args)
+        analyze_data(raw_data=E1_2_SCAN_FILE,
+                     base_path="{}/{}/inter_biased_M_80_V_full_{}".format(top_ref, name, type_name),
+                     is_advanced=True, full_model=False, is_inter_pixel=True, lock=tb_lock,
+                     distribution=True, test_cap_exclusion=True, mask_pixel=data_constants.e1_pixel_mask,
+                     total_cap_file=E1_2_SCAN_FILE,
+                     total_cap_group="{}/{}/biased_80_V_full_model_{}/total_cap".format(top_ref, name, type_name),
+                     **correction_args)
+        analyze_data(raw_data=E1_2_SCAN_FILE,
+                     base_path="{}/{}/inter_unbiased_full_model_{}".format(top_ref, name, type_name),
+                     is_advanced=True, full_model=True, is_inter_pixel=True, lock=tb_lock,
+                     distribution=True, test_cap_exclusion=True, mask_pixel=data_constants.e1_pixel_mask,
+                     total_cap_file=E1_2_SCAN_FILE,
+                     total_cap_group="{}/{}/unbiased_full_model_{}/total_cap".format(top_ref, name, type_name),
+                     **correction_args)
+        analyze_data(raw_data=E1_2_SCAN_FILE,
+                     base_path="{}/{}/inter_biased_M_80_V_full_model_{}".format(top_ref, name, type_name),
+                     is_advanced=True, full_model=True, is_inter_pixel=True, lock=tb_lock,
+                     distribution=True, test_cap_exclusion=True, mask_pixel=data_constants.e1_pixel_mask,
+                     total_cap_file=E1_2_SCAN_FILE,
+                     total_cap_group="{}/{}/biased_80_V_full_model_{}/total_cap".format(top_ref, name, type_name),
+                     **correction_args)
+
+        actual_depletion_args = data_constants.e1_pixel_depletion_args[type_name]
+        actual_depletion_args.update(**correction_args)
+        actual_depletion_args.update(chip_group_name=hdf(top_ref, name, 'sensor'), apply_doping=True)
+
+        # with PdfPages("Fit References/{}/Renew_C_V_Verify_{}.pdf".format(name, type_name)) as pdf:
+        analyze_data(raw_data=E1_2_SCAN_FILE,
+                     base_path="{}/{}/C_V_Characteristic_refined_{}".format(top_ref, name, type_name),
+                     is_advanced=True, full_model=False, is_cv=True, use_corrected=True,
+                     test_cap_exclusion=True,
+                     lock=tb_lock, **actual_depletion_args)
+
+    print("Finished", name)
 
 
 def x1_analysator_first(tb_lock, correction_args, **kwargs):
@@ -321,6 +657,310 @@ def x1_analysator_first(tb_lock, correction_args, **kwargs):
     print(LOG_FINISHED_ANALYSIS, name)
 
 
+def x1_analysator_second(tb_lock, correction_args, **kwargs):
+    import pixcap65.concurrency
+    name = "X1"
+    display_name = name + SECOND_LABEL
+    top_ref = "Thesis/ATLAS_ITk"
+    print("Analyze", display_name)
+    print(threading.get_native_id())
+    print(mp.current_process().name)
+    print(mp.current_process().pid)
+    print(AUTHKEY_OUTPUT, mp.current_process().authkey)
+
+    primary_manager = pixcap65.concurrency.get_manager(**kwargs)
+    x1_depletion_args = {
+        "first_boundaries": [(-60, -20), (-83, -77.5)],
+        "second_boundaries": [(-0.6, 0), (-77.5, -67.5)],
+        "distribution": True,
+        "apply_contour": False,
+        "apply_contours": False,
+        "chip_group_name": hdf(top_ref, name, 'sensor'),
+        "apply_doping": True
+    }
+    x1_depletion_args.update(**correction_args)
+    print("The manager address:", primary_manager.address)
+
+    synchronize_full_model(X1_SCAN_2_FILE, top_ref, name, 80, tb_lock, unbiased_group="unbiased_61_full", )
+
+    with synchronized_process_open_file("packaged/data/X1_12_Renew_Scan.h5", 'a', lock=tb_lock) as h5_file:
+        h5_file.copy_node(where="/Thesis/ATLAS_ITk/X1", name="biased_200_V_full", newname="biased_200_V_full_model",
+                          overwrite=True, recursive=True)
+        h5_file.copy_node(where="/Thesis/ATLAS_ITk/X1", name="inter_unbiased_full_renew_Extended",
+                          newname="inter_unbiased_full_model_renew_Extended", overwrite=True, recursive=True)
+        h5_file.copy_node(where="/Thesis/ATLAS_ITk/X1", name="inter_biased_M_200_V_full_renew_Extended",
+                          newname="inter_biased_M_200_V_full_model_renew_Extended", overwrite=True, recursive=True)
+        h5_file.copy_node(where="/Thesis/ATLAS_ITk/X1", newname="inter_biased_M_80_V_full_model_Extended__sides",
+                          name="inter_biased_M_80_V_full_Extended__sides", overwrite=True, recursive=True)
+        h5_file.copy_node(where="/Thesis/ATLAS_ITk/X1", newname="inter_biased_M_80_V_full_model_Extended__diagonals",
+                          name="inter_biased_M_80_V_full_Extended__diagonals", overwrite=True, recursive=True)
+        h5_file.copy_node(where="/Thesis/ATLAS_ITk/X1", newname="inter_biased_M_80_V_full_model_Extended__tops",
+                          name="inter_biased_M_80_V_full_Extended__tops", overwrite=True, recursive=True)
+        # h5_file.copy_node(where="/Thesis/ATLAS_ITk/X1", newname="inter_biased_M_80_V_full_model_Extended",
+        #              name="inter_biased_M_80_V_full_Extended", overwrite=True, recursive=True)
+        h5_file.copy_node(where="/Thesis/ATLAS_ITk/X1", newname="inter_biased_M_80_V_full_model_Extended_2__sides",
+                          name="inter_biased_M_80_V_full_Extended_2__sides", overwrite=True, recursive=True)
+        h5_file.copy_node(where="/Thesis/ATLAS_ITk/X1", newname="inter_biased_M_80_V_full_model_Extended_2__diagonals",
+                          name="inter_biased_M_80_V_full_Extended_2__diagonals", overwrite=True, recursive=True)
+        h5_file.copy_node(where="/Thesis/ATLAS_ITk/X1", newname="inter_biased_M_80_V_full_model_Extended_2__tops",
+                          name="inter_biased_M_80_V_full_Extended_2__tops", overwrite=True, recursive=True)
+        # h5_file.copy_node(where="/Thesis/ATLAS_ITk/X1", newname="inter_biased_M_80_V_full_model_Extended",
+        #                   name="inter_biased_M_80_V_full_Extended", overwrite=True, recursive=True)
+
+    analyze_data(raw_data=X1_SCAN_2_FILE, base_path=hdf(top_ref, name, 'unbiased_61_full'), is_advanced=True,
+                 full_model=False,
+                 distribution=True, test_cap_exclusion=True, mask_pixel=data_constants.x1_second_pixel_mask,
+                 lock=tb_lock, fit_plot_pdf_name="Fit References/{}/unbiased_reduced_model.pdf".format(name), plot=True,
+                 **correction_args)
+    analyze_data(raw_data=X1_SCAN_2_FILE, base_path=hdf(top_ref, name, 'biased_80_V_full'), is_advanced=True,
+                 full_model=False,
+                 distribution=True, test_cap_exclusion=True, mask_pixel=data_constants.x1_second_pixel_mask,
+                 fit_plot_pdf_name="Fit References/{}/biased_reduced_model.pdf".format(name), plot=True,
+                 lock=tb_lock, **correction_args)
+    analyze_data(raw_data="packaged/data/X1_12_Renew_Scan.h5",
+                 base_path=hdf(top_ref, name, 'biased_200_V_full'), is_advanced=True,
+                 full_model=False,
+                 distribution=True, test_cap_exclusion=True, mask_pixel=data_constants.x1_second_pixel_mask,
+                 lock=tb_lock, **correction_args)
+    analyze_data(raw_data=X1_SCAN_2_FILE, base_path=hdf(top_ref, name, 'unbiased_61_full_model'),
+                 is_advanced=True,
+                 distribution=True, test_cap_exclusion=True, mask_pixel=data_constants.x1_second_pixel_mask,
+                 lock=tb_lock, fit_plot_pdf_name="Fit References/{}/unbiased_full_model.pdf".format(name), plot=True,
+                 **correction_args)
+    analyze_data(raw_data=X1_SCAN_2_FILE, base_path=hdf(top_ref, name, 'biased_80_V_full_model'),
+                 is_advanced=True,
+                 distribution=True, test_cap_exclusion=True, mask_pixel=data_constants.x1_second_pixel_mask,
+                 fit_plot_pdf_name="Fit References/{}/biased_full_model.pdf".format(name), plot=True,
+                 lock=tb_lock, **correction_args)
+    analyze_data(raw_data="packaged/data/X1_12_Renew_Scan.h5",
+                 base_path=hdf(top_ref, name, 'biased_200_V_full_model'),
+                 is_advanced=True,
+                 distribution=True, test_cap_exclusion=True, mask_pixel=data_constants.x1_second_pixel_mask,
+                 lock=tb_lock, **correction_args)
+
+    analyze_data(raw_data=X1_SCAN_2_FILE, base_path=hdf(top_ref, name, 'inter_unbiased_full'),
+                 is_advanced=True, full_model=False, is_inter_pixel=True,
+                 distribution=True, test_cap_exclusion=True, mask_pixel=data_constants.x1_second_pixel_mask,
+                 lock=tb_lock,
+                 total_cap_file=X1_SCAN_2_FILE,
+                 total_cap_group=hdf(top_ref, name, 'unbiased_61_full_model/total_cap'),
+                 **correction_args)
+    analyze_data(raw_data=X1_SCAN_2_FILE, base_path=hdf(top_ref, name, 'inter_biased_M_80_V_full'),
+                 is_advanced=True, full_model=False, is_inter_pixel=True, distribution=True, test_cap_exclusion=True,
+                 mask_pixel=data_constants.x1_second_pixel_mask, total_cap_file=X1_SCAN_2_FILE,
+                 lock=tb_lock, total_cap_group=hdf(top_ref, name, 'biased_80_V_full_model/total_cap'),
+                 **correction_args)
+    analyze_data(raw_data=X1_SCAN_2_FILE, base_path=hdf(top_ref, name, 'inter_unbiased_full_model'),
+                 is_advanced=True, full_model=True, is_inter_pixel=True,
+                 distribution=True, test_cap_exclusion=True, mask_pixel=data_constants.x1_second_pixel_mask,
+                 lock=tb_lock,
+                 total_cap_file=X1_SCAN_2_FILE,
+                 total_cap_group=hdf(top_ref, name, 'unbiased_61_full_model/total_cap'),
+                 **correction_args)
+    analyze_data(raw_data=X1_SCAN_2_FILE, base_path=hdf(top_ref, name, 'inter_biased_M_80_V_full_model'),
+                 is_advanced=True, full_model=True, is_inter_pixel=True, distribution=True, test_cap_exclusion=True,
+                 mask_pixel=data_constants.x1_second_pixel_mask, total_cap_file=X1_SCAN_2_FILE,
+                 lock=tb_lock, total_cap_group=hdf(top_ref, name, 'biased_80_V_full_model/total_cap'),
+                 **correction_args)
+
+    analyze_data(raw_data="packaged/data/X1_12_Renew_Scan.h5",
+                 base_path=hdf(top_ref, name, 'inter_unbiased_full_renew_Extended'),
+                 is_advanced=True, full_model=False, is_inter_pixel=True,
+                 distribution=True, test_cap_exclusion=True, mask_pixel=data_constants.x1_second_pixel_mask,
+                 lock=tb_lock,
+                 total_cap_file=X1_SCAN_2_FILE,
+                 total_cap_group=hdf(top_ref, name, 'unbiased_61_full_model/total_cap'),
+                 **correction_args)
+    analyze_data(raw_data="packaged/data/X1_12_Renew_Scan.h5",
+                 base_path=hdf(top_ref, name, 'inter_unbiased_full_model_renew_Extended'),
+                 is_advanced=True, full_model=True, is_inter_pixel=True,
+                 distribution=True, test_cap_exclusion=True, mask_pixel=data_constants.x1_second_pixel_mask,
+                 lock=tb_lock,
+                 total_cap_file=X1_SCAN_2_FILE,
+                 total_cap_group=hdf(top_ref, name, 'unbiased_61_full_model/total_cap'),
+                 **correction_args)
+    analyze_data(raw_data="packaged/data/X1_12_Renew_Scan.h5",
+                 base_path=hdf(top_ref, name, 'inter_biased_M_200_V_full_renew_Extended'),
+                 is_advanced=True, full_model=False, is_inter_pixel=True,
+                 distribution=True, test_cap_exclusion=True, mask_pixel=data_constants.x1_second_pixel_mask,
+                 lock=tb_lock,
+                 total_cap_file="packaged/data/X1_12_Renew_Scan.h5",
+                 total_cap_group=hdf(top_ref, name, 'biased_200_V_full_model/total_cap'),
+                 **correction_args)
+    analyze_data(raw_data="packaged/data/X1_12_Renew_Scan.h5",
+                 base_path=hdf(top_ref, name, 'inter_biased_M_200_V_full_model_renew_Extended'),
+                 is_advanced=True, full_model=True, is_inter_pixel=True,
+                 distribution=True, test_cap_exclusion=True, mask_pixel=data_constants.x1_second_pixel_mask,
+                 lock=tb_lock,
+                 total_cap_file="packaged/data/X1_12_Renew_Scan.h5",
+                 total_cap_group=hdf(top_ref, name, 'biased_200_V_full_model/total_cap'),
+                 **correction_args)
+
+    analyze_data(raw_data="packaged/data/X1_12_Renew_Scan.h5",
+                 base_path=hdf(top_ref, name, 'inter_biased_M_80_V_full_model_Extended__sides'),
+                 is_advanced=True, full_model=True, is_inter_pixel=True,
+                 test_cap_exclusion=True, distribution=True,
+                 lock=tb_lock, mask_pixel=data_constants.x1_second_pixel_mask,
+                 total_cap_file=X1_SCAN_2_FILE,
+                 total_cap_group=hdf(top_ref, name, 'biased_80_V_full_model/total_cap'),
+                 in_cap_file=X1_SCAN_2_FILE, in_cap_group=hdf(top_ref, name, 'inter_biased_M_80_V_full/inter_cap'),
+                 inter_pix_id=20000, **correction_args)
+    analyze_data(raw_data="packaged/data/X1_12_Renew_Scan.h5",
+                 base_path=hdf(top_ref, name, 'inter_biased_M_80_V_full_Extended__sides'),
+                 is_advanced=True, full_model=False, is_inter_pixel=True,
+                 test_cap_exclusion=True, distribution=True,
+                 lock=tb_lock, mask_pixel=data_constants.x1_second_pixel_mask,
+                 total_cap_file=X1_SCAN_2_FILE,
+                 total_cap_group=hdf(top_ref, name, 'biased_80_V_full_model/total_cap'),
+                 in_cap_file=X1_SCAN_2_FILE, in_cap_group=hdf(top_ref, name, 'inter_biased_M_80_V_full/inter_cap'),
+                 inter_pix_id=20000, **correction_args)
+    analyze_data(raw_data="packaged/data/X1_12_Renew_Scan.h5",
+                 base_path=hdf(top_ref, name, 'inter_biased_M_80_V_full_model_Extended__diagonals'),
+                 is_advanced=True, full_model=True, is_inter_pixel=True,
+                 test_cap_exclusion=True, distribution=True,
+                 lock=tb_lock, mask_pixel=data_constants.x1_second_pixel_mask,
+                 total_cap_file=X1_SCAN_2_FILE,
+                 total_cap_group=hdf(top_ref, name, 'biased_80_V_full_model/total_cap'),
+                 in_cap_file=X1_SCAN_2_FILE, in_cap_group=hdf(top_ref, name, 'inter_biased_M_80_V_full/inter_cap'),
+                 inter_pix_id=18000, **correction_args)
+    analyze_data(raw_data="packaged/data/X1_12_Renew_Scan.h5",
+                 base_path=hdf(top_ref, name, 'inter_biased_M_80_V_full_Extended__diagonals'),
+                 is_advanced=True, full_model=False, is_inter_pixel=True,
+                 test_cap_exclusion=True, distribution=True,
+                 lock=tb_lock, mask_pixel=data_constants.x1_second_pixel_mask,
+                 total_cap_file=X1_SCAN_2_FILE,
+                 total_cap_group=hdf(top_ref, name, 'biased_80_V_full_model/total_cap'),
+                 in_cap_file=X1_SCAN_2_FILE, in_cap_group=hdf(top_ref, name, 'inter_biased_M_80_V_full/inter_cap'),
+                 inter_pix_id=18000, **correction_args)
+    analyze_data(raw_data="packaged/data/X1_12_Renew_Scan.h5",
+                 base_path=hdf(top_ref, name, 'inter_biased_M_80_V_full_model_Extended__tops'),
+                 is_advanced=True, full_model=True, is_inter_pixel=True,
+                 test_cap_exclusion=True, distribution=True,
+                 lock=tb_lock, mask_pixel=data_constants.x1_second_pixel_mask,
+                 total_cap_file=X1_SCAN_2_FILE,
+                 total_cap_group=hdf(top_ref, name, 'biased_80_V_full_model/total_cap'),
+                 in_cap_file=X1_SCAN_2_FILE, in_cap_group=hdf(top_ref, name, 'inter_biased_M_80_V_full/inter_cap'),
+                 inter_pix_id=19000, **correction_args)
+    analyze_data(raw_data="packaged/data/X1_12_Renew_Scan.h5",
+                 base_path=hdf(top_ref, name, 'inter_biased_M_80_V_full_Extended__tops'),
+                 is_advanced=True, full_model=False, is_inter_pixel=True,
+                 test_cap_exclusion=True, distribution=True,
+                 lock=tb_lock, mask_pixel=data_constants.x1_second_pixel_mask,
+                 total_cap_file=X1_SCAN_2_FILE,
+                 total_cap_group=hdf(top_ref, name, 'biased_80_V_full_model/total_cap'),
+                 in_cap_file=X1_SCAN_2_FILE, in_cap_group=hdf(top_ref, name, 'inter_biased_M_80_V_full/inter_cap'),
+                 inter_pix_id=19000, **correction_args)
+
+    analyze_data(raw_data="packaged/data/X1_12_Renew_Scan.h5",
+                 base_path=hdf(top_ref, name, 'inter_biased_M_80_V_full_model_Extended_2__sides'),
+                 is_advanced=True, full_model=True, is_inter_pixel=True,
+                 test_cap_exclusion=True, distribution=True,
+                 lock=tb_lock, mask_pixel=data_constants.x1_second_pixel_mask,
+                 total_cap_file=X1_SCAN_2_FILE,
+                 total_cap_group=hdf(top_ref, name, 'biased_80_V_full_model/total_cap'),
+                 in_cap_file=X1_SCAN_2_FILE, in_cap_group=hdf(top_ref, name, 'inter_biased_M_80_V_full/inter_cap'),
+                 inter_pix_id=20000, **correction_args)
+    analyze_data(raw_data="packaged/data/X1_12_Renew_Scan.h5",
+                 base_path=hdf(top_ref, name, 'inter_biased_M_80_V_full_Extended_2__sides'),
+                 is_advanced=True, full_model=False, is_inter_pixel=True,
+                 test_cap_exclusion=True, distribution=True,
+                 lock=tb_lock, mask_pixel=data_constants.x1_second_pixel_mask,
+                 total_cap_file=X1_SCAN_2_FILE,
+                 total_cap_group=hdf(top_ref, name, 'biased_80_V_full_model/total_cap'),
+                 in_cap_file=X1_SCAN_2_FILE, in_cap_group=hdf(top_ref, name, 'inter_biased_M_80_V_full/inter_cap'),
+                 inter_pix_id=20000, **correction_args)
+    analyze_data(raw_data="packaged/data/X1_12_Renew_Scan.h5",
+                 base_path=hdf(top_ref, name, 'inter_biased_M_80_V_full_model_Extended_2__diagonals'),
+                 is_advanced=True, full_model=True, is_inter_pixel=True,
+                 test_cap_exclusion=True, distribution=True,
+                 lock=tb_lock, mask_pixel=data_constants.x1_second_pixel_mask,
+                 total_cap_file=X1_SCAN_2_FILE,
+                 total_cap_group=hdf(top_ref, name, 'biased_80_V_full_model/total_cap'),
+                 in_cap_file=X1_SCAN_2_FILE, in_cap_group=hdf(top_ref, name, 'inter_biased_M_80_V_full/inter_cap'),
+                 inter_pix_id=18000, **correction_args)
+    analyze_data(raw_data="packaged/data/X1_12_Renew_Scan.h5",
+                 base_path=hdf(top_ref, name, 'inter_biased_M_80_V_full_Extended_2__diagonals'),
+                 is_advanced=True, full_model=False, is_inter_pixel=True,
+                 test_cap_exclusion=True, distribution=True,
+                 lock=tb_lock, mask_pixel=data_constants.x1_second_pixel_mask,
+                 total_cap_file=X1_SCAN_2_FILE,
+                 total_cap_group=hdf(top_ref, name, 'biased_80_V_full_model/total_cap'),
+                 in_cap_file=X1_SCAN_2_FILE, in_cap_group=hdf(top_ref, name, 'inter_biased_M_80_V_full/inter_cap'),
+                 inter_pix_id=18000, **correction_args)
+    analyze_data(raw_data="packaged/data/X1_12_Renew_Scan.h5",
+                 base_path=hdf(top_ref, name, 'inter_biased_M_80_V_full_model_Extended_2__tops'),
+                 is_advanced=True, full_model=True, is_inter_pixel=True,
+                 test_cap_exclusion=True, distribution=True,
+                 lock=tb_lock, mask_pixel=data_constants.x1_second_pixel_mask,
+                 total_cap_file=X1_SCAN_2_FILE,
+                 total_cap_group=hdf(top_ref, name, 'biased_80_V_full_model/total_cap'),
+                 in_cap_file=X1_SCAN_2_FILE, in_cap_group=hdf(top_ref, name, 'inter_biased_M_80_V_full/inter_cap'),
+                 inter_pix_id=19000, **correction_args)
+    analyze_data(raw_data="packaged/data/X1_12_Renew_Scan.h5",
+                 base_path=hdf(top_ref, name, 'inter_biased_M_80_V_full_Extended_2__tops'),
+                 is_advanced=True, full_model=False, is_inter_pixel=True,
+                 test_cap_exclusion=True, distribution=True,
+                 lock=tb_lock, mask_pixel=data_constants.x1_second_pixel_mask,
+                 total_cap_file=X1_SCAN_2_FILE,
+                 total_cap_group=hdf(top_ref, name, 'biased_80_V_full_model/total_cap'),
+                 in_cap_file=X1_SCAN_2_FILE, in_cap_group=hdf(top_ref, name, 'inter_biased_M_80_V_full/inter_cap'),
+                 inter_pix_id=19000, **correction_args)
+
+    print("CV -", display_name)
+    analyze_data(raw_data=X1_SCAN_2_FILE, base_path=hdf(top_ref, name, 'C_V_Characteristic_refined'),
+                 is_advanced=True, full_model=False, is_cv=True, use_corrected=True,
+                 test_cap_exclusion=True, mask_pixel=data_constants.x1_second_pixel_mask,
+                 lock=tb_lock,
+                 **x1_depletion_args)
+    x1_depletion_args = {
+        "first_boundaries": [(-60, -20), (-350, -150)],
+        "second_boundaries": [(-2.6, 0), (-72, -62)],
+        "distribution": False,
+        "apply_contour": False,
+        "apply_contours": False,
+        "chip_group_name": hdf(top_ref, name, 'sensor'),
+        "apply_doping": True
+    }
+    x1_depletion_args.update(**correction_args)
+    analyze_data(raw_data=X1_SCAN_2_FILE, base_path=hdf(top_ref, name, 'C_V_Characteristic_Second_Extended'),
+                 is_advanced=True, full_model=False, is_inter_pixel=False, is_cv=True, use_corrected=True,
+                 test_cap_exclusion=True, mask_pixel=data_constants.x1_second_pixel_mask, lock=tb_lock,
+                 **x1_depletion_args)
+    x1_depletion_args = {
+        "first_boundaries": [(-60, -20), (-350, -200), (-85, -75)],
+        "second_boundaries": [(-0.6, 0), (-69.8, -64), (-70, -60)],
+        "distribution": True,
+        "apply_contour": False,
+        "apply_contours": False,
+        "chip_group_name": hdf(top_ref, name, 'sensor'),
+        "apply_doping": True
+    }
+    x1_depletion_args.update(**correction_args)
+    with PdfPages("Fit References/X1/Combined_reference_fits_Extended_combined.pdf") as cv_pdf:
+        analyze_data(raw_data=X1_SCAN_2_FILE,
+                     base_path=hdf(top_ref, name, 'C_V_Characteristic_refined_Extended_Combined'),
+                     is_advanced=True, full_model=False, is_inter_pixel=False, is_cv=True, use_corrected=True,
+                     test_cap_exclusion=True, mask_pixel=data_constants.x1_second_pixel_mask,
+                     cv_fit_plot_pdf=cv_pdf,
+                     lock=tb_lock, **x1_depletion_args)
+
+    x1_depletion_args = {
+        "first_boundaries": [(-60, -20), (-350, -150)],
+        "second_boundaries": [(-2.6, 0), (-72, -66)],
+        "distribution": False,
+        "apply_contour": False,
+        "apply_contours": False,
+        "chip_group_name": hdf(top_ref, name, 'sensor'),
+        "apply_doping": True
+    }
+    x1_depletion_args.update(**correction_args)
+    analyze_data(raw_data=X1_SCAN_2_FILE, base_path=hdf(top_ref, name, 'C_V_Characteristic_Second_Extended'),
+                 is_advanced=True, full_model=False, is_inter_pixel=False, is_cv=True, use_corrected=True,
+                 test_cap_exclusion=True, mask_pixel=data_constants.x1_second_pixel_mask,
+                 lock=tb_lock, **x1_depletion_args)
+    print("Finished", display_name)
+
+
 def x2_analysator_first(tb_lock, correction_args, **kwargs):
     import pixcap65.concurrency
     name = "X2"
@@ -352,6 +992,81 @@ def x2_analysator_first(tb_lock, correction_args, **kwargs):
                      chip_group_name="ATLAS_Itk/X2/sensor", distribution=True, set_parasitic=False,
                      distribution_output_pdf=pdf, **correction_args)
     print(LOG_FINISHED_ANALYSIS, name)
+
+
+def x2_analysator_second(tb_lock, correction_args, **kwargs):
+    import pixcap65.concurrency
+    name = "X2"
+    display_name = name + SECOND_LABEL
+    top_ref = "Thesis/ATLAS_ITk"
+    print("Analyze", display_name)
+    print(threading.get_native_id())
+    print(mp.current_process().name)
+    print(mp.current_process().pid)
+    print(AUTHKEY_OUTPUT, mp.current_process().authkey)
+
+    _ = pixcap65.concurrency.get_manager(**kwargs)
+    x2_depletion_args = {
+        "first_boundaries": [(-59.5, -15), (-100, -60)],
+        "second_boundaries": [(-0.5, 0), (-75, -50)],
+        "distribution": True,
+        "apply_contour": False,
+        "apply_contours": False,
+        "chip_group_name": hdf(top_ref, name, 'sensor'),
+        "apply_doping": True,
+    }
+    x2_depletion_refined_args = {
+        "first_boundaries": [(-59.5, -15), (-350, -150), (-85, -75)],
+        "second_boundaries": [(-0.5, 0), (-70, -54), (-70, -60)],
+        "distribution": True,
+        "apply_contour": False,
+        "apply_contours": False,
+        "chip_group_name": hdf(top_ref, name, 'sensor'),
+        "apply_doping": True,
+    }
+    x2_depletion_args.update(**correction_args)
+    x2_depletion_refined_args.update(**correction_args)
+
+    synchronize_full_model(X2_SCAN_2_FILE, top_ref, name, 80, tb_lock, unbiased_group="unbiased_1_full")
+    synchronize_full_model(X2_SCAN_2_FILE, top_ref, name, 200, tb_lock)
+    with synchronized_process_open_file(X2_SCAN_2_FILE, mode='a', lock=tb_lock) as h5_file:
+        h5_file.copy_node(where="/Thesis/ATLAS_ITk/X2", newname="unbiased_1_full_model", name="unbiased_1_full",
+                          recursive=True, overwrite=True)
+        h5_file.copy_node(where="/Thesis/ATLAS_ITk/X2", newname="biased_80_V_full_model", name="biased_80_V_full",
+                          recursive=True, overwrite=True)
+
+    analyze_data(raw_data=X2_SCAN_2_FILE, base_path=hdf(top_ref, name, 'unbiased_1_full'), is_advanced=True,
+                 lock=tb_lock,
+                 full_model=False, distribution=True, **correction_args)
+    analyze_data(raw_data=X2_SCAN_2_FILE, base_path=hdf(top_ref, name, 'biased_80_V_full'), is_advanced=True,
+                 lock=tb_lock,
+                 full_model=False, distribution=True, **correction_args)
+    analyze_data(raw_data=X2_SCAN_2_FILE, base_path=hdf(top_ref, name, 'biased_200_V_full'), is_advanced=True,
+                 lock=tb_lock,
+                 full_model=False, distribution=True, **correction_args)
+    analyze_data(raw_data=X2_SCAN_2_FILE, base_path=hdf(top_ref, name, 'unbiased_1_full_model'),
+                 is_advanced=True, lock=tb_lock,
+                 distribution=True, **correction_args)
+    analyze_data(raw_data=X2_SCAN_2_FILE, base_path=hdf(top_ref, name, 'biased_80_V_full_model'),
+                 is_advanced=True, lock=tb_lock,
+                 distribution=True, **correction_args)
+    analyze_data(raw_data=X2_SCAN_2_FILE, base_path=hdf(top_ref, name, 'biased_200_V_full_model'),
+                 is_advanced=True, lock=tb_lock,
+                 distribution=True, **correction_args)
+
+    print("CV -", display_name)
+    # are both arguments available use_corrected and apply_correction!
+    analyze_data(raw_data=X2_SCAN_2_FILE, base_path=hdf(top_ref, name, 'C_V_Characteristic_refined'),
+                 is_advanced=True, full_model=False, is_cv=True, use_corrected=True, lock=tb_lock,
+                 **x2_depletion_args)
+    with PdfPages("Fit References/X2/Scan_extended_reference_fits.pdf") as cv_pdf:
+        analyze_data(raw_data=X2_SCAN_2_FILE,
+                     base_path=hdf(top_ref, name, 'C_V_Characteristic_refined_extended_renew_retry'),
+                     is_advanced=True, full_model=False, is_cv=True, use_corrected=True, lock=tb_lock,
+                     # cv_fit_plot_pdf=cv_pdf,
+                     **x2_depletion_refined_args)
+    # After all they could not be measured at all.
+    print("Finished -", display_name)
 
 
 def x4_analysator(tb_lock, correction_args, **kwargs):
@@ -451,6 +1166,338 @@ def x4_analysator(tb_lock, correction_args, **kwargs):
                      lock=tb_lock, **x4_depletion_args_refined)
     print(LOG_FINISHED_ANALYSIS, display_name)
 
+
+def x5_analysator(tb_lock, correction_args, **kwargs):
+    import pixcap65.concurrency
+    name = "X5"
+    display_name = name
+    top_ref = "Thesis/ATLAS_ITk"
+    print("Analyze", display_name)
+    print(threading.get_native_id())
+    print(mp.current_process().name)
+    print(mp.current_process().pid)
+    print(AUTHKEY_OUTPUT, mp.current_process().authkey)
+
+    _ = pixcap65.concurrency.get_manager(**kwargs)
+    # new data store for FBK:
+    np.unique(np.concat((
+        np.geomspace(0.1, 15, 15),
+        np.geomspace(15, 60, 35)
+    )))
+    np.unique(np.concat((
+        np.geomspace(0.1, 15, 15),
+        np.geomspace(15, 40, 20),
+        np.arange(40, 100.1, 1.25)
+    )))
+
+    synchronize_full_model(X5_SCAN_FILE, top_ref, name, 40, tb_lock)
+    synchronize_full_model(X5_SCAN_FILE, top_ref, name, 90, tb_lock)
+
+    # handle the full sensor analysis
+    analyze_data(raw_data=X5_SCAN_FILE, base_path=hdf(top_ref, name, 'unbiased_full'), is_advanced=True,
+                 distribution=True, full_model=False, mask_pixel=data_constants.x5_second_pixel_mask,
+                 test_cap_exclusion=True,
+                 lock=tb_lock, plot=True,
+                 fit_plot_pdf_name="Fit References/{}/unbiased_reduced_model_reference_fits.pdf".format(name),
+                 **correction_args)
+    analyze_data(raw_data=X5_SCAN_FILE, base_path=hdf(top_ref, name, 'biased_40_V_full'),
+                 is_advanced=True,
+                 distribution=True, full_model=False, mask_pixel=data_constants.x5_second_pixel_mask,
+                 test_cap_exclusion=True,
+                 lock=tb_lock, plot=True,
+                 fit_plot_pdf_name="Fit References/{}/biased_reduced_model_reference_fits.pdf".format(name),
+                 mask_lower=50e-15,
+                 **correction_args)
+    analyze_data(raw_data=X5_SCAN_FILE, base_path=hdf(top_ref, name, 'biased_90_V_full'),
+                 is_advanced=True,
+                 distribution=True, full_model=False, mask_pixel=data_constants.x5_second_pixel_mask,
+                 test_cap_exclusion=True,
+                 lock=tb_lock,
+                 # mask_lower=50e-15,
+                 **correction_args)
+    analyze_data(raw_data=X5_SCAN_FILE, base_path=hdf(top_ref, name, 'unbiased_full_model'),
+                 is_advanced=True,
+                 distribution=True, mask_pixel=data_constants.x5_second_pixel_mask, test_cap_exclusion=True,
+                 lock=tb_lock, plot=True,
+                 fit_plot_pdf_name="Fit References/{}/unbiased_full_model_reference_fits.pdf".format(name),
+                 **correction_args)
+    analyze_data(raw_data=X5_SCAN_FILE, base_path=hdf(top_ref, name, 'biased_40_V_full_model'),
+                 is_advanced=True, full_model=True,
+                 distribution=True, mask_pixel=data_constants.x5_second_pixel_mask, test_cap_exclusion=True,
+                 lock=tb_lock, mask_lower=51.5e-15,
+                 **correction_args)
+    analyze_data(raw_data=X5_SCAN_FILE, base_path=hdf(top_ref, name, 'biased_90_V_full_model'),
+                 is_advanced=True,
+                 distribution=True, mask_pixel=data_constants.x5_second_pixel_mask, test_cap_exclusion=True,
+                 lock=tb_lock,
+                 # mask_lower=50e-15,
+                 **correction_args)
+
+    # handle the inter-pix analysis
+    analyze_data(raw_data=X5_SCAN_FILE, base_path=hdf(top_ref, name, 'inter_unbiased_full'),
+                 is_advanced=True, full_model=False, is_inter_pixel=True,
+                 mask_pixel=data_constants.x5_second_pixel_mask, test_cap_exclusion=True, distribution=True,
+                 total_cap_file=X5_SCAN_FILE,
+                 lock=tb_lock,
+                 total_cap_group=hdf(top_ref, name, 'unbiased_full_model/total_cap'),
+                 **correction_args)
+    analyze_data(raw_data=X5_SCAN_FILE, base_path=hdf(top_ref, name, 'inter_biased_M_40_V_full'),
+                 is_advanced=True, full_model=False, is_inter_pixel=True,
+                 mask_pixel=data_constants.x5_pixel_mask, test_cap_exclusion=True, distribution=True,
+                 lock=tb_lock,
+                 total_cap_file=X5_SCAN_FILE,
+                 total_cap_group=hdf(top_ref, name, 'biased_40_V_full_model/total_cap'),
+                 **correction_args)
+    analyze_data(raw_data=X5_SCAN_FILE, base_path=hdf(top_ref, name, 'inter_unbiased_full_model'),
+                 is_advanced=True, full_model=True, is_inter_pixel=True,
+                 mask_pixel=data_constants.x5_second_pixel_mask, test_cap_exclusion=True, distribution=True,
+                 total_cap_file=X5_SCAN_FILE,
+                 lock=tb_lock,
+                 total_cap_group=hdf(top_ref, name, 'unbiased_full/total_cap'),
+                 **correction_args)
+    analyze_data(raw_data=X5_SCAN_FILE, base_path=hdf(top_ref, name, 'inter_biased_M_40_V_full_model'),
+                 is_advanced=True, full_model=True, is_inter_pixel=True,
+                 mask_pixel=data_constants.x5_pixel_mask, test_cap_exclusion=True, distribution=True,
+                 lock=tb_lock,
+                 total_cap_file=X5_SCAN_FILE,
+                 total_cap_group=hdf(top_ref, name, 'biased_40_V_full/total_cap'),
+                 **correction_args)
+
+    # handle the C-V-analysis
+    x5_depletion_args = {
+        "first_boundaries": [(-15, -4.5), (-57.5, -40), (-57.5, -40)],
+        "second_boundaries": [(-3, 0), (-35, -25), (-23, -20)],
+        "distribution": True,
+        "apply_contour": False,
+        "apply_contours": False,
+        "chip_group_name": hdf(top_ref, name, 'sensor'),
+        "apply_doping": True,
+    }
+    x5_depletion_args_refined = {
+        "first_boundaries": [(-15, -4.5), (-57, -36), (-57, -36)],
+        "second_boundaries": [(-0.75, 0), (-35, -26), (-23.5, -18)],
+        "distribution": True,
+        "apply_contour": False,
+        "apply_contours": False,
+        "chip_group_name": hdf(top_ref, name, 'sensor'),
+        "apply_doping": True,
+    }
+    x5_depletion_args.update(**correction_args)
+    x5_depletion_args_refined.update(**correction_args)
+
+    print("CV Analysis for X5")
+    analyze_data(raw_data=X5_SCAN_FILE, base_path=hdf(top_ref, name, 'C_V_Characteristic'),
+                 is_advanced=True, full_model=False, is_cv=True, use_corrected=False,
+                 mask_pixel=data_constants.x5_second_pixel_mask,
+                 test_cap_exclusion=True,
+                 lock=tb_lock, **x5_depletion_args)
+    print("Finished first CV")
+    analyze_data(raw_data=X5_SCAN_FILE, base_path=hdf(top_ref, name, 'C_V_Characteristic_refined'),
+                 is_advanced=True, full_model=False, is_cv=True, use_corrected=False,
+                 mask_pixel=data_constants.x5_pixel_mask,
+                 test_cap_exclusion=True,
+                 lock=tb_lock, **x5_depletion_args_refined)
+    print("Finished second CV")
+    analyze_data(raw_data=X5_SCAN_FILE, base_path=hdf(top_ref, name, 'C_V_Characteristic_refined_Extended'),
+                 is_advanced=True, full_model=False, is_cv=True, use_corrected=False,
+                 mask_pixel=data_constants.x5_pixel_mask,
+                 test_cap_exclusion=True,
+                 lock=tb_lock, **x5_depletion_args_refined)
+    print("Finished third CV")
+
+    # add here the additonal CV analysis used for extended range!
+    print("Finished the Analysis for X5")
+
+
+def x6_analysator(tb_lock, correction_args, **kwargs):
+    import pixcap65.concurrency
+    name = "X6"
+    display_name = name
+    top_ref = "Thesis/ATLAS_ITk"
+    print("Analyze", display_name)
+    print(threading.get_native_id())
+    print(mp.current_process().name)
+    print(mp.current_process().pid)
+    print(AUTHKEY_OUTPUT, mp.current_process().authkey)
+
+    _ = pixcap65.concurrency.get_manager(**kwargs)
+    x6_depletion_args = {
+        "first_boundaries": (-100, -35),
+        "second_boundaries": (-2.8, -0.1),
+        "distribution": False,
+        "apply_contour": False,
+        "apply_contours": False,
+        "chip_group_name": hdf(top_ref, name, 'sensor'),
+        "apply_doping": True,
+    }
+    # most of the refined scan is missing for this sensor!
+    x6_depletion_args_refined = {
+        "first_boundaries": (-100, -40),
+        "second_boundaries": (-2.0, -0.6),
+        "distribution": True,
+        "apply_contour": False,
+        "apply_contours": False,
+        "chip_group_name": hdf(top_ref, name, 'sensor'),
+        "apply_doping": True,
+    }
+    x6_depletion_args.update(**correction_args)
+    x6_depletion_args_refined.update(**correction_args)
+    synchronize_full_model(X6_SCAN_FILE, top_ref, name, 45, tb_lock)
+
+    analyze_data(raw_data=data_constants.X6_SCAN_FILE, base_path=hdf(top_ref, name, 'unbiased_full'),
+                 is_advanced=True, distribution=True, full_model=False, test_cap_exclusion=True,
+                 lock=tb_lock, mask_pixel=data_constants.x6_second_pixel_mask,
+                 **correction_args)
+    analyze_data(raw_data=data_constants.X6_SCAN_FILE, base_path=hdf(top_ref, name, 'biased_45_V_full'),
+                 is_advanced=True,
+                 distribution=True, full_model=False, mask_pixel=data_constants.x6_second_pixel_mask,
+                 test_cap_exclusion=True,
+                 **correction_args)
+    analyze_data(raw_data=data_constants.X6_SCAN_FILE, base_path=hdf(top_ref, name, 'unbiased_full_model'),
+                 is_advanced=True, distribution=True, test_cap_exclusion=True,
+                 lock=tb_lock, mask_pixel=data_constants.x6_second_pixel_mask,
+                 **correction_args)
+    analyze_data(raw_data=data_constants.X6_SCAN_FILE, base_path=hdf(top_ref, name, 'biased_45_V_full_model'),
+                 is_advanced=True,
+                 distribution=True, mask_pixel=data_constants.x6_second_pixel_mask, test_cap_exclusion=True,
+                 **correction_args)
+
+    # handle the inter-pix analysis
+    analyze_data(raw_data=data_constants.X6_SCAN_FILE, base_path=hdf(top_ref, name, 'inter_unbiased_full'),
+                 is_advanced=True, full_model=False, is_inter_pixel=True,
+                 test_cap_exclusion=True, distribution=True,
+                 total_cap_file=data_constants.X6_SCAN_FILE,
+                 lock=tb_lock,
+                 total_cap_group=hdf(top_ref, name, 'unbiased_full_model/total_cap'),
+                 **correction_args)
+    analyze_data(raw_data=data_constants.X6_SCAN_FILE,
+                 base_path=hdf(top_ref, name, 'inter_unbiased_full_model'),
+                 is_advanced=True, full_model=True, is_inter_pixel=True,
+                 test_cap_exclusion=True, distribution=True,
+                 total_cap_file=data_constants.X6_SCAN_FILE,
+                 lock=tb_lock,
+                 total_cap_group=hdf(top_ref, name, 'unbiased_full_model/total_cap'),
+                 **correction_args)
+    analyze_data(raw_data=data_constants.X6_SCAN_FILE, base_path=hdf(top_ref, name, 'inter_biased_M_45_V_full'),
+                 is_advanced=True, full_model=False, is_inter_pixel=True,
+                 test_cap_exclusion=True, distribution=True,
+                 lock=tb_lock,
+                 total_cap_file=data_constants.X6_SCAN_FILE,
+                 total_cap_group=hdf(top_ref, name, 'biased_45_V_full_model/total_cap'),
+                 **correction_args)
+    analyze_data(raw_data=data_constants.X6_SCAN_FILE,
+                 base_path=hdf(top_ref, name, 'inter_biased_M_45_V_full_model'),
+                 is_advanced=True, full_model=True, is_inter_pixel=True,
+                 test_cap_exclusion=True, distribution=True,
+                 lock=tb_lock,
+                 total_cap_file=data_constants.X6_SCAN_FILE,
+                 total_cap_group=hdf(top_ref, name, 'biased_45_V_full_model/total_cap'),
+                 **correction_args)
+
+    # CV analysis
+    print("Cv analysis for X6")
+    analyze_data(raw_data=X6_SCAN_FILE, base_path=hdf(top_ref, name, 'C_V_Characteristic'),
+                 is_advanced=True, full_model=False, is_cv=True, use_corrected=False,
+                 test_cap_exclusion=True, mask_pixel=data_constants.x6_second_pixel_mask,
+                 lock=tb_lock, **x6_depletion_args)
+
+    analyze_data(raw_data=X6_SCAN_FILE, base_path=hdf(top_ref, name, 'C_V_Characteristic_refined'),
+                 is_advanced=True, full_model=False, is_cv=True, use_corrected=False,
+                 lock=tb_lock, mask_pixel=data_constants.x6_second_pixel_mask,
+                 test_cap_exclusion=True, **x6_depletion_args_refined)
+    print("Finished the CV analysis for X6")
+
+
+def x7_analysator(tb_lock, correction_args, **kwargs):
+    import pixcap65.concurrency
+    name = "X7"
+    display_name = name
+    top_ref = "Thesis/ATLAS_ITk"
+    print("Analyze", display_name)
+    print(threading.get_native_id())
+    print(mp.current_process().name)
+    print(mp.current_process().pid)
+    print(AUTHKEY_OUTPUT, mp.current_process().authkey)
+
+    _ = pixcap65.concurrency.get_manager(**kwargs)
+    synchronize_full_model(X7_SCAN_FILE, top_ref, name, 40.0, tb_lock)
+
+    analyze_data(raw_data=data_constants.X7_SCAN_FILE, base_path=hdf(top_ref, name, 'unbiased_full'),
+                 is_advanced=True,
+                 distribution=True, full_model=False, test_cap_exclusion=True, lock=tb_lock,
+                 **correction_args)
+    analyze_data(raw_data=data_constants.X7_SCAN_FILE, base_path=hdf(top_ref, name, 'biased_40.0_V_full'),
+                 is_advanced=True, distribution=True, full_model=False, test_cap_exclusion=True, lock=tb_lock,
+                 **correction_args)
+    analyze_data(raw_data=data_constants.X7_SCAN_FILE, base_path=hdf(top_ref, name, 'unbiased_full_model'),
+                 is_advanced=True, distribution=True, test_cap_exclusion=True, lock=tb_lock,
+                 **correction_args)
+    analyze_data(raw_data=data_constants.X7_SCAN_FILE, base_path=hdf(top_ref, name, 'biased_40.0_V_full_model'),
+                 is_advanced=True, distribution=True, test_cap_exclusion=True, lock=tb_lock,
+                 **correction_args)
+
+    # inter-pixel capacitance analysis
+    analyze_data(raw_data=data_constants.X7_SCAN_FILE, base_path=hdf(top_ref, name, 'inter_unbiased_full'),
+                 is_advanced=True, full_model=False, is_inter_pixel=True,
+                 test_cap_exclusion=True, distribution=True, lock=tb_lock,
+                 total_cap_file=data_constants.X7_SCAN_FILE,
+                 total_cap_group=hdf(top_ref, name, 'unbiased_full_model/total_cap'),
+                 **correction_args)
+    analyze_data(raw_data=data_constants.X7_SCAN_FILE,
+                 base_path=hdf(top_ref, name, 'inter_biased_M_40.0_V_full'),
+                 is_advanced=True, full_model=False, is_inter_pixel=True,
+                 test_cap_exclusion=True, distribution=True, lock=tb_lock,
+                 total_cap_file=data_constants.X7_SCAN_FILE,
+                 total_cap_group=hdf(top_ref, name, 'biased_40.0_V_full_model/total_cap'),
+                 **correction_args)
+    analyze_data(raw_data=data_constants.X7_SCAN_FILE,
+                 base_path=hdf(top_ref, name, 'inter_unbiased_full_model'),
+                 is_advanced=True, full_model=True, is_inter_pixel=True,
+                 test_cap_exclusion=True, distribution=True, lock=tb_lock,
+                 total_cap_file=data_constants.X7_SCAN_FILE,
+                 total_cap_group=hdf(top_ref, name, 'unbiased_full/total_cap'),
+                 **correction_args)
+    analyze_data(raw_data=data_constants.X7_SCAN_FILE,
+                 base_path=hdf(top_ref, name, 'inter_biased_M_40.0_V_full_model'),
+                 is_advanced=True, full_model=True, is_inter_pixel=True,
+                 test_cap_exclusion=True, distribution=True, lock=tb_lock,
+                 total_cap_file=data_constants.X7_SCAN_FILE,
+                 total_cap_group=hdf(top_ref, name, 'biased_40.0_V_full/total_cap'),
+                 **correction_args)
+
+    x7_depletion_args = {
+        "first_boundaries": (-100, -30),
+        "second_boundaries": (-1.8, -0.5),
+        "distribution": False,
+        "apply_contour": False,
+        "apply_contours": False,
+        "chip_group_name": hdf(top_ref, name, 'sensor'),
+        "apply_doping": True,
+    }
+    x7_depletion_args_refined = {
+        "first_boundaries": (-100, -40),
+        "second_boundaries": (-2.0, -0.6),
+        "distribution": True,
+        "apply_contour": False,
+        "apply_contours": False,
+        "chip_group_name": hdf(top_ref, name, 'sensor'),
+        "apply_doping": True,
+    }
+    x7_depletion_args.update(correction_args)
+    x7_depletion_args_refined.update(correction_args)
+    print("CV Analysis for", display_name)
+    analyze_data(raw_data=X7_SCAN_FILE, base_path=hdf(top_ref, name, 'C_V_Characteristic'),
+                 is_advanced=True, full_model=False, is_cv=True, use_corrected=False,
+                 test_cap_exclusion=True, lock=tb_lock,
+                 **x7_depletion_args)
+
+    analyze_data(raw_data=X7_SCAN_FILE, base_path=hdf(top_ref, name, 'C_V_Characteristic_refined'),
+                 is_advanced=True, full_model=False, is_cv=True, use_corrected=False,
+                 test_cap_exclusion=True, lock=tb_lock,
+                 **x7_depletion_args_refined)
+    print("Finished the Analysis for", display_name)
+
+
 # define the plotting handler
 def bare_sample_plotter_first(tb_lock):
     """
@@ -534,8 +1581,15 @@ def general_plotter(tb_lock, file_name, bias, **kwargs):
     """
     Handles the plotting of the measurements with the 3D-Sensor X5 (FBK sample).
 
+    :author: Dominik Fischer
+    :date: 2026-06-22
+
+    last update: 2026-09-17
+
     In a first run overview pdf of the unbiased and biased measurements are created including the distributions of these
     capacitances over the whole sensor.
+
+    TODO: this docstring requires improvement.
 
     Next the analysis of the leakage current over the a large range of reversed biasing voltages.
     Then the Inter-Pixel-Capacitance analysis is plotted.
@@ -560,6 +1614,17 @@ def general_plotter(tb_lock, file_name, bias, **kwargs):
       - C
 
     :param tb_lock: multiprocessing lock to make operations on the hdf files process- and thread-safe.
+    :param file_name: name of the hdf file, where the measurement data is stored together with the results of the
+     analysis.
+    :param bias: bias voltage applied for measurements with a fully depleted sensor.
+    :keyword name: name of the sensor for which the results should be plotted. This must be part of the correct hdf
+     groups path. (default: X5)
+    :keyword appendix: appendix to `name` for the display name of this sensor in outputs.
+    :keyword reference: path of the hdf files' group under which the sensors measurements are stored
+     (default: Thesis/ATLAS_ITk).
+    :keyword bias_sets: set of measurement group names containing purely I-V characterization measurements.
+    :keyword simple_sets: set of measurement group names containing c-v characterization measurement (simple case)
+    :keyword refined_sets: set of measurement group names containing c-v characterization measurements (refined case)
     """
     # note: the pixel mask must be submitted explicitly by 'mask_pixel'
     from os.path import join as hdf
@@ -806,8 +1871,8 @@ def r1_plotter(tb_lock):
                         grouped_inter_pix_id=19000)
 
     plot_inter_pix_data(interpreted_data=R11_SCAN_FILE,
-                        base_path=hdf(top_ref, name, 'inter_biased_M_80_V_full_model_Extended__diagonals'), use_group=True,
-                        test_cap_exclusion=True, distribution=True, total_data=R11_SCAN_FILE,
+                        base_path=hdf(top_ref, name, 'inter_biased_M_80_V_full_model_Extended__diagonals'),
+                        use_group=True, test_cap_exclusion=True, distribution=True, total_data=R11_SCAN_FILE,
                         total_path=hdf(top_ref, name, 'biased_80_V_full'), lock=tb_lock,
                         mask_pixel=data_constants.r1_pixel_mask,
                         inter_data=R11_SCAN_FILE, inter_path=hdf(top_ref, name, 'inter_biased_M_80_V_full'),
@@ -1132,7 +2197,8 @@ def r13_plotter_second(tb_lock):
     print(display_name, "- CV")
     threaded_plotting.plot_combined_data(interpreted_data=R13_2_SCAN_FILE,
                                          base_path=hdf(top_ref, name, 'C_V_Characteristic_refined'), lock=tb_lock,
-                                         use_group=True, test_cap_exclusion=True, distribution=True, apply_doping=False, )
+                                         use_group=True, test_cap_exclusion=True, distribution=True,
+                                         apply_doping=False,)
     threaded_plotting.plot_combined_data(interpreted_data=R13_2_SCAN_FILE, lock=tb_lock, apply_doping=False,
                                          base_path=hdf(top_ref, name, 'C_V_Characteristic_refined'),
                                          use_group=True, test_cap_exclusion=True, distribution=True, use_corrected=True)
@@ -1150,10 +2216,16 @@ def e1_plotter_first(tb_lock):
     plot_data(interpreted_data=E1_SCAN_FILE, base_path=hdf(top_ref, name, 'unbiased_4_full'),
               use_group=True, use_corrected=True, distribution=True, test_cap_exclusion=True,
               mask_pixel=data_constants.e1_pixel_mask, lock=tb_lock, )
+    plot_data(interpreted_data=E1_SCAN_FILE, base_path=hdf(top_ref, name, 'unbiased_1_test'),
+              use_group=True, lock=tb_lock)
+    plot_data(interpreted_data=E1_SCAN_FILE, base_path=hdf(top_ref, name, 'unbiased_2_test'),
+              use_group=True, lock=tb_lock)
+    plot_data(interpreted_data=E1_SCAN_FILE, base_path=hdf(top_ref, name, 'unbiased_3_test'),
+              use_group=True, lock=tb_lock)
     threaded_plotting.plot_bias_data(interpreted_data=E1_SCAN_FILE,
-                                     base_path=hdf(top_ref, name, 'I_V_Characteristic'), use_group=True,
-                                     lock=tb_lock, )
-
+                                     base_path=hdf(top_ref, name, 'I_V_Characteristic'),
+                                     use_group=True, lock=tb_lock)
+    print(display_name, "- CV")
     print(display_name, "- CV")
     threaded_plotting.plot_combined_data(interpreted_data=E1_SCAN_FILE,
                                          base_path=hdf(top_ref, name, 'C_V_Characteristic'),
@@ -1220,18 +2292,12 @@ def e1_plotter_second(tb_lock):
                                          use_group=True, distribution=True, mask_pixel=data_constants.e1_pixel_mask,
                                          use_corrected=True, lock=tb_lock, )
 
-
     print("E1 - Switching to individual pixel regions.")
     for type_name in data_constants.e1_pixel_groups.keys():
         path_name = hdf(top_ref, name, 'unbiased_full_' + type_name)
-        try:
-            plot_data(interpreted_data=E1_2_SCAN_FILE, use_group=True,
-                      base_path=path_name, test_cap_exclusion=True,
-                      mask_pixel=data_constants.e1_pixel_mask, lock=tb_lock, distribution=True)
-        except:
-            print("The new actual path name is:")
-            print(path_name)
-            raise
+        plot_data(interpreted_data=E1_2_SCAN_FILE, use_group=True,
+                  base_path=path_name, test_cap_exclusion=True,
+                  mask_pixel=data_constants.e1_pixel_mask, lock=tb_lock, distribution=True)
         plot_data(interpreted_data=E1_2_SCAN_FILE, use_group=True,
                   base_path=hdf(top_ref, name, 'unbiased_full_' + type_name), test_cap_exclusion=True,
                   mask_pixel=data_constants.e1_pixel_mask, use_corrected=True, lock=tb_lock, distribution=True)
@@ -1348,39 +2414,39 @@ def x1_plotter_first(tb_lock):
     top_ref = "Thesis/ATLAS_ITk"
     print("Plotting", display_name)
     plot_data(interpreted_data='pixcap65/Data/ATLAS ITk/New_1_Initial_2_Scan.h5',
-                                base_path="run_1", suffix="test_run", use_group=True, lock=tb_lock)
+              base_path="run_1", suffix="test_run", use_group=True, lock=tb_lock)
     plot_data(interpreted_data='pixcap65/Data/ATLAS ITk/New_1_Initial_2_Scan.h5',
-                                base_path="run_1", suffix="test_run", use_group=True, use_corrected=True, lock=tb_lock)
+              base_path="run_1", suffix="test_run", use_group=True, use_corrected=True, lock=tb_lock)
     plot_data(interpreted_data='pixcap65/Data/ATLAS ITk/New_1_Initial_2_Scan.h5',
-                                base_path="run_2", suffix="test_run", use_group=True, lock=tb_lock)
+              base_path="run_2", suffix="test_run", use_group=True, lock=tb_lock)
     plot_data(interpreted_data='pixcap65/Data/ATLAS ITk/New_1_Initial_2_Scan.h5',
-                                base_path="run_2", suffix="test_run", use_group=True, use_corrected=True,
-                                lock=tb_lock)
+              base_path="run_2", suffix="test_run", use_group=True, use_corrected=True,
+              lock=tb_lock)
     plot_data(interpreted_data='pixcap65/Data/ATLAS ITk/New_1_Initial_3_Scan.h5',
-                                base_path="ATLAS ITk/run_1", suffix="test_run", use_group=True, lock=tb_lock)
+              base_path="ATLAS ITk/run_1", suffix="test_run", use_group=True, lock=tb_lock)
     plot_data(interpreted_data='pixcap65/Data/ATLAS ITk/New_1_Initial_3_Scan.h5',
-                                base_path="ATLAS ITk/run_1", suffix="test_run", use_group=True, use_corrected=True,
-                                lock=tb_lock)
+              base_path="ATLAS ITk/run_1", suffix="test_run", use_group=True, use_corrected=True,
+              lock=tb_lock)
     plot_data(interpreted_data='pixcap65/Data/ATLAS ITk/New_1_Initial_3_Scan.h5',
-                                base_path="ATLAS ITk/run_2", suffix="test_run", use_group=True, lock=tb_lock)
+              base_path="ATLAS ITk/run_2", suffix="test_run", use_group=True, lock=tb_lock)
     plot_data(interpreted_data='pixcap65/Data/ATLAS ITk/New_1_Initial_3_Scan.h5',
-                                base_path="ATLAS ITk/run_2", suffix="test_run", use_group=True, use_corrected=True,
-                                lock=tb_lock)
+              base_path="ATLAS ITk/run_2", suffix="test_run", use_group=True, use_corrected=True,
+              lock=tb_lock)
     plot_data(interpreted_data='pixcap65/Data/ATLAS ITk/New_1_Initial_Scan.h5', suffix="test_run",
-                                use_group=True, lock=tb_lock)
+              use_group=True, lock=tb_lock)
     plot_data(interpreted_data='pixcap65/Data/ATLAS ITk/New_1_Initial_Scan.h5', suffix="test_run",
-                                use_group=True, use_corrected=True, lock=tb_lock)
+              use_group=True, use_corrected=True, lock=tb_lock)
     plot_data(interpreted_data='pixcap65/Data/New_1_Initial_6_Scan.h5',
-                                base_path="ATLAS ITk/run_1", suffix="general_data_test_test", use_group=True,
-                                lock=tb_lock)
+              base_path="ATLAS ITk/run_1", suffix="general_data_test_test", use_group=True,
+              lock=tb_lock)
     plot_data(interpreted_data='pixcap65/Data/New_1_Initial_6_Scan.h5',
-                                base_path="ATLAS ITk/run_1", suffix="general_data_test_test", use_group=True,
-                                use_corrected=True, lock=tb_lock)
+              base_path="ATLAS ITk/run_1", suffix="general_data_test_test", use_group=True,
+              use_corrected=True, lock=tb_lock)
     plot_data(interpreted_data='pixcap65/Data/New_1_Initial_6_Scan.h5',
-                                base_path="ATLAS ITk/run_2", suffix="general_data", use_group=True, lock=tb_lock)
+              base_path="ATLAS ITk/run_2", suffix="general_data", use_group=True, lock=tb_lock)
     plot_data(interpreted_data='pixcap65/Data/New_1_Initial_6_Scan.h5',
-                                base_path="ATLAS ITk/run_2", suffix="general_data", use_group=True,
-                                use_corrected=True, lock=tb_lock)
+              base_path="ATLAS ITk/run_2", suffix="general_data", use_group=True,
+              use_corrected=True, lock=tb_lock)
     plot_data(interpreted_data='pixcap65/Data/New_1_Initial_6_Scan.h5', base_path="ATLAS ITk/unbiased_3",
               suffix="general_data", use_group=True, test_cap_exclusion=True,
               mask_pixel=data_constants.x1_second_pixel_mask, distribution=True, lock=tb_lock)
@@ -1389,11 +2455,11 @@ def x1_plotter_first(tb_lock):
               mask_pixel=data_constants.x1_second_pixel_mask, test_cap_exclusion=True, distribution=True,
               lock=tb_lock)
     plot_data(interpreted_data='pixcap65/Data/New_1_Initial_6_Scan.h5',
-                                base_path="ATLAS ITk/unbiased_4", suffix="general_data", use_group=True,
-                                lock=tb_lock)
+              base_path="ATLAS ITk/unbiased_4", suffix="general_data", use_group=True,
+              lock=tb_lock)
     plot_data(interpreted_data='pixcap65/Data/New_1_Initial_6_Scan.h5',
-                                base_path="ATLAS ITk/unbiased_4", suffix="general_data", use_group=True,
-                                use_corrected=True, lock=tb_lock)
+              base_path="ATLAS ITk/unbiased_4", suffix="general_data", use_group=True,
+              use_corrected=True, lock=tb_lock)
     threaded_plotting.plot_bias_data(interpreted_data='pixcap65/Data/New_1_Initial_6_Scan.h5',
                                      base_path="ATLAS ITk/I_V_Characteristic", use_group=True, lock=tb_lock)
     plot_data(interpreted_data='pixcap65/Data/New_1_Initial_6_Scan.h5', base_path="ATLAS ITk/full_biased_80_V",
@@ -1450,7 +2516,7 @@ def x1_plotter(tb_lock):
     top_ref = "Thesis/ATLAS_ITk"
     print("Plotting", display_name)
     plot_data(interpreted_data=X1_SCAN_2_FILE, base_path=hdf(top_ref, name, 'unbiased_61_full'), use_group=True,
-              test_cap_exclusion=True, mask_pixel=data_constants.x1_second_pixel_mask, distribution=True, lock=tb_lock, )
+              test_cap_exclusion=True, mask_pixel=data_constants.x1_second_pixel_mask, distribution=True, lock=tb_lock,)
     plot_data(interpreted_data=X1_SCAN_2_FILE, base_path=hdf(top_ref, name, 'unbiased_61_full'), use_group=True,
               test_cap_exclusion=True, use_corrected=True, mask_pixel=data_constants.x1_second_pixel_mask,
               distribution=True, lock=tb_lock, )
@@ -1461,7 +2527,7 @@ def x1_plotter(tb_lock):
               test_cap_exclusion=True, use_corrected=True, mask_pixel=data_constants.x1_second_pixel_mask,
               distribution=True, lock=tb_lock, )
     plot_data(interpreted_data=X1_SCAN_2_FILE, base_path=hdf(top_ref, name, 'unbiased_61_full_model'), use_group=True,
-              test_cap_exclusion=True, mask_pixel=data_constants.x1_second_pixel_mask, distribution=True, lock=tb_lock, )
+              test_cap_exclusion=True, mask_pixel=data_constants.x1_second_pixel_mask, distribution=True, lock=tb_lock,)
     plot_data(interpreted_data=X1_SCAN_2_FILE, base_path=hdf(top_ref, name, 'unbiased_61_full_model'), use_group=True,
               test_cap_exclusion=True, use_corrected=True, mask_pixel=data_constants.x1_second_pixel_mask,
               distribution=True, lock=tb_lock, )
@@ -1655,8 +2721,8 @@ def x1_plotter(tb_lock):
                         inter_data=X1_SCAN_2_FILE, inter_path=hdf(top_ref, name, 'inter_biased_M_80_V_full'),
                         grouped_inter_pix_id=18000)
     plot_inter_pix_data(interpreted_data="packaged/data/X1_12_Renew_Scan.h5",
-                        base_path=hdf(top_ref, name, 'inter_biased_M_80_V_full_model_Extended_2__sides'), use_group=True,
-                        test_cap_exclusion=True, distribution=True, total_data=X1_SCAN_2_FILE,
+                        base_path=hdf(top_ref, name, 'inter_biased_M_80_V_full_model_Extended_2__sides'),
+                        use_group=True, test_cap_exclusion=True, distribution=True, total_data=X1_SCAN_2_FILE,
                         total_path=hdf(top_ref, name, 'biased_80_V_full'), lock=tb_lock,
                         mask_pixel=data_constants.x1_second_pixel_mask,
                         inter_data=X1_SCAN_2_FILE, inter_path=hdf(top_ref, name, 'inter_biased_M_80_V_full'),
@@ -2024,40 +3090,41 @@ def x5_plotter(tb_lock):
     top_ref = "Thesis/ATLAS_ITk"
     print("Plotting", display_name)
     plot_data(interpreted_data=X5_SCAN_FILE, base_path=hdf(top_ref, name, 'unbiased_full'), use_group=True,
-              test_cap_exclusion=True, mask_pixel=data_constants.x5_second_pixel_mask, distribution=True, lock=tb_lock, )
+              test_cap_exclusion=True, mask_pixel=data_constants.x5_second_pixel_mask, distribution=True, lock=tb_lock,)
     plot_data(interpreted_data=X5_SCAN_FILE, base_path=hdf(top_ref, name, 'unbiased_full'), use_group=True,
               use_corrected=True, test_cap_exclusion=True, mask_pixel=data_constants.x5_second_pixel_mask,
               distribution=True, lock=tb_lock, )
     plot_data(interpreted_data=X5_SCAN_FILE, base_path=hdf(top_ref, name, 'biased_40_V_full'),
-              use_group=True, test_cap_exclusion=True, mask_pixel=data_constants.x5_second_pixel_mask, distribution=True,
-              lock=tb_lock, mask_lower=50e-15)
+              use_group=True, test_cap_exclusion=True, mask_pixel=data_constants.x5_second_pixel_mask,
+              distribution=True, lock=tb_lock, mask_lower=50e-15)
     plot_data(interpreted_data=X5_SCAN_FILE, base_path=hdf(top_ref, name, 'biased_40_V_full'),
-              use_group=True, use_corrected=True, test_cap_exclusion=True, mask_pixel=data_constants.x5_second_pixel_mask,
+              use_group=True, use_corrected=True, test_cap_exclusion=True,
+              mask_pixel=data_constants.x5_second_pixel_mask,
               distribution=True, lock=tb_lock, mask_lower=50e-15)
     plot_data(interpreted_data=X5_SCAN_FILE, base_path=hdf(top_ref, name, 'biased_90_V_full'),
-              use_group=True, test_cap_exclusion=True, mask_pixel=data_constants.x5_second_pixel_mask, distribution=True,
-              lock=tb_lock)
-    plot_data(interpreted_data=X5_SCAN_FILE, base_path=hdf(top_ref, name, 'biased_90_V_full'),
-              use_group=True, use_corrected=True, test_cap_exclusion=True, mask_pixel=data_constants.x5_second_pixel_mask,
+              use_group=True, test_cap_exclusion=True, mask_pixel=data_constants.x5_second_pixel_mask,
               distribution=True, lock=tb_lock)
+    plot_data(interpreted_data=X5_SCAN_FILE, base_path=hdf(top_ref, name, 'biased_90_V_full'),
+              use_group=True, use_corrected=True, test_cap_exclusion=True,
+              mask_pixel=data_constants.x5_second_pixel_mask, distribution=True, lock=tb_lock)
     plot_data(interpreted_data=X5_SCAN_FILE, base_path=hdf(top_ref, name, 'unbiased_full_model'),
-              use_group=True, test_cap_exclusion=True, mask_pixel=data_constants.x5_second_pixel_mask, distribution=True,
-              lock=tb_lock)
+              use_group=True, test_cap_exclusion=True, mask_pixel=data_constants.x5_second_pixel_mask,
+              distribution=True, lock=tb_lock)
     plot_data(interpreted_data=X5_SCAN_FILE, base_path=hdf(top_ref, name, 'unbiased_full_model'), use_group=True,
               use_corrected=True, test_cap_exclusion=True, mask_pixel=data_constants.x5_second_pixel_mask,
               distribution=True, lock=tb_lock)
     plot_data(interpreted_data=X5_SCAN_FILE, base_path=hdf(top_ref, name, 'biased_40_V_full_model'),
-              use_group=True, test_cap_exclusion=True, mask_pixel=data_constants.x5_second_pixel_mask, distribution=True,
-              lock=tb_lock, mask_lower=51.5e-15)
-    plot_data(interpreted_data=X5_SCAN_FILE, base_path=hdf(top_ref, name, 'biased_40_V_full_model'),
-              use_group=True, use_corrected=True, test_cap_exclusion=True, mask_pixel=data_constants.x5_second_pixel_mask,
+              use_group=True, test_cap_exclusion=True, mask_pixel=data_constants.x5_second_pixel_mask,
               distribution=True, lock=tb_lock, mask_lower=51.5e-15)
+    plot_data(interpreted_data=X5_SCAN_FILE, base_path=hdf(top_ref, name, 'biased_40_V_full_model'),
+              use_group=True, use_corrected=True, test_cap_exclusion=True,
+              mask_pixel=data_constants.x5_second_pixel_mask, distribution=True, lock=tb_lock, mask_lower=51.5e-15)
     plot_data(interpreted_data=X5_SCAN_FILE, base_path=hdf(top_ref, name, 'biased_90_V_full_model'),
-              use_group=True, test_cap_exclusion=True, mask_pixel=data_constants.x5_second_pixel_mask, distribution=True,
-              lock=tb_lock)
-    plot_data(interpreted_data=X5_SCAN_FILE, base_path=hdf(top_ref, name, 'biased_90_V_full_model'),
-              use_group=True, use_corrected=True, test_cap_exclusion=True, mask_pixel=data_constants.x5_second_pixel_mask,
+              use_group=True, test_cap_exclusion=True, mask_pixel=data_constants.x5_second_pixel_mask,
               distribution=True, lock=tb_lock)
+    plot_data(interpreted_data=X5_SCAN_FILE, base_path=hdf(top_ref, name, 'biased_90_V_full_model'),
+              use_group=True, use_corrected=True, test_cap_exclusion=True,
+              mask_pixel=data_constants.x5_second_pixel_mask, distribution=True, lock=tb_lock)
     plot_bias_data(interpreted_data=X5_SCAN_FILE, base_path=hdf(top_ref, name, 'I_V_Characteristic'),
                    use_group=True, lock=tb_lock, )
     plot_bias_data(interpreted_data=X5_SCAN_FILE, base_path=hdf(top_ref, name, 'I_V_Characteristic_Extended'),
@@ -2168,22 +3235,22 @@ def x6_plotter(tb_lock):
     top_ref = "Thesis/ATLAS_ITk"
     print("Plotting", display_name)
     plot_data(interpreted_data=X6_SCAN_FILE, base_path=hdf(top_ref, name, 'unbiased_full'), use_group=True,
-              test_cap_exclusion=True, lock=tb_lock, mask_pixel=data_constants.x6_second_pixel_mask, distribution=True, )
+              test_cap_exclusion=True, lock=tb_lock, mask_pixel=data_constants.x6_second_pixel_mask, distribution=True,)
     plot_data(interpreted_data=X6_SCAN_FILE, base_path=hdf(top_ref, name, 'unbiased_full'), use_group=True,
               use_corrected=True, test_cap_exclusion=True, lock=tb_lock,
               mask_pixel=data_constants.x6_second_pixel_mask, distribution=True, )
     plot_data(interpreted_data=X6_SCAN_FILE, base_path=hdf(top_ref, name, 'unbiased_full_model'), use_group=True,
-              test_cap_exclusion=True, lock=tb_lock, mask_pixel=data_constants.x6_second_pixel_mask, distribution=True, )
+              test_cap_exclusion=True, lock=tb_lock, mask_pixel=data_constants.x6_second_pixel_mask, distribution=True,)
     plot_data(interpreted_data=X6_SCAN_FILE, base_path=hdf(top_ref, name, 'unbiased_full_model'), use_group=True,
               use_corrected=True, test_cap_exclusion=True, lock=tb_lock,
               mask_pixel=data_constants.x6_second_pixel_mask, distribution=True, )
     plot_data(interpreted_data=X6_SCAN_FILE, base_path=hdf(top_ref, name, 'biased_45_V_full'), use_group=True,
-              test_cap_exclusion=True, lock=tb_lock, mask_pixel=data_constants.x6_second_pixel_mask, distribution=True, )
+              test_cap_exclusion=True, lock=tb_lock, mask_pixel=data_constants.x6_second_pixel_mask, distribution=True,)
     plot_data(interpreted_data=X6_SCAN_FILE, base_path=hdf(top_ref, name, 'biased_45_V_full'), use_group=True,
               use_corrected=True, test_cap_exclusion=True, lock=tb_lock,
               mask_pixel=data_constants.x6_second_pixel_mask, distribution=True, )
     plot_data(interpreted_data=X6_SCAN_FILE, base_path=hdf(top_ref, name, 'biased_45_V_full_model'), use_group=True,
-              test_cap_exclusion=True, lock=tb_lock, mask_pixel=data_constants.x6_second_pixel_mask, distribution=True, )
+              test_cap_exclusion=True, lock=tb_lock, mask_pixel=data_constants.x6_second_pixel_mask, distribution=True,)
     plot_data(interpreted_data=X6_SCAN_FILE, base_path=hdf(top_ref, name, 'biased_45_V_full_model'), use_group=True,
               use_corrected=True, test_cap_exclusion=True, lock=tb_lock,
               mask_pixel=data_constants.x6_second_pixel_mask, distribution=True, )
@@ -2822,21 +3889,20 @@ if __name__ == '__main__':
     # investigate the bump capacitance
     with tb.open_file("../Bare_Repeat_2_Scan.h5", 'r') as f:
         base_group = get_base_group("Reference/bare/unbiased_8", f)
-        try:
-            bump_caps = np.concat(
-                (base_group.total_cap.analysis.HistCap[:5, 0], base_group.total_cap.analysis.HistCap[35:, 0],))
-            bump_errors = np.concat(
-                (base_group.total_cap.analysis.HistCapErr[:5, 0], base_group.total_cap.analysis.HistCapErr[35:, 0],))
-            weights = np.reciprocal(bump_errors ** 2)
-            average_bump_cap = np.average(bump_caps, weights=weights)
-            statistical_bump_error = np.shape(bump_errors)[0] / np.sum(weights)
-            parasitic = get_group_attribute(base_group.total_cap.analysis, "parasitic")
-            parasitic_error = get_group_attribute(base_group.total_cap.analysis, "parasitic_error")
-            print(f"bump capacitance: ({parasitic - average_bump_cap}+-{statistical_bump_error}+-{parasitic_error})")
-            print(np.std(bump_caps))
-        except:
-            print(f)
-            raise
+        bump_caps = np.concat(
+            (base_group.total_cap.analysis.HistCap[:5, 0], base_group.total_cap.analysis.HistCap[35:, 0],))
+        bump_errors = np.concat(
+            (base_group.total_cap.analysis.HistCapErr[:5, 0], base_group.total_cap.analysis.HistCapErr[35:, 0],))
+        weights = np.reciprocal(bump_errors ** 2)
+        average_bump_cap = np.average(bump_caps, weights=weights)
+        statistical_bump_error = np.shape(bump_errors)[0] / np.sum(weights)
+        parasitic = get_group_attribute(base_group.total_cap.analysis, "parasitic")
+        parasitic_error = get_group_attribute(base_group.total_cap.analysis, "parasitic_error")
+        bump_capacitance = parasitic - average_bump_cap
+        logger.info("bump capacitance: ({}+-{}+-{})".format(bump_capacitance,
+                                                            statistical_bump_error,
+                                                            parasitic_error))
+        logger.info(np.std(bump_caps))
 
     # analysis section/calibration
     print("Analyze the R13 reference sample.")
@@ -2877,10 +3943,7 @@ if __name__ == '__main__':
         print(LOG_FINISHED_ANALYSIS, name)
 
 
-    from examples.mp_analysis import e1_analysator_second
-    from examples.mp_analysis import r13_analysator_second
-    from examples.mp_analysis import x1_analysator as x1_analysator_second, x2_analysator as x2_analysator_second
-    from examples.mp_analysis import x5_analysator, x6_analysator
+    from examples.mp_analysis import SECOND_LABEL, AUTHKEY_OUTPUT, synchronize_full_model
 
     print("Analyze the ATLAS ITk samples.")
     x1_analysator_first(global_processing_lock, bare_correction_args)
@@ -2902,7 +3965,8 @@ if __name__ == '__main__':
     x1_analysator_second(global_processing_lock, bare_correction_args)
 
     # Second Try X2
-    # I do not think that we could use this data set properly as the C-V-curve ends to soon! will need to perform a new measurement for higher voltages.
+    # I do not think that we could use this data set properly as the C-V-curve ends to soon! will need
+    # to perform a new measurement for higher voltages.
     print("Analyze X2")
     x2_analysator_second(global_processing_lock, bare_correction_args)
 
@@ -2957,61 +4021,3 @@ if __name__ == '__main__':
 
     print("Plot X7")
     x7_plotter(global_processing_lock)
-CV_DATA_FOR_ = "CV Data for {}"
-
-
-def bare_analysis_handler(tb_lock):
-    with synchronized_process_open_file("packaged/Reference_Bare_renewed.h5", 'a', lock=tb_lock) as h5_file:
-        h5_file.copy_node(where="/Reference/Bare", name="unbiased_31_renew", newname="unbiased_31_renew_full_model",
-                          overwrite=True, recursive=True)
-
-    with synchronized_process_open_file("packaged/data/Bare_Sample_05_Extended_Scan.h5", 'a', lock=tb_lock) as h5_file:
-        h5_file.copy_node(where="/Reference/Bare", name="unbiased_full", newname="unbiased_full_model",
-                          overwrite=True, recursive=True)
-        h5_file.copy_node(where="/Reference/Bare", name="unbiased_full", newname="unbiased_full_kafe2",
-                          overwrite=True, recursive=True)
-        h5_file.copy_node(where="/Reference/Bare", name="unbiased_full", newname="unbiased_full_extended",
-                          overwrite=True, recursive=True)
-        h5_file.copy_node(where="/Reference/Bare", name="unbiased_full", newname="unbiased_full_quad",
-                          overwrite=True, recursive=True)
-
-    analyze_data(raw_data="packaged/Reference_Bare_renewed.h5", base_path="Reference/Bare/unbiased_31_renew",
-                 is_advanced=True, full_model=False, lock=tb_lock)
-    analyze_data(raw_data="packaged/Reference_Bare_renewed.h5",
-                 base_path="Reference/Bare/unbiased_31_renew_full_model", is_advanced=True,
-                 full_model=True, lock=tb_lock)
-    analyze_data(raw_data="packaged/data/Bare_Sample_05_Extended_Scan.h5", base_path="Reference/Bare/unbiased_full",
-                 is_advanced=True, full_model=False, lock=tb_lock)
-    analyze_data(raw_data="packaged/data/Bare_Sample_05_Extended_Scan.h5",
-                 base_path="Reference/Bare/unbiased_full_model", is_advanced=True,
-                 full_model=True, lock=tb_lock)
-    analyze_data(raw_data="packaged/data/Bare_Sample_05_Extended_Scan.h5",
-                 base_path="Reference/Bare/unbiased_full_kafe2", is_advanced=True,
-                 full_model=True, lock=tb_lock, use_kafe2=True)
-    analyze_data(raw_data="packaged/data/Bare_Sample_05_Extended_Scan.h5",
-                 base_path="Reference/Bare/unbiased_full_extended", is_advanced=True,
-                 full_model='extended', lock=tb_lock)
-    analyze_data(raw_data="packaged/data/Bare_Sample_05_Extended_Scan.h5",
-                 base_path="Reference/Bare/unbiased_full_quad", is_advanced=True,
-                 full_model='quad', lock=tb_lock)
-    analyze_capacitance_distribution(raw_data="packaged/Reference_Bare_renewed.h5",
-                                     base_path="Reference/Bare/unbiased_31_renew",
-                                     corrected_distribution=False,
-                                     exclude_test_cap=True, use_kafe2=False,
-                                     fit_plot_pdf_name="Bare_analysis_renew_parasitic.pdf", lock=tb_lock)
-    analyze_capacitance_distribution(raw_data="packaged/Reference_Bare_renewed.h5",
-                                     base_path="Reference/Bare/unbiased_31_renew_full_model",
-                                     corrected_distribution=False,
-                                     exclude_test_cap=True, use_kafe2=False,
-                                     fit_plot_pdf_name="Bare_analysis_renew_parasitic_full_model.pdf", lock=tb_lock)
-    analyze_capacitance_distribution(raw_data='Bare_Repeat_2_Scan.h5',
-                                     base_path="Reference/bare/unbiased_8_full_model",
-                                     corrected_distribution=False,
-                                     exclude_test_cap=True, use_kafe2=False,
-                                     fit_plot_pdf_name="Bare_analysis_parasitic_full_model.pdf", lock=tb_lock)
-    analyze_capacitance_distribution(raw_data="packaged/data/Bare_Sample_05_Extended_Scan.h5",
-                                     base_path="Reference/Bare/unbiased_full",
-                                     corrected_distribution=False,
-                                     exclude_test_cap=True, use_kafe2=False,
-                                     fit_plot_pdf_name="Bare_analysis_parasitic_extended_renew_full_model.pdf",
-                                     lock=tb_lock)
