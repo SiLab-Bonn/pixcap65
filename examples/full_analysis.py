@@ -74,11 +74,8 @@ def bare_analysis_handler(tb_lock):
     extract the inter-pixel capacitance.
 
     The applied biasing states are:
-    .. list-table:: Table Bias States
-        :widths: 20 50 30
-        :header-rows: 1
 
-    * - 0V (unbiased)
+    * 0V (unbiased)
 
     :param tb_lock: multiprocessing lock to make operations on the hdf files process- and thread-safe.
     """
@@ -161,12 +158,9 @@ def r1_analysator(tb_lock, correction_args, **kwargs):
     extract the inter-pixel capacitance.
 
     The applied biasing states are:
-    .. list-table:: Table Bias States
-        :widths: 20 50 30
-        :header-rows: 1
 
-    * - 0V (unbiased)
-    * - -80V (biased, full depletion?)
+    * 0V (unbiased)
+    * -80V (biased, full depletion?)
 
 
     In this special case also measurements for only considering top-bottom neighbours, only considering left-right
@@ -355,12 +349,9 @@ def r13_analysator_first(tb_lock, correction_args, **kwargs):
     Also it is tried to characterize the distribution of these capacitances' over the measured sensor.
 
     The applied biasing states are:
-    .. list-table:: Table Bias States
-        :widths: 20 50 30
-        :header-rows: 1
 
-    * - 0V (unbiased)
-    * - -80V (biased, fully depleted?)
+    * 0V (unbiased)
+    * -80V (biased, fully depleted?)
 
     :param tb_lock: multiprocessing lock to make operations on the hdf files process- and thread-safe.
     :param correction_args: keyword arguments/dict to define how to correct for parasitic capacitances'.
@@ -427,12 +418,9 @@ def r13_analysator_second(tb_lock, correction_args, **kwargs):
     extract the inter-pixel capacitance.
 
     The applied biasing states are:
-    .. list-table:: Table Bias States
-        :widths: 20 50 30
-        :header-rows: 1
 
-    * - 0V (unbiased)
-    * - -80V (biased, fully depleted?)
+    * 0V (unbiased)
+    * -80V (biased, fully depleted?)
 
     :param tb_lock: multiprocessing lock to make operations on the hdf files process- and thread-safe.
     :param correction_args: keyword arguments/dict to define how to correct for parasitic capacitances'.
@@ -620,12 +608,9 @@ def e1_analysator_second(tb_lock, correction_args, **kwargs):
     extract the inter-pixel capacitance.
 
     The applied biasing states are:
-    .. list-table:: Table Bias States
-        :widths: 20 50 30
-        :header-rows: 1
 
-    * - 0V (unbiased)
-    * - -80V (biased, fully depleted?)
+    * 0V (unbiased)
+    * -80V (biased, fully depleted?)
 
     :param tb_lock: multiprocessing lock to make operations on the hdf files process- and thread-safe.
     :param correction_args: keyword arguments/dict to define how to correct for parasitic capacitances'.
@@ -789,12 +774,9 @@ def x1_analysator_first(tb_lock, correction_args, **kwargs):
     This in particular includes the estimation of depletion voltage.
 
     The applied biasing states are:
-    .. list-table:: Table Bias States
-        :widths: 20 50 30
-        :header-rows: 1
 
-    * - 0V (unbiased)
-    * - -80V (biased, fully depleted?)
+    * 0V (unbiased)
+    * -80V (biased, fully depleted?)
 
     :param tb_lock: multiprocessing lock to make operations on the hdf files process- and thread-safe.
     :param correction_args: keyword arguments/dict to define how to correct for parasitic capacitances'.
@@ -865,12 +847,9 @@ def x1_analysator_second(tb_lock, correction_args, **kwargs):
     This in particular includes the estimation of depletion voltage.
 
     The applied biasing states are:
-    .. list-table:: Table Bias States
-        :widths: 20 50 30
-        :header-rows: 1
 
-    * - 0V (unbiased)
-    * - -80V (biased, fully depleted?)
+    * 0V (unbiased)
+    * -80V (biased, fully depleted?)
 
     :param tb_lock: multiprocessing lock to make operations on the hdf files process- and thread-safe.
     :param correction_args: keyword arguments/dict to define how to correct for parasitic capacitances'.
@@ -1200,12 +1179,9 @@ def x2_analysator_first(tb_lock, correction_args, **kwargs):
     This in particular includes the estimation of depletion voltage.
 
     The applied biasing states are:
-    .. list-table:: Table Bias States
-        :widths: 20 50 30
-        :header-rows: 1
 
-    * - 0V (unbiased)
-    * - -80V (biased, fully depleted?)
+    * 0V (unbiased)
+    * -80V (biased, fully depleted?)
 
     :param tb_lock: multiprocessing lock to make operations on the hdf files process- and thread-safe.
     :param correction_args: keyword arguments/dict to define how to correct for parasitic capacitances'.
@@ -1261,12 +1237,9 @@ def x2_analysator_second(tb_lock, correction_args, **kwargs):
     This in particular includes the estimation of depletion voltage.
 
     The applied biasing states are:
-    .. list-table:: Table Bias States
-        :widths: 20 50 30
-        :header-rows: 1
 
-    * - 0V (unbiased)
-    * - -80V (biased, fully depleted?)
+    * 0V (unbiased)
+    * -80V (biased, fully depleted?)
 
     :param tb_lock: multiprocessing lock to make operations on the hdf files process- and thread-safe.
     :param correction_args: keyword arguments/dict to define how to correct for parasitic capacitances'.
@@ -1367,12 +1340,9 @@ def x4_analysator(tb_lock, correction_args, **kwargs):
     This in particular includes the estimation of depletion voltage.
 
     The applied biasing states are:
-    .. list-table:: Table Bias States
-        :widths: 20 50 30
-        :header-rows: 1
 
-    * - 0V (unbiased)
-    * - -80V (biased, fully depleted?)
+    * 0V (unbiased)
+    * -80V (biased, fully depleted?)
 
     :param tb_lock: multiprocessing lock to make operations on the hdf files process- and thread-safe.
     :param correction_args: keyword arguments/dict to define how to correct for parasitic capacitances'.
@@ -1497,13 +1467,10 @@ def x5_analysator(tb_lock, correction_args, **kwargs):
     This in particular includes the estimation of depletion voltage.
 
     The applied biasing states are:
-    .. list-table:: Table Bias States
-        :widths: 20 50 30
-        :header-rows: 1
 
-    * - 0V (unbiased)
-    * - -40V (biased, fully depleted?)
-    * - -90V (biased, fully depleted?)
+    * 0V (unbiased)
+    * -40V (biased, fully depleted?)
+    * -90V (biased, fully depleted?)
 
     :param tb_lock: multiprocessing lock to make operations on the hdf files process- and thread-safe.
     :param correction_args: keyword arguments/dict to define how to correct for parasitic capacitances'.
@@ -1671,12 +1638,9 @@ def x6_analysator(tb_lock, correction_args, **kwargs):
     This in particular includes the estimation of depletion voltage.
 
     The applied biasing states are:
-    .. list-table:: Table Bias States
-        :widths: 20 50 30
-        :header-rows: 1
 
-    * - 0V (unbiased)
-    * - -45V (biased, fully depleted?)
+    * 0V (unbiased)
+    * -45V (biased, fully depleted?)
 
     :param tb_lock: multiprocessing lock to make operations on the hdf files process- and thread-safe.
     :param correction_args: keyword arguments/dict to define how to correct for parasitic capacitances'.
@@ -1805,12 +1769,9 @@ def x7_analysator(tb_lock, correction_args, **kwargs):
     This in particular includes the estimation of depletion voltage.
 
     The applied biasing states are:
-    .. list-table:: Table Bias States
-        :widths: 20 50 30
-        :header-rows: 1
 
-    * - 0V (unbiased)
-    * - -40V (biased, fully depleted?)
+    * 0V (unbiased)
+    * -40V (biased, fully depleted?)
 
     :param tb_lock: multiprocessing lock to make operations on the hdf files process- and thread-safe.
     :param correction_args: keyword arguments/dict to define how to correct for parasitic capacitances'.
@@ -2003,12 +1964,9 @@ def general_plotter(tb_lock, file_name, bias, **kwargs):
     The plots are then created for each possibility for each biasing state.
 
     The applied biasing states are:
-    .. list-table:: Table Bias States
-        :widths: 20 50 30
-        :header-rows: 1
 
-    * - 0V (unbiased)
-    * - -40V (biased, exact value will depend here on the provided parameters.)
+    * 0V (unbiased)
+    * -40V (biased, exact value will depend here on the provided parameters.)
 
     :param tb_lock: multiprocessing lock to make operations on the hdf files process- and thread-safe.
     :param file_name: name of the hdf file, where the measurement data is stored together with the results of the
@@ -2138,12 +2096,9 @@ def r1_plotter(tb_lock):
     The plots are then created for each possibility for each biasing state.
 
     The applied biasing states are:
-    .. list-table:: Table Bias States
-        :widths: 20 50 30
-        :header-rows: 1
 
-    * - 0V (unbiased)
-    * - -80V (biased)
+    * 0V (unbiased)
+    * -80V (biased)
 
     :param tb_lock: multiprocessing lock to make operations on the hdf files process- and thread-safe.
     """
@@ -2364,12 +2319,9 @@ def r13_plotter_first(tb_lock):
     The plots are then created for each possibility for each biasing state.
 
     The applied biasing states are:
-    .. list-table:: Table Bias States
-        :widths: 20 50 30
-        :header-rows: 1
 
-    * - 0V (unbiased)
-    * - -80V (biased)
+    * 0V (unbiased)
+    * -80V (biased)
 
     :param tb_lock: multiprocessing lock to make operations on the hdf files process- and thread-safe.
     """
@@ -2436,12 +2388,9 @@ def r13_plotter_second(tb_lock):
     The plots are then created for each possibility for each biasing state.
 
     The applied biasing states are:
-    .. list-table:: Table Bias States
-        :widths: 20 50 30
-        :header-rows: 1
 
-    * - 0V (unbiased)
-    * - -80V (biased)
+    * 0V (unbiased)
+    * -80V (biased)
 
     :param tb_lock: multiprocessing lock to make operations on the hdf files process- and thread-safe.
     """
@@ -2600,12 +2549,9 @@ def e1_plotter_first(tb_lock):
     The plots are then created for each possibility for each biasing state.
 
     The applied biasing states are:
-    .. list-table:: Table Bias States
-        :widths: 20 50 30
-        :header-rows: 1
 
-    * - 0V (unbiased)
-    * - -80V (biased)
+    * 0V (unbiased)
+    * -80V (biased)
 
     :param tb_lock: multiprocessing lock to make operations on the hdf files process- and thread-safe.
     """
@@ -2663,12 +2609,9 @@ def e1_plotter_second(tb_lock):
     The plots are then created for each possibility for each biasing state.
 
     The applied biasing states are:
-    .. list-table:: Table Bias States
-        :widths: 20 50 30
-        :header-rows: 1
 
-    * - 0V (unbiased)
-    * - -80V (biased)
+    * 0V (unbiased)
+    * -80V (biased)
 
     :param tb_lock: multiprocessing lock to make operations on the hdf files process- and thread-safe.
     """
@@ -2826,19 +2769,9 @@ def x1_plotter_first(tb_lock):
     The plots are then created for each possibility for each biasing state.
 
     The applied biasing states are:
-    .. list-table:: Table Bias States
-        :widths: 20 50 30
-        :header-rows: 1
 
-    * - HV
-      - Column B
-      - Column C
-    * - 0V (unbiased)
-      - A
-      - A
-    * - -80V (biased)
-      - B
-      - C
+    * 0V (unbiased)
+    * -80V (biased)
 
     :param tb_lock: multiprocessing lock to make operations on the hdf files process- and thread-safe.
     """
@@ -2928,19 +2861,10 @@ def x1_plotter(tb_lock):
     The plots are then created for each possibility for each biasing state.
 
     The applied biasing states are:
-    .. list-table:: Table Bias States
-        :widths: 20 50 30
-        :header-rows: 1
 
-    * - HV
-      - Column B
-      - Column C
-    * - 0V (unbiased)
-      - A
-      - A
-    * - -80V (biased)
-      - B
-      - C
+    * 0V (unbiased)
+    * -80V (biased)
+
 
     :param tb_lock: multiprocessing lock to make operations on the hdf files process- and thread-safe.
     """
@@ -3226,19 +3150,8 @@ def x2_plotter_first(tb_lock):
     The plots are then created for each possibility for each biasing state.
 
     The applied biasing states are:
-    .. list-table:: Table Bias States
-        :widths: 20 50 30
-        :header-rows: 1
-
-    * - HV
-      - Column B
-      - Column C
-    * - 0V (unbiased)
-      - A
-      - A
-    * - -80V (biased)
-      - B
-      - C
+    * 0V (unbiased)
+    * -80V (biased)
 
     :param tb_lock: multiprocessing lock to make operations on the hdf files process- and thread-safe.
     """
@@ -3297,19 +3210,8 @@ def x2_plotter_second(tb_lock):
     The plots are then created for each possibility for each biasing state.
 
     The applied biasing states are:
-    .. list-table:: Table Bias States
-        :widths: 20 50 30
-        :header-rows: 1
-
-    * - HV
-      - Column B
-      - Column C
-    * - 0V (unbiased)
-      - A
-      - A
-    * - -80V (biased)
-      - B
-      - C
+    * 0V (unbiased)
+    * -80V (biased)
 
     :param tb_lock: multiprocessing lock to make operations on the hdf files process- and thread-safe.
     """
@@ -3379,12 +3281,9 @@ def x4_plotter(tb_lock):
     The plots are then created for each possibility for each biasing state.
 
     The applied biasing states are:
-    .. list-table:: Table Bias States
-        :widths: 20 50 30
-        :header-rows: 1
 
-    * - 0V (unbiased)
-    * - -80V (biased)
+    * 0V (unbiased)
+    * -80V (biased)
 
     :param tb_lock: multiprocessing lock to make operations on the hdf files process- and thread-safe.
     """
@@ -3496,12 +3395,9 @@ def x5_plotter(tb_lock):
     The plots are then created for each possibility for each biasing state.
 
     The applied biasing states are:
-    .. list-table:: Table Bias States
-        :widths: 20 50 30
-        :header-rows: 1
 
-    * - 0V (unbiased)
-    * - -40V (biased)
+    * 0V (unbiased)
+    * -40V (biased)
 
     :param tb_lock: multiprocessing lock to make operations on the hdf files process- and thread-safe.
     """
@@ -3634,11 +3530,9 @@ def x6_plotter(tb_lock):
     The plots are then created for each possibility for each biasing state.
 
     The applied biasing states are:
-    .. list-table:: Table Bias States
-        :widths: 20 50 30
-        :header-rows: 1
-    * - 0V (unbiased)
-    * - -40V (biased)
+
+    * 0V (unbiased)
+    * -40V (biased)
 
     :param tb_lock: multiprocessing lock to make operations on the hdf files process- and thread-safe.
     """
@@ -3741,12 +3635,9 @@ def x7_plotter(tb_lock):
     The plots are then created for each possibility for each biasing state.
 
     The applied biasing states are:
-    .. list-table:: Table Bias States
-        :widths: 20 50 30
-        :header-rows: 1
 
-    * - 0V (unbiased)
-    * - -40V (biased)
+    * 0V (unbiased)
+    * -40V (biased)
 
     :param tb_lock: multiprocessing lock to make operations on the hdf files process- and thread-safe.
     """

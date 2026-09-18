@@ -129,7 +129,6 @@ def load_configuration_main():
     load_configuration(arguments.target)
 
 
-# TODO: test implementations on the actual device (In progress)
 def load_firmware(config=None):
     """
     load_firmware
