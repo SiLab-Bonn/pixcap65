@@ -462,10 +462,9 @@ class PixCapSetup(Dut):
         super(PixCapSetup, self).close()
 
     def fetch_commands(self):
-        assert 'power' in self
         self["power"].identify_device()
 
-        return fetch_psu_commands(self)
+        return fetch_psu_commands(self["power"])
 
     def __enter__(self):
         Dut.init(self)
