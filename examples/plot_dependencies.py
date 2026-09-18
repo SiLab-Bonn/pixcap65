@@ -743,7 +743,7 @@ def handle_model_fit(x_data, y_data, y_errors, model_function, name, *initial_ar
     :param name: name of the modelling.
     :param initial_args: initial guess for the fitting algorithm of the parameters of the model.
     :param limits: iterable/mapping of suitable limits to some of the parameters.
-    :return optimal cost value, d.o.f. of this fit.
+    :return: optimal cost value, d.o.f. of this fit.
     """
     from inspect import signature
     from warnings import warn

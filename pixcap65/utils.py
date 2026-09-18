@@ -470,8 +470,9 @@ class PixCapSetup(Dut):
     def __enter__(self):
         Dut.init(self)
 
-        # CHECK: maybe use a special function to handle this?
-        # this here may not be present in other implementations!
+        # CHECK: maybe use a special function to handle this? (implementation of this special function is now under
+        #  investigation)
+        #  this here may not be present in other implementations!
         enable_command, disable_command, psu_set_voltage, psu_set_current_limit, psu_get_current = self.fetch_commands()
         # self["power"].identify_device()
         #

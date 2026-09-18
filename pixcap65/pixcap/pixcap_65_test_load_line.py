@@ -5,6 +5,7 @@ Calculate t_charge with t_charge = m/seq_size * 1/f_rep
 """
 
 # TODO: Analysis and plotting of this kind of measurement is still missing.
+# we need to plot the behaviour of the current for different frequencies.
 
 import logging
 import numpy as np
@@ -176,9 +177,32 @@ class Pixcap65LoadLine(PixCap65Measurement):
 
     def analyze(self):
         logger.info("There is nothing to analyze for the load line test.")
+        # how to analyse all of this?
+        # is there any sense in investigating the capacitance in this case?
+        # of course we could use the standard procedure for that, but would it help at all?
 
     def plot(self):
         logger.info("There is nothing to plot for the load line test.")
+        from matplotlib import pyplot as plt
+        from matplotlib.backends.backend_pdf import PdfPages
+
+        # we will need one plot per frequency handled and then current in dependence an that also for each pixel measured;
+        # perhaps print all the different frequencies into just a single plot?
+        with PdfPages(self.output_file[:-3] + '_load_line.pdf') as pdf_file:
+            # need to iterate over-all the pixels
+            for row, col in np.ndindex((40,41)):
+                fig, ax = plt.subplots()
+
+                if not np.isfinite(self.hist_current[col, row, 1, 0]):
+                    continue
+
+                # need to iterate over all the frequencies to create line plots from them.
+                for k, frequency in enumerate(self.frequency_range):
+                    ax.errorbar(self.hist_current[col, row, 0, :], self.hist_current[col, row, k + 1, :],label="f={}".format(frequency))
+
+                pdf_file.savefig(fig, bbox_inches='tight')
+
+
 
     def storage_exception_handler(self, temp_id):
         with open("error_storage_configuration_{}_line_test.yaml".format(temp_id), 'w') as f:

@@ -485,24 +485,24 @@ def main():
     # C-V characterization sample
     coarse_bias_range = -1 * np.arange(0.1, arguments.maximum_hv_voltage, arguments.hv_step)
     # fine grid for HPK sensors.
-    # fine_bias_range = -1 * np.unique(np.concat((
-    #     np.geomspace(0.1, 1, 8),
-    #     np.geomspace(1, 15, 14),
-    #     np.arange(15, 50.1, 5),
-    #     np.geomspace(50,150, 26),
-    #     np.arange(150, 350,10)
-    # )))
+    fine_bias_range = -1 * np.unique(np.concat((
+        np.geomspace(0.1, 1, 8),
+        np.geomspace(1, 15, 14),
+        np.arange(15, 50.1, 5),
+        np.geomspace(50,150, 26),
+        np.arange(150, 350,10)
+    )))
     # fine grid sintef
     # fine_bias_range = -1 * np.unique(np.concat((
     #     np.geomspace(0.1, 30, 30),
     #     np.geomspace(30, 58, 41)
     # )))
     # fine grid FBK
-    fine_bias_range = -1 * np.unique(np.concat((
-        np.geomspace(0.1, 15, 15),
-        np.geomspace(15, 40, 20),
-        np.arange(40, 130.1, 1.25),
-    )))
+    # fine_bias_range = -1 * np.unique(np.concat((
+    #     np.geomspace(0.1, 15, 15),
+    #     np.geomspace(15, 40, 20),
+    #     np.arange(40, 130.1, 1.25),
+    # )))
     # fine grid R11/R13/R1
     # fine_bias_range = -1 * np.unique(np.concat((
     #     np.geomspace(0.1, 30, 20),

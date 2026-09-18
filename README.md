@@ -2,10 +2,16 @@
 
 [![License](https://img.shields.io/badge/License-Apache%202.0-blue.svg)](https://opensource.org/licenses/Apache-2.0)
 
-
+## Overview
 Host software for the PixCap65 chip control system based on MIO2 + GPAC hardware.
 
+### Features
+
+### Installation
+
 ## Setup
+
+### Overview
 
 * GPAC 5V
 * FPGA-Board 5V (MIO2)
@@ -21,7 +27,9 @@ Tests are only performed with
 * python 3.13: no bugs within operation, but after closing a measurement class, waiting for some time and reopening *
   *always** a USBTimeoutError occurs.
 
-## Traps
+### Usage
+
+### Traps
 
 * double import trap: **never** run any of the test scripts directly by using their filename but *only* with the `-m`
   flag of python. In all other cases the class and import hierarchy **will** break.
@@ -33,4 +41,7 @@ implementations.
 The latter ones were moved to [legacy](legacy).
 
 The utility code file [homogenize_plots.py](pixcap65/utility/homogenize_plots.py) is taken from code sources provided for the module `physik131: EDV für Physiker`.
+
+# License
+
 

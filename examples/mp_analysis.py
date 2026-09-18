@@ -169,7 +169,7 @@ def processed_manager(**kwargs):
     :keyword address: address of the socket of the :py:class:`multiprocessing.Manager` object we want to connect to.
     :keyword authkey: authentication key necessary to connect to the socket. (It is recommended not to use this
      parameter as it is not pickable)
-    :return manager, lock
+    :return: (manager, lock)
     """
     import pixcap65.concurrency
     import gc
