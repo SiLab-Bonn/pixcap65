@@ -19,8 +19,7 @@ Collection of inter-pixel capacitance models attempted in my bachelor thesis.
 
 import numpy as np
 
-from compare_plots import linear_model
-from examples.general_model import quadratic_model
+from examples.general_model import quadratic_model, linear_model
 
 
 def inter_cap_model(xy, a0, a1, a2, a3, a4):
