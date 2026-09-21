@@ -23,10 +23,11 @@ import tables as tb
 from pixcap65.analysis_util.constants import SI_MOBILITY, BOUNDARY_TYPE, BIAS_VOLTAGE_ACCESS_IDX
 from pixcap65.analysis_util.delegation.cv.doping import analyze_doping_profile
 from pixcap65.analysis_util.delegation.depletion import depletion_delegation_impl
-from pixcap65.analysis_util.modelling.data_store import DopingArrayStore
+from pixcap65.analysis_util.modelling.data_store import DopingArrayStore, DepletionArrayStore
 from pixcap65.analysis_util.multi_processing import get_manager_keywords
 from pixcap65.utility.tables_util import group_get_file
 from pixcap65.utility.utils_2 import create_carray
+from .constants import MP_ACCELERATION_FLAG
 from ..utility import GLOBAL_FILTERS, GENERAL_PIXCAP_SHAPE
 
 try:
@@ -235,30 +236,47 @@ def analyze_depletion_delegate(data_group: tb.Group, analysis_group: tb.Group,
         voltage_data = voltage_data[:, BIAS_VOLTAGE_ACCESS_IDX]
 
     # FIXME: provide here the correct manager arguments! (put it under investigation for now)
-    with get_context_manager(**manager_keywords) as manager:
+    with get_context_manager() as manager:
         if isinstance(first_boundaries, Iterable) and not isinstance(first_boundaries, Tuple):
             assert first_boundaries is not None
             assert second_boundaries is not None
             assert isinstance(first_boundaries, Sized)
-            # fit_result_storage = DepletionArrayStore(n_depletions=len(first_boundaries))
             number_depletions = len(first_boundaries)
-            fit_result_storage = manager.DepletionArrayStorage(n_depletions=number_depletions)
-            for k, (first_bound, second_bound) in enumerate(zip(first_boundaries, second_boundaries)):
-                first_lower, first_upper = first_bound
-                second_lower, second_upper = second_bound
-                fit_result_storage.set_depletion_region(k)
-                depletion_delegation_impl(cap_data, cap_error_data, first_lower, first_upper, second_lower,
-                                          second_upper,
-                                          fit_result_storage, voltage_data, **kwargs)
+            # if MP_ACCELERATION_FLAG:
+            #     fit_result_storage = manager.DepletionArrayStorage(n_depletions=number_depletions)
+            # else:
+            #     fit_result_storage = DepletionArrayStore(n_depletions=len(first_boundaries))
+            # for k, (first_bound, second_bound) in enumerate(zip(first_boundaries, second_boundaries)):
+            #     first_lower, first_upper = first_bound
+            #     second_lower, second_upper = second_bound
+            #     fit_result_storage.set_depletion_region(k)
+            #     depletion_delegation_impl(cap_data, cap_error_data, first_lower, first_upper, second_lower,
+            #                               second_upper,
+            #                               fit_result_storage, voltage_data, **kwargs)
 
         else:
             # extract the required data and create arrays for temporary storage.
-            first_lower, first_upper = first_boundaries
-            second_lower, second_upper = second_boundaries
-            # fit_result_storage = DepletionArrayStore()
+            # first_lower, first_upper = first_boundaries
+            # second_lower, second_upper = second_boundaries
+
             number_depletions = 1
-            fit_result_storage = manager.DepletionArrayStorage()
-            depletion_delegation_impl(cap_data, cap_error_data, first_lower, first_upper, second_lower, second_upper,
+            # if MP_ACCELERATION_FLAG:
+            #     fit_result_storage = manager.DepletionArrayStorage(n_depletions=number_depletions)
+            # else:
+            #     fit_result_storage = DepletionArrayStore(n_depletions=number_depletions)
+            # depletion_delegation_impl(cap_data, cap_error_data, first_lower, first_upper, second_lower, second_upper,
+            #                           fit_result_storage, voltage_data, **kwargs)
+
+        if MP_ACCELERATION_FLAG:
+            fit_result_storage = manager.DepletionArrayStorage(n_depletions=number_depletions)
+        else:
+            fit_result_storage = DepletionArrayStore(n_depletions=len(first_boundaries))
+        for k, (first_bound, second_bound) in enumerate(zip(np.atleast_2d(first_boundaries), np.atleast_2d(second_boundaries))):
+            first_lower, first_upper = first_bound
+            second_lower, second_upper = second_bound
+            fit_result_storage.set_depletion_region(k)
+            depletion_delegation_impl(cap_data, cap_error_data, first_lower, first_upper, second_lower,
+                                      second_upper,
                                       fit_result_storage, voltage_data, **kwargs)
 
         # save the depletion voltage data.
