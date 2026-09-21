@@ -246,7 +246,7 @@ def _plot_individual_pixel(analysis_group: tb.Group, inter_a_cap_hist: np.ndarra
                                                        parasitic_correction=extract_parasitic_capacitance(
                                                            analysis_group.HistCap))
                 residues = total_current_hist[col, row, nan_mask] * CURRENT_CONVERSION_FACTOR - cap_pred
-                ax[0].errorbar(f_res, residues, fmt='o')
+                ax[1].errorbar(f_res, residues, fmt='o', label='1')
                 if np.isfinite(inter_a_current_hist[col, row, 0]):
                     plot_current_model(ax[0], col, row, analysis_group,
                                        inter_a_cap_hist[col, row] * CAPACITANCE_CONVERSION_FACTOR, inter_a_leak_hist, f,
@@ -259,7 +259,7 @@ def _plot_individual_pixel(analysis_group: tb.Group, inter_a_cap_hist: np.ndarra
                                                            parasitic_correction=extract_parasitic_capacitance(
                                                                analysis_group.HistCap))
                     residues = inter_a_current_hist[col, row, nan_mask] * CURRENT_CONVERSION_FACTOR - cap_pred
-                    ax[1].errorbar(f_res, residues, fmt='v')
+                    ax[1].errorbar(f_res, residues, fmt='v', label='2')
                 if np.isfinite(inter_b_current_hist[col, row, 0]):
                     plot_current_model(ax[0], col, row, analysis_group,
                                        inter_b_cap_hist[col, row] * CAPACITANCE_CONVERSION_FACTOR, inter_b_leak_hist, f,
@@ -272,7 +272,7 @@ def _plot_individual_pixel(analysis_group: tb.Group, inter_a_cap_hist: np.ndarra
                                                            parasitic_correction=extract_parasitic_capacitance(
                                                                analysis_group.HistCap))
                     residues = inter_b_current_hist[col, row, nan_mask] * CURRENT_CONVERSION_FACTOR - cap_pred
-                    ax[1].errorbar(f_res, residues, fmt='s')
+                    ax[1].errorbar(f_res, residues, fmt='s', label='3')
                 ax[0].set_ylabel(CURRENT_LABEL)
                 ax[1].set_ylabel(CURRENT_LABEL)
                 ax[1].set_xlabel(FREQUENCY_LABEL)

@@ -361,6 +361,10 @@ def _get_sensor_distribution(ana_group: tb.Group, bias_voltage, cap_data, dist_e
         __mp_init_distribution_delegate(cap_data_para, kwargs)
         parasitic_adv_cap_est = np.rec.array([__mp_handle_distribution_delegate(item) for item in parasitic_advanced_samples], dtype=sensor_distribution_type)
         dispersion_estimator = np.rec.array([__mp_handle_distribution_delegate(item) for item in dispersion_cap_sample], dtype=sensor_distribution_type)
+        import multiprocessing as mp
+        with mp.Pool(processes=8, initializer=__mp_init_distribution_delegate,
+                     initargs=(cap_data_para, kwargs)) as pool:
+            pass
     else:
         # for current size of these iterables there is no improvement in time by using pooled execution!
         with mp.Pool(processes=8, initializer=__mp_init_distribution_delegate, initargs=(cap_data_para, kwargs)) as pool:
