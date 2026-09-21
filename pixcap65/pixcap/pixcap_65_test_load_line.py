@@ -13,7 +13,8 @@ import tables as tb
 import time
 from bitarray import bitarray
 
-from pixcap65.analysis_util.utility import HIST_CURRENT_MEAS_UNIT
+from pixcap65.analysis_util.utility import HIST_CURRENT_MEAS_UNIT, GENERAL_PIXCAP_SHAPE, HIST_CAP_UNIT, \
+    HIST_LEAK_CURRENT_UNIT
 from pixcap65.pixcap.pixcap65_measurement import ScanConfigurationKeys, CapType, MeasurementAttributes
 from pixcap65.pixcap_65_total_cap import PixCap65Measurement, _store_scan_par_values
 from pixcap65.utility import pixcap65_constants as c
@@ -175,18 +176,100 @@ class Pixcap65LoadLine(PixCap65Measurement):
         super(Pixcap65LoadLine, self).close()
         logger.debug("Done and closed the pixcap system.")
 
-    def analyze(self):
+    def analyze(self, data_group_spec=None, **kwargs):
         logger.info("There is nothing to analyze for the load line test.")
         # how to analyse all of this?
         # is there any sense in investigating the capacitance in this case?
         # of course we could use the standard procedure for that, but would it help at all?
+        # The issue why we cannot use the analysis framework directly is the additional dimension by the line tests; maybe we must use temporary stores.
+        # but the analysis delegation handler requires a quite particular layout of the data.
+        # create a full copy of the data group.
+        # iterate and copy on each iteration the extracted part of the data into the Histogramm
+        # perform the analysis and store it's results
+        original_group = self.get_data_group(data_group_spec, CapType.TOTAL_PIXEL)
+        original_parent = original_group._v_parent
+        temporary_group = self.out_file_h5.copy_node(where=original_parent, name=original_group._v_name,
+                                                     newname="temporary_group", recursive=True)
+        # we also need the arrays to store the final results to.
+        result_shape = tuple([*GENERAL_PIXCAP_SHAPE, int(self.seq_size / 2 - 1)])
+        cap_hist = np.full(shape=result_shape, fill_value=np.nan)
+        cap_error_hist = np.full(shape=result_shape, fill_value=np.nan)
+        leak_hist = np.full(shape=result_shape, fill_value=np.nan)
+        leak_error_hist = np.full(shape=result_shape, fill_value=np.nan)
+        resistor_hist = np.full(shape=result_shape, fill_value=np.nan)
+        resistor_error_hist = np.full(shape=result_shape, fill_value=np.nan)
+        fit_cov = None
+
+        for l in range(int(self.seq_size / 2 - 1)):
+            temporary_group.HistCurr._f_remove()
+            temporary_group.HistCurrErr._f_remove()
+
+            # create as a new array
+            temp_currents_hist = original_group.HistCurr[:]
+            temp_currents = temp_currents_hist[:, :, :, l]
+            temp_errors_hist = original_group.HistCurrErr[:]
+            temp_errors = temp_errors_hist[:, :, :, l]
+            self.create_carray(temporary_group, name='HistCurr', title='Current Histogram',
+                               obj=temp_currents, filters=self.filters, unit=HIST_CURRENT_MEAS_UNIT)
+
+            if np.any(np.isfinite(temp_errors)):
+                self.create_carray(temporary_group, name='HistCurrErr', title='Current Error Histogram',
+                                   obj=temp_errors, filters=self.filters, unit=HIST_CURRENT_MEAS_UNIT)
+            # analyse the whole thing
+            from pixcap65.analysis_util.general import analysis_data_handle
+            analysis_data_handle(self.out_file_h5, temporary_group, temporary_group)
+            # store the retrieved data.
+            temp = temporary_group.HistCap[:]
+            cap_hist[:, :, :, l] = temp[:]
+            temp = temporary_group.HistCapErr[:]
+            cap_error_hist[:, :, :, l] = temp[:]
+            temp = temporary_group.HistLeak[:]
+            leak_hist[:, :, :, l] = temp[:]
+            temp = temporary_group.HistLeakErr[:]
+            leak_error_hist[:, :, :, l] = temp[:]
+            if "HistRes" in temporary_group:
+                temp = temporary_group.HistRes[:]
+                resistor_hist[:, :, :, l] = temp[:]
+                temp = temporary_group.HistResErr[:]
+                resistor_error_hist[:, :, :, l] = temp[:]
+            if fit_cov is None:
+                fit_cov_shape = tuple([*temporary_group.HistFitCov, int(self.seq_size / 2 - 1)])
+                fit_cov = np.full(shape=fit_cov_shape, fill_value=np.nan)
+            temp = temporary_group.HistFitCov[:]
+            # TODO: Missing the implementation for the covariance matrix!
+
+        # save the full results in the end if everything is all fine.
+        self.create_carray(original_group, name=kwargs.get("cap_name", "HistCap"),
+                           title=kwargs.get("cap_title", "Capacitance Histogram"), obj=cap_hist, filters=self.filters,
+                           unit=HIST_CAP_UNIT)
+        self.create_carray(original_group, name=kwargs.get("cap_err_name", "HistCapErr"),
+                           title=kwargs.get("cap_err_title", "Capacitance Error Histogram"), obj=cap_error_hist,
+                           filters=self.filters, unit=HIST_CAP_UNIT)
+
+        self.create_carray(original_group, name=kwargs.get("leak_name", "HistLeak"),
+                           title=kwargs.get("leak_title", "Leakage Current Histogram"), obj=leak_hist,
+                           filters=self.filters,
+                           unit=HIST_LEAK_CURRENT_UNIT)
+        self.create_carray(original_group, name=kwargs.get("leak_error_name", "HistLeakErr"),
+                           title=kwargs.get("leak_error_title", "Leakage Current Error Histogram"), obj=leak_error_hist,
+                           filters=self.filters, unit=HIST_LEAK_CURRENT_UNIT)
+        self.create_carray(original_group, name=kwargs.get("resistor_name", "HistRes"),
+                           title=kwargs.get("resistor_title", "On-Resistance Histogram"), obj=resistor_hist,
+                           filters=self.filters, unit="O")
+        self.create_carray(original_group, name=kwargs.get("resistor_error_name", "HistResErr"),
+                           title=kwargs.get("resistor_error_title", "On-Resistance Error Histogram"),
+                           obj=resistor_error_hist,
+                           filters=self.filters, unit="O")
+        self.create_carray(original_group, name=kwargs.get("cov_name", "HistFitCov"),
+                           title=kwargs.get("cov_title", 'Fit Covariance Matrix'), obj=fit_cov, filters=self.filters,
+                           unit="{{F^2, F O, F nA, F V},{O F, O^2, O nA, O V},{nA F, nA O, nA^2, nA V}, {V F, V O, V nA, V^2}")
 
     def plot(self):
         logger.info("There is nothing to plot for the load line test.")
         from matplotlib import pyplot as plt
         from matplotlib.backends.backend_pdf import PdfPages
 
-        # we will need one plot per frequency handled and then current in dependence an that also for each pixel measured;
+        # we will need one plot per frequency handled and then current in dependence on that also for each pixel measured;
         # perhaps print all the different frequencies into just a single plot?
         with PdfPages(self.output_file[:-3] + '_load_line.pdf') as pdf_file:
             # need to iterate over-all the pixels
