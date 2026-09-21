@@ -24,7 +24,9 @@ import multiprocessing as mp
 import time
 from contextlib import contextmanager
 
-from examples.full_analysis import x5_analysator
+from examples.full_analysis import r13_analysator_second, r1_analysator, e1_analysator_second
+from examples.full_analysis import x1_analysator_second as x1_analysator, x2_analysator_second as x2_analysator, \
+    x4_analysator, x5_analysator, x6_analysator, x7_analysator
 from pixcap65.utility import synchronized_process_open_file
 
 AUTHKEY_OUTPUT = "Fetch new authkey:"
@@ -189,15 +191,15 @@ if __name__ == "__main__":
     start_time = time.time()
 
     process_handles = [
-        # x1_analysator,
-        # x2_analysator,
+        x1_analysator,
+        x2_analysator,
         x5_analysator,
-        # x6_analysator,
-        # x7_analysator,
-        # e1_analysator_second,
-        # r13_analysator_second,
-        # r1_analysator,
-        # x4_analysator,
+        x6_analysator,
+        x7_analysator,
+        e1_analysator_second,
+        r13_analysator_second,
+        r1_analysator,
+        x4_analysator,
     ]
 
     with processed_manager() as (manager, tables_lock):

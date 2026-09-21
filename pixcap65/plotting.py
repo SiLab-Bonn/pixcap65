@@ -15,14 +15,6 @@ except ImportError:
     # noinspection PyProtectedMember,PyUnresolvedReferences
     from collections import Iterable
 
-# seemingly unused
-# before deleting them, just comment them in case they are still required for one of the plotting handlers.
-# HISTOGRAM_SHAPE_FORMAT = "The histograms shape is {}"
-# E1_SCAN_FILE = "Reference_Evelyn_Scan.h5"
-# X2_SCAN_FILE = 'New_2_Scan.h5'
-# X1_SCAN_2_FILE = "packaged/data/X1_4_Renew_Scan.h5"
-# REFERENCE_TEST_FILE = "packaged/Reference_Demo.h5"
-
 if __name__ == '__main__':
     # plot_data(interpreted_data=os.path.expanduser('~/git/pixcap65/pixcap_LF_50x50_DC_R3_80V_HV.h5'))
 
