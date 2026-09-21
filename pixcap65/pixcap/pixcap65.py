@@ -287,18 +287,6 @@ class Pixcap65(Dut):
                 from ..utils import fetch_psu_commands
                 enable_command, disable_command, psu_set_voltage, psu_set_current_limit, psu_get_current = \
                     fetch_psu_commands(power_driver)
-                # power_config = power_driver._conf
-                # if "mappings" in power_config:
-                #     command_mappings = power_config["mappings"]
-                #     # Or would separate on-off commands be the better choice?
-                #     enable_command = getattr(power_driver, command_mappings["set_enable"])
-                #     disable_command = getattr(power_driver, command_mappings["set_disable"])
-                # else:
-                #     def enable_command(**kwargs):
-                #         power_driver.set_enable(1, **kwargs)
-                #
-                #     def disable_command(**kwargs):
-                #         power_driver.set_enable(0, **kwargs)
 
                 try:
                     disable_command(channel=1)
