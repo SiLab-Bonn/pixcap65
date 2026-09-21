@@ -46,6 +46,8 @@ INTER_UNBIASED = 'inter_unbiased_full'
 LOG_FINISHED_ANALYSIS = "Finished the Analysis for"
 LOG_CV_ANALYSIS = "CV Analysis for"
 CV_DATA_FOR_ = "CV Data for {}"
+SECOND_LABEL = " Second Try."
+AUTHKEY_OUTPUT = "Fetch new authkey:"
 
 logger = logging.getLogger(__name__)
 
@@ -425,15 +427,16 @@ def r13_analysator_second(tb_lock, correction_args, **kwargs):
     :param tb_lock: multiprocessing lock to make operations on the hdf files process- and thread-safe.
     :param correction_args: keyword arguments/dict to define how to correct for parasitic capacitances'.
     """
+    from examples.mp_analysis import synchronize_full_model
     import pixcap65.concurrency
     name = "R13"
     display_name = "R13" + SECOND_LABEL
     top_ref = "Reference"
     print("Analyze", display_name)
-    print(threading.get_native_id())
-    print(mp.current_process().name)
-    print(mp.current_process().pid)
-    print(AUTHKEY_OUTPUT, mp.current_process().authkey)
+    logger.debug(threading.get_native_id())
+    logger.debug(mp.current_process().name)
+    logger.debug(mp.current_process().pid)
+    logger.debug(AUTHKEY_OUTPUT, mp.current_process().authkey)
 
     _ = pixcap65.concurrency.get_manager(**kwargs)
     r13_depletion_args = {
@@ -448,13 +451,13 @@ def r13_analysator_second(tb_lock, correction_args, **kwargs):
     r13_depletion_args.update(**correction_args)
 
     synchronize_full_model(R13_2_SCAN_FILE, top_ref, name, 80, tb_lock,
-                           unbiased_group="unbiased_1_full")
+                           unbiased_group="unbiased_1_full", api=True)
     synchronize_full_model(R13_2_SCAN_FILE, top_ref, name, 80, tb_lock,
                            unbiased_group="unbiased_1_full", inter_unbiased_group="inter_unbiased_full_renew",
                            inter_biased_group="inter_biased_M_{}_V_full_renew")
     synchronize_full_model(R13_2_SCAN_FILE, top_ref, name, 80, tb_lock,
                            inter_unbiased_group="inter_unbiased_renew_Extended_full",
-                           inter_biased_group="inter_biased_M_{}_V_renew_Extended_full")
+                           inter_biased_group="inter_biased_M_{}_V_renew_Extended_full", api=True)
 
     analyze_data(raw_data=R13_2_SCAN_FILE, base_path=hdf(top_ref, name, 'unbiased_1_full'), is_advanced=True,
                  lock=tb_lock, test_cap_exclusion=True, distribution=True, full_model=False,
@@ -2911,7 +2914,7 @@ def x1_plotter(tb_lock):
     plot_data(interpreted_data="packaged/data/X1_12_Renew_Scan.h5",
               base_path=hdf(top_ref, name, 'biased_200_V_full_model'), use_group=True,
               test_cap_exclusion=True, use_corrected=True, mask_pixel=data_constants.x1_second_pixel_mask,
-              distribution=True, lock=tb_lock, )
+              distribution=True, lock=tb_lock,)
 
     plot_inter_pix_data(interpreted_data=X1_SCAN_2_FILE, base_path=hdf(top_ref, name, 'inter_unbiased_full'),
                         use_group=True, test_cap_exclusion=True, distribution=True,
@@ -3131,7 +3134,7 @@ def x1_plotter(tb_lock):
                        apply_doping=True, distribution=True,
                        mask_pixel=data_constants.x1_second_pixel_mask,
                        lock=tb_lock)
-    # threaded_plotting.joint_plotting()
+    threaded_plotting.joint_plotting()
     print("Finished -", display_name)
 
 

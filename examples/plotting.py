@@ -46,7 +46,8 @@ if __name__ == "__main__":
     # use this attempt to achieve a better performance when generating the plots
     import multiprocessing as mp
     from examples.full_analysis import x1_plotter, \
-        x5_plotter
+    x5_plotter, presentation_plotter, bare_sample_plotter_second, x2_plotter_second, x6_plotter, x7_plotter, \
+    r13_plotter_second, e1_plotter_second, r1_plotter, x4_plotter
 
     print(mp.current_process().name)
     print(mp.cpu_count())
@@ -54,18 +55,18 @@ if __name__ == "__main__":
     start = time.time()
     with mp.Manager() as manager, mp.Pool(initializer=mp_plotting_init, initargs=("PDF", has_latex,)) as pool:
         tables_lock = manager.RLock()
-        # presentation_plotter(tables_lock)
+        presentation_plotter(tables_lock)
         process_handles = [
-            # bare_sample_plotter_second,
+            bare_sample_plotter_second,
             x1_plotter,
-            # x2_plotter_second,
+            x2_plotter_second,
             x5_plotter,
-            # x6_plotter,
-            # x7_plotter,
-            # r13_plotter_second,
-            # e1_plotter_second,
-            # r1_plotter,
-            # x4_plotter,
+            x6_plotter,
+            x7_plotter,
+            r13_plotter_second,
+            e1_plotter_second,
+            r1_plotter,
+            x4_plotter,
         ]
         processes = [pool.apply_async(handle, (tables_lock,), error_callback=error_handler) for handle in
                      process_handles]
