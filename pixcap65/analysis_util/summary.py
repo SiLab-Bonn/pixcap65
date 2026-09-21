@@ -102,7 +102,6 @@ spatial_identifier = ["X{}".format(i) for i in range(3, 9)]
 
 # but how to format such a table (to store a summary of all our measurement results)?
 # we will need a master table 'to do' so.
-# CHECK: should this here be moved to our general data structure definitions?
 class MasterTableResultEntry(tb.IsDescription):
     """
     General structure of result entry in the summary table for all sensors.

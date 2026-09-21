@@ -22,7 +22,7 @@ from warnings import warn, filterwarnings
 
 from pixcap65.analysis_util.constants import BOUNDARY_TYPE, RANDOM_SEED
 from pixcap65.analysis_util.general import _analyze_data
-from pixcap65.analysis_util.multiprocessing import get_manager_keywords
+from pixcap65.analysis_util.multi_processing import get_manager_keywords
 from pixcap65.analysis_util.utility import GENERAL_PIXCAP_SHAPE, FARAD_CONVERSION_FACTOR, CURRENT_CONVERSION_FACTOR, \
     GLOBAL_FILTERS
 from pixcap65.analysis_util.utility import TABLES_ARRAY_TYPE, TABLES_TABLE_TYPE, GENERAL_PIXCAP_SHAPE, \
