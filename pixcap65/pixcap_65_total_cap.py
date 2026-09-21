@@ -1571,7 +1571,7 @@ class PixCap65TotalCap(PixCap65Measurement):
 
     def plot(self, data_group_spec=None, **kwargs):
         from matplotlib.backends.backend_pdf import PdfPages
-        from pixcap65.plotting import get_analysis_group
+        from pixcap65.analysis_util.utility import get_analysis_group
         from pixcap65.plotting_util.utility import get_pdf_name
 
         suffix = kwargs.pop("suffix", "general_data_intern")
