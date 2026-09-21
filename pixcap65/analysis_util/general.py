@@ -504,8 +504,6 @@ def _cv_analysis(in_file_h5: tb.File, bare_file_arg, bare_path_arg, base_group: 
                                                                  "SensorDepletionRaw")
             depletion_data_table.flush()
 
-            # FIXME: for correct resistivity estimation it is necessary to use the correct pixel area/size
-            # perhaps we should move this here to another position to also fetch the pixel geometry data.
             # this would require detailed information about the sensor geometry!
             # we would need to know which pixels contribute to give an estimate
             # could we fetch the correct geometry from the corresponding data set?
@@ -515,7 +513,7 @@ def _cv_analysis(in_file_h5: tb.File, bare_file_arg, bare_path_arg, base_group: 
                 raw_pixel_areas = np.prod(chip_spec_group.PhysicalDimensions[:], axis=2)
                 sensor_pixel_mask = np.isfinite(cv_data[:, :, 0])
                 distribution_pixel_area = np.mean(raw_pixel_areas[sensor_pixel_mask])
-            except:
+            except (NameError, tb.NoSuchNodeError, np.exceptions.AxisError):
                 distribution_pixel_area = 50 * 50
             resistivity_estimator = EPS_SILICON * epsilon_0 * distribution_pixel_area ** 2 * depletion_data_table.cols.c[
                 :] / (2 * SI_MOBILITY) * SLOPE_RESISTIVITY_CONVERSION
@@ -677,4 +675,5 @@ def analysis_data_handle(file: tb.File, data_group: GroupType, result_group: Gro
 
     # if necessary: directly apply the correction of the capacitance values
     # FIXME: this is explicitly using a lock!
+    # but then the question is whether it could leak the lock outside!
     _handle_cap_correction(result_group, **kwargs)
