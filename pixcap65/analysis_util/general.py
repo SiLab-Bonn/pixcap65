@@ -31,7 +31,7 @@ finally:
 from .constants import SI_MOBILITY, DISPERSION_PARASITIC_DEVIATION, BIAS_VOLTAGE_ACCESS_IDX, \
     SLOPE_RESISTIVITY_CONVERSION
 from .delegation.depletion import __distribution_depletion_estimation
-from .multiprocessing import _handle_mp_parasitic_cap
+from .multi_processing import _handle_mp_parasitic_cap
 from .delegation.distribution import _get_sensor_distribution
 from .delegation import _get_analyze, analyze_depletion_delegate
 from .correction import apply_correction_simple, _handle_cap_correction

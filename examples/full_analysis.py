@@ -1475,6 +1475,7 @@ def x5_analysator(tb_lock, correction_args, **kwargs):
     :param tb_lock: multiprocessing lock to make operations on the hdf files process- and thread-safe.
     :param correction_args: keyword arguments/dict to define how to correct for parasitic capacitances'.
     """
+    from examples.mp_analysis import synchronize_full_model
     import pixcap65.concurrency
     name = "X5"
     display_name = name

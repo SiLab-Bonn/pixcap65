@@ -4,7 +4,7 @@ import re
 import tables as tb
 from contextlib import asynccontextmanager
 from tables import Filters
-from typing import Literal
+from typing import Literal, Optional
 
 with concurrent.futures.ProcessPoolExecutor() as pool:
     pool.map(print, [])
@@ -21,8 +21,8 @@ regex = r"The files '.*' is already opened"
 async def __internal_tables_open_file(filename: str, mode: Literal["r", "w", "a", "r+"] = "r",
                                       title: str = "",
                                       root_uep: str = "/",
-                                      filters: Filters | None = None,
-                                      **kwargs,):
+                                      filters: Optional[Filters] = None,
+                                      **kwargs, ):
     while True:
         try:
             with tb.open_file(filename, mode, title, root_uep, filters, **kwargs) as file:
@@ -50,8 +50,8 @@ async def tables_open_file(filename: str,
                            mode: Literal["r", "w", "a", "r+"] = "r",
                            title: str = "",
                            root_uep: str = "/",
-                           filters: Filters | None = None,
-                           **kwargs,):
+                           filters: Optional[Filters] = None,
+                           **kwargs, ):
     timeout = kwargs.pop("timeout", None)
     if timeout:
         file = await async_lib.wait_for(__internal_tables_open_file(filename, mode, title, root_uep, filters, **kwargs), timeout)

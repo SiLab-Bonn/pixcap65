@@ -24,7 +24,7 @@ from pixcap65.analysis_util.constants import SI_MOBILITY, BOUNDARY_TYPE, BIAS_VO
 from pixcap65.analysis_util.delegation.cv.doping import analyze_doping_profile
 from pixcap65.analysis_util.delegation.depletion import depletion_delegation_impl
 from pixcap65.analysis_util.modelling.data_store import DopingArrayStore
-from pixcap65.analysis_util.multiprocessing import get_manager_keywords
+from pixcap65.analysis_util.multi_processing import get_manager_keywords
 from pixcap65.utility.tables_util import group_get_file
 from pixcap65.utility.utils_2 import create_carray
 from ..utility import GLOBAL_FILTERS, GENERAL_PIXCAP_SHAPE
