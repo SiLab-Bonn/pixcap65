@@ -242,36 +242,16 @@ def analyze_depletion_delegate(data_group: tb.Group, analysis_group: tb.Group,
             assert second_boundaries is not None
             assert isinstance(first_boundaries, Sized)
             number_depletions = len(first_boundaries)
-            # if MP_ACCELERATION_FLAG:
-            #     fit_result_storage = manager.DepletionArrayStorage(n_depletions=number_depletions)
-            # else:
-            #     fit_result_storage = DepletionArrayStore(n_depletions=len(first_boundaries))
-            # for k, (first_bound, second_bound) in enumerate(zip(first_boundaries, second_boundaries)):
-            #     first_lower, first_upper = first_bound
-            #     second_lower, second_upper = second_bound
-            #     fit_result_storage.set_depletion_region(k)
-            #     depletion_delegation_impl(cap_data, cap_error_data, first_lower, first_upper, second_lower,
-            #                               second_upper,
-            #                               fit_result_storage, voltage_data, **kwargs)
 
         else:
-            # extract the required data and create arrays for temporary storage.
-            # first_lower, first_upper = first_boundaries
-            # second_lower, second_upper = second_boundaries
-
             number_depletions = 1
-            # if MP_ACCELERATION_FLAG:
-            #     fit_result_storage = manager.DepletionArrayStorage(n_depletions=number_depletions)
-            # else:
-            #     fit_result_storage = DepletionArrayStore(n_depletions=number_depletions)
-            # depletion_delegation_impl(cap_data, cap_error_data, first_lower, first_upper, second_lower, second_upper,
-            #                           fit_result_storage, voltage_data, **kwargs)
 
         if MP_ACCELERATION_FLAG:
             fit_result_storage = manager.DepletionArrayStorage(n_depletions=number_depletions)
         else:
-            fit_result_storage = DepletionArrayStore(n_depletions=len(first_boundaries))
-        for k, (first_bound, second_bound) in enumerate(zip(np.atleast_2d(first_boundaries), np.atleast_2d(second_boundaries))):
+            fit_result_storage = DepletionArrayStore(n_depletions=number_depletions)
+        for k, (first_bound, second_bound) in enumerate(zip(np.atleast_2d(first_boundaries),
+                                                                np.atleast_2d(second_boundaries))):
             first_lower, first_upper = first_bound
             second_lower, second_upper = second_bound
             fit_result_storage.set_depletion_region(k)
