@@ -356,17 +356,20 @@ def _get_sensor_distribution(ana_group: tb.Group, bias_voltage, cap_data, dist_e
     # we could also optimise here by using multiprocessing iterators!
     dispersion_cap_sample = rng.normal(loc=0, scale=DISPERSION_PARASITIC_DEVIATION,
                                        size=REDUCED_SYSTEMATICS_SAMPLE_SIZE,)
-    # FIXME: prevent this mp worker pool from leaking semaphore objects all around!
-    if True:
-        __mp_init_distribution_delegate(cap_data_para, kwargs)
-        parasitic_adv_cap_est = np.rec.array([__mp_handle_distribution_delegate(item) for item in parasitic_advanced_samples], dtype=sensor_distribution_type)
-        dispersion_estimator = np.rec.array([__mp_handle_distribution_delegate(item) for item in dispersion_cap_sample], dtype=sensor_distribution_type)
+    if False:
         import multiprocessing as mp
         with mp.Pool(processes=8, initializer=__mp_init_distribution_delegate,
                      initargs=(cap_data_para, kwargs)) as pool:
-            pass
+            np.rec.array(pool.map(__mp_handle_distribution_delegate, parasitic_advanced_samples,
+                                                          chunksize=None), dtype=sensor_distribution_type)
+            np.rec.array(pool.map(__mp_handle_distribution_delegate, dispersion_cap_sample,
+                                  chunksize=None), dtype=sensor_distribution_type)
+        __mp_init_distribution_delegate(cap_data_para, kwargs)
+        parasitic_adv_cap_est = np.rec.array([__mp_handle_distribution_delegate(item) for item in parasitic_advanced_samples], dtype=sensor_distribution_type)
+        dispersion_estimator = np.rec.array([__mp_handle_distribution_delegate(item) for item in dispersion_cap_sample], dtype=sensor_distribution_type)
     else:
         # for current size of these iterables there is no improvement in time by using pooled execution!
+        import multiprocessing as mp
         with mp.Pool(processes=8, initializer=__mp_init_distribution_delegate, initargs=(cap_data_para, kwargs)) as pool:
             try:
                 parasitic_adv_cap_est = np.rec.array(pool.map(__mp_handle_distribution_delegate, parasitic_advanced_samples,

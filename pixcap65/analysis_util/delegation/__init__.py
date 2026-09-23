@@ -27,7 +27,7 @@ from pixcap65.analysis_util.modelling.data_store import DopingArrayStore, Deplet
 from pixcap65.analysis_util.multi_processing import get_manager_keywords
 from pixcap65.utility.tables_util import group_get_file
 from pixcap65.utility.utils_2 import create_carray
-from .constants import MP_ACCELERATION_FLAG
+from .constants import MP_ACCELERATION_FLAG, RESISTIVITY_CONVERSION
 from ..utility import GLOBAL_FILTERS, GENERAL_PIXCAP_SHAPE
 
 try:
@@ -251,7 +251,7 @@ def analyze_depletion_delegate(data_group: tb.Group, analysis_group: tb.Group,
         else:
             fit_result_storage = DepletionArrayStore(n_depletions=number_depletions)
         for k, (first_bound, second_bound) in enumerate(zip(np.atleast_2d(first_boundaries),
-                                                                np.atleast_2d(second_boundaries))):
+                                                            np.atleast_2d(second_boundaries))):
             first_lower, first_upper = first_bound
             second_lower, second_upper = second_bound
             fit_result_storage.set_depletion_region(k)
@@ -344,18 +344,13 @@ def analyze_depletion_delegate(data_group: tb.Group, analysis_group: tb.Group,
 
         # could compute the resistivity from here!
         pixel_depletion_parameter = None
-        try:
-            pixel_depletion_parameter = np.atleast_2d(depletion_fit_parameters[col, row])
-            pixel_depletion_parameter_errors = np.atleast_2d(depletion_fit_parameter_errors[col, row])
-            doping_result_storage.store_data('res_mod', EPS_SILICON * epsilon_0 * pixel_area ** 2 / (2 * SI_MOBILITY) *
-                                             pixel_depletion_parameter[:, 2] * 1e12)
-            doping_result_storage.store_data('res_mod_err',
-                                             EPS_SILICON * epsilon_0 * pixel_area ** 2 / (2 * SI_MOBILITY) *
-                                             pixel_depletion_parameter_errors[:, 2] * 1e12)
-        except:
-            print(depletion_fit_parameters[col, row])
-            print(pixel_depletion_parameter)
-            raise
+        pixel_depletion_parameter = np.atleast_2d(depletion_fit_parameters[col, row])
+        pixel_depletion_parameter_errors = np.atleast_2d(depletion_fit_parameter_errors[col, row])
+        doping_result_storage.store_data('res_mod', EPS_SILICON * epsilon_0 * pixel_area ** 2 / (2 * SI_MOBILITY) *
+                                         pixel_depletion_parameter[:, 2] * RESISTIVITY_CONVERSION)
+        doping_result_storage.store_data('res_mod_err',
+                                         EPS_SILICON * epsilon_0 * pixel_area ** 2 / (2 * SI_MOBILITY) *
+                                         pixel_depletion_parameter_errors[:, 2] * RESISTIVITY_CONVERSION)
 
         if kwargs.get("verbose", False):
             msg = "The minimum concentration is {nm} and depth {dep_min} for pixel ({col}, {row})"

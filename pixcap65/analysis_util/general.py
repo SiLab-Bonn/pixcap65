@@ -674,6 +674,5 @@ def analysis_data_handle(file: tb.File, data_group: GroupType, result_group: Gro
         perform_analysis(file, result_group, current_hist, scan_parameters, **kwargs)
 
     # if necessary: directly apply the correction of the capacitance values
-    # FIXME: this is explicitly using a lock!
     # but then the question is whether it could leak the lock outside!
     _handle_cap_correction(result_group, **kwargs)

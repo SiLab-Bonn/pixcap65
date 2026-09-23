@@ -451,8 +451,3 @@ def plot_depletion_delegate(data_group: tb.Group, analysis_group: GroupType, out
 # FIXME: labeling of the distribution plots for CV analysis. (Found the issue?) This odd behaviour is a consequnce of
 #  using the figures suptitle and the axes title both with quite long information.
 #  But: How to fix this permanently?
-
-# TODO: Inter-pixel plotting is
-#  missing the residues. (under investigation, should be implemented by now) it is implemented, but it looks a bit
-#  off. looks like only the inter-a residues are plotted accordingly. perhaps this is due to the large residues for
-#  this one?

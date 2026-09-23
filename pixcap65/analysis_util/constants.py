@@ -13,6 +13,7 @@
 #  See the License for the specific language governing permissions and
 #  limitations under the License.
 # ----------------------------------------------------------
+import logging
 import numpy as np
 
 try:
@@ -38,3 +39,4 @@ DISPERSION_PARASITIC_DEVIATION = 3.e-16
 BIAS_VOLTAGE_ACCESS_IDX = 0
 SLOPE_RESISTIVITY_CONVERSION = 1e12
 DOPING_RESULT_TYPE = Tuple[np.ndarray, np.ndarray, int]
+logger = logging.getLogger('.'.join(__name__.split('.')[:-1]))
