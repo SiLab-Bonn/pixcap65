@@ -858,6 +858,7 @@ def x1_analysator_second(tb_lock, correction_args, **kwargs):
     :param correction_args: keyword arguments/dict to define how to correct for parasitic capacitances'.
     """
     import pixcap65.concurrency
+    from examples.mp_analysis import synchronize_full_model
     name = "X1"
     display_name = name + SECOND_LABEL
     top_ref = "Thesis/ATLAS_ITk"
@@ -880,31 +881,16 @@ def x1_analysator_second(tb_lock, correction_args, **kwargs):
     x1_depletion_args.update(**correction_args)
     print("The manager address:", primary_manager.address)
 
-    synchronize_full_model(X1_SCAN_2_FILE, top_ref, name, 80, tb_lock, unbiased_group="unbiased_61_full", )
-
-    with synchronized_process_open_file("packaged/data/X1_12_Renew_Scan.h5", 'a', lock=tb_lock) as h5_file:
-        h5_file.copy_node(where="/Thesis/ATLAS_ITk/X1", name="biased_200_V_full", newname="biased_200_V_full_model",
-                          overwrite=True, recursive=True)
-        h5_file.copy_node(where="/Thesis/ATLAS_ITk/X1", name="inter_unbiased_full_renew_Extended",
-                          newname="inter_unbiased_full_model_renew_Extended", overwrite=True, recursive=True)
-        h5_file.copy_node(where="/Thesis/ATLAS_ITk/X1", name="inter_biased_M_200_V_full_renew_Extended",
-                          newname="inter_biased_M_200_V_full_model_renew_Extended", overwrite=True, recursive=True)
-        h5_file.copy_node(where="/Thesis/ATLAS_ITk/X1", newname="inter_biased_M_80_V_full_model_Extended__sides",
-                          name="inter_biased_M_80_V_full_Extended__sides", overwrite=True, recursive=True)
-        h5_file.copy_node(where="/Thesis/ATLAS_ITk/X1", newname="inter_biased_M_80_V_full_model_Extended__diagonals",
-                          name="inter_biased_M_80_V_full_Extended__diagonals", overwrite=True, recursive=True)
-        h5_file.copy_node(where="/Thesis/ATLAS_ITk/X1", newname="inter_biased_M_80_V_full_model_Extended__tops",
-                          name="inter_biased_M_80_V_full_Extended__tops", overwrite=True, recursive=True)
-        # h5_file.copy_node(where="/Thesis/ATLAS_ITk/X1", newname="inter_biased_M_80_V_full_model_Extended",
-        #              name="inter_biased_M_80_V_full_Extended", overwrite=True, recursive=True)
-        h5_file.copy_node(where="/Thesis/ATLAS_ITk/X1", newname="inter_biased_M_80_V_full_model_Extended_2__sides",
-                          name="inter_biased_M_80_V_full_Extended_2__sides", overwrite=True, recursive=True)
-        h5_file.copy_node(where="/Thesis/ATLAS_ITk/X1", newname="inter_biased_M_80_V_full_model_Extended_2__diagonals",
-                          name="inter_biased_M_80_V_full_Extended_2__diagonals", overwrite=True, recursive=True)
-        h5_file.copy_node(where="/Thesis/ATLAS_ITk/X1", newname="inter_biased_M_80_V_full_model_Extended_2__tops",
-                          name="inter_biased_M_80_V_full_Extended_2__tops", overwrite=True, recursive=True)
-        # h5_file.copy_node(where="/Thesis/ATLAS_ITk/X1", newname="inter_biased_M_80_V_full_model_Extended",
-        #                   name="inter_biased_M_80_V_full_Extended", overwrite=True, recursive=True)
+    synchronize_full_model(X1_SCAN_2_FILE, top_ref, name, 80, tb_lock, unbiased_group="unbiased_61_full", api=True)
+    synchronize_full_model(X1_SCAN_2_FILE, top_ref, name, 200, tb_lock, unbiased_group="unbiased_61_full",
+                           inter_unbiased_group="inter_unbiased_full_renew_Extended",
+                           inter_biased_group="inter_biased_M_{}_V_full_renew_Extended", api=True)
+    synchronize_full_model(X1_SCAN_2_FILE, top_ref, name, 80, tb_lock,
+                           inter_biased_group="inter_biased_M_{}_V_full_Extended",
+                           inter_pix_extension_active=True, api=True)
+    synchronize_full_model(X1_SCAN_2_FILE, top_ref, name, 80, tb_lock,
+                           inter_biased_group="inter_biased_M_{}_V_full_Extended_2",
+                           inter_pix_extension_active=True, api=True)
 
     analyze_data(raw_data=X1_SCAN_2_FILE, base_path=hdf(top_ref, name, 'unbiased_61_full'), is_advanced=True,
                  full_model=False,
@@ -1247,6 +1233,7 @@ def x2_analysator_second(tb_lock, correction_args, **kwargs):
     :param tb_lock: multiprocessing lock to make operations on the hdf files process- and thread-safe.
     :param correction_args: keyword arguments/dict to define how to correct for parasitic capacitances'.
     """
+    from examples.mp_analysis import synchronize_full_model
     import pixcap65.concurrency
     name = "X2"
     display_name = name + SECOND_LABEL
@@ -2406,7 +2393,7 @@ def r13_plotter_second(tb_lock):
               use_group=True, lock=tb_lock, test_cap_exclusion=True, distribution=True)
     plot_data(interpreted_data=R13_2_SCAN_FILE, base_path=hdf(top_ref, name, 'unbiased_1_full'),
               use_group=True, lock=tb_lock, test_cap_exclusion=True, distribution=True, use_corrected=True)
-    # noqa: S1192
+    noqa: S1192
     plot_data(interpreted_data=R13_2_SCAN_FILE, base_path=hdf(top_ref, name, 'biased_80_V_full'),
               use_group=True, lock=tb_lock, distribution=True)
     plot_data(interpreted_data=R13_2_SCAN_FILE, base_path=hdf(top_ref, name, 'biased_80_V_full'),
@@ -2415,7 +2402,7 @@ def r13_plotter_second(tb_lock):
               use_group=True, lock=tb_lock, test_cap_exclusion=True, distribution=True)
     plot_data(interpreted_data=R13_2_SCAN_FILE, base_path=hdf(top_ref, name, 'unbiased_1_full_model'),
               use_group=True, lock=tb_lock, test_cap_exclusion=True, distribution=True, use_corrected=True)
-    # noqa: S1192
+    noqa: S1192
     plot_data(interpreted_data=R13_2_SCAN_FILE, base_path=hdf(top_ref, name, 'biased_80_V_full_model'),
               use_group=True, lock=tb_lock, distribution=True)
     plot_data(interpreted_data=R13_2_SCAN_FILE, base_path=hdf(top_ref, name, 'biased_80_V_full_model'),
@@ -2528,7 +2515,7 @@ def r13_plotter_second(tb_lock):
                                          base_path=hdf(top_ref, name, 'C_V_Characteristic_refined'), lock=tb_lock,
                                          use_group=True, test_cap_exclusion=True, distribution=True,
                                          apply_doping=False,)
-    threaded_plotting.plot_combined_data(interpreted_data=R13_2_SCAN_FILE, lock=tb_lock, apply_doping=False,
+    threaded_plotting.plot_combined_data(interpreted_data=R13_2_SCAN_FILE, lock=tb_lock, apply_doping=True,
                                          base_path=hdf(top_ref, name, 'C_V_Characteristic_refined'),
                                          use_group=True, test_cap_exclusion=True, distribution=True, use_corrected=True)
     threaded_plotting.joint_plotting()
