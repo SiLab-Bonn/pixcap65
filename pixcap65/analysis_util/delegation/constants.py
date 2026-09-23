@@ -15,3 +15,4 @@
 # ----------------------------------------------------------
 
 MP_ACCELERATION_FLAG=True
+RESISTIVITY_CONVERSION = 1e12

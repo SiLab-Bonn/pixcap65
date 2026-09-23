@@ -4,7 +4,6 @@ Outputs in txt file the number of bits m that were set to 1 and the correspondin
 Calculate t_charge with t_charge = m/seq_size * 1/f_rep
 """
 
-# TODO: Analysis and plotting of this kind of measurement is still missing.
 # we need to plot the behaviour of the current for different frequencies.
 
 import logging
@@ -201,6 +200,7 @@ class Pixcap65LoadLine(PixCap65Measurement):
         fit_cov = None
 
         for l in range(int(self.seq_size / 2 - 1)):
+            # this implementation ignores the fact that the charging time is not a half-period.
             temporary_group.HistCurr._f_remove()
             temporary_group.HistCurrErr._f_remove()
 
@@ -236,7 +236,9 @@ class Pixcap65LoadLine(PixCap65Measurement):
                 fit_cov_shape = tuple([*temporary_group.HistFitCov, int(self.seq_size / 2 - 1)])
                 fit_cov = np.full(shape=fit_cov_shape, fill_value=np.nan)
             temp = temporary_group.HistFitCov[:]
-            # TODO: Missing the implementation for the covariance matrix!
+            for indices in np.ndindex(*temp.shape):
+                temp_cov_item = temp[indices]
+                fit_cov[indices][l] = temp_cov_item
 
         # save the full results in the end if everything is all fine.
         self.create_carray(original_group, name=kwargs.get("cap_name", "HistCap"),

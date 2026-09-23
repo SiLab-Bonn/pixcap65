@@ -230,3 +230,16 @@ docs = [
     "pkg-resources-backport ; python_version >= '3.9'",
     "myst-parser ; python_version >= '3.6'",
 ]
+
+# this is another syntax than that used for hatch!
+all = [
+    { include-group = "visualization"},
+    { include-group = "advanced"},
+    { include-group = "modelling"},
+    { include-group = "dut"}
+]
+
+dev = [
+    { include-group = "docs"},
+    { include-group = "all"}
+]

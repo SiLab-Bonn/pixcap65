@@ -149,19 +149,20 @@ def _handle_cap_correction(result_group: tb.Group, **kwargs):
     last update: 2026-08-12
 
     (Internal) Utility function to correct the measured capacitance for the parasitic ones by the measurement circuit.
+    For reading data about the parasitic capacitances' a synchronization primitive (lock) is used here explicitly.
 
     :param result_group: hdf files' group where the analysis results were written to.
     :keyword lock: synchronization object to prevent multiple overlapping accesses to the pytables api and simultaneously
-        write/read operations on the same file.
+     write/read operations on the same file.
     :keyword apply_correction: boolean, apply_correction: boolean, indicates whether the measured capacitance should be corrected
-        immediately; Will require the presence of further arguments as information about the parasitic capacitance needs to be
-        submitted. (data corrected for parasitic capacitances of PixCap65, default: False)
+     immediately; Will require the presence of further arguments as information about the parasitic capacitance needs to be
+     submitted. (data corrected for parasitic capacitances of PixCap65, default: False)
     :keyword bare_file: hdf file containing the measurements and investigation of a bare pix cap sample to obtain
-        information about intrinsic and parasitic capacitance. (Only required for the correction procedure, but in
-        this case it must be present)
+     information about intrinsic and parasitic capacitance. (Only required for the correction procedure, but in
+     this case it must be present)
     :keyword bare_path: hdf files hierarchy path to the group containing the bare pix cap analysis with the information
-        about the parasitic after investigating the capacitance distribution. (Only required for
-        the correction procedure, but in this case it must be present)
+     about the parasitic after investigating the capacitance distribution. (Only required for
+     the correction procedure, but in this case it must be present)
     """
     global cap_counter
     cap_counter += 1
