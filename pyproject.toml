@@ -1,7 +1,7 @@
 # commented configuration options are the result when using hatch instead of setuptool
 [project]
 name = "pixcap65_DOMI1279"
-version = "1.0.0.dev9"
+version = "1.0.0.dev10"
 description = "Host software for the PixCap65 chip control system based on MIO2 + GPAC hardware."
 authors = [
     { name = "Hans Krüger", email = "krueger@physik.uni-bonn.de" },
