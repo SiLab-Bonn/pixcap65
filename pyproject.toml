@@ -15,8 +15,18 @@ license = "Apache-2.0"
 readme = { file = "README.md", content-type = "text/markdown" }
 requires-python = ">=2.7"
 classifiers = [
+    "Programming Language :: Python :: 2.7",
     "Programming Language :: Python :: 3",
+    "Programming Language :: Python :: 3.14",
     "Operating System :: OS Independent",
+    "Development Status :: 4",
+    "Framework :: Matplotlib",
+    "Framework :: Sphinx",
+    "Intended Audience :: Science/Research",
+    "Topic :: Scientific/Engineering",
+    "Topic :: Scientific/Engineering :: Physics",
+    "Topic :: Scientific/Engineering :: Instrument Drivers",
+    "Topic :: Scientific/Engineering :: Visualization",
 ]
 dependencies = [
     "numpy < 2; python_version < '3'",

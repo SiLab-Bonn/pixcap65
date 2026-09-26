@@ -256,6 +256,7 @@ def figure_provider(lock, *args, separate_plots=False, output=None, callback=Non
             fig, ax = plt.subplots(*args, **kwargs)
 
     yield fig, ax, back_inform
+
     figures = np.atleast_1d(fig)
     if callback is not None:
         if call_all:

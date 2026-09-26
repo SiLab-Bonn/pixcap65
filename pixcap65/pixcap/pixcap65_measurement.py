@@ -521,6 +521,9 @@ class ScanConfigurationKeys(StrEnum):
     # Additional current limit for the HV measurements to protect the sensor from destruction.
     BIAS_HV_CURRENT_LIMIT = "bias_hv_limit"
 
+    HV_SETTLING = "settle_hv_voltage_time"
+    HV_TOLERANCE_VALUE = "hv_settling_tolerance"
+
 class MeasurementAttributes(StrEnum):
     """Enumeration of the attribute names used to tag the arrays and tables in the output file."""
     BIAS_MEASUREMENT_UNIT = 'bias_unit'

@@ -447,7 +447,3 @@ def plot_depletion_delegate(data_group: tb.Group, analysis_group: GroupType, out
                                       view_depletion_width_plate_error,
                                       view_effective_doping_table, output_pdf, row, view_table,
                                       view_effective_resistivity_table)
-
-# FIXME: labeling of the distribution plots for CV analysis. (Found the issue?) This odd behaviour is a consequnce of
-#  using the figures suptitle and the axes title both with quite long information.
-#  But: How to fix this permanently?

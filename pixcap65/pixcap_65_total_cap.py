@@ -414,12 +414,11 @@ class PixCap65Measurement(Pixcap65BaseMeasurement, metaclass=ABCMeta):
         :return: result from the last voltage measurement.
         """
         previous_measurement = hv_less.bias_measure_volts()
-        # CHECK: should I make it configurable? (needs feedback)
-        time.sleep(HV_WAIT)
+        time.sleep(self.scan_config.get(ScanConfigurationKeys.HV_SETTLING, HV_WAIT))
         current_measurement = hv_less.bias_measure_volts()
         for _ in range(100):
-            # CHECK: should the voltage tolerance also be configurable? (needs feedback)
-            if np.abs(current_measurement - previous_measurement) < HV_VOLTAGE_TOL * np.abs(
+            tol = self.scan_config.get(ScanConfigurationKeys.HV_TOLERANCE_VALUE, HV_VOLTAGE_TOL)
+            if np.abs(current_measurement - previous_measurement) < tol * np.abs(
                     current_measurement):
                 break
             previous_measurement = current_measurement

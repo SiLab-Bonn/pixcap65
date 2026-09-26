@@ -223,9 +223,6 @@ def plot_cv_data_delegate(data_group: Union[tb.Group, SENSOR_ITERABLE],
 
         # Plot the doping analysis only for single-sensor samplings.
         if apply_doping:
-            # CHECK: is there a better implementation for this?
-            #  perhaps we could np.atleastxd functions here?
-            #  new version is now under investigation
             voltage_collection_idx = 1
             view_analysis_group = np.atleast_1d(analysis_group)
             view_data_group = np.atleast_1d(data_group)
@@ -244,41 +241,6 @@ def plot_cv_data_delegate(data_group: Union[tb.Group, SENSOR_ITERABLE],
                 view_bias_voltages = view_origin_bias_voltages[:, :, voltage_collection_idx]
             else:
                 view_bias_voltages = view_origin_bias_voltages
-            if isinstance(data_group, tb.Group):
-                pass
-                # depletion_width_plate = check_leaf_unit(analysis_group.DepletionWidth, "um")
-                # depletion_width_plate_error = check_leaf_unit(analysis_group.DepletionWidthErr, "um")
-                # effective_doping_table = check_leaf_unit(analysis_group.DepletionEffDoping, "cm^-3")
-                # resistivity_table = check_leaf_unit(analysis_group.DepletionResitivity, "Ocm")
-                # view_depletion_width_plate = depletion_width_plate[None, :]
-                # view_depletion_width_plate_error = depletion_width_plate_error[None, :]
-                # view_effective_doping_table = effective_doping_table[None, :]
-                # view_effective_resistivity_table = resistivity_table[None, :]
-                # origin_bias_voltages = check_leaf_unit(data_group.BiasVoltageHist, HIST_BIAS_MEAS_UNIT)
-                # table = analysis_group.DepletionParamTable
-                # view_table = [table]
-                # if len(origin_bias_voltages.shape) > 1:
-                #     bias_voltages = origin_bias_voltages[:, voltage_collection_idx]
-                # else:
-                #     bias_voltages = origin_bias_voltages
-                # view_bias_voltages = np.atleast_2d(bias_voltages)
-            else:
-                pass
-                # view_depletion_width_plate = np.array(
-                #     [check_leaf_unit(ana.DepletionWidth, "um") for ana in analysis_group])
-                # view_depletion_width_plate_error = np.array(
-                #     [check_leaf_unit(ana.DepletionWidthErr, "um") for ana in analysis_group])
-                # view_effective_doping_table = np.array(
-                #     [check_leaf_unit(ana.DepletionEffDoping, "cm^-3") for ana in analysis_group])
-                # view_effective_resistivity_table = np.array(
-                #     [check_leaf_unit(ana.DepletionResistivity, "Ocm") for ana in analysis_group])
-                # view_table = [gr.DepletionParamTable for gr in analysis_group]
-                # view_origin_bias_voltages = np.array(
-                #     [check_leaf_unit(gr.BiasVoltageHist, HIST_BIAS_MEAS_UNIT) for gr in data_group])
-                # if len(view_origin_bias_voltages.shape) > 2:
-                #     view_bias_voltages = view_origin_bias_voltages[:, :, voltage_collection_idx]
-                # else:
-                #     view_bias_voltages = view_origin_bias_voltages
             plot_depletion_pixel_delegate(view_bias_voltages, ii, view_depletion_width_plate,
                                           view_depletion_width_plate_error,
                                           view_effective_doping_table, output_pdf, jj, view_table,
@@ -323,11 +285,9 @@ def plot_cv_data_delegate(data_group: Union[tb.Group, SENSOR_ITERABLE],
     title_str = ""
 
     def __callback_handler(fig):
-        from matplotlib import pyplot as plt
         fig.suptitle(title_str)
-        top_extra = 0.85 - len(title_str.split('\n')) * 0.05
-        # FIXME: attempt to fix the cv labels!
-        plt.subplots_adjust(top=0.80)
+        top_extra = 0.95 - len(title_str.split('\n')) * 0.05
+        fig.subplots_adjust(top=top_extra)
 
     with figure_provider(interactive_lock, output=output_pdf, ncols=2, separate_plots=True, call_all=True,
                          callback=None if GENERATE_THESIS_PLOTS else __callback_handler) as (fig, ax, back_pipe):

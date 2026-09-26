@@ -379,7 +379,7 @@ def analyze_depletion_delegate(data_group: tb.Group, analysis_group: tb.Group,
     create_carray(file_h5, where=analysis_group, name="DepletionEffDoping",
                   title="Data for the effective doping from the cv-analysis",
                   filters=GLOBAL_FILTERS, obj=doping_result_storage.effective_doping_table, unit="cm^-3")
-    create_carray(file_h5, where=analysis_group, name="DepletionResitivity",
+    create_carray(file_h5, where=analysis_group, name="DepletionResistivity",
                   title="Data for the specific resistivity from the cv-analysis", filters=GLOBAL_FILTERS,
                   obj=doping_result_storage.resistivity_table, unit="Ocm")
     create_carray(file_h5, where=analysis_group, name="ModDepletionResistivity",
