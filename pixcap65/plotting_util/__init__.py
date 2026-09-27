@@ -17,6 +17,7 @@
 Plotting of Pixcap65 data.
 """
 import atexit
+import gc
 import logging
 import threading
 from matplotlib.backends.backend_pdf import PdfPages
@@ -103,8 +104,7 @@ def release_lock():
     global_interactive_lock.release()
     del global_interactive_lock
     global_interactive_lock = None
-    import gc
-    print("release the plotting lock")
+    logger.debug("release the plotting lock")
     atexit.unregister(release_lock)
     gc.collect()
 

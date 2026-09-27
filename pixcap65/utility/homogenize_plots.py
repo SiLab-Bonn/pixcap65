@@ -3,6 +3,7 @@ Homoegenize plots module from the bachelor's degree EDV module.
 Could be used to make all plots in e.g. a thesis the same.
 """
 import atexit
+import logging
 import matplotlib
 # from matplotlib.ticker import AutoMinorLocator
 import numpy as np
@@ -15,6 +16,8 @@ import threading
 
 # Store original plot parameters so that we can revert:
 ORIG_MATPLOTLIB_CONF = dict(matplotlib.rcParams)
+
+logger = logging.getLogger(__name__)
 
 def get_error_cycler():
     """property cycler for errorbar plots which cycles the usual marker symbols but no lines to be drawn."""
@@ -59,8 +62,8 @@ def set_params(fig_width=None, fig_height=None, columns=1, fontsize=8, dpi=300,
         golden_mean = (np.sqrt(5.0) - 1.0) / 2.0  # aesthetic ratio
         fig_height = fig_width * golden_mean  # height in inches
 
-    # print('\nOld keys:')
-    # print(matplotlib.rcParams.keys())
+    logger.debug('\nOld keys:')
+    logger.debug(matplotlib.rcParams.keys())
 
     from cycler import cycler
     standard_color = matplotlib.rcParams['axes.prop_cycle'].by_key()['color']
@@ -104,8 +107,9 @@ def set_params(fig_width=None, fig_height=None, columns=1, fontsize=8, dpi=300,
                     'pgf.preamble': latex_preamble,
                     'pgf.texsystem': 'pdflatex',
                     }
-    # print(params)
-    # print(latex_params)
+    logger.debug("Parameters for latex use:")
+    logger.debug(params)
+    logger.debug(latex_params)
     matplotlib.rcParams.update(params)
     matplotlib.rcParams.update(latex_params)
 
@@ -128,7 +132,7 @@ def set_params(fig_width=None, fig_height=None, columns=1, fontsize=8, dpi=300,
             'ytick.right': True
         }
     if ticks:
-        # print('Setting tick parameters to', tick_params)
+        logger.debug('Setting tick parameters to', tick_params)
         matplotlib.rcParams.update(tick_params)
 
     # Turn on minor ticks; make ticks bigger
@@ -144,8 +148,8 @@ def set_params(fig_width=None, fig_height=None, columns=1, fontsize=8, dpi=300,
         }
         matplotlib.rcParams.update(tick_extra)
 
-    # print('\nNew keys:')
-    # print(matplotlib.rcParams.keys())
+    logger.debug('\nNew keys:')
+    logger.debug(matplotlib.rcParams.keys())
 
 
 def revert_params():

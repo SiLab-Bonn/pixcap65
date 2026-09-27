@@ -398,7 +398,7 @@ def perform_inter_pix_scan(cli_args):
                          measurement=Pixcap65InterCapDiagonals) as pix:
             with pix.enhanced_readout_mode():
                 pix.frequency_settling = cli_args.freq_settle
-                pix.scan(data_group_spec="inter_biased_M_{}_V_full___diagonals".format(cli_args.hv_voltage))
+                pix.scan(data_group_spec="inter_biased_M_{}_V_full__diagonals".format(cli_args.hv_voltage))
 
     with get_lock():
         try:

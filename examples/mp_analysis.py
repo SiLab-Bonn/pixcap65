@@ -52,7 +52,7 @@ def get_name_appendix(name, api=OLD_API):
     last update: 2026-09-17
 
     :param name: original name of the measurement group.
-    :param api: whether to use the new api to determine the new group name. (default: False)
+    :param api: whether to use the old api to determine the new group name. (default: False)
     :return: group name to be used for the full enhanced model copy of the data.
     """
     if "full" in name and not api:
@@ -88,7 +88,7 @@ def synchronize_full_model(file, reference, name, bias, p_lock, **kwargs):
     :keyword inter_biased_group: name of the group for the biased inter-pix capacitance measurement.
     :keyword inter_pix_extension_active: whether to also duplicate optional extension measurements which only include
      contributions from specific pixels. (default: False)
-    :keyword api: whether to use the new api to determine the new group name. (default: False)
+    :keyword api: whether to use the old api to determine the new group name. (default: False)
     """
     from tables import Group
     # perhaps we should refactor this function to be more general applicable?
@@ -112,7 +112,7 @@ def synchronize_full_model(file, reference, name, bias, p_lock, **kwargs):
             inter_pixel_names.append("{}__{}".format(inter_unbiased_name, add_on))
             inter_pixel_names.append("{}__{}".format(inter_biased_name, add_on))
 
-    if not kwargs.get('api', False):
+    if kwargs.get('api', OLD_API):
         from warnings import warn
         warn("It is highly encouraged to change the implementation such that the new replacement api is used. "
              "This might require the adjustment of paths.", stacklevel=2)

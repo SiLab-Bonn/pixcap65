@@ -182,11 +182,11 @@ def r1_analysator(tb_lock, correction_args, **kwargs):
     # this is not necessary for the ExtendedSyncManager as this accessed right here.
     # But this will only take effect as long as we are not spawning additional subprocesses.
 
-    synchronize_full_model(R11_SCAN_FILE, top_ref, name, 80, tb_lock,)
+    synchronize_full_model(R11_SCAN_FILE, top_ref, name, 80, tb_lock, api=True)
     synchronize_full_model(R11_SCAN_FILE, top_ref, name, 80, tb_lock,
                            inter_biased_group="inter_biased_M_80_V_full_Extended",
                            inter_pix_extension_active=True,
-                           api=False)
+                           api=True)
 
     # handle the full sensor analysis
     analyze_data(raw_data=R11_SCAN_FILE, base_path=hdf(top_ref, name, 'unbiased_full'),
@@ -619,11 +619,12 @@ def e1_analysator_second(tb_lock, correction_args, **kwargs):
     :param correction_args: keyword arguments/dict to define how to correct for parasitic capacitances'.
     """
     import pixcap65.concurrency
+    from examples.mp_analysis import synchronize_full_model
     name = "E1"
     display_name = name + SECOND_LABEL
     top_ref = "Reference"
     print("Analyze", display_name)
-    print(AUTHKEY_OUTPUT, mp.current_process().authkey)
+    logger.debug(AUTHKEY_OUTPUT, mp.current_process().authkey)
 
     _ = pixcap65.concurrency.get_manager(**kwargs)
     e1_depletion_args = {
@@ -637,7 +638,7 @@ def e1_analysator_second(tb_lock, correction_args, **kwargs):
         "apply_doping": True,
     }
     e1_depletion_args.update(**correction_args)
-    synchronize_full_model(E1_2_SCAN_FILE, top_ref, name, 80, tb_lock)
+    synchronize_full_model(E1_2_SCAN_FILE, top_ref, name, 80, tb_lock, api=True)
 
     analyze_data(raw_data=E1_2_SCAN_FILE, base_path=hdf(top_ref, name, 'unbiased_full'), is_advanced=True,
                  lock=tb_lock,
@@ -863,10 +864,10 @@ def x1_analysator_second(tb_lock, correction_args, **kwargs):
     display_name = name + SECOND_LABEL
     top_ref = "Thesis/ATLAS_ITk"
     print("Analyze", display_name)
-    print(threading.get_native_id())
-    print(mp.current_process().name)
-    print(mp.current_process().pid)
-    print(AUTHKEY_OUTPUT, mp.current_process().authkey)
+    logger.debug(threading.get_native_id())
+    logger.debug(mp.current_process().name)
+    logger.debug(mp.current_process().pid)
+    logger.debug(AUTHKEY_OUTPUT, mp.current_process().authkey)
 
     primary_manager = pixcap65.concurrency.get_manager(**kwargs)
     x1_depletion_args = {
@@ -1262,13 +1263,8 @@ def x2_analysator_second(tb_lock, correction_args, **kwargs):
     x2_depletion_args.update(**correction_args)
     x2_depletion_refined_args.update(**correction_args)
 
-    synchronize_full_model(X2_SCAN_2_FILE, top_ref, name, 80, tb_lock, unbiased_group="unbiased_1_full")
-    synchronize_full_model(X2_SCAN_2_FILE, top_ref, name, 200, tb_lock)
-    with synchronized_process_open_file(X2_SCAN_2_FILE, mode='a', lock=tb_lock) as h5_file:
-        h5_file.copy_node(where="/Thesis/ATLAS_ITk/X2", newname="unbiased_1_full_model", name="unbiased_1_full",
-                          recursive=True, overwrite=True)
-        h5_file.copy_node(where="/Thesis/ATLAS_ITk/X2", newname="biased_80_V_full_model", name="biased_80_V_full",
-                          recursive=True, overwrite=True)
+    synchronize_full_model(X2_SCAN_2_FILE, top_ref, name, 80, tb_lock, unbiased_group="unbiased_1_full", api=True)
+    synchronize_full_model(X2_SCAN_2_FILE, top_ref, name, 200, tb_lock, api=True)
 
     analyze_data(raw_data=X2_SCAN_2_FILE, base_path=hdf(top_ref, name, 'unbiased_1_full'), is_advanced=True,
                  lock=tb_lock,
@@ -1348,7 +1344,7 @@ def x4_analysator(tb_lock, correction_args, **kwargs):
     # this is not necessary for the ExtendedSyncManager as this accessed right here.
     # But this will only take effect as long as we are not spawning additional subprocesses.
 
-    synchronize_full_model(X4_SCAN_FILE, top_ref, name, 80, tb_lock, )
+    synchronize_full_model(X4_SCAN_FILE, top_ref, name, 80, tb_lock, api=True)
 
     # handle the full sensor analysis
     analyze_data(raw_data=X4_SCAN_FILE, base_path=hdf(top_ref, name, 'unbiased_full'),
@@ -1484,8 +1480,8 @@ def x5_analysator(tb_lock, correction_args, **kwargs):
         np.arange(40, 100.1, 1.25)
     )))
 
-    synchronize_full_model(X5_SCAN_FILE, top_ref, name, 40, tb_lock)
-    synchronize_full_model(X5_SCAN_FILE, top_ref, name, 90, tb_lock)
+    synchronize_full_model(X5_SCAN_FILE, top_ref, name, 40, tb_lock, api=True)
+    synchronize_full_model(X5_SCAN_FILE, top_ref, name, 90, tb_lock, api=True)
 
     # handle the full sensor analysis
     analyze_data(raw_data=X5_SCAN_FILE, base_path=hdf(top_ref, name, 'unbiased_full'), is_advanced=True,
@@ -1637,14 +1633,15 @@ def x6_analysator(tb_lock, correction_args, **kwargs):
     :param correction_args: keyword arguments/dict to define how to correct for parasitic capacitances'.
     """
     import pixcap65.concurrency
+    from examples.mp_analysis import synchronize_full_model
     name = "X6"
     display_name = name
     top_ref = "Thesis/ATLAS_ITk"
     print("Analyze", display_name)
-    print(threading.get_native_id())
-    print(mp.current_process().name)
-    print(mp.current_process().pid)
-    print(AUTHKEY_OUTPUT, mp.current_process().authkey)
+    logger.debug(threading.get_native_id())
+    logger.debug(mp.current_process().name)
+    logger.debug(mp.current_process().pid)
+    logger.debug(AUTHKEY_OUTPUT, mp.current_process().authkey)
 
     _ = pixcap65.concurrency.get_manager(**kwargs)
     x6_depletion_args = {
@@ -1668,7 +1665,7 @@ def x6_analysator(tb_lock, correction_args, **kwargs):
     }
     x6_depletion_args.update(**correction_args)
     x6_depletion_args_refined.update(**correction_args)
-    synchronize_full_model(X6_SCAN_FILE, top_ref, name, 45, tb_lock)
+    synchronize_full_model(X6_SCAN_FILE, top_ref, name, 45, tb_lock, api=True)
 
     analyze_data(raw_data=data_constants.X6_SCAN_FILE, base_path=hdf(top_ref, name, 'unbiased_full'),
                  is_advanced=True, distribution=True, full_model=False, test_cap_exclusion=True,
@@ -1768,17 +1765,18 @@ def x7_analysator(tb_lock, correction_args, **kwargs):
     :param correction_args: keyword arguments/dict to define how to correct for parasitic capacitances'.
     """
     import pixcap65.concurrency
+    from examples.mp_analysis import synchronize_full_model
     name = "X7"
     display_name = name
     top_ref = "Thesis/ATLAS_ITk"
     print("Analyze", display_name)
-    print(threading.get_native_id())
-    print(mp.current_process().name)
-    print(mp.current_process().pid)
-    print(AUTHKEY_OUTPUT, mp.current_process().authkey)
+    logger.debug(threading.get_native_id())
+    logger.debug(mp.current_process().name)
+    logger.debug(mp.current_process().pid)
+    logger.debug(AUTHKEY_OUTPUT, mp.current_process().authkey)
 
     _ = pixcap65.concurrency.get_manager(**kwargs)
-    synchronize_full_model(X7_SCAN_FILE, top_ref, name, 40.0, tb_lock)
+    synchronize_full_model(X7_SCAN_FILE, top_ref, name, 40.0, tb_lock, api=True)
 
     analyze_data(raw_data=data_constants.X7_SCAN_FILE, base_path=hdf(top_ref, name, 'unbiased_full'),
                  is_advanced=True,
@@ -2393,7 +2391,7 @@ def r13_plotter_second(tb_lock):
               use_group=True, lock=tb_lock, test_cap_exclusion=True, distribution=True)
     plot_data(interpreted_data=R13_2_SCAN_FILE, base_path=hdf(top_ref, name, 'unbiased_1_full'),
               use_group=True, lock=tb_lock, test_cap_exclusion=True, distribution=True, use_corrected=True)
-    noqa: S1192
+    # noqa: S1192
     plot_data(interpreted_data=R13_2_SCAN_FILE, base_path=hdf(top_ref, name, 'biased_80_V_full'),
               use_group=True, lock=tb_lock, distribution=True)
     plot_data(interpreted_data=R13_2_SCAN_FILE, base_path=hdf(top_ref, name, 'biased_80_V_full'),
@@ -2402,7 +2400,7 @@ def r13_plotter_second(tb_lock):
               use_group=True, lock=tb_lock, test_cap_exclusion=True, distribution=True)
     plot_data(interpreted_data=R13_2_SCAN_FILE, base_path=hdf(top_ref, name, 'unbiased_1_full_model'),
               use_group=True, lock=tb_lock, test_cap_exclusion=True, distribution=True, use_corrected=True)
-    noqa: S1192
+    # noqa: S1192
     plot_data(interpreted_data=R13_2_SCAN_FILE, base_path=hdf(top_ref, name, 'biased_80_V_full_model'),
               use_group=True, lock=tb_lock, distribution=True)
     plot_data(interpreted_data=R13_2_SCAN_FILE, base_path=hdf(top_ref, name, 'biased_80_V_full_model'),
@@ -2564,7 +2562,6 @@ def e1_plotter_first(tb_lock):
     threaded_plotting.plot_bias_data(interpreted_data=E1_SCAN_FILE,
                                      base_path=hdf(top_ref, name, 'I_V_Characteristic'),
                                      use_group=True, lock=tb_lock)
-    print(display_name, "- CV")
     print(display_name, "- CV")
     threaded_plotting.plot_combined_data(interpreted_data=E1_SCAN_FILE,
                                          base_path=hdf(top_ref, name, 'C_V_Characteristic'),
@@ -3433,9 +3430,9 @@ def x5_plotter(tb_lock):
               use_group=True, use_corrected=True, test_cap_exclusion=True,
               mask_pixel=data_constants.x5_second_pixel_mask, distribution=True, lock=tb_lock)
     plot_bias_data(interpreted_data=X5_SCAN_FILE, base_path=hdf(top_ref, name, 'I_V_Characteristic'),
-                   use_group=True, lock=tb_lock, )
+                   use_group=True, lock=tb_lock,)
     plot_bias_data(interpreted_data=X5_SCAN_FILE, base_path=hdf(top_ref, name, 'I_V_Characteristic_Extended'),
-                   use_group=True, lock=tb_lock, )
+                   use_group=True, lock=tb_lock,)
 
     plot_inter_pix_data(interpreted_data=X5_SCAN_FILE, base_path=hdf(top_ref, name, 'inter_unbiased_full'),
                         use_group=True, distribution=True, mask_pixel=data_constants.x5_second_pixel_mask,
