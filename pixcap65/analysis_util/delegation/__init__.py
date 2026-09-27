@@ -235,8 +235,7 @@ def analyze_depletion_delegate(data_group: tb.Group, analysis_group: tb.Group,
     if len(voltage_data.shape) > 1:
         voltage_data = voltage_data[:, BIAS_VOLTAGE_ACCESS_IDX]
 
-    # FIXME: provide here the correct manager arguments! (put it under investigation for now; does not work together with the side scripts)
-    with get_context_manager() as manager:
+    with get_context_manager(**manager_keywords) as manager:
         if isinstance(first_boundaries, Iterable) and not isinstance(first_boundaries, Tuple):
             assert first_boundaries is not None
             assert second_boundaries is not None
@@ -247,6 +246,7 @@ def analyze_depletion_delegate(data_group: tb.Group, analysis_group: tb.Group,
             number_depletions = 1
 
         if MP_ACCELERATION_FLAG:
+            # CHECK: providing manager args here might break the code.
             fit_result_storage = manager.DepletionArrayStorage(n_depletions=number_depletions)
         else:
             fit_result_storage = DepletionArrayStore(n_depletions=number_depletions)

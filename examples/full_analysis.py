@@ -182,11 +182,11 @@ def r1_analysator(tb_lock, correction_args, **kwargs):
     # this is not necessary for the ExtendedSyncManager as this accessed right here.
     # But this will only take effect as long as we are not spawning additional subprocesses.
 
-    synchronize_full_model(R11_SCAN_FILE, top_ref, name, 80, tb_lock, api=True)
+    synchronize_full_model(R11_SCAN_FILE, top_ref, name, 80, tb_lock, api=False)
     synchronize_full_model(R11_SCAN_FILE, top_ref, name, 80, tb_lock,
                            inter_biased_group="inter_biased_M_80_V_full_Extended",
                            inter_pix_extension_active=True,
-                           api=True)
+                           api=False)
 
     # handle the full sensor analysis
     analyze_data(raw_data=R11_SCAN_FILE, base_path=hdf(top_ref, name, 'unbiased_full'),
@@ -451,13 +451,13 @@ def r13_analysator_second(tb_lock, correction_args, **kwargs):
     r13_depletion_args.update(**correction_args)
 
     synchronize_full_model(R13_2_SCAN_FILE, top_ref, name, 80, tb_lock,
-                           unbiased_group="unbiased_1_full", api=True)
+                           unbiased_group="unbiased_1_full", api=False)
     synchronize_full_model(R13_2_SCAN_FILE, top_ref, name, 80, tb_lock,
                            unbiased_group="unbiased_1_full", inter_unbiased_group="inter_unbiased_full_renew",
                            inter_biased_group="inter_biased_M_{}_V_full_renew")
     synchronize_full_model(R13_2_SCAN_FILE, top_ref, name, 80, tb_lock,
                            inter_unbiased_group="inter_unbiased_renew_Extended_full",
-                           inter_biased_group="inter_biased_M_{}_V_renew_Extended_full", api=True)
+                           inter_biased_group="inter_biased_M_{}_V_renew_Extended_full", api=False)
 
     analyze_data(raw_data=R13_2_SCAN_FILE, base_path=hdf(top_ref, name, 'unbiased_1_full'), is_advanced=True,
                  lock=tb_lock, test_cap_exclusion=True, distribution=True, full_model=False,
@@ -638,7 +638,7 @@ def e1_analysator_second(tb_lock, correction_args, **kwargs):
         "apply_doping": True,
     }
     e1_depletion_args.update(**correction_args)
-    synchronize_full_model(E1_2_SCAN_FILE, top_ref, name, 80, tb_lock, api=True)
+    synchronize_full_model(E1_2_SCAN_FILE, top_ref, name, 80, tb_lock, api=False)
 
     analyze_data(raw_data=E1_2_SCAN_FILE, base_path=hdf(top_ref, name, 'unbiased_full'), is_advanced=True,
                  lock=tb_lock,
@@ -882,16 +882,16 @@ def x1_analysator_second(tb_lock, correction_args, **kwargs):
     x1_depletion_args.update(**correction_args)
     print("The manager address:", primary_manager.address)
 
-    synchronize_full_model(X1_SCAN_2_FILE, top_ref, name, 80, tb_lock, unbiased_group="unbiased_61_full", api=True)
+    synchronize_full_model(X1_SCAN_2_FILE, top_ref, name, 80, tb_lock, unbiased_group="unbiased_61_full", api=False)
     synchronize_full_model(X1_SCAN_2_FILE, top_ref, name, 200, tb_lock, unbiased_group="unbiased_61_full",
                            inter_unbiased_group="inter_unbiased_full_renew_Extended",
-                           inter_biased_group="inter_biased_M_{}_V_full_renew_Extended", api=True)
+                           inter_biased_group="inter_biased_M_{}_V_full_renew_Extended", api=False)
     synchronize_full_model(X1_SCAN_2_FILE, top_ref, name, 80, tb_lock,
                            inter_biased_group="inter_biased_M_{}_V_full_Extended",
-                           inter_pix_extension_active=True, api=True)
+                           inter_pix_extension_active=True, api=False)
     synchronize_full_model(X1_SCAN_2_FILE, top_ref, name, 80, tb_lock,
                            inter_biased_group="inter_biased_M_{}_V_full_Extended_2",
-                           inter_pix_extension_active=True, api=True)
+                           inter_pix_extension_active=True, api=False)
 
     analyze_data(raw_data=X1_SCAN_2_FILE, base_path=hdf(top_ref, name, 'unbiased_61_full'), is_advanced=True,
                  full_model=False,
@@ -1263,8 +1263,8 @@ def x2_analysator_second(tb_lock, correction_args, **kwargs):
     x2_depletion_args.update(**correction_args)
     x2_depletion_refined_args.update(**correction_args)
 
-    synchronize_full_model(X2_SCAN_2_FILE, top_ref, name, 80, tb_lock, unbiased_group="unbiased_1_full", api=True)
-    synchronize_full_model(X2_SCAN_2_FILE, top_ref, name, 200, tb_lock, api=True)
+    synchronize_full_model(X2_SCAN_2_FILE, top_ref, name, 80, tb_lock, unbiased_group="unbiased_1_full", api=False)
+    synchronize_full_model(X2_SCAN_2_FILE, top_ref, name, 200, tb_lock, api=False)
 
     analyze_data(raw_data=X2_SCAN_2_FILE, base_path=hdf(top_ref, name, 'unbiased_1_full'), is_advanced=True,
                  lock=tb_lock,
@@ -1344,7 +1344,7 @@ def x4_analysator(tb_lock, correction_args, **kwargs):
     # this is not necessary for the ExtendedSyncManager as this accessed right here.
     # But this will only take effect as long as we are not spawning additional subprocesses.
 
-    synchronize_full_model(X4_SCAN_FILE, top_ref, name, 80, tb_lock, api=True)
+    synchronize_full_model(X4_SCAN_FILE, top_ref, name, 80, tb_lock, api=False)
 
     # handle the full sensor analysis
     analyze_data(raw_data=X4_SCAN_FILE, base_path=hdf(top_ref, name, 'unbiased_full'),
@@ -1480,8 +1480,8 @@ def x5_analysator(tb_lock, correction_args, **kwargs):
         np.arange(40, 100.1, 1.25)
     )))
 
-    synchronize_full_model(X5_SCAN_FILE, top_ref, name, 40, tb_lock, api=True)
-    synchronize_full_model(X5_SCAN_FILE, top_ref, name, 90, tb_lock, api=True)
+    synchronize_full_model(X5_SCAN_FILE, top_ref, name, 40, tb_lock, api=False)
+    synchronize_full_model(X5_SCAN_FILE, top_ref, name, 90, tb_lock, api=False)
 
     # handle the full sensor analysis
     analyze_data(raw_data=X5_SCAN_FILE, base_path=hdf(top_ref, name, 'unbiased_full'), is_advanced=True,
@@ -1665,7 +1665,7 @@ def x6_analysator(tb_lock, correction_args, **kwargs):
     }
     x6_depletion_args.update(**correction_args)
     x6_depletion_args_refined.update(**correction_args)
-    synchronize_full_model(X6_SCAN_FILE, top_ref, name, 45, tb_lock, api=True)
+    synchronize_full_model(X6_SCAN_FILE, top_ref, name, 45, tb_lock, api=False)
 
     analyze_data(raw_data=data_constants.X6_SCAN_FILE, base_path=hdf(top_ref, name, 'unbiased_full'),
                  is_advanced=True, distribution=True, full_model=False, test_cap_exclusion=True,
@@ -1776,7 +1776,7 @@ def x7_analysator(tb_lock, correction_args, **kwargs):
     logger.debug(AUTHKEY_OUTPUT, mp.current_process().authkey)
 
     _ = pixcap65.concurrency.get_manager(**kwargs)
-    synchronize_full_model(X7_SCAN_FILE, top_ref, name, 40.0, tb_lock, api=True)
+    synchronize_full_model(X7_SCAN_FILE, top_ref, name, 40.0, tb_lock, api=False)
 
     analyze_data(raw_data=data_constants.X7_SCAN_FILE, base_path=hdf(top_ref, name, 'unbiased_full'),
                  is_advanced=True,
