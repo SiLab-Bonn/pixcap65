@@ -1,7 +1,7 @@
 # commented configuration options are the result when using hatch instead of setuptool
 [project]
 name = "pixcap65_DOMI1279"
-version = "1.0.0.dev10"
+version = "1.0.0.dev11"
 description = "Host software for the PixCap65 chip control system based on MIO2 + GPAC hardware."
 authors = [
     { name = "Hans Krüger", email = "krueger@physik.uni-bonn.de" },
@@ -19,7 +19,7 @@ classifiers = [
     "Programming Language :: Python :: 3",
     "Programming Language :: Python :: 3.14",
     "Operating System :: OS Independent",
-    "Development Status :: 4",
+    "Development Status :: 4 - Beta",
     "Framework :: Matplotlib",
     "Framework :: Sphinx",
     "Intended Audience :: Science/Research",
@@ -103,24 +103,8 @@ docs = [
 # configuration of different build systems which could be used interchangebly!
 [build-system]
 requires = ["setuptools >= 77.0.3", "hatchling >= 1.26", "uv_build >= 0.11.7, <0.12.0"]
-# build-backend = "setuptools.build_meta"
-# build-backend = "hatchling.build"
+#build-backend = "hatchling.build"
 build-backend = "uv_build"
-
-# setuptools configuration
-[tool.setuptools]
-include-package-data = true
-
-[tool.setuptools.package-data]
-pixcap65.device = ["*.bit"]
-device = ["*.bit"]
-
-[tool.setuptools.exclude-package-data]
-pixcap65 = [".gitattributes", ".gitignore", "**.h5"]
-
-[tool.setuptools.packages.find]
-include = ["pixcap65*", "device*"]
-exclude = ["tests", "data_local", "Data", "doc", "**full_analysis", "**.h5", "**.pdf", "legacy"]
 
 # hatch configuration
 [tool.hatch.metadata]
@@ -132,19 +116,21 @@ skip-excluded-dirs = true
 
 [tool.hatch.build.targets.wheel]
 # the wheel target will determine the editable installs
-packages = ["pixcap65"]
-
-[tool.hatch.build.targets.sdist]
+include = ["pixcap65"]
 exclude = [
     "*.h5",
     "*.pdf",
+    "*.npy",
+    "*.txt",
     "**/full_analysis.py",
+    "*.log",
     "/.github",
     "/.venv",
     "/.qodana",
     "/.vscode",
     "/.build",
     "/Combination Plots",
+    "/doc",
     "/data_local",
     "/dist",
     "/dist-uv",
@@ -155,9 +141,66 @@ exclude = [
     "results/**",
     "data_local*",
     "Data*",
+    "/sides",
+    "Brewfile",
+    "*_back.yaml",
+    "*_template.yaml",
+    "/tests",
+    "/packaged",
+    "*.xz",
+    "qodana.yaml",
+    "pixcap65.yaml",
+    "/device"
+]
+
+[tool.hatch.build.targets.wheel.sources]
+"examples" = "pixcap65/examples"
+"legacy" = "pixcap65/legacy"
+
+[tool.hatch.build.targets.sdist]
+exclude = [
+    "*.h5",
+    "*.pdf",
+    "*.npy",
+    "*.txt",
+    "**/full_analysis.py",
+    "*.log",
+    "/.github",
+    "/.venv",
+    "/.qodana",
+    "/.vscode",
+    "/.build",
+    "/Combination Plots",
+    "/doc",
+    "/data_local",
+    "/dist",
+    "/dist-uv",
+    "/Fit References",
+    "/out",
+    "out",
+    "/.gitignore",
+    "results/**",
+    "data_local*",
+    "Data*",
     "sides",
     "Brewfile",
+    "*_back.yaml",
+    "*_template.yaml",
+    "/tests",
+    "/packaged",
+    "*.xz",
+    "qodana.yaml",
+    "pixcap65.yaml",
+    "/device"
 ]
+#include = [
+#    "/examples",
+#    "/legacy"
+#]
+
+[tool.hatch.build.targets.sdist.sources]
+"examples" = "pixcap65/examples"
+"legacy" = "pixcap65/legacy"
 
 [tool.hatch.envs.hatch-build]
 installer = "pip"
@@ -168,6 +211,7 @@ package = true
 [tool.uv.sources]
 #basil-daq = { path = "../basil-pixcap", editable = true }
 basil-daq = { git = "https://github.com/SiLab-Bonn/basil", branch = "Ba-Pixcap-2026/python-compatibility" }
+# this needs to be removed for the final release!
 smoda-fitter = { path = "../Smoda_2025_Final_Project_Temp", editable = true }
 
 [tool.uv.build-backend]

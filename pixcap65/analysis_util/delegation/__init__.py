@@ -246,7 +246,7 @@ def analyze_depletion_delegate(data_group: tb.Group, analysis_group: tb.Group,
             number_depletions = 1
 
         if MP_ACCELERATION_FLAG:
-            # CHECK: providing manager args here might break the code.
+            # providing manager args here might break the code.
             fit_result_storage = manager.DepletionArrayStorage(n_depletions=number_depletions)
         else:
             fit_result_storage = DepletionArrayStore(n_depletions=number_depletions)
