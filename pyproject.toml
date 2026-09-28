@@ -193,10 +193,6 @@ exclude = [
     "pixcap65.yaml",
     "/device"
 ]
-#include = [
-#    "/examples",
-#    "/legacy"
-#]
 
 [tool.hatch.build.targets.sdist.sources]
 "examples" = "pixcap65/examples"
