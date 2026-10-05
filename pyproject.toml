@@ -1,6 +1,6 @@
 # commented configuration options are the result when using hatch instead of setuptool
 [project]
-name = "pixcap65_DOMI1279"
+name = "pixcap65"
 version = "1.0.0.dev11"
 description = "Host software for the PixCap65 chip control system based on MIO2 + GPAC hardware."
 authors = [
@@ -103,8 +103,8 @@ docs = [
 # configuration of different build systems which could be used interchangebly!
 [build-system]
 requires = ["setuptools >= 77.0.3", "hatchling >= 1.26", "uv_build >= 0.11.7, <0.12.0"]
-#build-backend = "hatchling.build"
-build-backend = "uv_build"
+build-backend = "hatchling.build"
+#build-backend = "uv_build"
 
 # hatch configuration
 [tool.hatch.metadata]
@@ -207,8 +207,6 @@ package = true
 [tool.uv.sources]
 #basil-daq = { path = "../basil-pixcap", editable = true }
 basil-daq = { git = "https://github.com/SiLab-Bonn/basil", branch = "Ba-Pixcap-2026/python-compatibility" }
-# this needs to be removed for the final release!
-smoda-fitter = { path = "../Smoda_2025_Final_Project_Temp", editable = true }
 
 [tool.uv.build-backend]
 module-name = "pixcap65"
