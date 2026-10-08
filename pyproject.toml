@@ -80,9 +80,8 @@ advanced = [
     "numba ; python_version > '3.9'"
 ]
 visualization = [
-    "pyqt5",
-    "vitables",
-    # "matplotlib<=3.10.9",
+    "pyqt5; python_version >= '3.5'",
+    "vitables; python_version >= '3.5'",
     "matplotlib>=3.11.1; python_version >= '3.11'",
     "matplotlib<3.10.9; python_version < '3.11'",
     # pycairo seems to be be troublesome on linux/debian.
@@ -241,7 +240,8 @@ modelling = [
     "iminuit>=1.4.9",
     "numdifftools>=0.9.41",
     "numpy>=1.16.6",
-    "scikit-learn>=0.21.0",
+    "scikit-learn>=1.0.0; python_version >= '3.8'",
+    "scikit-learn<=1.0.0; python_version < '3.8'",
 ]
 dut = [
     "pyserial",
@@ -262,10 +262,11 @@ advanced = [
     "numba ; python_version > '3.9'"
 ]
 visualization = [
-    "pyqt5",
-    "vitables",
+    "pyqt5; python_version >= '3.5'",
+    "vitables; python_version >= '3.5'",
     "matplotlib>=3.11.1; python_version >= '3.11'",
     "matplotlib<3.10.9; python_version < '3.11'",
+    # pycairo seems to be be troublesome on linux/debian.
     "pycairo",
     "mpld3"
 ]
