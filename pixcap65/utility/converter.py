@@ -1,0 +1,850 @@
+"""
+While enhancing the pixcap measurement framework some of the api where changed on the way down.
+This also effected the analysis procedures.
+Older measurements may have a structure incompatible with what the analysis and plotting expects.
+So this provides a collection of conversion handler to transform the old apis into the currently used one.
+
+In addition, there are also handlers to take care of incomplete data written or re-generates some of the data tables and
+in particular the measurement uncertainties.
+"""
+
+try:
+    from importlib.resources import files, open_text
+except ImportError:
+    # for python 2.x or python 3.x with x < 7 we need a backport here
+    from importlib_resources import files, open_text
+
+import logging
+import time
+
+import numpy as np
+import tables as tb
+import yaml
+
+# from examples import data_constants
+# from examples.data_constants import *
+from pixcap65.analysis_util.utility import HIST_BIAS_MEAS_UNIT, HIST_CURRENT_MEAS_UNIT, GLOBAL_FILTERS
+from pixcap65.configs.config_handler import extract_smu_voltage_error, extract_smu_current_error
+from pixcap65.pixcap.pixcap65_measurement import ScanConfigurationKeys
+from pixcap65.pixcap_65_total_cap import BiasTable
+from pixcap65.utility.tables_util import set_group_attribute, group_get_file, get_groups, list_group_attributes, \
+    get_group_attribute
+from pixcap65.utility.utils_2 import UNITS_ATTRIBUTE_KEY, prevent_group_mix_up
+
+logger = logging.getLogger(__name__)
+
+def adjust_i_v_measurement(group, has_values=False):
+    """
+    Adjust the measurement w.r.t. to array and table attributes in the :py:class:`pytables.File` concerning the units
+    of the measured quantities as otherwhise the analysis results may have the wrong units.
+
+    @author: Dominik Fischer
+    last update: 2026-08-26
+
+    :param group: full hdf group which contains the measurement data.
+    :type group: :py:class:`pytables.Group`
+    :param has_values: whether there should be an additonal matrix with multiple current measurements for each frequency
+        and pixel
+    :type has_values: bool
+    """
+    group.HistCurr.attrs[UNITS_ATTRIBUTE_KEY] = HIST_CURRENT_MEAS_UNIT
+    if "HistCurrErr" in group:
+        group.HistCurrErr.attrs[UNITS_ATTRIBUTE_KEY] = HIST_CURRENT_MEAS_UNIT
+    else:
+        print("WHY DOES NO ERROR HIST EXIST FOR THE I-V CURVE?????")
+    if has_values:
+        group.HistCurrValues.attrs[UNITS_ATTRIBUTE_KEY] = HIST_CURRENT_MEAS_UNIT
+
+    set_group_attribute(group, "bias_current_unit", HIST_CURRENT_MEAS_UNIT)
+    set_group_attribute(group, "bias_voltage_unit", HIST_BIAS_MEAS_UNIT)
+    set_group_attribute(group, "bias_unit", HIST_BIAS_MEAS_UNIT)
+    group.BiasVoltageHist.attrs[UNITS_ATTRIBUTE_KEY] = HIST_BIAS_MEAS_UNIT
+
+
+def regenerate_i_v_errors(group):
+    """
+    Re-evaluates the measurement uncertainties of the leakage current measurements.
+    If multiple current measurements are present, these are used to define the statistical uncertainty of the
+    measurement by their standard deviation.
+    If these estimation is zero or only a single measurement is performed, the tech specs for the 1kV voltage range and
+    1 µA measurement range are used to determine the statistical uncertainty.
+
+    @author: Dominik Fischer
+    last update: 2026-08-26
+
+    :param group: full hdf group which contains the measurement data.
+    :type group: :py:class:`pytables.Group`
+    """
+    print("regenerate_i_v_errors")
+    config_file = files("pixcap65.configs").joinpath("keithley_2410_range.yaml")
+    if "HistCurrValues" not in group and "HistCurr" in group:
+        print("No enhanced values!")
+        with config_file.open('r') as f:
+            config = yaml.safe_load(f)
+            data = group.HistCurr[:]
+            errors = np.where(np.isfinite(data), extract_smu_current_error(config, data, 0.000001), np.nan)
+            # maybe the error comes from not executing this part here probably?
+            if "HistCurrErr" not in group:
+                group_get_file(group).create_carray(where=group, name="HistCurrErr", obj=errors,
+                                                    filters=GLOBAL_FILTERS)
+            else:
+                group.HistCurrErr[:] = errors
+    if "HistCurrValues" in group:
+        print("using enhanced values!")
+        average = np.nanmean(group.HistCurrValues, axis=1, keepdims=True)
+        uncertainty = np.nanstd(group.HistCurrValues, mean=average, axis=1)
+        if np.count_nonzero(uncertainty) == 0:
+            with config_file.open('r') as f:
+                config = yaml.safe_load(f)
+                data = group.HistCurr[:]
+                uncertainty = np.where(np.isfinite(data), extract_smu_current_error(config, data, 0.000001), np.nan)
+        group.HistCurr[:] = average[:, 0]
+        if "HistCurrErr" not in group:
+            group_get_file(group).create_carray(where=group, name="HistCurrErr", obj=uncertainty,
+                                                filters=GLOBAL_FILTERS)
+        else:
+            group.HistCurrErr[:] = uncertainty
+
+
+def regenerate_c_v_errors(group):
+    """
+    Re-evaluates the measurement uncertainties of the current measurements in order to characterize the cv
+    behaviour.
+    If a combined measurement together with the leakage current was performed also the leakage current uncertainties
+    are re-calculated.
+    If multiple current measurements are present, these are used to define the statistical uncertainty of the
+    measurement by their standard deviation.
+
+    If these estimation is zero or only a single measurement is performed, the tech specs for the 1kV voltage range and
+    1 µA measurement range are used to determine the statistical uncertainty. (Holds only for the leakage current).
+
+    @author: Dominik Fischer
+    last update: 2026-08-26
+
+    :param group: full hdf group which contains the measurement data.
+    :type group: :py:class:`pytables.Group`
+    """
+    regenerate_i_v_errors(group)
+    for _, subgroup in get_groups(group):
+        if "HistCurr" not in subgroup:
+            print(subgroup)
+            print("No entries?")
+        else:
+            regenerate_measurement_errors(subgroup)
+
+
+def adjust_c_v_measurement(group, iv_values=False, cv_values=False):
+    """
+    Adjust the measurement w.r.t. to array and table attributes in the :py:class:`pytables.File` concerning the units
+    of the measured quantities as otherwhise the analysis results may have the wrong units.
+
+    This function handles the adjustment for measurements in order to perform a cv characterization.
+
+    @author: Dominik Fischer
+    last update: 2026-08-26
+
+    :param group: full hdf group which contains the measurement data.
+    :type group: :py:class:`pytables.Group`
+    :param iv_values: whether multiple leakage current measurements are performed here.
+    :type iv_values: bool
+    :param cv_values: whether multiple current measurements are performed here for the capacitance measurements.
+    :type cv_values: bool
+    """
+    adjust_i_v_measurement(group, has_values=iv_values)
+
+    assert isinstance(group, tb.Group)
+    for _, subgroup in get_groups(group):
+        set_group_attribute(subgroup, "bias_voltage_unit", HIST_BIAS_MEAS_UNIT)
+        set_group_attribute(subgroup, "bias_unit", HIST_BIAS_MEAS_UNIT)
+        set_group_attribute(subgroup, "freq_unit", "MHz")
+        set_group_attribute(subgroup, "current_unit", HIST_CURRENT_MEAS_UNIT)
+        if "HistCurr" not in subgroup:
+            print(subgroup)
+            print("No entries?")
+        else:
+            subgroup.HistCurr.attrs[UNITS_ATTRIBUTE_KEY] = HIST_CURRENT_MEAS_UNIT
+            subgroup.HistCurrErr.attrs[UNITS_ATTRIBUTE_KEY] = HIST_CURRENT_MEAS_UNIT
+            if cv_values:
+                subgroup.HistCurrValues.attrs[UNITS_ATTRIBUTE_KEY] = HIST_CURRENT_MEAS_UNIT
+
+
+def adjust_cap_measurement(group, has_values=False):
+    """
+    Adjust the measurement w.r.t. to array and table attributes in the :py:class:`pytables.File` concerning the units
+    of the measured quantities as otherwhise the analysis results may have the wrong units.
+    This function handles the adjustment for raw capacitance measurements.
+
+    @author: Dominik Fischer
+    last update: 2026-08-26
+
+    :param group: full hdf group which contains the measurement data.
+    :type group: :py:class:`pytables.Group`
+    :param has_values: whether there should be an additonal matrix with multiple current measurements for each frequency
+        and pixel
+    :type has_values: bool
+    """
+    group.HistCurr.attrs["Units"] = "A"
+    if "HistCurrErr" not in group:
+        config_file = files('pixcap65.configs').joinpath("keithley_2602a_range.yaml")
+        with config_file.open('r') as f:
+            config = yaml.safe_load(f)
+            data = group.HistCurr[:]
+            errors = extract_smu_current_error(config, data, 0.000001)
+            group_get_file(group).create_carray(where=group, name="HistCurrErr", obj=errors,
+                                                filters=GLOBAL_FILTERS)
+    group.HistCurrErr.attrs[UNITS_ATTRIBUTE_KEY] = HIST_CURRENT_MEAS_UNIT
+    if has_values:
+        group.HistCurrValues.attrs[UNITS_ATTRIBUTE_KEY] = HIST_CURRENT_MEAS_UNIT
+    set_group_attribute(group, "current_unit", HIST_CURRENT_MEAS_UNIT)
+    set_group_attribute(group, "freq_unit", "MHz")
+
+
+def generate_pixel_dimensions(group, quad_length=50.0):
+    """
+    Generate the pixel/implantation array in the specs group of the investigated sensor.
+    This array is used to estimate the pixel area for investigations of the doping profile or the specific resistivity.
+
+    @author: Dominik Fischer
+    last update: 2026-08-26
+
+    :param group: full hdf group which contains the measurement data.
+    :type group: :py:class:`pytables.Group`
+    :param quad_length: length of one pixel side of a quadratic pixel!
+    """
+    prevent_group_mix_up(group, "sensor")
+
+    group_get_file(group).create_group(group, name="sensor")
+    dimensions_array = np.full((40, 40, 2), fill_value=quad_length)
+    array = group_get_file(group).create_carray(where=group.sensor, name="PhysicalDimensions", obj=dimensions_array,
+                                                filters=GLOBAL_FILTERS)
+    array.attrs[UNITS_ATTRIBUTE_KEY] = "um"
+    array.flush()
+
+
+def regenerate_measurement_errors(group):
+    """
+    Re-evaluates the measurement uncertainties of the current measurements performed to determine the pixel
+    capacitances.
+    If multiple current measurements are present, these are used to define the statistical uncertainty of the
+    measurement by their standard deviation. (seems to be not implemented, yet.)
+    Otherwise, the SMUs tech specs and the used range are used. (Here the 1µA measurement range will be assumed).
+
+    @author: Dominik Fischer
+    last update: 2026-08-26
+
+    :param group: full hdf group which contains the measurement data.
+    :type group: :py:class:`pytables.Group`
+    """
+    if "HistCurrValues" not in group:
+        config_file = files('pixcap65.configs').joinpath('keithley_2602a_range.yaml')
+        with config_file.open('r') as f:
+            config = yaml.safe_load(f)
+            data = group.HistCurr[:]
+            errors = np.where(np.isfinite(data), extract_smu_current_error(config, data, 0.000001), np.nan)
+            if "HistCurrErr" not in group:
+                group_get_file(group).create_carray(where=group, name="HistCurrErr", obj=errors,
+                                                    filters=tb.Filters(complib='blosc', fletcher32=False, complevel=5))
+            else:
+                group.HistCurrErr[:] = errors
+
+
+def regenerate_basi_table(group):
+    """
+    Re-generate the summary tables for biasing when performing leakage current measurements or a cv characterization.
+    Only performs an update to the `BiasTable`:py:class:`pytables.Table` object in contrast to e.g.
+    :py:func:`pixcap65.utility.converter.full_regenerate_bias_table`.
+    The actually applied bias voltages may be retrieved from scan parameters table.
+    If necessary, the uncertainties are re-calculated.
+    Also the bias voltages ranges are not used directly from the stored scan parameters but recomputeted.
+    This is becaus this function was designed to fix an issue with the scan parameters storing options with some of the
+    measurements.
+
+    @author: Dominik Fischer
+    last update: 2026-08-26
+
+    :param group: full hdf group which contains the measurement data.
+    :type group: :py:class:`pytables.Group`
+    """
+    assert "scan_params" in group
+    out_file = group_get_file(group)
+    table = out_file.create_table(group, name="BiasTable", description=BiasTable,
+                                          filters=GLOBAL_FILTERS)
+    entry = table.row
+
+    # need to handle the actually measured voltages.
+    try:
+        internal_parameters = group.scan_parameters[:]
+    except (KeyError, tb.exceptions.NoSuchNodeError):
+        internal_parameters = group.scan_params[:]
+    voltages = internal_parameters["hv_voltage"]
+
+    # characteristic is here 'to do' the determination of the voltage uncertainties every time.
+    try:
+        device_name = "keithley_2410"
+        config_file = files("pixcap65.configs").joinpath(
+            "{name}_range.yaml".format(name=device_name))
+        with config_file.open('r') as conf_file:
+            scan_range_config = yaml.safe_load(conf_file)
+
+        voltage_errors = extract_smu_voltage_error(scan_range_config, voltages, 1000)
+    except:
+        logging.warning("Could not extract voltage errors from keithley_2410_range.yaml", exc_info=True)
+        voltage_errors = np.full_like(voltages, np.nan)
+
+    scan_configuration = {}
+    for key in list_group_attributes(group):
+        if key.startswith("configuration_"):
+            scan_configuration[key.removeprefix("configuration_")] = get_group_attribute(group, key)
+
+    print(scan_configuration)
+    scan_configuration[ScanConfigurationKeys.BIAS_VOLTAGE_RANGE] = -1 * np.arange(1, 350, 0.25)
+
+    # seems to be more or less the same for both implementations; except for discussions about the voltage_settings, voltages and voltage_erros arrays in the alternative implementation.
+    # for the voltage settings a different parameters is fetched, as here we manually recreate the whole procedure!
+    # equals the bias_currents array of the alternative implementation!
+    hist_bias_current = group.HistCurr[:]
+    # equals the bias_errors array of the alternative implementation!
+    hist_bias_current_errors = group.HistCurrErr[:]
+    for set_voltage, leak_current, current_error, meas_voltage, meas_voltage_error in zip(
+            scan_configuration[ScanConfigurationKeys.BIAS_VOLTAGE_RANGE], hist_bias_current,
+            hist_bias_current_errors, voltages, voltage_errors):
+        try:
+            entry['Us'] = set_voltage
+            entry['U'] = meas_voltage
+            entry['I'] = leak_current
+            entry['DI'] = current_error
+            entry['DU'] = meas_voltage_error
+            entry.append()
+        except ValueError as e:
+            logging.info("scan parameters")
+            logging.info(set_voltage)
+            logging.info("currents")
+            logging.info(hist_bias_current.shape)
+            logging.info(leak_current)
+            logging.info("Errors")
+            logging.info(hist_bias_current_errors.shape)
+            logging.info(current_error)
+            raise e
+
+    # transformation to the new api seems to be missing here!
+
+
+def combine_cv_measurements(first_group: tb.Group, second_group: tb.Group):
+    """
+    Combine two sets of partical c-v measurements into just a single one.
+    The procedure is trivial for non-overlapping parts of the data.
+    The name of the resulting measurement group will be
+    `C_V_Characteristic_refined_Extended_Combined`.
+    Any existing group with this name will be removed.
+    It is designed to combine two groups with consecutive bias voltage ranges and not to combine two measurement
+    zeros which are maximally overlapping w.r.t. the bias voltages applied.
+
+    @author: Dominik Fischer
+    last update: 2026-08-26
+
+    :param first_group: full hdf group which contains the measurement data.
+    :type first_group: :py:class:`pytables.Group`
+    :param second_group: full hdf group which contains the measurement data.
+    :type second_group: :py:class:`pytables.Group`
+    """
+    # parent group and file
+    parent_group = first_group._v_parent
+    h5_file = group_get_file(parent_group)
+
+    if "C_V_Characteristic_refined_Extended_Combined" in parent_group:
+        parent_group["C_V_Characteristic_refined_Extended_Combined"]._f_remove(recursive=True)
+        time.sleep(10)
+    target_group = h5_file.create_group(where=parent_group, name="C_V_Characteristic_refined_Extended_Combined")
+    target_group = h5_file.create_group(where=target_group, name="biasing")
+    target_group = h5_file.create_group(where=target_group, name="measurements")
+    first_group = first_group.biasing.measurements
+    second_group = second_group.biasing.measurements
+
+    # load the basic data
+    first_current_error = first_group.HistCurrErr[:]
+    second_current_error = second_group.HistCurrErr[:]
+    first_current_data = first_group.HistCurr[:]
+    second_current_data = second_group.HistCurr[:]
+    first_bias_table = np.rec.array(first_group.BiasTable[:], dtype=first_group.BiasTable.dtype)
+    second_bias_table = np.rec.array(second_group.BiasTable[:], dtype=second_group.BiasTable.dtype)
+    first_voltage_hist = first_group.BiasVoltageHist[:]
+    second_voltage_hist = second_group.BiasVoltageHist[:]
+    first_scan_parameters = np.rec.array(first_group.scan_params[:], dtype=first_group.scan_params.dtype)
+    second_scan_parameters = np.rec.array(second_group.scan_params[:], dtype=second_group.scan_params.dtype)
+    if len(first_voltage_hist.shape) <= 1:
+        temp_array = np.full(shape=(first_voltage_hist.shape[0], 3), fill_value=np.nan)
+        temp_array[:, 0] = first_voltage_hist
+        if "U" in first_bias_table.dtype.fields:
+            temp_array[:, 1] = first_bias_table.U
+        elif "hv_voltage" in first_scan_parameters.dtype.fields:
+            temp_array[:, 1] = first_bias_table.hv_voltage
+        else:
+            temp_array[:, 1] = first_voltage_hist
+
+        if "DU" not in first_bias_table.dtype.fields or np.any(np.isnan(first_bias_table.DU)):
+            try:
+                with files("pixcap65.configs").joinpath("keithley_2410_range.yaml").open('r') as conf_file:
+                    scan_range_config = yaml.safe_load(conf_file)
+
+                temp_array[:, 2] = extract_smu_voltage_error(scan_range_config, first_voltage_hist, 1000)
+            except:
+                logging.warning("Could not extract voltage errors from keithley_2410_range.yaml", exc_info=True)
+                temp_array[:, 2] = np.full_like(first_voltage_hist, np.nan)
+        else:
+            temp_array[:, 2] = first_bias_table.DU
+
+        first_voltage_hist = temp_array
+
+    if len(second_voltage_hist.shape) <= 1:
+        temp_array = np.full(shape=(second_voltage_hist.shape[0], 3), fill_value=np.nan)
+        temp_array[:, 0] = second_voltage_hist
+        if "U" in second_bias_table.dtype.fields:
+            temp_array[:, 1] = second_bias_table.U
+        elif "hv_voltage" in second_scan_parameters.dtype.fields:
+            temp_array[:, 1] = second_bias_table.hv_voltage
+        else:
+            temp_array[:, 1] = second_voltage_hist
+
+        if "DU" not in second_bias_table.dtype.fields or np.any(np.isnan(second_bias_table.DU)):
+            try:
+                with open("pixcap65/configs/keithley_2410_range.yaml", "r") as conf_file:
+                    scan_range_config = yaml.safe_load(conf_file)
+
+                temp_array[:, 2] = extract_smu_voltage_error(scan_range_config, second_voltage_hist, 1000)
+            except:
+                logging.warning("Could not extract voltage errors from keithley_2410_range.yaml", exc_info=True)
+                temp_array[:, 2] = np.full_like(second_voltage_hist, np.nan)
+        else:
+            temp_array[:, 2] = second_bias_table.DU
+
+        second_voltage_hist = temp_array
+
+    first_unique_voltages = np.setdiff1d(first_voltage_hist[:, 0], second_voltage_hist[:, 0])
+
+    first_mask = np.abs(first_scan_parameters.bias_voltage) <= np.max(np.abs(first_unique_voltages))
+    new_current_data = np.concat([first_current_data[first_mask], second_current_data])
+    new_current_error = np.concat([first_current_error[first_mask], second_current_error])
+    new_scan_parameters = np.concat([first_scan_parameters[first_mask], second_scan_parameters])
+    new_bias_table = np.concat([first_bias_table[first_mask], second_bias_table])
+    new_voltage_hist = np.concat([first_voltage_hist[first_mask], second_voltage_hist])
+
+
+    # write the newly created data sets to the new group for the combined results.
+    new_array = h5_file.create_carray(where=target_group, name="HistCurr", title=first_group.HistCurr.title, filters=first_group.HistCurr.filters, obj=new_current_data)
+    for attribute in first_group.HistCurr.attrs._f_list():
+        new_array.attrs[attribute] = first_group.HistCurr.attrs[attribute]
+    new_array = h5_file.create_carray(where=target_group, name="HistCurrErr", title=first_group.HistCurrErr.title, filters=first_group.HistCurrErr.filters, obj=new_current_error)
+    for attribute in first_group.HistCurrErr.attrs._f_list():
+        new_array.attrs[attribute] = first_group.HistCurrErr.attrs[attribute]
+    h5_file.create_table(where=target_group, name="scan_params", description=new_scan_parameters, filters=first_group.scan_params.filters)
+    h5_file.create_table(where=target_group, name="BiasTable", description=new_bias_table, filters=first_group.BiasTable.filters)
+    new_array = h5_file.create_carray(where=target_group, name="BiasVoltageHist", title=first_group.BiasVoltageHist.title, filters=first_group.BiasVoltageHist.filters, obj=new_voltage_hist)
+    for attribute in first_group.BiasVoltageHist.attrs._f_list():
+        new_array.attrs[attribute] = first_group.BiasVoltageHist.attrs[attribute]
+
+    # get the data points (bias voltages) which are unique for both groups and extract the overlapping ones
+
+    # we must copy all the sub measurement groups into the new group
+    for voltage in first_unique_voltages:
+        group_name = ("bias_{bias_voltage}_V"
+                      .format(bias_voltage=voltage)
+                      .replace('-', "M_")
+                      .replace(".", "__"))
+        h5_file.copy_node(where=first_group, name=group_name, new_name=group_name, newparent=target_group, overwrite=True, recursive=True)
+    for voltage in second_voltage_hist[:, 0]:
+        group_name = ("bias_{bias_voltage}_V"
+                      .format(bias_voltage=voltage)
+                      .replace('-', "M_")
+                      .replace(".", "__"))
+        h5_file.copy_node(where=second_group, name=group_name, new_name=group_name, newparent=target_group,
+                          overwrite=True, recursive=True)
+
+    for attribute in list_group_attributes(first_group):
+        target_group._f_setattr(attribute, get_group_attribute(first_group, attribute))
+
+def full_regenerate_bias_table(group: tb.Group, **kwargs):
+    """
+    Re-generate the summary tables for biasing when performing leakage current measurements or a cv characterization.
+    If the old api to summarise the applied bias voltage and the measured leakage currents is used the matrix will be
+    converted to its new form.
+    The new form contains the requested sourcing voltage, the measured sourced voltage and the uncertainty of the
+    voltage measurement.
+    The actually applied bias voltages may be retrieved from scan parameters table.
+    If necessary, the uncertainties are re-calculated.
+
+    @author: Dominik Fischer
+    last update: 2026-08-26
+
+    :param group: full hdf group which contains the measurement data.
+    :type group: :py:class:`pytables.Group`
+    :keyword transform_api: specifies whether the transformation/conversion to the new api should be done.
+    """
+    out_file = group_get_file(group)
+    if "BiasTable" in group:
+        group.BiasTable._f_remove()
+        time.sleep(5)
+
+    table = out_file.create_table(group, name="BiasTable", description=BiasTable,
+                              filters=GLOBAL_FILTERS)
+    entry = table.row
+
+    try:
+        internal_parameters = group.scan_parameters[:]
+    except (KeyError, tb.exceptions.NoSuchNodeError):
+        internal_parameters = group.scan_params[:]
+
+    # fetch the voltage parameters
+    try:
+        voltages = internal_parameters["hv_voltage"]
+    except KeyError:
+        # if the measured value does not exist, use the value which should be set/sourced.
+        voltages = internal_parameters["bias_voltage"]
+    try:
+        hist_parameters = group.BiasVoltageHist[:]
+        need_bias_table_hist = False
+    except (KeyError, tb.exceptions.NoSuchNodeError):
+        hist_parameters = np.full(voltages.shape[0], np.nan)
+        need_bias_table_hist = True
+    if np.any(np.isfinite(hist_parameters)):
+        if len(hist_parameters.shape) > 1:
+            voltages = hist_parameters[:, 1]
+            voltage_errors = hist_parameters[:, 2]
+            voltage_settings = hist_parameters[:, 0]
+        else:
+            # extract from old-style api!
+            voltages = hist_parameters
+            voltage_errors = np.full_like(voltages, np.nan)
+            voltage_settings = voltages.copy()
+    else:
+        # What 'to do' if this argument does not exist. We only started catching this lately.
+        # we'll still need to fetch this errors here correctly!
+        voltage_errors = np.full_like(voltages, np.nan)
+
+    if np.all(~np.isfinite(voltage_errors)) or kwargs.get("force_recalculation", False):
+        try:
+            voltage_settings = internal_parameters['bias_voltage']
+            device_name = "keithley_2410"
+            config_file = files("pixcap65.configs").joinpath(
+                "{name}_range.yaml".format(name=device_name))
+            with config_file.open('r') as conf_file:
+                range_config = yaml.safe_load(conf_file)
+                voltage_errors = extract_smu_voltage_error(range_config, voltages, 1000)
+        except:
+            logging.warning("Could not extract voltage errors from keithley_2410_range.yaml", exc_info=True)
+            voltage_errors = np.full_like(voltages, np.nan)
+
+    # generate the new/renew table
+    bias_currents = group.HistCurr[:]
+    bias_errors = group.HistCurrErr[:]
+    new_voltage_hist_data = np.full(shape=(hist_parameters.shape[0], 3,), fill_value=np.nan)
+    for set_voltage, leak_current, current_error, meas_voltage, meas_voltage_error in zip(
+            voltage_settings, bias_currents,
+            bias_errors, voltages, voltage_errors):
+        try:
+            entry['Us'] = set_voltage
+            entry['U'] = meas_voltage
+            entry['I'] = leak_current
+            entry['DI'] = current_error
+            entry['DU'] = meas_voltage_error
+            entry.append()
+        except ValueError as e:
+            logger.info("scan parameters")
+            logger.info(set_voltage)
+            logger.info("currents")
+            logger.info(bias_currents.shape)
+            logger.info(leak_current)
+            logger.info("Errors")
+            logger.info(bias_errors.shape)
+            logger.info(current_error)
+            raise e
+
+    if need_bias_table_hist and kwargs.pop("transform_api", False):
+        # FIXME: maybe this here breaks the BiasTableHist access?
+        new_voltage_hist_data[:, 0] = voltage_settings
+        new_voltage_hist_data[:, 1] = voltages
+        new_voltage_hist_data[:, 2] = voltage_errors
+        if "BiasVoltageHist" in group:
+            temp = group.BiasVoltageHist
+            assert isinstance(temp, tb.CArray)
+            temp._f_remove()
+            time.sleep(30)
+        out_file.create_carray(group, "BiasVoltageHist", obj=new_voltage_hist_data,
+                           filters=GLOBAL_FILTERS)
+
+
+def generate_bias_table(group, **kwargs):
+    """
+    Re-generate the summary tables for biasing when performing leakage current measurements or a cv characterization.
+    If the old api to summarise the applied bias voltage and the measured leakage currents is used the matrix will be
+    converted to its new form.
+    The new form contains the requested sourcing voltage, the measured sourced voltage and the uncertainty of the
+    voltage measurement.
+    The actually applied bias voltages may be retrieved from scan parameters table.
+    If necessary, the uncertainties are re-calculated.
+
+    :deprecated:
+
+    @author: Dominik Fischer
+    last update: 2026-08-26
+
+    :param group: full hdf group which contains the measurement data.
+    :type group: :py:class:`pytables.Group`
+    :keyword transform_api: specifies whether the transformation/conversion to the new api should be done.
+    """
+    file = group_get_file(group)
+    if "BiasTable" in group:
+        group.BiasTable._f_remove()
+        time.sleep(5)
+
+    table = file.create_table(group, name="BiasTable", description=BiasTable,
+                                          filters=GLOBAL_FILTERS)
+    entry = table.row
+
+    # need to handle the actually measured voltages.
+    try:
+        internal_parameters = group.scan_parameters[:]
+    except (KeyError, tb.exceptions.NoSuchNodeError):
+        internal_parameters = group.scan_params[:]
+    try:
+        hist_parameters = group.BiasVoltageHist[:]
+        # we will expect here in the first column the 'bias_range' data
+        # we will expect here in the second column the 'hv_voltage' data
+        # we will expect here in the third column the measurement uncertainties. (for the voltages)
+    except (KeyError, tb.exceptions.NoSuchNodeError):
+        hist_parameters = np.full(internal_parameters["hv_voltage"].shape[0], np.nan)
+
+
+    bias_currents = group.HistCurr[:]
+    bias_errors = group.HistCurrErr[:]
+    new_voltage_hist_data = np.full(shape=(hist_parameters.shape[0], 3,), fill_value=np.nan)
+    # if the BiasVoltageHist was initialized correctly, this should yield the same voltages array as the alternative
+    # implementation!
+    if np.any(np.isfinite(hist_parameters)):
+        if len(hist_parameters.shape) > 1:
+            voltages = hist_parameters[:, 1]
+            voltage_errors = hist_parameters[:, 2]
+            voltage_settings = hist_parameters[:, 0]
+        else:
+            # extract from old-style api!
+            voltages = hist_parameters
+            voltage_errors = np.full_like(voltages, np.nan)
+            voltage_settings = voltages.copy()
+    else:
+        # What 'to do' if this argument does not exist. We only started catching this lately.
+        voltages = internal_parameters["hv_voltage"]
+        voltage_errors = np.full_like(voltages, np.nan)
+    if np.all(~np.isfinite(voltage_errors)):
+        try:
+            voltage_settings = internal_parameters['bias_voltage']
+            device_name = "keithley_2410"
+            config_file = files("pixcap65.configs").joinpath(
+                "{name}_range.yaml".format(name=device_name))
+            with config_file.open('r') as conf_file:
+                range_config = yaml.safe_load(conf_file)
+                voltage_errors = extract_smu_voltage_error(range_config, voltages, 1000)
+        except:
+            logging.warning("Could not extract voltage errors from keithley_2410_range.yaml", exc_info=True)
+            voltage_errors = np.full_like(voltages, np.nan)
+    # seems to be more or less the same for both implementations; except for discussions about the voltage_settings,
+    # voltages and voltage_erros arrays.
+    for set_voltage, leak_current, current_error, meas_voltage, meas_voltage_error in zip(
+            voltage_settings, bias_currents,
+            bias_errors, voltages, voltage_errors):
+        try:
+            entry['Us'] = set_voltage
+            entry['U'] = meas_voltage
+            entry['I'] = leak_current
+            entry['DI'] = current_error
+            entry['DU'] = meas_voltage_error
+            entry.append()
+        except ValueError as e:
+            logger.info("scan parameters")
+            logger.info(set_voltage)
+            logger.info("currents")
+            logger.info(bias_currents.shape)
+            logger.info(leak_current)
+            logger.info("Errors")
+            logger.info(bias_errors.shape)
+            logger.info(current_error)
+            raise e
+
+    # this transformation is not present within the other implementation.
+    # when the old api for the bias voltage hist is used we should transform it to the new one
+    if len(hist_parameters) <= 1 and kwargs.pop("transform_api", False):
+        new_voltage_hist_data[:, 0] = voltage_settings
+        new_voltage_hist_data[:, 1] = voltages
+        new_voltage_hist_data[:, 2] = voltage_errors
+        if "BiasVoltageHist" in group:
+            temp = group.BiasVoltageHist
+            assert isinstance(temp, tb.CArray)
+            temp._f_remove()
+            time.sleep(30)
+        file.create_carray(group, "BiasVoltageHist", obj=new_voltage_hist_data, filters=tb.Filters(complib='blosc', fletcher32=False, complevel=5))
+
+
+def regenerate_inter_pix_errors(group):
+    """
+    Re-evaluates the measurement uncertainties of the current measurements performed to determine the inter-pixel
+    capacitances.
+    If multiple current measurements are present, these are used to define the statistical uncertainty of the
+    measurement by their standard deviation. (seems to be not implemented, yet.)
+    Otherwise, the SMUs tech specs and the used range are used. (Here the 1µA measurement range will be assumed).
+
+    Quite similar to :py:func:`pixcap65.utility.converter.regenerate_measurement_errors` except that here multiple
+    measurement channels needs to be accounted for.
+
+    @author: Dominik Fischer
+    last update: 2026-08-26
+
+    :param group: full hdf group which contains the measurement data.
+    :type group: :py:class:`pytables.Group`
+    """
+    if "HistCurrValues" not in group:
+        with files("pixcap65.configs").joinpath("keithley_2602a_range.yaml").open() as f:
+            config = yaml.safe_load(f)
+            total_data = group.TotalHistCurr[:]
+            total_errors = np.where(np.isfinite(total_data),
+                                    extract_smu_current_error(config, total_data, 0.000001), np.nan)
+            if "TotalHistCurrErr" not in group:
+                group_get_file(group).create_carray(where=group, name="TotalHistCurrErr", obj=total_errors,
+                                                    filters=tb.Filters(complib='blosc', fletcher32=False, complevel=5))
+            else:
+                group.TotalHistCurrErr[:] = total_errors
+            inter_data_1 = group.InterHistCurrA[:]
+            inter_errors_1 = np.where(np.isfinite(inter_data_1),
+                                      extract_smu_current_error(config, inter_data_1, 0.000010), np.nan)
+            if "InterHistCurrErrA" not in group:
+                group_get_file(group).create_carray(where=group, name="InterHistCurrErrA", obj=inter_errors_1,
+                                                    filters=tb.Filters(complib='blosc', fletcher32=False, complevel=5))
+            else:
+                group.InterHistCurrErrA[:] = inter_errors_1
+
+            inter_data_2 = group.InterHistCurrB[:]
+            inter_errors_2 = np.where(np.isfinite(inter_data_2),
+                                      extract_smu_current_error(config, inter_data_2, 0.000001), np.nan)
+            if "InterHistCurrErrB" not in group:
+                group_get_file(group).create_carray(where=group, name="InterHistCurrErrB", obj=inter_errors_2,
+                                                    filters=tb.Filters(complib='blosc', fletcher32=False, complevel=5))
+            else:
+                group.InterHistCurrErrB[:] = inter_errors_2
+
+
+def split_sensor_group(group: tb.Group, pixel_groups):
+    """
+    Utility function to extract different regions from a sensor.
+    This is in particular necessary for sensor with different pixel/implantation sizes to thread their analysis differently.
+    In particular the investigation of distributions during the cv characterization is improved by this strict separation.
+    :param group: hdf files group containing the measurement data.
+    :param pixel_groups: mapping to group the similar pixels on the sensor together and distinguish them from other
+     ones.
+    """
+    h5_file = group_get_file(group)
+    original_name = group._v_name
+    parent_group = group._v_parent
+
+    def _transfer_selected_data(fetched, target, **kwargs):
+        for col_set, row_set in zip(kwargs["columns"], kwargs["rows"]):
+            target[col_set[0]:col_set[1], row_set[0]:row_set[1]] = fetched[col_set[0]:col_set[1], row_set[0]:row_set[1]]
+
+    def _apply_changes(group: tb.Group, **kwargs):
+        if "HistCurr" in group:
+            fetch_data = group.HistCurr[:]
+            if fetch_data.shape[:2] == (40, 40):
+                new_data = np.full_like(fetch_data, np.nan)
+                _transfer_selected_data(fetch_data, new_data, **kwargs)
+                if np.all(new_data == fetch_data):
+                    print("Unexpectedly the new data has not changed at all.")
+
+                group.HistCurr[:] = new_data
+                group._g_flush_group()
+                group_get_file(group).flush()
+
+        if "InterHistCurrA" in group:
+            fetch_data = group.InterHistCurrA[:]
+            if fetch_data.shape[:2] == (40, 40):
+                new_data = np.full_like(fetch_data, np.nan)
+                _transfer_selected_data(fetch_data, new_data, **kwargs)
+                group.InterHistCurrA[:] = new_data
+                group._g_flush_group()
+                group_get_file(group).flush()
+
+        if "InterHistCurrB" in group:
+            fetch_data = group.InterHistCurrB[:]
+            if fetch_data.shape[:2] == (40, 40):
+                new_data = np.full_like(fetch_data, np.nan)
+                _transfer_selected_data(fetch_data, new_data, **kwargs)
+                group.InterHistCurrB[:] = new_data
+                group._g_flush_group()
+                group_get_file(group).flush()
+
+        if "TotalHistCurr" in group:
+            fetch_data = group.TotalHistCurr[:]
+            if fetch_data.shape[:2] == (40, 40):
+                new_data = np.full_like(fetch_data, np.nan)
+                _transfer_selected_data(fetch_data, new_data, **kwargs)
+                group.TotalHistCurr[:] = new_data
+                group._g_flush_group()
+                group_get_file(group).flush()
+
+        if "HistCurrErr" in group:
+            fetch_data = group.HistCurrErr[:]
+            if fetch_data.shape[:2] == (40, 40):
+                new_data = np.full_like(fetch_data, np.nan)
+                _transfer_selected_data(fetch_data, new_data, **kwargs)
+                group.HistCurrErr[:] = new_data
+                group._g_flush_group()
+                group_get_file(group).flush()
+
+        if "InterHistCurrErrA" in group:
+            fetch_data = group.InterHistCurrErrA[:]
+            if fetch_data.shape[:2] == (40, 40):
+                new_data = np.full_like(fetch_data, np.nan)
+                _transfer_selected_data(fetch_data, new_data, **kwargs)
+                group.InterHistCurrErrA[:] = new_data
+                group._g_flush_group()
+                group_get_file(group).flush()
+
+        if "InterHistCurrErrB" in group:
+            fetch_data = group.InterHistCurrErrB[:]
+            if fetch_data.shape[:2] == (40, 40):
+                new_data = np.full_like(fetch_data, np.nan)
+                _transfer_selected_data(fetch_data, new_data, **kwargs)
+                group.InterHistCurrErrB[:] = new_data
+                group._g_flush_group()
+                group_get_file(group).flush()
+
+        if "TotalHistCurrErr" in group:
+            fetch_data = group.TotalHistCurrErr[:]
+            if fetch_data.shape[:2] == (40, 40):
+                new_data = np.full_like(fetch_data, np.nan)
+                _transfer_selected_data(fetch_data, new_data, **kwargs)
+                group.TotalHistCurrErr[:] = new_data
+                group._g_flush_group()
+                group_get_file(group).flush()
+
+        if "HistCurrValues" in group:
+            fetch_data = group.HistCurrValues[:]
+            if fetch_data.shape[:2] == (40, 40):
+                new_data = np.full_like(fetch_data, np.nan)
+                _transfer_selected_data(fetch_data, new_data, **kwargs)
+                group.HistCurrValues[:] = new_data
+                group._g_flush_group()
+                group_get_file(group).flush()
+
+        # now it is still necessary to walkt the children
+        for child in group._f_walk_groups():
+            if child == group:
+                continue
+            if "analysis" in child._v_name:
+                continue
+            _apply_changes(child, **kwargs)
+
+    new_names = ["{}_{}".format(original_name, i) for i in pixel_groups.keys()]
+    for (new_name, type_name) in zip(new_names, pixel_groups.keys()):
+        new_group = h5_file.copy_node(where=parent_group, newparent=parent_group, name=original_name, newname=new_name, overwrite=True, recursive=True)
+        # now it is necessary to update the data arrays to only feature the extracted data
+        if isinstance(new_group, tb.Group):
+            _apply_changes(new_group, **pixel_groups[type_name])
+
+# no main script part anymore, as it is no longer required.
+# The script has been moved to the examples module (conversion.py)

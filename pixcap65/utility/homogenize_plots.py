@@ -1,0 +1,225 @@
+"""
+Homoegenize plots module from the bachelor's degree EDV module.
+Could be used to make all plots in e.g. a thesis the same.
+"""
+import atexit
+import logging
+import matplotlib
+# from matplotlib.ticker import AutoMinorLocator
+import numpy as np
+import threading
+
+# If the code gives a lot of matplotlib deprecation warnings
+# these can be turned off (although this is not a recommended procedure)
+# import warnings
+# warnings.filterwarnings("ignore")
+
+# Store original plot parameters so that we can revert:
+ORIG_MATPLOTLIB_CONF = dict(matplotlib.rcParams)
+
+logger = logging.getLogger(__name__)
+
+def get_error_cycler():
+    """property cycler for errorbar plots which cycles the usual marker symbols but no lines to be drawn."""
+    from cycler import cycler
+    standard_color = matplotlib.rcParams['axes.prop_cycle'].by_key()['color']
+    return cycler(marker=['x', '*', 'v'], linestyle=['','','']) * cycler(color=standard_color)
+
+# noinspection PyUnboundLocalVariable
+def set_params(fig_width=None, fig_height=None, columns=1, fontsize=8, dpi=300,
+               serif='serif', font=None, latex=True, latex_extra='',
+               ticks='', minor=False):
+    """Set up matplotlib's RC params for LaTeX plotting.
+    Call this function before plotting a figure.
+
+    Parameters
+    ----------
+    fig_width : float, optional, inches
+    fig_height : float,  optional, inches
+    columns : {1, 2}; 1 is default
+    fontsize : 8 pt is default
+    dpi : 300 is default, set to 600 for poster printing or PR figures
+    serif : serif is default, set to sans-serif as an alternative
+    font : name of font to be used (if not default)
+    latex : True is default, use LaTeX for text (this is slow!)
+    latex_extra : extra text to add to LaTeX preamble
+    ticks : {'', 'in', 'out', 'inall'} out is default, set to 'in' or 'inall'
+    minor : False is default, set to True to also get minor ticks
+    """
+
+    assert (columns in [1, 2])
+    assert (ticks in ['', 'in', 'out', 'inall'])
+
+    if fig_width is None:
+        # Figure widths for one-column and two-column printing
+        # (taken from https://www.elsevier.com/authors/author-schemas/artwork-and-media-instructions/artwork-sizing)
+        if columns == 2:
+            fig_width = 3.5
+        else:
+            fig_width = 7.0
+
+    if fig_height is None:
+        golden_mean = (np.sqrt(5.0) - 1.0) / 2.0  # aesthetic ratio
+        fig_height = fig_width * golden_mean  # height in inches
+
+    logger.debug('\nOld keys:')
+    logger.debug(matplotlib.rcParams.keys())
+
+    from cycler import cycler
+    standard_color = matplotlib.rcParams['axes.prop_cycle'].by_key()['color']
+    cc = cycler(linestyle=['-', '--', '-.']) * cycler(color=standard_color)
+
+    # May have to set 'backend': 'ps'
+    params = {
+        'axes.labelsize': fontsize,
+        'axes.titlesize': 1.2 * fontsize,
+        'axes.prop_cycle': cc,
+        'axes.formatter.use_locale': True,
+        'axes.unicode_minus': False,
+        'font.size': fontsize,
+        'legend.fontsize': fontsize,
+        'legend.frameon': False,
+        'xtick.labelsize': fontsize,
+        'ytick.labelsize': fontsize,
+        'axes.linewidth': 1,
+        'lines.linewidth': 1,
+        'figure.figsize': [fig_width, fig_height],
+        'font.family': serif,
+        'savefig.bbox': 'tight',
+        'savefig.dpi': dpi,
+        'errorbar.capsize': 3.0,
+    }
+
+    # Set serif or sans serif font
+    if serif == 'sans-serif':
+        if font: params['font.sans-serif'] = [font]
+    elif serif == 'serif':
+        if font: params['font.serif'] = [font]
+
+    # LaTeX preamble
+    latex_preamble = r'\usepackage{siunitx}'
+    latex_preamble += r'\usepackage{newtxtext}'
+    latex_preamble += r'\usepackage{newtxmath}'
+    latex_preamble += r'\usepackage[utf8]{inputenc}\usepackage[T1]{fontenc}'
+    if latex_extra: latex_preamble += latex_extra
+    latex_params = {'text.usetex': latex,
+                    'text.latex.preamble': latex_preamble,
+                    'pgf.preamble': latex_preamble,
+                    'pgf.texsystem': 'pdflatex',
+                    }
+    logger.debug("Parameters for latex use:")
+    logger.debug(params)
+    logger.debug(latex_params)
+    matplotlib.rcParams.update(params)
+    matplotlib.rcParams.update(latex_params)
+
+    # Tick settings
+    if ticks == 'in':
+        tick_params = {'xtick.direction': 'in',
+                       'ytick.direction': 'in'
+                       }
+    elif ticks == 'out':
+        tick_params = {'xtick.direction': 'out',
+                       'ytick.direction': 'out'
+                       }
+    elif ticks == 'inall':
+        tick_params = {
+            'xtick.direction': 'in',
+            'ytick.direction': 'in',
+            'xtick.top': True,
+            'xtick.bottom': True,
+            'ytick.left': True,
+            'ytick.right': True
+        }
+    if ticks:
+        logger.debug('Setting tick parameters to', tick_params)
+        matplotlib.rcParams.update(tick_params)
+
+    # Turn on minor ticks; make ticks bigger
+    if minor:
+        # print('Turn on minor ticks')
+        tick_extra = {
+            'xtick.minor.visible': True,
+            'ytick.minor.visible': True,
+            'xtick.major.size': 5.0,
+            'ytick.major.size': 5.0,
+            'xtick.minor.size': 3.5,
+            'ytick.minor.size': 3.5,
+        }
+        matplotlib.rcParams.update(tick_extra)
+
+    logger.debug('\nNew keys:')
+    logger.debug(matplotlib.rcParams.keys())
+
+
+def revert_params():
+    """Revert any changes done to matplotlib parameters and restore
+    the state before homogenise_plot was called
+    """
+
+    dict.update(matplotlib.rcParams, ORIG_MATPLOTLIB_CONF)
+    # matplotlib.rcParams.update(ORIG_MATPLOTLIB_CONF)
+
+
+# added for the pixcap65 framework specifically.
+homo_lock = threading.RLock()
+current_cycle_data = {}
+enhanced_cycler =list(get_error_cycler())
+
+def release_locks():
+    """
+    Make sure that at the end of the process life time the locks used to protect the access to the plotting engine and
+    the cycler are released.
+    """
+    global homo_lock
+    del homo_lock
+    atexit.unregister(release_locks)
+
+
+atexit.register(release_locks)
+
+
+def enhanced_error_bar(ax: matplotlib.axes.Axes, *args, **kwargs):
+    """
+    Modified version of :py:func:`matplotlib.pyplot.errorbar` that adds the specific property cycler which may be a
+    different from one used for other plots without errorbars.
+
+    :param ax: axes into which to plot
+    :param args: positional arguments passed to :py:func:`matplotlib.pyplot.errorbar`
+    :param kwargs: keyword arguments passed to :py:func:`matplotlib.pyplot.errorbar`
+    :return: same as for :py:func:`matplotlib.pyplot.errorbar`
+    """
+    h = hash(ax)
+    with homo_lock:
+        current_cycle_idx = current_cycle_data.setdefault(h, 0)
+    style_information = enhanced_cycler[current_cycle_idx]
+    style_information.update(**kwargs)
+    if 'xerr' in style_information:
+        del style_information['xerr']
+    result = ax.errorbar(*args, **style_information)
+    current_cycle_idx += 1
+    current_cycle_idx %= len(enhanced_cycler)
+    with homo_lock:
+        current_cycle_data[h] = current_cycle_idx
+    return result
+
+
+def close_figure(figs):
+    """
+    Close the provided figures if they are still open to free memory.
+    :param figs: :py:class:`matplotlib.figure.Figure` objects to be closed.
+    """
+    from matplotlib import pyplot as plt
+    import numpy as np
+    figs = np.atleast_1d(figs)
+    for fig in figs:
+        # need to check the axis of this figure and wether they are a key for our special dict.
+        for ax in fig.get_axes():
+            key = hash(ax)
+            with homo_lock:
+                if key in current_cycle_data:
+                    del current_cycle_data[key]
+        plt.close(fig)
+
+
+

@@ -1,0 +1,24 @@
+numpy>=2.3
+matplotlib
+tables
+pyyaml
+
+
+# basil_daq@git+https://github.com/SiLab-Bonn/basil.git
+# this approach is working but it requires it to be present
+# -e ../basil-pixcap
+basil-daq
+bitarray
+coloredlogs
+pyusb
+pySiLibUSB
+pyserial
+
+-r gui_requirements.txt
+-r advanced-requirements.txt
+tqdm
+scipy
+kafe2
+iminuit
+jacobi
+findiff

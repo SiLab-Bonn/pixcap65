@@ -1,0 +1,130 @@
+voltage:
+  - range: 100
+    unit: "mV"
+    prefix: 1e-3
+    resolution:
+      display: 1e-3
+      accuracy: 0.015
+      amps: 0.15
+      resistance: 1e10
+      temperature: 23
+
+  - range: 1
+    unit: "V"
+    prefix: 1e0
+    resolution:
+      display: 1e-5
+      accuracy: 0.015
+      amps: 2e-4
+      resistance: 1e10
+      temperature: 23
+
+  - range: 6
+    unit: "V"
+    prefix: 1e0
+    resolution:
+      display: 1e-5
+      accuracy: 0.015
+      amps: 1e-3
+      resistance: 1e10
+      temperature: 23
+
+  - range: 40
+    unit: "V"
+    prefix: 1e0
+    resolution:
+      display: 1e-4
+      accuracy: 0.015
+      amps: 8e-3
+      resistance: 1e10
+      temperature: 23
+
+
+
+current:
+  - range: 100
+    unit: "nA"
+    prefix: 1e-9
+    resolution:
+      display: 1e-3
+      accuracy: 0.05
+      amps: 0.1
+      temperature: 23
+  - range: 1
+    unit: "µA"
+    prefix: 1e-6
+    resolution:
+      display: 1e-5
+      accuracy: 0.025
+      amps: 5e-4
+      temperature: 23
+  - range: 10
+    unit: "µA"
+    prefix: 1e-6
+    resolution:
+      display: 1e-4
+      accuracy: 0.025
+      amps: 1.5e-3
+      temperature: 23
+  - range: 100
+    unit: "µA"
+    prefix: 1e-6
+    resolution:
+      display: 1e-3
+      accuracy: 0.02
+      amps: 25e-3
+      temperature: 23
+  - range: 1
+    unit: "mA"
+    prefix: 1e-3
+    resolution:
+      display: 1e-5
+      accuracy: 0.02
+      amps: 2e-4
+      temperature: 23
+  - range: 10
+    unit: "mA"
+    prefix: 1e-3
+    resolution:
+      display: 1e-4
+      accuracy: 0.02
+      amps: 2.5e-3
+      temperature: 23
+  - range: 100
+    unit: "mA"
+    prefix: 1e-3
+    resolution:
+      display: 1e-3
+      accuracy: 0.02
+      amps: 2e-2
+      temperature: 23
+  - range: 1
+    unit: "A"
+    prefix: 1e0
+    resolution:
+      display: 1e-5
+      accuracy: 0.03
+      amps: 1.5e-3
+      temperature: 23
+  - range: 3
+    unit: "A"
+    prefix: 1e0
+    resolution:
+      display: 1e-5
+      accuracy: 0.05
+      amps: 3.5e-3
+      temperature: 23
+
+temperature:
+  voltage:
+    - upper: 1000000
+      lower: 0
+      scaling: 0.15
+      coefficient: 1.0
+
+  current:
+    - upper: 1000000
+      lower: 0
+      scaling: 0.15
+      coefficient: 1.0
+

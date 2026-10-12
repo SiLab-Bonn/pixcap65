@@ -1,0 +1,298 @@
+# commented configuration options are the result when using hatch instead of setuptool
+[project]
+name = "pixcap65"
+version = "1.0.0.dev11"
+description = "Host software for the PixCap65 chip control system based on MIO2 + GPAC hardware."
+authors = [
+    { name = "Hans Krüger", email = "krueger@physik.uni-bonn.de" },
+    { name = "Dominik Fischer", email = "s6dkfisc@uni-bonn.de" },
+]
+maintainers = [
+    { name = "Yannick Dieter", email = "dieter@physik.uni-bonn.de" },
+    { name = "Dominik Fischer", email = "s6dkfisc@uni-bonn.de" },
+]
+license = "Apache-2.0"
+readme = { file = "README.md", content-type = "text/markdown" }
+requires-python = ">=2.7"
+classifiers = [
+    "Programming Language :: Python :: 2.7",
+    "Programming Language :: Python :: 3",
+    "Programming Language :: Python :: 3.14",
+    "Operating System :: OS Independent",
+    "Development Status :: 4 - Beta",
+    "Framework :: Matplotlib",
+    "Framework :: Sphinx",
+    "Intended Audience :: Science/Research",
+    "Topic :: Scientific/Engineering",
+    "Topic :: Scientific/Engineering :: Physics",
+    "Topic :: Scientific/Engineering :: Instrument Drivers",
+    "Topic :: Scientific/Engineering :: Visualization",
+]
+dependencies = [
+    "numpy < 2; python_version < '3'",
+    "numpy < 2.3; python_version > '3' and python_version < '3.11'",
+    "numpy>=2.3; python_version >= '3.11'",
+    "tables>=3.0",
+    "pyyaml",
+    "ruamel-yaml",
+    "bitarray<=1.9.0; python_version < '3'",
+    "bitarray>=3.4.0; python_version >= '3.5'",
+    "bitarray; python_version < '3.5' and python_version >= '3'",
+    "coloredlogs",
+    # these declaration is only for the package index!
+    "basil-daq <= 3.2.0.dev0 ; python_version >= '3.7'",
+    # only to be used for the installations and not for defining the dependency for the package index! (Could not use uv then)
+    # "basil-daq @ ../basil-pixcap",
+    # "basil-daq @ git+https:////github.com/SiLab-Bonn/basil.git@502a999eb5075e04850f7a481d2668726583c290 ; python_version >= '3.9'",
+    # "basil-daq==3.1.0; platform_system == 'Windows' or python_version < '3.9'",
+    "tqdm",
+    "importlib-resources ; python_version < '3.7'",
+]
+
+[project.urls]
+Homepage = "https://github.com/SiLab-Bonn/pixcap65/"
+Issues = "https://github.com/SiLab-Bonn/pixcap65/issues/"
+source = "https://github.com/SiLab-Bonn/pixcap65/"
+# no documentation present.
+
+[project.scripts]
+pixcap65-save-firmware = "pixcap65.pixcap.pixcap65_measurement:load_firmware_main"
+pixcap65-load-example-configuration = "pixcap65.pixcap.pixcap65_measurement:load_configuration_main"
+pixcap65-measurement = "pixcap65.measurements:main"
+
+[project.optional-dependencies]
+dut = [
+    "pyserial",
+    "pyvisa ; python_version > '3.5'",
+    "pyusb",
+    "pysilibusb"
+]
+advanced = [
+    "iminuit>2.30.0; python_version >= '3.9'",
+    "iminuit ; python_version < '3.9'",
+    "kafe2>2.10.0; python_version >= '3.7'",
+    "kafe2 ; python_version < '3.7'",
+    "scipy>=1.15.0; python_version >= '3.10'",
+    "scipy ; python_version < '3.10'",
+    "jacobi ; python_version >= '3.6'",
+    "findiff",
+    "numba_stats ; python_version >= '3.6'",
+    "numba ; python_version > '3.9'"
+]
+visualization = [
+    "pyqt5; python_version >= '3.5'",
+    "vitables; python_version >= '3.5'",
+    "matplotlib>=3.11.1; python_version >= '3.11'",
+    "matplotlib<3.10.9; python_version < '3.11'",
+    # pycairo seems to be be troublesome on linux/debian.
+    "pycairo",
+    "mpld3"
+]
+docs = [
+    "sphinxcontrib-blockdiag",
+    "sphinx_rtd_theme",
+    "bitarray",
+    "pyyaml",
+    "setuptools",
+    "pkg-resources-backport ; python_version >= '3.9'",
+    "myst-parser ; python_version >= '3.6'",
+]
+
+
+# configuration of different build systems which could be used interchangebly!
+[build-system]
+requires = ["setuptools >= 77.0.3", "hatchling >= 1.26", "uv_build >= 0.11.7, <0.12.0"]
+build-backend = "hatchling.build"
+#build-backend = "uv_build"
+
+# hatch configuration
+[tool.hatch.metadata]
+allow-direct-references = true
+
+[tool.hatch.build]
+directory = "out"
+skip-excluded-dirs = true
+
+[tool.hatch.build.targets.wheel]
+# the wheel target will determine the editable installs
+include = ["pixcap65"]
+exclude = [
+    "*.h5",
+    "*.pdf",
+    "*.npy",
+    "*.txt",
+    "**/full_analysis.py",
+    "*.log",
+    "/.github",
+    "/.venv",
+    "/.qodana",
+    "/.vscode",
+    "/.build",
+    "/Combination Plots",
+    "/doc",
+    "/data_local",
+    "/dist",
+    "/dist-uv",
+    "/Fit References",
+    "/out",
+    "/.gitignore",
+    "examples/**",
+    "results/**",
+    "data_local*",
+    "Data*",
+    "/sides",
+    "Brewfile",
+    "*_back.yaml",
+    "*_template.yaml",
+    "/tests",
+    "/packaged",
+    "*.xz",
+    "qodana.yaml",
+    "pixcap65.yaml",
+    "/device"
+]
+
+[tool.hatch.build.targets.wheel.sources]
+"examples" = "pixcap65/examples"
+"legacy" = "pixcap65/legacy"
+
+[tool.hatch.build.targets.sdist]
+exclude = [
+    "*.h5",
+    "*.pdf",
+    "*.npy",
+    "*.txt",
+    "**/full_analysis.py",
+    "*.log",
+    "/.github",
+    "/.venv",
+    "/.qodana",
+    "/.vscode",
+    "/.build",
+    "/Combination Plots",
+    "/doc",
+    "/data_local",
+    "/dist",
+    "/dist-uv",
+    "/Fit References",
+    "/out",
+    "out",
+    "/.gitignore",
+    "results/**",
+    "data_local*",
+    "Data*",
+    "sides",
+    "Brewfile",
+    "*_back.yaml",
+    "*_template.yaml",
+    "/tests",
+    "/packaged",
+    "*.xz",
+    "qodana.yaml",
+    "pixcap65.yaml",
+    "/device"
+]
+
+[tool.hatch.build.targets.sdist.sources]
+"examples" = "pixcap65/examples"
+"legacy" = "pixcap65/legacy"
+
+[tool.hatch.envs.hatch-build]
+installer = "pip"
+
+[tool.ruff]
+# Set the maximum line length to 180.
+line-length = 120
+
+[tool.uv]
+package = true
+
+[tool.uv.sources]
+#basil-daq = { path = "../basil-pixcap", editable = true }
+basil-daq = { git = "https://github.com/SiLab-Bonn/basil", branch = "Ba-Pixcap-2026/python-compatibility" }
+
+[tool.uv.build-backend]
+module-name = "pixcap65"
+module-root = ""
+namespace = true
+data = { data = "pixcap65/device" }
+source-exclude = [
+    "doc",
+    "Data",
+    "data_local",
+    "dist",
+    "dist-uv",
+    "Data*",
+    "*.egg-info",
+    "results",
+    "*_back.yaml",
+    "*_template.yaml",
+    "*.log",
+    "sides",
+    "Brewfile",
+    ".vscode",
+]
+
+[[tool.uv.index]]
+name = "testpypi"
+url = "https://test.pypi.org/simple/"
+publish-url = "https://test.pypi.org/legacy/"
+explicit = true
+
+[dependency-groups]
+modelling = [
+    "iminuit>=1.4.9",
+    "numdifftools>=0.9.41",
+    "numpy>=1.16.6",
+    "scikit-learn>=1.0.0; python_version >= '3.8'",
+    "scikit-learn<=1.0.0; python_version < '3.8'",
+]
+dut = [
+    "pyserial",
+    "pyvisa ; python_version > '3.5'",
+    "pyusb",
+    "pysilibusb"
+]
+advanced = [
+    "iminuit>2.30.0; python_version >= '3.9'",
+    "iminuit ; python_version < '3.9'",
+    "kafe2>2.10.0; python_version >= '3.7'",
+    "kafe2 ; python_version < '3.7'",
+    "scipy>=1.15.0; python_version >= '3.10'",
+    "scipy ; python_version < '3.10'",
+    "jacobi ; python_version >= '3.6'",
+    "findiff",
+    "numba_stats ; python_version >= '3.6'",
+    "numba ; python_version > '3.9'"
+]
+visualization = [
+    "pyqt5; python_version >= '3.5'",
+    "vitables; python_version >= '3.5'",
+    "matplotlib>=3.11.1; python_version >= '3.11'",
+    "matplotlib<3.10.9; python_version < '3.11'",
+    # pycairo seems to be be troublesome on linux/debian.
+    "pycairo",
+    "mpld3"
+]
+docs = [
+    "sphinxcontrib-blockdiag",
+    "sphinx_rtd_theme",
+    "bitarray",
+    "pyyaml",
+    "setuptools",
+    "pkg-resources-backport ; python_version >= '3.9'",
+    "myst-parser ; python_version >= '3.6'",
+]
+
+# this is another syntax than that used for hatch!
+all = [
+    { include-group = "visualization"},
+    { include-group = "advanced"},
+    { include-group = "modelling"},
+    { include-group = "dut"}
+]
+
+dev = [
+    { include-group = "docs"},
+    { include-group = "all"}
+]

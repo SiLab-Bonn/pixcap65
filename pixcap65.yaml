@@ -1,3 +1,4 @@
+#file: noinspection SpellCheckingInspection,IncorrectFormatting
 #
 # ------------------------------------------------------------
 # Copyright (c) SILAB , Physics Institute of Bonn University
@@ -24,17 +25,63 @@ transfer_layer:
 
   - name     : Serial
     type     : Serial
+    identification : Keithley Instruments Inc., Model 2602A
     init     :
-        port     : COM3
-        read_termination : "\r"
+        port     : "/dev/ttyUSB0"
+        # hwid: USB VID:PID=067B:2303 LOCATION=4-10
+        # for primary SMU
+        read_termination : "\n"
         baudrate : 19200
+        # only necessary when 2602a is used as SMU
+        parity   : "E"
+        bytesize : 8
+        rtscts   : True
+        exclusive : False
+        timeout: 120
+
+  - name: Serial2 
+    type: Serial
+    identification: KEITHLEY INSTRUMENTS INC.,MODEL 2410
+    init:
+      port: "/dev/ttyUSB2"
+      # hwid: USB VID:PID=0403:6001 LOCATION=4-9
+      # for biasing smu
+      read_termination: "\r"
+      baudrate: 19200
+      parity: N
+      bytesize: 8
+      timeout: 120
+
+  - name: Serial3 
+    type: Serial
+    identification: THURLBY-THANDAR,QL355TP,0,1.6
+    init:
+      port: "/dev/ttyUSB1"
+      # for power supply
+      read_termination: "\r\n"
+      write_termination: "\n"
+      baudrate: 19200
+      timeout: 2.0
+      xonxoff: True
+      parity: N
+      stopbits: 1
+      bytesize: 8
+
 
 hw_drivers:
-  - name      : SMU
-    type      : scpi
-    interface : Serial
-    init      :
-        device : Keithley 2410
+  - name        : SMU_Device
+    type        : scpi
+    interface   : Serial
+    init        :
+        device  : Keithley 2602a
+        enable_binary_commands: True
+
+  - name        : BIAS_SMU
+    type        : scpi
+    interface   : Serial2
+    init        :
+      device    : Keithley 2410
+      enable_formatting: False
 
   - name      : GPAC
     type      : GPAC
@@ -64,16 +111,17 @@ hw_drivers:
     interface : USB
     base_addr : 0x14000
     
-#  - name      : power
-#    type      : tti_ql355tp
-#    interface : SerialCOM12
+  - name      : power
+    type      : tti_ql355tp
+    interface : Serial3
 
 registers:
   - name        : VDD
     type        : FunctionalRegister
     hw_driver   : GPAC
     arg_names   : [ value ]
-    arg_add     : { 'channel': 'PWR0'}
+    arg_add     : { # noinspection YAMLIncompatibleTypes
+      'channel': 'PWR0' }
 
   - name        : GPIO
     type        : StdRegister
@@ -151,4 +199,44 @@ registers:
       - name    : RST_B
         size    : 1
         offset  : 0              
+
+  - name: SMU
+    type: FunctionalRegister
+    hw_driver: SMU_Device
+    arg_add: { 'channel': 1 }
+    init:
+      active: True
+
+  - name: BIAS_SUPPLY
+    type: FunctionalRegister
+    hw_driver: BIAS_SMU
+    arg_add: { }
+    init:
+      active: True
+
+  - name: VM1
+    type: FunctionalRegister
+    hw_driver: BIAS_SMU
+    arg_add: {  }
+    init:
+      active: False
+
+  - name: VM2
+    type: FunctionalRegister
+    hw_driver: SMU_Device
+    arg_add: { 'channel': 2 }
+    init:
+      active: True
+
+  - name: VM3
+    type: FunctionalRegister
+    hw_driver: SMU_Device
+    arg_add: { 'channel': 1 }
+    init:
+      active: True
+
+  - name: SMU_SETUP
+    type: FunctionalRegister
+    hw_driver: SMU_Device
+    arg_add: {}
 
