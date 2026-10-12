@@ -24,7 +24,7 @@ import multiprocessing as mp
 import time
 from contextlib import contextmanager
 
-from examples.full_analysis import r13_analysator_second, r1_analysator, e1_analysator_second
+from examples.full_analysis import r13_analysator_second, r1_analysator, e1_analysator_second, bare_analysis_handler
 from examples.full_analysis import x1_analysator_second as x1_analysator, x2_analysator_second as x2_analysator, \
     x4_analysator, x5_analysator, x6_analysator, x7_analysator
 from pixcap65.utility import synchronized_process_open_file
@@ -222,7 +222,7 @@ if __name__ == "__main__":
             kwargs=manager_args
         ) for process in process_handles}
 
-        # bare_analysis_handler(tables_lock)
+        bare_analysis_handler(tables_lock)
 
         for p in processes.values():
             p.start()

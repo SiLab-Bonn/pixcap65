@@ -133,11 +133,11 @@ if __name__ == '__main__':
         generate_pixel_dimensions(h5_file.root.Reference.E1)
         physical_dimensions = h5_file.root.Reference.E1.sensor.PhysicalDimensions[:]
         physical_dimensions[:, 0] = np.nan
-        for key, region in data_constants.e1_pixel_groups.items():
+        for key, region in e1_pixel_groups.items():
             for col_range, row_range in zip(region["columns"], region["rows"]):
                 physical_dimensions[col_range[0]:col_range[1], row_range[0]:row_range[1]]\
-                    = [data_constants.e1_pixel_dimensions[key],
-                       data_constants.e1_pixel_dimensions[key]]
+                    = [e1_pixel_dimensions[key],
+                       e1_pixel_dimensions[key]]
 
         h5_file.root.Reference.E1.sensor.PhysicalDimensions[:] = physical_dimensions
         h5_file.root.Reference.E1.sensor.PhysicalDimensions.flush()
@@ -147,11 +147,11 @@ if __name__ == '__main__':
         regenerate_inter_pix_errors(h5_file.root.Reference.E1.inter_unbiased_full.inter_cap.measurements)
         regenerate_inter_pix_errors(h5_file.root.Reference.E1.inter_biased_M_80_V_full.inter_cap.measurements)
 
-        split_sensor_group(h5_file.root.Reference.E1.inter_biased_M_80_V_full)
-        split_sensor_group(h5_file.root.Reference.E1.C_V_Characteristic_refined)
-        split_sensor_group(h5_file.root.Reference.E1.biased_80_V_full)
-        split_sensor_group(h5_file.root.Reference.E1.unbiased_full)
-        split_sensor_group(h5_file.root.Reference.E1.inter_unbiased_full)
+        split_sensor_group(h5_file.root.Reference.E1.inter_biased_M_80_V_full, e1_pixel_groups)
+        split_sensor_group(h5_file.root.Reference.E1.C_V_Characteristic_refined, e1_pixel_groups)
+        split_sensor_group(h5_file.root.Reference.E1.biased_80_V_full, e1_pixel_groups)
+        split_sensor_group(h5_file.root.Reference.E1.unbiased_full, e1_pixel_groups)
+        split_sensor_group(h5_file.root.Reference.E1.inter_unbiased_full, e1_pixel_groups)
 
     with tb.open_file(X4_SCAN_FILE, "a") as h5_file:
         generate_pixel_dimensions(h5_file.root.Thesis.ATLAS_ITk.X4)
@@ -179,3 +179,13 @@ if __name__ == '__main__':
 
     with tb.open_file(X7_SCAN_FILE, 'a') as h5_file:
         generate_pixel_dimensions(h5_file.root.Thesis.ATLAS_ITk.X7)
+
+    with tb.open_file('Bare_Repeat_2_Scan.h5', 'a') as h5_file:
+        if "reference" in h5_file.root:
+            h5_file.root.reference._f_rename("Reference")
+        h5_file.root.Reference.bare.unbiased_8.total_cap.measurements.HistCurr.attrs["Units"] = "A"
+        h5_file.root.Reference.bare.unbiased_8.total_cap.measurements.HistCurrErr.attrs["Units"] = "A"
+
+    # missing paths
+    # FILE : PATH
+    # packaged/data/X1_12_Renew_Scan.h5 : Thesis/ATLAS_ITk/X1/biased_200_V_full_model

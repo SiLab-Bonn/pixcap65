@@ -200,6 +200,10 @@ exclude = [
 [tool.hatch.envs.hatch-build]
 installer = "pip"
 
+[tool.ruff]
+# Set the maximum line length to 180.
+line-length = 120
+
 [tool.uv]
 package = true
 

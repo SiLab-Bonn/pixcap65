@@ -15,12 +15,14 @@ except ImportError:
     from importlib_resources import files, open_text
 
 import logging
-import tables as tb
 import time
+
+import numpy as np
+import tables as tb
 import yaml
 
-from examples import data_constants
-from examples.data_constants import *
+# from examples import data_constants
+# from examples.data_constants import *
 from pixcap65.analysis_util.utility import HIST_BIAS_MEAS_UNIT, HIST_CURRENT_MEAS_UNIT, GLOBAL_FILTERS
 from pixcap65.configs.config_handler import extract_smu_voltage_error, extract_smu_current_error
 from pixcap65.pixcap.pixcap65_measurement import ScanConfigurationKeys
@@ -727,17 +729,18 @@ def regenerate_inter_pix_errors(group):
                 group.InterHistCurrErrB[:] = inter_errors_2
 
 
-def split_sensor_group(group: tb.Group):
+def split_sensor_group(group: tb.Group, pixel_groups):
     """
     Utility function to extract different regions from a sensor.
     This is in particular necessary for sensor with different pixel/implantation sizes to thread their analysis differently.
     In particular the investigation of distributions during the cv characterization is improved by this strict separation.
     :param group: hdf files group containing the measurement data.
+    :param pixel_groups: mapping to group the similar pixels on the sensor together and distinguish them from other
+     ones.
     """
     h5_file = group_get_file(group)
     original_name = group._v_name
     parent_group = group._v_parent
-    pixel_groups = data_constants.e1_pixel_groups
 
     def _transfer_selected_data(fetched, target, **kwargs):
         for col_set, row_set in zip(kwargs["columns"], kwargs["rows"]):

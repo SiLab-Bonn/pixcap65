@@ -30,7 +30,7 @@ X6_SCAN_FILE = "packaged/data/3D_Sensor_I14_S24_Full_Scan.h5"
 X7_SCAN_FILE = "packaged/data/3D_Sensor_H23_S24_Full_Scan.h5"
 
 E1_SCAN_FILE = "Reference_Evelyn_Scan.h5"
-E1_2_SCAN_FILE = "packaged/E1_Renew_Scan.h5"
+E1_2_SCAN_FILE = "packaged/data/E1_Renew_Scan.h5"
 R13_2_SCAN_FILE = "packaged/R13_Renew_Scan.h5"
 R11_SCAN_FILE = "packaged/data/R11_R1_RX_Scan.h5"
 
@@ -235,3 +235,5 @@ e1_pixel_depletion_args = {
 
 # multiprocessing_key = b"\x1f\xb8MC3\xf8@7\x11\x9fh7,\x11\xb5\xd4JI\x06e\xdc<b\x0f\x92\x04\xb9C\xfb\xb0\xc8\xa2"
 multiprocessing_address = "/var/folders/dx/8f5fkysj3hd09_kxxswbk11r0000gt/T/pymp-h0892jfv/sock-gk7ht_jg"
+BARE_EXTENDED_DATA_PATH = "packaged/data/Bare_Sample_05_Extended_Scan.h5"
+BARE_RENEW_DATA_PATH = "packaged/data/Reference_Bare_renewed.h5"
